@@ -14,8 +14,8 @@ class ItemStat:
 @dataclass
 class ItemEffect:
     name: str
-    trigger: str        # e.g. "When Equipped:"
-    lines: list[str]    # Each bullet line
+    trigger: str                    # e.g. "When Equipped:"
+    lines: list[tuple[int, str]]    # (indentation_level, text)
 
 
 @dataclass
@@ -37,3 +37,5 @@ class ItemData:
     adornment_slots: list[str] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
     game_link: Optional[str] = None
+    container_slots: Optional[int] = None
+    extra_info: list[tuple[str, str]] = field(default_factory=list)  # (label, value) rows

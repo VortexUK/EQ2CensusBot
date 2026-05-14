@@ -6,7 +6,7 @@ from typing import Optional
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from census.constants import CLASS_GROUPS, ALL_CLASSES
+from census.constants import ARCHETYPES, CLASS_GROUPS, ALL_CLASSES
 from census.models import ItemData, ItemEffect, ItemStat
 
 # ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ def _z(n: float) -> int:
     """Convert a base pixel value to render pixels, applying both ZOOM and SCALE."""
     return round(n * ZOOM) * SCALE
 
-WIDTH_OUT   = round(460 * ZOOM)    # final output width in pixels
+WIDTH_OUT   = round(368 * ZOOM)    # final output width in pixels
 WIDTH       = WIDTH_OUT * SCALE    # internal render width
 PADDING     = _z(18)
 BORDER_W    = _z(3)
@@ -163,29 +163,45 @@ class _TooltipRenderer:
             y += _lh(fonts["name"])
         y += 2
 
-        # Keep y below icon bottom
-        if item.icon_bytes:
-            y = max(y, icon_y + ICON_SIZE + 6)
+        # Description (bags, quest items, etc.) — stays in left column
+        if item.description:
+            for line in _wrap(item.description, fonts["regular"], name_max_w):
+                draw.text((x, y), line, font=fonts["regular"], fill=C_BODY)
+                y += _lh(fonts["regular"])
+            y += LINE_GAP
 
-        # Rarity
+        # Container slots
+        if item.container_slots is not None:
+            y = _draw_kv(draw, x, y, "Slots", str(item.container_slots), fonts["regular"], value_color=C_WHITE)
+            y += LINE_GAP
+
+        # Rarity — bottom of tier text aligns with bottom of icon
         if item.quality:
+            tier_h  = _lh(fonts["bold_lg"])
+            tier_y  = max(y + LINE_GAP, icon_y + ICON_SIZE - tier_h)
             q = item.quality.lower()
             color = QUALITY_COLORS.get(q, C_WHITE)
             glow_info = QUALITY_GLOWS.get(q)
             if glow_info:
                 glow_color, glow_radius, glow_passes = glow_info
                 _draw_with_glow(
-                    canvas, x, y, item.quality.upper(), fonts["bold_lg"],
+                    canvas, x, tier_y, item.quality.upper(), fonts["bold_lg"],
                     color, glow_color, glow_radius, glow_passes,
                 )
             else:
-                draw.text((x, y), item.quality.upper(), font=fonts["bold_lg"], fill=color)
-            y += _lh(fonts["bold_lg"]) + 4
+                draw.text((x, tier_y), item.quality.upper(), font=fonts["bold_lg"], fill=color)
+            y = max(tier_y + tier_h, icon_y + ICON_SIZE) + 6
+
+        # Adornment header
+        if "adornment" in (item.armor_type or "").lower():
+            draw.text((x, y), "Adds the following to an item:", font=fonts["regular"], fill=C_BODY)
+            y += _lh(fonts["regular"]) + LINE_GAP
 
         # Primary stats (green) — attributes first (str/sta), skills last
+        _PRIMARY_ORDER = {"Stamina": 0, "Primary Attributes": 1, "Resistances": 2, "Combat Skills": 3}
         primary = sorted(
             [s for s in item.stats if s.stat_group == "primary"],
-            key=lambda s: (1 if s.name in ("combatskills", "combatskill", "combat_skill") else 0),
+            key=lambda s: _PRIMARY_ORDER.get(s.display_name, 99),
         )
         if primary:
             y = _draw_stat_cols(draw, primary, fonts["bold"], y, x, col2_x, C_STAT_PRIMARY)
@@ -197,18 +213,20 @@ class _TooltipRenderer:
             y = _draw_stat_cols(draw, secondary, fonts["bold"], y, x, col2_x, C_STAT_SECONDARY)
             y += LINE_GAP
 
-        # Armor section
-        has_armor = any([item.armor_type, item.slot_type, item.mitigation, item.item_level])
-        if has_armor:
+        # Item properties block (type, slot, mitigation, level, charges, casting, recast…)
+        has_info = any([item.armor_type, item.slot_type, item.mitigation, item.item_level, item.extra_info])
+        if has_info:
             y += SECTION_GAP
-            header = _armor_header(item)
-            if header:
-                draw.text((x, y), header, font=fonts["bold"], fill=C_WHITE)
-                y += _lh(fonts["bold"]) + LINE_GAP
-            if item.mitigation is not None:
+            if item.armor_type:
+                y = _draw_kv(draw, x, y, "Type", item.armor_type, fonts["regular"], value_color=C_WHITE)
+            if item.slot_type:
+                y = _draw_kv(draw, x, y, "Slot", item.slot_type, fonts["regular"], value_color=C_WHITE)
+            if item.mitigation:
                 y = _draw_kv(draw, x, y, "Mitigation", str(item.mitigation), fonts["regular"], value_color=C_WHITE)
             if item.item_level is not None:
                 y = _draw_kv(draw, x, y, "Level", str(item.item_level), fonts["regular"], value_color=C_STAT_PRIMARY)
+            for label, value in item.extra_info:
+                y = _draw_kv(draw, x, y, label, value, fonts["regular"], value_color=C_WHITE)
             y += LINE_GAP
 
         # Class restrictions (word-wrap if the string is too wide)
@@ -222,10 +240,14 @@ class _TooltipRenderer:
 
         # Effects
         if item.effects:
+            q = item.quality.lower() if item.quality else ""
+            eff_color = QUALITY_COLORS.get(q, C_EFFECT_NAME)
+            eff_glow  = QUALITY_GLOWS.get(q)
             draw.text((x, y), "Effects:", font=fonts["bold"], fill=C_GOLD)
             y += _lh(fonts["bold"]) + LINE_GAP
             for eff in item.effects:
-                y = _draw_effect(draw, eff, fonts, y, x, content_w, canvas)
+                y = _draw_effect(draw, eff, fonts, y, x, content_w, canvas,
+                                 name_color=eff_color, glow_info=eff_glow)
 
         # Adornment slots
         if item.adornment_slots:
@@ -349,31 +371,35 @@ def _draw_effect(
     x: int,
     content_w: int,
     canvas: Optional[Image.Image] = None,
+    name_color: tuple = C_EFFECT_NAME,
+    glow_info: Optional[tuple] = EFFECT_GLOW,
 ) -> int:
-    # Effect name gets the same pink glow as FABLED rarity
-    glow_color, glow_radius, glow_passes = EFFECT_GLOW
-    if canvas is not None:
-        _draw_with_glow(canvas, x, y, eff.name, fonts["bold"], C_EFFECT_NAME, glow_color, glow_radius, glow_passes)
+    if canvas is not None and glow_info is not None:
+        glow_color, glow_radius, glow_passes = glow_info
+        _draw_with_glow(canvas, x, y, eff.name, fonts["bold"], name_color, glow_color, glow_radius, glow_passes)
     else:
-        draw.text((x, y), eff.name, font=fonts["bold"], fill=C_EFFECT_NAME)
+        draw.text((x, y), eff.name, font=fonts["bold"], fill=name_color)
     y += _lh(fonts["bold"]) + 1
 
     if eff.trigger:
-        draw.text((x, y), eff.trigger, font=fonts["regular"], fill=C_BODY)
-        y += _lh(fonts["regular"]) + LINE_GAP
+        for line in _wrap(eff.trigger, fonts["regular"], content_w):
+            draw.text((x, y), line, font=fonts["regular"], fill=C_BODY)
+            y += _lh(fonts["regular"])
+        y += LINE_GAP
 
     BULLET = "• "
     bullet_w = fonts["regular"].getbbox(BULLET)[2]
-    indent_x = x + _z(4)
-    wrap_w = WIDTH - x - PADDING - BORDER_W - _z(1) - bullet_w - _z(4)
+    indent_step = _z(12)
 
-    for line_text in eff.lines:
+    for indent_level, line_text in eff.lines:
+        line_x  = x + indent_level * indent_step
+        wrap_w  = WIDTH - line_x - PADDING - BORDER_W - _z(1) - bullet_w
         wrapped = _wrap(line_text, fonts["regular"], wrap_w)
         for j, wline in enumerate(wrapped):
             if j == 0:
-                draw.text((indent_x, y), BULLET + wline, font=fonts["regular"], fill=C_BODY)
+                draw.text((line_x, y), BULLET + wline, font=fonts["regular"], fill=C_BODY)
             else:
-                draw.text((indent_x + bullet_w, y), wline, font=fonts["regular"], fill=C_BODY)
+                draw.text((line_x + bullet_w, y), wline, font=fonts["regular"], fill=C_BODY)
             y += _lh(fonts["regular"]) + 1
 
     return y + LINE_GAP
@@ -412,16 +438,24 @@ def _format_classes(classes: list[str]) -> str:
     if not classes:
         return ""
     class_set = frozenset(classes)
+
+    # Exact match (handles single groups and All Classes)
     for group_set, group_name in CLASS_GROUPS.items():
         if class_set == group_set:
             return group_name
+
+    # Decompose into archetype groups (e.g. All Priests + All Mages)
+    remaining = class_set
+    matched: list[str] = []
+    for archetype_set, archetype_name in ARCHETYPES:
+        if archetype_set <= remaining:
+            matched.append(archetype_name)
+            remaining -= archetype_set
+    if not remaining and matched:
+        return ", ".join(matched)
+
     return ", ".join(sorted(classes))
 
-
-def _armor_header(item: ItemData) -> str:
-    if item.armor_type and item.slot_type:
-        return f"{item.armor_type} ({item.slot_type})"
-    return item.armor_type or item.slot_type
 
 
 def _wrap(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:

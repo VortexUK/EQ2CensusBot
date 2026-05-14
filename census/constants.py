@@ -11,12 +11,12 @@ STAT_MAP: dict[str, tuple[str, str]] = {
     "strength": ("Primary Attributes", "primary"),
     "sta": ("Stamina", "primary"),
     "stamina": ("Stamina", "primary"),
-    "agi": ("Agility", "primary"),
-    "agility": ("Agility", "primary"),
-    "int": ("Intelligence", "primary"),
-    "intelligence": ("Intelligence", "primary"),
-    "wis": ("Wisdom", "primary"),
-    "wisdom": ("Wisdom", "primary"),
+    "agi": ("Primary Attributes", "primary"),
+    "agility": ("Primary Attributes", "primary"),
+    "int": ("Primary Attributes", "primary"),
+    "intelligence": ("Primary Attributes", "primary"),
+    "wis": ("Primary Attributes", "primary"),
+    "wisdom": ("Primary Attributes", "primary"),
     "combatskill": ("Combat Skills", "primary"),
     "combat_skill": ("Combat Skills", "primary"),
     "combatskills": ("Combat Skills", "primary"),
@@ -63,35 +63,67 @@ STAT_MAP: dict[str, tuple[str, str]] = {
     "spell_dmg_bonus": ("Spell Dmg Bonus", "secondary"),
     "attackspeed": ("Attack Speed", "secondary"),
     "attack_speed": ("Attack Speed", "secondary"),
+    "arcane":       ("Resistances", "primary"),
+    "elemental":    ("Resistances", "primary"),
+    "noxious":      ("Resistances", "primary"),
 }
 
 # EQ2 class groups — used to collapse full class lists into group names
-_FIGHTERS = frozenset(["Guardian", "Berserker", "Monk", "Bruiser", "Shadowknight", "Paladin"])
-_PRIESTS = frozenset(["Templar", "Inquisitor", "Fury", "Warden", "Mystic", "Defiler", "Channeler"])
-_SCOUTS = frozenset(["Troubador", "Dirge", "Assassin", "Ranger", "Swashbuckler", "Brigand", "Beastlord"])
-_MAGES = frozenset(["Coercer", "Illusionist", "Conjuror", "Necromancer", "Wizard", "Warlock"])
+FIGHTERS  = frozenset(["Guardian", "Berserker", "Monk", "Bruiser", "Shadowknight", "Paladin"])
+PRIESTS   = frozenset(["Templar", "Inquisitor", "Fury", "Warden", "Mystic", "Defiler", "Channeler"])
+SCOUTS    = frozenset(["Troubador", "Dirge", "Assassin", "Ranger", "Swashbuckler", "Brigand", "Beastlord"])
+MAGES     = frozenset(["Coercer", "Illusionist", "Conjuror", "Necromancer", "Wizard", "Warlock"])
+ARTISANS  = frozenset(["Sage", "Armorer", "Weaponsmith", "Woodworker", "Jeweler",
+                        "Carpenter", "Tailor", "Alchemist", "Provisioner"])
 
-ALL_CLASSES: frozenset[str] = _FIGHTERS | _PRIESTS | _SCOUTS | _MAGES
+# Ordered list used for archetype decomposition (most specific → least specific)
+ARCHETYPES: list[tuple[frozenset, str]] = [
+    (FIGHTERS, "All Fighters"),
+    (PRIESTS,  "All Priests"),
+    (SCOUTS,   "All Scouts"),
+    (MAGES,    "All Mages"),
+    (ARTISANS, "All Artisans"),
+]
+
+ALL_CLASSES: frozenset[str] = FIGHTERS | PRIESTS | SCOUTS | MAGES
+ALL_WITH_ARTISANS: frozenset[str] = ALL_CLASSES | ARTISANS
 
 CLASS_GROUPS: dict[frozenset, str] = {
+    ALL_WITH_ARTISANS: "All Classes",
     ALL_CLASSES: "All Classes",
-    _FIGHTERS: "All Fighters",
+    FIGHTERS: "All Fighters",
     frozenset(["Guardian", "Berserker"]): "All Warriors",
     frozenset(["Monk", "Bruiser"]): "All Brawlers",
     frozenset(["Shadowknight", "Paladin"]): "All Crusaders",
-    _PRIESTS: "All Priests",
+    PRIESTS: "All Priests",
     frozenset(["Templar", "Inquisitor"]): "All Clerics",
     frozenset(["Fury", "Warden"]): "All Druids",
     frozenset(["Mystic", "Defiler"]): "All Shamans",
-    _SCOUTS: "All Scouts",
+    SCOUTS: "All Scouts",
     frozenset(["Troubador", "Dirge"]): "All Bards",
     frozenset(["Assassin", "Ranger"]): "All Predators",
     frozenset(["Swashbuckler", "Brigand"]): "All Rogues",
-    _MAGES: "All Mages",
+    MAGES: "All Mages",
     frozenset(["Coercer", "Illusionist"]): "All Enchanters",
     frozenset(["Conjuror", "Necromancer"]): "All Summoners",
     frozenset(["Wizard", "Warlock"]): "All Sorcerers",
+    ARTISANS: "All Artisans",
 }
+
+# typeinfo fields to render as info rows.
+# "duration" values are formatted as "X sec / X min / X hr".
+# Add new entries here to display additional typeinfo fields.
+TYPEINFO_DISPLAY: list[tuple[str, str, str]] = [
+    # (api_field, display_label, format)  — format: "duration" | "str"
+    ("duration",   "Duration", "duration"),
+    ("casttime",   "Casting",  "duration"),
+    ("recasttime", "Recast",   "duration"),
+]
+
+# Top-level item fields to render as info rows.
+ITEM_DISPLAY: list[tuple[str, str, str]] = [
+    ("maxcharges", "Charges", "charges"),
+]
 
 # Flag field names → display labels (order matters for output)
 FLAG_FIELDS: list[tuple[str, str]] = [
