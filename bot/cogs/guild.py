@@ -36,11 +36,12 @@ def _build_table(data: GuildData) -> str:
         return ts or "—"
 
     cols: list[tuple[str, callable, int]] = [
-        ("Rank",       lambda m: m.rank or "—",       16),
-        ("Name",       lambda m: m.name,              22),
-        ("Class",      _cls,                          24),
-        ("Tradeskill", _ts,                           24),
-        ("Deity",      lambda m: m.deity or "—",      16),
+        ("Rank",       lambda m: m.rank or "—",                              16),
+        ("Name",       lambda m: m.name,                                     22),
+        ("Class",      _cls,                                                 24),
+        ("AA",         lambda m: str(m.aa_level) if m.aa_level is not None else "—", 4),
+        ("Tradeskill", _ts,                                                  24),
+        ("Deity",      lambda m: m.deity or "—",                             16),
     ]
 
     # Compute actual column widths (header vs data)
