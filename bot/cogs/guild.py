@@ -30,9 +30,10 @@ def _build_table(data: GuildData) -> str:
         return m.cls or "—"
 
     def _ts(m: GuildMember) -> str:
-        if m.ts_class and m.ts_level is not None:
-            return f"{m.ts_class} ({m.ts_level})"
-        return m.ts_class or "—"
+        ts = m.ts_class.capitalize() if m.ts_class else None
+        if ts and m.ts_level is not None:
+            return f"{ts} ({m.ts_level})"
+        return ts or "—"
 
     cols: list[tuple[str, callable, int]] = [
         ("Rank",       lambda m: m.rank or "—",       16),

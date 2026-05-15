@@ -96,7 +96,7 @@ class CensusClient:
             raw_rank = _int((m.get("guild") or {}).get("rank"))
             deity_val = t.get("deity")
             members.append(GuildMember(
-                name     = m.get("displayname", "Unknown"),
+                name     = m.get("name") or m.get("displayname", "Unknown"),
                 level    = _int(t.get("level")),
                 cls      = t.get("class"),
                 ts_class = t.get("ts_class"),
