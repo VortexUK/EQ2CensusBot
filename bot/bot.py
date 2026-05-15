@@ -12,9 +12,10 @@ class EQ2Bot(commands.Bot):
         from bot.cogs.guild import GuildCog
         await self.add_cog(ItemsCog(self))
         await self.add_cog(GuildCog(self))
-        guild = discord.Object(id=648253204760625160)
-        self.tree.copy_global_to(guild=guild)
-        await self.tree.sync(guild=guild)
+        for guild_id in (648253204760625160, 955890381847928892):
+            guild = discord.Object(id=guild_id)
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
         await self.tree.sync()
         print("[Bot] Slash commands synced.")
 
