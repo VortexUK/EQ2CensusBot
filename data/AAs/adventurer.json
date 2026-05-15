@@ -1,0 +1,1119 @@
+{
+  "constants_list": [
+    {
+      "adventureclass_list": [
+        {
+          "issubclass": "false",
+          "id": 1,
+          "name": "fighter"
+        },
+        {
+          "issubclass": "false",
+          "id": 2,
+          "name": "warrior"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 12
+            },
+            {
+              "id": 13
+            },
+            {
+              "id": 43
+            },
+            {
+              "id": 72
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 102
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 147
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 3,
+          "name": "guardian"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 12
+            },
+            {
+              "id": 14
+            },
+            {
+              "id": 44
+            },
+            {
+              "id": 72
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 103
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 146
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 4,
+          "name": "berserker"
+        },
+        {
+          "issubclass": "false",
+          "id": 5,
+          "name": "brawler"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 2
+            },
+            {
+              "id": 17
+            },
+            {
+              "id": 47
+            },
+            {
+              "id": 62
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 106
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 149
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 6,
+          "name": "monk"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 2
+            },
+            {
+              "id": 18
+            },
+            {
+              "id": 48
+            },
+            {
+              "id": 62
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 107
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 148
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 7,
+          "name": "bruiser"
+        },
+        {
+          "issubclass": "false",
+          "id": 8,
+          "name": "crusader"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 4
+            },
+            {
+              "id": 16
+            },
+            {
+              "id": 46
+            },
+            {
+              "id": 64
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 105
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 150
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 9,
+          "name": "shadowknight"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 4
+            },
+            {
+              "id": 15
+            },
+            {
+              "id": 45
+            },
+            {
+              "id": 64
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 104
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 151
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 10,
+          "name": "paladin"
+        },
+        {
+          "issubclass": "false",
+          "id": 11,
+          "name": "priest"
+        },
+        {
+          "issubclass": "false",
+          "id": 12,
+          "name": "cleric"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 3
+            },
+            {
+              "id": 25
+            },
+            {
+              "id": 49
+            },
+            {
+              "id": 63
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 96
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 142
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 13,
+          "name": "templar"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 3
+            },
+            {
+              "id": 26
+            },
+            {
+              "id": 50
+            },
+            {
+              "id": 63
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 97
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 141
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 14,
+          "name": "inquisitor"
+        },
+        {
+          "issubclass": "false",
+          "id": 15,
+          "name": "druid"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 5
+            },
+            {
+              "id": 27
+            },
+            {
+              "id": 51
+            },
+            {
+              "id": 65
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 99
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 144
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 16,
+          "name": "warden"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 5
+            },
+            {
+              "id": 28
+            },
+            {
+              "id": 52
+            },
+            {
+              "id": 65
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 98
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 143
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 17,
+          "name": "fury"
+        },
+        {
+          "issubclass": "false",
+          "id": 18,
+          "name": "shaman"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 9
+            },
+            {
+              "id": 29
+            },
+            {
+              "id": 54
+            },
+            {
+              "id": 69
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 100
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 140
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 19,
+          "name": "mystic"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 9
+            },
+            {
+              "id": 30
+            },
+            {
+              "id": 53
+            },
+            {
+              "id": 69
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 101
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 139
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 20,
+          "name": "defiler"
+        },
+        {
+          "issubclass": "false",
+          "id": 21,
+          "name": "mage"
+        },
+        {
+          "issubclass": "false",
+          "id": 22,
+          "name": "sorcerer"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 10
+            },
+            {
+              "id": 31
+            },
+            {
+              "id": 55
+            },
+            {
+              "id": 70
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 108
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 157
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 23,
+          "name": "wizard"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 10
+            },
+            {
+              "id": 32
+            },
+            {
+              "id": 56
+            },
+            {
+              "id": 70
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 109
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 156
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 24,
+          "name": "warlock"
+        },
+        {
+          "issubclass": "false",
+          "id": 25,
+          "name": "enchanter"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 6
+            },
+            {
+              "id": 36
+            },
+            {
+              "id": 60
+            },
+            {
+              "id": 66
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 110
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 153
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 26,
+          "name": "illusionist"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 6
+            },
+            {
+              "id": 35
+            },
+            {
+              "id": 59
+            },
+            {
+              "id": 66
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 111
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 152
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 27,
+          "name": "coercer"
+        },
+        {
+          "issubclass": "false",
+          "id": 28,
+          "name": "summoner"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 11
+            },
+            {
+              "id": 33
+            },
+            {
+              "id": 57
+            },
+            {
+              "id": 71
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 112
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 155
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 29,
+          "name": "conjuror"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 11
+            },
+            {
+              "id": 34
+            },
+            {
+              "id": 58
+            },
+            {
+              "id": 71
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 113
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 154
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 30,
+          "name": "necromancer"
+        },
+        {
+          "issubclass": "false",
+          "id": 31,
+          "name": "scout"
+        },
+        {
+          "issubclass": "false",
+          "id": 32,
+          "name": "rogue"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 8
+            },
+            {
+              "id": 22
+            },
+            {
+              "id": 40
+            },
+            {
+              "id": 68
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 116
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 137
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 33,
+          "name": "swashbuckler"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 8
+            },
+            {
+              "id": 21
+            },
+            {
+              "id": 39
+            },
+            {
+              "id": 68
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 117
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 136
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 34,
+          "name": "brigand"
+        },
+        {
+          "issubclass": "false",
+          "id": 35,
+          "name": "bard"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 1
+            },
+            {
+              "id": 24
+            },
+            {
+              "id": 42
+            },
+            {
+              "id": 61
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 118
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 133
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 36,
+          "name": "troubador"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 1
+            },
+            {
+              "id": 23
+            },
+            {
+              "id": 41
+            },
+            {
+              "id": 61
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 119
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 132
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 37,
+          "name": "dirge"
+        },
+        {
+          "issubclass": "false",
+          "id": 38,
+          "name": "predator"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 7
+            },
+            {
+              "id": 20
+            },
+            {
+              "id": 38
+            },
+            {
+              "id": 67
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 114
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 135
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 39,
+          "name": "ranger"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 7
+            },
+            {
+              "id": 19
+            },
+            {
+              "id": 37
+            },
+            {
+              "id": 67
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 115
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 134
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 40,
+          "name": "assassin"
+        },
+        {
+          "issubclass": "false",
+          "id": 41,
+          "name": "animalist"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 73
+            },
+            {
+              "id": 74
+            },
+            {
+              "id": 75
+            },
+            {
+              "id": 76
+            },
+            {
+              "id": 77
+            },
+            {
+              "id": 78
+            },
+            {
+              "id": 79
+            },
+            {
+              "id": 80
+            },
+            {
+              "id": 81
+            },
+            {
+              "id": 82
+            },
+            {
+              "id": 83
+            },
+            {
+              "id": 84
+            },
+            {
+              "id": 85
+            },
+            {
+              "id": 86
+            },
+            {
+              "id": 87
+            },
+            {
+              "id": 88
+            },
+            {
+              "id": 89
+            },
+            {
+              "id": 90
+            },
+            {
+              "id": 91
+            },
+            {
+              "id": 92
+            },
+            {
+              "id": 93
+            },
+            {
+              "id": 94
+            },
+            {
+              "id": 95
+            },
+            {
+              "id": 120
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 138
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 42,
+          "name": "beastlord"
+        },
+        {
+          "issubclass": "false",
+          "id": 43,
+          "name": "shaper"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 73
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 122
+            },
+            {
+              "id": 123
+            },
+            {
+              "id": 124
+            },
+            {
+              "id": 125
+            },
+            {
+              "id": 126
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 145
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 44,
+          "name": "channeler"
+        }
+      ],
+      "id": 1
+    }
+  ],
+  "returned": 1,
+  "limit": 1,
+  "min_ts": 0.0,
+  "max_ts": 4.9E-324
+}
