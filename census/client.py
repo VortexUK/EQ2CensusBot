@@ -66,8 +66,8 @@ class CensusClient:
         m = re.match(r'\\?aITEM\s+(\d+)', query)
         if m:
             return {"id": m.group(1), "c:limit": "1"}
-        # Bare numeric ID
-        if re.fullmatch(r'\d+', query):
+        # Bare numeric ID (positive or negative)
+        if re.fullmatch(r'-?\d+', query):
             return {"id": query, "c:limit": "1"}
         # Display name
         return {"displayname": query, "c:limit": "1"}
