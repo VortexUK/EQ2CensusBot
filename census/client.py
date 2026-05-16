@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Optional
 
 import aiohttp
@@ -7,7 +8,13 @@ import aiohttp
 from census.constants import ITEM_DISPLAY, STAT_MAP, TYPEINFO_DISPLAY
 from census.models import CharacterAAs, CharacterSpells, GuildData, GuildMember, ItemData, ItemEffect, ItemStat, NodeAA, SpellEntry
 
-BASE_URL = "https://census.daybreakgames.com"
+BASE_URL       = "https://census.daybreakgames.com"
+_ITEM_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
+
+
+def _load_item_icon(icon_id: str) -> Optional[bytes]:
+    path = _ITEM_ICONS_DIR / f"{icon_id}.png"
+    return path.read_bytes() if path.exists() else None
 
 # JSON flag key → display label (order = display order in tooltip)
 _FLAG_LABELS: dict[str, str] = {
@@ -262,7 +269,7 @@ class CensusClient:
             quality     = str(item.get("tier", "")).lower(),      # "FABLED" → "fabled"
             description = _str(item.get("description")),
             icon_id     = str(item["iconid"]) if item.get("iconid") else None,
-            icon_bytes  = None,                                    # Icon API currently broken
+            icon_bytes  = _load_item_icon(str(item["iconid"])) if item.get("iconid") else None,
             armor_type  = _armor_type(typeinfo),
             mitigation  = _int(typeinfo.get("maxarmorclass")),
             slot_type   = _slot_type(slot_list, typeinfo),
