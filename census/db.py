@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS items (
     typeid               INTEGER,
     item_level           INTEGER,
     level_to_use         INTEGER,
+    planar_level         INTEGER,
     icon_id              INTEGER,
     max_stack_size       INTEGER,
 
@@ -129,7 +130,7 @@ _CREATE_INDEXES = [
 _UPSERT_SQL = """
 INSERT OR REPLACE INTO items (
     id, displayname, displayname_lower, gamelink, description, last_update,
-    tier, tierid, type, typeid, item_level, level_to_use, icon_id, max_stack_size,
+    tier, tierid, type, typeid, item_level, level_to_use, planar_level, icon_id, max_stack_size,
     slot,
     armor_class_min, armor_class_max,
     damage_min, damage_max, damage_type, damage_rating, delay, wield_style,
@@ -149,7 +150,7 @@ INSERT OR REPLACE INTO items (
     flags_json, raw_json
 ) VALUES (
     :id, :displayname, :displayname_lower, :gamelink, :description, :last_update,
-    :tier, :tierid, :type, :typeid, :item_level, :level_to_use, :icon_id, :max_stack_size,
+    :tier, :tierid, :type, :typeid, :item_level, :level_to_use, :planar_level, :icon_id, :max_stack_size,
     :slot,
     :armor_class_min, :armor_class_max,
     :damage_min, :damage_max, :damage_type, :damage_rating, :delay, :wield_style,
@@ -236,6 +237,7 @@ def item_to_row(item: dict) -> dict:
         "typeid":               _int_field_zero(item.get("typeid")),
         "item_level":           _int_field_zero(item.get("itemlevel")),
         "level_to_use":         _int_field_zero(item.get("leveltouse")),
+        "planar_level":         _int_field_zero(item.get("planar_level")),
         "icon_id":              _int_field_zero(item.get("iconid")),
         "max_stack_size":       _int_field_zero(item.get("maxstacksize")),
         "slot":                 slot_list[0].get("name") if slot_list else None,

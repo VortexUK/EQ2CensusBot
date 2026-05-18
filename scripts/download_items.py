@@ -22,7 +22,7 @@ import aiohttp
 from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-load_dotenv()
+load_dotenv(override=True)
 
 from census.db import DB_PATH, init_db, item_count, upsert_items
 
