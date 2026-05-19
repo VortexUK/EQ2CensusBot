@@ -111,7 +111,8 @@ class FunCog(commands.Cog):
         metric_str = _random_time_metric(minutes, metrics)
         insult     = _random_insult(insults)
 
+        username = interaction.user.display_name
         await interaction.response.send_message(
             f"The server launches in approximately **{metric_str}**.\n\n"
-            f"You know what? You're nothing but a {insult}."
+            f"You're a {insult}, {username}."
         )
