@@ -1,0 +1,396 @@
+{
+  "metrics": [
+    {
+      "duration_minutes": 450,
+      "template": "{count} transatlantic flights (London → New York)"
+    },
+    {
+      "duration_minutes": 6,
+      "template": "{count} miles driven through London traffic"
+    },
+    {
+      "duration_minutes": 4,
+      "template": "{count} cups of tea"
+    },
+    {
+      "duration_minutes": 20,
+      "template": "{count} Full English breakfasts"
+    },
+    {
+      "duration_minutes": 3,
+      "template": "{count} Greggs sausage rolls eaten at a leisurely pace"
+    },
+    {
+      "duration_minutes": 120,
+      "template": "{count} pub quizzes"
+    },
+    {
+      "duration_minutes": 726,
+      "template": "{count} viewings of the Lord of the Rings Extended Edition trilogy"
+    },
+    {
+      "duration_minutes": 90,
+      "template": "{count} full sleep cycles"
+    },
+    {
+      "duration_minutes": 3720,
+      "template": "{count} complete rewatches of Breaking Bad"
+    },
+    {
+      "duration_minutes": 30,
+      "template": "{count} 5K fun runs (for someone not very fit)"
+    },
+    {
+      "duration_minutes": 25,
+      "template": "{count} queues at a British Post Office"
+    },
+    {
+      "duration_minutes": 11,
+      "template": "{count} IKEA trips (just browsing, no meatballs)"
+    },
+    {
+      "duration_minutes": 480,
+      "template": "{count} working days"
+    },
+    {
+      "duration_minutes": 52,
+      "template": "{count} episodes of EastEnders"
+    },
+    {
+      "duration_minutes": 1800,
+      "template": "{count} readings of War and Peace (at average reading speed)"
+    },
+    {
+      "duration_minutes": 160,
+      "template": "{count} trips around the M25"
+    },
+    {
+      "duration_minutes": 45,
+      "template": "{count} lukewarm baths before someone knocks on the door"
+    },
+    {
+      "duration_minutes": 15,
+      "template": "{count} NHS on-hold waiting times (optimistic estimate)"
+    },
+    {
+      "duration_minutes": 700,
+      "template": "{count} games of Monopoly (that someone actually finished)"
+    },
+    {
+      "duration_minutes": 194,
+      "template": "{count} viewings of Titanic"
+    },
+    {
+      "duration_minutes": 91,
+      "template": "{count} viewings of Monty Python and the Holy Grail"
+    },
+    {
+      "duration_minutes": 127,
+      "template": "{count} viewings of Jurassic Park"
+    },
+    {
+      "duration_minutes": 169,
+      "template": "{count} viewings of Interstellar"
+    },
+    {
+      "duration_minutes": 164,
+      "template": "{count} viewings of Blade Runner 2049"
+    },
+    {
+      "duration_minutes": 100,
+      "template": "{count} viewings of The Italian Job (the good one)"
+    },
+    {
+      "duration_minutes": 142,
+      "template": "{count} viewings of The Shawshank Redemption"
+    },
+    {
+      "duration_minutes": 177,
+      "template": "{count} viewings of Braveheart"
+    },
+    {
+      "duration_minutes": 99,
+      "template": "{count} viewings of The Grand Budapest Hotel"
+    },
+    {
+      "duration_minutes": 386,
+      "template": "{count} viewings of the original Star Wars trilogy"
+    },
+    {
+      "duration_minutes": 411,
+      "template": "{count} viewings of the original Matrix trilogy"
+    },
+    {
+      "duration_minutes": 3270,
+      "template": "{count} viewings of every James Bond film back to back"
+    },
+    {
+      "duration_minutes": 4228,
+      "template": "{count} full rewatches of Game of Thrones (all 8 seasons, including the bad ones)"
+    },
+    {
+      "duration_minutes": 3240,
+      "template": "{count} complete rewatches of Downton Abbey"
+    },
+    {
+      "duration_minutes": 3000,
+      "template": "{count} complete viewings of the Marvel Cinematic Universe (Phases 1–4)"
+    },
+    {
+      "duration_minutes": 4800,
+      "template": "{count} full read-throughs of the Harry Potter series"
+    },
+    {
+      "duration_minutes": 900,
+      "template": "{count} complete re-reads of The Hitchhiker's Guide to the Galaxy series"
+    },
+    {
+      "duration_minutes": 480,
+      "template": "{count} complete reads of The Hobbit"
+    },
+    {
+      "duration_minutes": 3360,
+      "template": "{count} readings of the Bible cover to cover"
+    },
+    {
+      "duration_minutes": 22,
+      "template": "{count} episodes of The Simpsons"
+    },
+    {
+      "duration_minutes": 60,
+      "template": "{count} episodes of Peaky Blinders"
+    },
+    {
+      "duration_minutes": 60,
+      "template": "{count} episodes of Top Gear (classic era)"
+    },
+    {
+      "duration_minutes": 30,
+      "template": "{count} episodes of Only Fools and Horses"
+    },
+    {
+      "duration_minutes": 30,
+      "template": "{count} episodes of Blackadder"
+    },
+    {
+      "duration_minutes": 60,
+      "template": "{count} episodes of Dragon's Den"
+    },
+    {
+      "duration_minutes": 6,
+      "template": "{count} listens to Bohemian Rhapsody on repeat"
+    },
+    {
+      "duration_minutes": 43,
+      "template": "{count} listens to Dark Side of the Moon"
+    },
+    {
+      "duration_minutes": 560,
+      "template": "{count} listens to the complete Beatles discography"
+    },
+    {
+      "duration_minutes": 42,
+      "template": "{count} listens to Led Zeppelin IV"
+    },
+    {
+      "duration_minutes": 52,
+      "template": "{count} listens to Eminem's The Slim Shady LP"
+    },
+    {
+      "duration_minutes": 37,
+      "template": "{count} listens to Nevermind by Nirvana"
+    },
+    {
+      "duration_minutes": 48,
+      "template": "{count} listens to Adele's 21"
+    },
+    {
+      "duration_minutes": 53,
+      "template": "{count} listens to OK Computer by Radiohead"
+    },
+    {
+      "duration_minutes": 1320,
+      "template": "{count} flights to Australia"
+    },
+    {
+      "duration_minutes": 75,
+      "template": "{count} flights from London to Edinburgh"
+    },
+    {
+      "duration_minutes": 35,
+      "template": "{count} Channel Tunnel crossings"
+    },
+    {
+      "duration_minutes": 480,
+      "template": "{count} drives from London to Edinburgh"
+    },
+    {
+      "duration_minutes": 180,
+      "template": "{count} bank holiday traffic jams on the A303"
+    },
+    {
+      "duration_minutes": 4320,
+      "template": "{count} Apollo 11 missions to the Moon"
+    },
+    {
+      "duration_minutes": 240,
+      "template": "{count} rounds of golf (for someone who's been once)"
+    },
+    {
+      "duration_minutes": 150,
+      "template": "{count} Wimbledon finals"
+    },
+    {
+      "duration_minutes": 3420,
+      "template": "{count} Premier League seasons worth of matches"
+    },
+    {
+      "duration_minutes": 90,
+      "template": "{count} games of football (including injury time)"
+    },
+    {
+      "duration_minutes": 450,
+      "template": "{count} days of Test cricket"
+    },
+    {
+      "duration_minutes": 45,
+      "template": "{count} games of Scrabble"
+    },
+    {
+      "duration_minutes": 45,
+      "template": "{count} games of Cluedo"
+    },
+    {
+      "duration_minutes": 45,
+      "template": "{count} games of bowling (10 frames)"
+    },
+    {
+      "duration_minutes": 360,
+      "template": "{count} average British wedding receptions (ceremony to last man standing)"
+    },
+    {
+      "duration_minutes": 240,
+      "template": "{count} Sunday afternoon naps that accidentally become the whole evening"
+    },
+    {
+      "duration_minutes": 120,
+      "template": "{count} IKEA flat-pack assembly sessions (instructions ignored)"
+    },
+    {
+      "duration_minutes": 10,
+      "template": "{count} hot showers before the water goes cold"
+    },
+    {
+      "duration_minutes": 90,
+      "template": "{count} Sunday roasts"
+    },
+    {
+      "duration_minutes": 40,
+      "template": "{count} driving lessons (before inevitably failing the test)"
+    },
+    {
+      "duration_minutes": 15,
+      "template": "{count} school fire drills"
+    },
+    {
+      "duration_minutes": 60,
+      "template": "{count} attempts to get through to HMRC"
+    },
+    {
+      "duration_minutes": 25,
+      "template": "{count} reads of a British tabloid's sidebar of shame"
+    },
+    {
+      "duration_minutes": 5,
+      "template": "{count} reads of the pinned messages in this Discord server"
+    },
+    {
+      "duration_minutes": 120,
+      "template": "{count} readings of the terms and conditions you definitely agreed to"
+    },
+    {
+      "duration_minutes": 30,
+      "template": "{count} Wetherspoons breakfasts"
+    },
+    {
+      "duration_minutes": 45,
+      "template": "{count} pints enjoyed slowly in a British pub"
+    },
+    {
+      "duration_minutes": 20,
+      "template": "{count} TED talks"
+    },
+    {
+      "duration_minutes": 18,
+      "template": "{count} TED talks (the short ones)"
+    },
+    {
+      "duration_minutes": 60,
+      "template": "{count} gym sessions (including the time spent deciding whether to go)"
+    },
+    {
+      "duration_minutes": 45,
+      "template": "{count} trips to Tesco and back (including losing your car in the car park)"
+    },
+    {
+      "duration_minutes": 25,
+      "template": "{count} attempts to find parking in a city centre"
+    },
+    {
+      "duration_minutes": 20,
+      "template": "{count} naps on a train that went three stops past your destination"
+    },
+    {
+      "duration_minutes": 2,
+      "template": "{count} Spotify Wrapped reveals"
+    },
+    {
+      "duration_minutes": 3,
+      "template": "{count} EQ2 loading screens on a good day"
+    },
+    {
+      "duration_minutes": 60,
+      "template": "{count} EQ2 server queue waits on launch day"
+    },
+    {
+      "duration_minutes": 90,
+      "template": "{count} EQ2 dungeon runs with a group that has no idea what they're doing"
+    },
+    {
+      "duration_minutes": 30,
+      "template": "{count} EQ2 crafting sessions (just the combines, not the harvesting)"
+    },
+    {
+      "duration_minutes": 180,
+      "template": "{count} EQ2 raid nights (starting time to first pull)"
+    },
+    {
+      "duration_minutes": 240,
+      "template": "{count} heated guild Discord arguments that solved absolutely nothing"
+    },
+    {
+      "duration_minutes": 8,
+      "template": "{count} attempts to log in before giving up and going to bed"
+    },
+    {
+      "duration_minutes": 60,
+      "template": "{count} hours spent min-maxing a character build you'll reroll in a week"
+    },
+    {
+      "duration_minutes": 480,
+      "template": "{count} sessions of /camping in a spot that someone else already has"
+    },
+    {
+      "duration_minutes": 1440,
+      "template": "{count} days"
+    },
+    {
+      "duration_minutes": 60,
+      "template": "{count} hours"
+    },
+    {
+      "duration_minutes": 1,
+      "template": "{count} minutes (you're welcome)"
+    }
+  ]
+}
