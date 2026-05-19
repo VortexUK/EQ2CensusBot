@@ -50,10 +50,17 @@ class CensusClient:
     # ------------------------------------------------------------------
 
     async def get_item(self, query: str) -> Optional[ItemData]:
+        from census.db import DB_PATH
+        db_exists = DB_PATH.exists()
         # Try local DB first (fast, no rate limits)
         raw = await self._find_in_db(query)
         if raw:
+            print(f"[DB] Cache hit for {query!r}")
             return self._parse_item(raw)
+        if db_exists:
+            print(f"[DB] Cache miss for {query!r} — falling back to Census API")
+        else:
+            print(f"[DB] No database at {DB_PATH} — using Census API")
         # Fall back to live Census API
         data = await self._fetch(self._build_params(query))
         if not data:
