@@ -8,6 +8,108 @@ from typing import Any, Optional
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "items" / "items.db"
 
 # ---------------------------------------------------------------------------
+# EQ2 class-group constants and label helper
+# ---------------------------------------------------------------------------
+
+# ── Subclasses (pairs within each archetype) ────────────────────────────────
+_WARRIORS   = frozenset(["guardian",     "berserker"])
+_CRUSADERS  = frozenset(["paladin",      "shadowknight"])
+_BRAWLERS   = frozenset(["monk",         "bruiser"])
+_CLERICS    = frozenset(["templar",      "inquisitor"])
+_SHAMANS    = frozenset(["mystic",       "defiler"])
+_DRUIDS     = frozenset(["warden",       "fury"])
+_SORCERERS  = frozenset(["wizard",       "warlock"])
+_ENCHANTERS = frozenset(["illusionist",  "coercer"])
+_SUMMONERS  = frozenset(["necromancer",  "conjuror"])
+_ROGUES     = frozenset(["swashbuckler", "brigand"])
+_PREDATORS  = frozenset(["ranger",       "assassin"])
+_BARDS      = frozenset(["troubador",    "dirge"])
+
+# ── Full archetypes ──────────────────────────────────────────────────────────
+_FIGHTERS = _WARRIORS | _CRUSADERS | _BRAWLERS
+_PRIESTS  = _CLERICS  | _SHAMANS   | _DRUIDS | frozenset(["channeler"])
+_MAGES    = _SORCERERS | _ENCHANTERS | _SUMMONERS
+_SCOUTS   = _ROGUES   | _PREDATORS  | _BARDS  | frozenset(["beastlord"])
+
+_CRAFTERS = frozenset([
+    "sage", "armorer", "weaponsmith", "woodworker",
+    "jeweler", "carpenter", "tailor", "alchemist", "provisioner",
+])
+_ALL_ADVENTURERS = _FIGHTERS | _PRIESTS | _MAGES | _SCOUTS
+
+# Groups checked in priority order: full archetypes first, then subclasses.
+# The algorithm removes matched classes from `remaining` as it goes, so
+# full archetypes are consumed before subclasses are tested.
+_ARCHETYPES = [
+    ("All Fighters",  _FIGHTERS),
+    ("All Priests",   _PRIESTS),
+    ("All Mages",     _MAGES),
+    ("All Scouts",    _SCOUTS),
+    # subclasses
+    ("All Warriors",   _WARRIORS),
+    ("All Crusaders",  _CRUSADERS),
+    ("All Brawlers",   _BRAWLERS),
+    ("All Clerics",    _CLERICS),
+    ("All Shamans",    _SHAMANS),
+    ("All Druids",     _DRUIDS),
+    ("All Sorcerers",  _SORCERERS),
+    ("All Enchanters", _ENCHANTERS),
+    ("All Summoners",  _SUMMONERS),
+    ("All Rogues",     _ROGUES),
+    ("All Predators",  _PREDATORS),
+    ("All Bards",      _BARDS),
+]
+
+
+def compute_class_label(classes: "dict | None") -> "str | None":
+    """
+    Return a human-readable class restriction label.
+
+    Rules:
+    - Any set that covers all 26 adventure classes (with or without crafters)
+      → "All Classes"
+    - Full archetype groups are collapsed: "All Fighters", "All Priests", etc.
+    - Partial archetypes + individual classes are listed by display name.
+    - None / empty → None
+    """
+    if not classes or not isinstance(classes, dict):
+        return None
+
+    keys = frozenset(classes.keys())
+    adv  = keys & _ALL_ADVENTURERS
+
+    # All 26 adventure classes present (crafters optional) → "All Classes"
+    if adv >= _ALL_ADVENTURERS:
+        return "All Classes"
+
+    parts: list[str] = []
+    remaining = set(adv)
+
+    for label, group in _ARCHETYPES:
+        if remaining >= group:
+            parts.append(label)
+            remaining -= group
+
+    # Any leftover individual classes
+    for key in sorted(remaining):
+        entry = classes.get(key)
+        display = (
+            entry.get("displayname", key.title())
+            if isinstance(entry, dict)
+            else key.title()
+        )
+        parts.append(display)
+
+    # Crafter-only items (no adventure classes matched at all)
+    if not parts:
+        crafter_keys = keys & _CRAFTERS
+        if crafter_keys:
+            return "Crafters"
+
+    return " / ".join(parts) if parts else None
+
+
+# ---------------------------------------------------------------------------
 # Schema
 # ---------------------------------------------------------------------------
 
@@ -101,6 +203,18 @@ CREATE TABLE IF NOT EXISTS items (
     -- Discovery (first seen on any world)
     first_discovered     INTEGER,
 
+    -- Visibility (0 = hidden/disabled item, 1 = normal)
+    visible              INTEGER DEFAULT 1,
+
+    -- Typeinfo summary columns (queryable without parsing typeinfo_json)
+    typeinfo_name                TEXT,       -- e.g. "Armor", "Weapon", "Spell Scroll"
+    classes_json                 TEXT,       -- JSON array/object of allowed classes
+    physical_damage_absorption   INTEGER,    -- armour mitigation value
+
+    -- Pre-computed class label and count (derived from classes_json)
+    class_label          TEXT,              -- e.g. "All Classes", "All Priests", "Guardian"
+    class_count          INTEGER,           -- number of classes that can use this item
+
     -- Common flags as fast-filter booleans
     flag_heirloom        INTEGER DEFAULT 0,
     flag_lore            INTEGER DEFAULT 0,
@@ -116,18 +230,7 @@ CREATE TABLE IF NOT EXISTS items (
     flag_infusable       INTEGER DEFAULT 0,
     flag_indestructible  INTEGER DEFAULT 0,
 
-    -- Complex nested blobs (display-only, not queried)
-    modifiers_json       TEXT,
-    typeinfo_json        TEXT,
-    effect_list_json     TEXT,
-    adornment_slots_json TEXT,
-    adornment_list_json  TEXT,
-    classification_json  TEXT,
-    slot_list_json       TEXT,
-    setbonus_list_json   TEXT,
-    flags_json           TEXT,
-
-    -- Full raw Census JSON — lets existing _parse_item() work unchanged
+    -- Full raw Census JSON — used by _parse_item(); all nested data lives here
     raw_json             TEXT
 );
 """
@@ -142,6 +245,19 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_icon        ON items(icon_id);",
     "CREATE INDEX IF NOT EXISTS idx_last_update ON items(last_update);",
     "CREATE INDEX IF NOT EXISTS idx_adorn_color ON items(adornment_color);",
+    "CREATE INDEX IF NOT EXISTS idx_visible     ON items(visible);",
+    "CREATE INDEX IF NOT EXISTS idx_ti_name     ON items(typeinfo_name);",
+    "CREATE INDEX IF NOT EXISTS idx_class_label ON items(class_label);",
+]
+
+# Columns added after initial schema — used by init_db() to migrate existing DBs
+_MIGRATIONS = [
+    ("visible",                    "INTEGER DEFAULT 1"),
+    ("typeinfo_name",              "TEXT"),
+    ("classes_json",               "TEXT"),
+    ("physical_damage_absorption", "INTEGER"),
+    ("class_label",                "TEXT"),
+    ("class_count",                "INTEGER"),
 ]
 
 _UPSERT_SQL = """
@@ -161,12 +277,12 @@ INSERT OR REPLACE INTO items (
     unique_equip_group, unique_equip_wearable_count, unique_equip_prestige,
     required_skill_name, required_skill_min,
     associated_quest, autoquest, first_discovered,
+    visible, typeinfo_name, classes_json, physical_damage_absorption,
+    class_label, class_count,
     flag_heirloom, flag_lore, flag_lore_equip, flag_no_trade, flag_no_value,
     flag_no_zone, flag_prestige, flag_relic, flag_attunable, flag_ornate,
     flag_refined, flag_infusable, flag_indestructible,
-    modifiers_json, typeinfo_json, effect_list_json, adornment_slots_json,
-    adornment_list_json, classification_json, slot_list_json, setbonus_list_json,
-    flags_json, raw_json
+    raw_json
 ) VALUES (
     :id, :displayname, :displayname_lower, :gamelink, :description, :last_update,
     :tier, :tierid, :type, :typeid, :item_level, :level_to_use, :planar_level, :icon_id, :max_stack_size,
@@ -183,12 +299,12 @@ INSERT OR REPLACE INTO items (
     :unique_equip_group, :unique_equip_wearable_count, :unique_equip_prestige,
     :required_skill_name, :required_skill_min,
     :associated_quest, :autoquest, :first_discovered,
+    :visible, :typeinfo_name, :classes_json, :physical_damage_absorption,
+    :class_label, :class_count,
     :flag_heirloom, :flag_lore, :flag_lore_equip, :flag_no_trade, :flag_no_value,
     :flag_no_zone, :flag_prestige, :flag_relic, :flag_attunable, :flag_ornate,
     :flag_refined, :flag_infusable, :flag_indestructible,
-    :modifiers_json, :typeinfo_json, :effect_list_json, :adornment_slots_json,
-    :adornment_list_json, :classification_json, :slot_list_json, :setbonus_list_json,
-    :flags_json, :raw_json
+    :raw_json
 )
 """
 
@@ -247,8 +363,8 @@ def item_to_row(item: dict) -> dict:
 
     return {
         "id":                   item.get("id"),
-        "displayname":          item.get("displayname", ""),
-        "displayname_lower":    (item.get("displayname") or "").lower(),
+        "displayname":          str(item.get("displayname") or ""),
+        "displayname_lower":    str(item.get("displayname") or "").lower(),
         "gamelink":             _str_field(item, "gamelink"),
         "description":          _str_field(item, "description"),
         "last_update":          _int_field_zero(item.get("last_update")),
@@ -295,6 +411,12 @@ def item_to_row(item: dict) -> dict:
         "associated_quest":     aq,
         "autoquest":            autoq,
         "first_discovered":     _int_field_zero(discovered),
+        "visible":                      _int_field_zero(item.get("visible")),
+        "typeinfo_name":                _str_field(typeinfo, "name"),
+        "classes_json":                 json.dumps(typeinfo["classes"]) if typeinfo.get("classes") is not None else None,
+        "physical_damage_absorption":   _int_field_zero(typeinfo.get("physicaldamageabsorption")),
+        "class_label":                  compute_class_label(typeinfo.get("classes")),
+        "class_count":                  len(typeinfo["classes"]) if typeinfo.get("classes") else None,
         "flag_heirloom":        _flag(flags, "heirloom"),
         "flag_lore":            _flag(flags, "lore"),
         "flag_lore_equip":      _flag(flags, "lore-equip"),
@@ -308,15 +430,6 @@ def item_to_row(item: dict) -> dict:
         "flag_refined":         _flag(flags, "refined"),
         "flag_infusable":       _flag(flags, "infusable"),
         "flag_indestructible":  _flag(flags, "indestructible"),
-        "modifiers_json":       json.dumps(item.get("modifiers") or {}),
-        "typeinfo_json":        json.dumps(typeinfo),
-        "effect_list_json":     json.dumps(item.get("effect_list") or []),
-        "adornment_slots_json": json.dumps(item.get("adornmentslot_list") or []),
-        "adornment_list_json":  json.dumps(item.get("adornment_list") or []),
-        "classification_json":  json.dumps(item.get("classification_list") or []),
-        "slot_list_json":       json.dumps(slot_list),
-        "setbonus_list_json":   json.dumps(item.get("setbonus_list") or []),
-        "flags_json":           json.dumps(flags),
         "raw_json":             json.dumps(item),
     }
 
@@ -333,6 +446,12 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute(_CREATE_META)
     conn.execute(_CREATE_TABLE)
+    # Migrate existing DBs: add any columns introduced after initial creation
+    # Must run BEFORE index creation so new indexes on new columns don't fail
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
+    for col_name, col_def in _MIGRATIONS:
+        if col_name not in existing_cols:
+            conn.execute(f"ALTER TABLE items ADD COLUMN {col_name} {col_def}")
     for idx in _CREATE_INDEXES:
         conn.execute(idx)
     conn.commit()

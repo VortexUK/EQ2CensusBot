@@ -61,7 +61,10 @@ class CensusClient:
         item_list = data.get("item_list", [])
         if not item_list:
             return None
-        return self._parse_item(item_list[0])
+        raw_item = item_list[0]
+        # Cache in local DB so the next lookup is instant
+        self._cache_item(raw_item)
+        return self._parse_item(raw_item)
 
     async def _find_in_db(self, query: str) -> Optional[dict]:
         """Look up an item in the local SQLite DB. Returns raw Census dict or None."""
@@ -79,6 +82,16 @@ class CensusClient:
             return await item_db.find_by_id(int(query))
         # Display name
         return await item_db.find_by_name(query)
+
+    def _cache_item(self, raw: dict) -> None:
+        """Write a freshly-fetched Census item into the local DB."""
+        try:
+            conn = item_db.init_db()
+            item_db.upsert_items([raw], conn)
+            conn.close()
+            print(f"[DB] Cached item {raw.get('id')} ({raw.get('displayname')})")
+        except Exception as exc:
+            print(f"[DB] Failed to cache item {raw.get('id')}: {exc}")
 
     async def get_raw_item(self, query: str) -> Optional[dict]:
         """Return the raw parsed JSON — used by inspect_item.py."""

@@ -222,6 +222,9 @@ data/items/items.db
 data/items/items.db-wal
 data/items/items.db-shm
 
+# Census API dump files (analysis artifacts)
+example_items.json
+
 # Local preview output
 preview*.png
 test_*.png

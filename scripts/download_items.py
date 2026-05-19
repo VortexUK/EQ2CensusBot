@@ -28,11 +28,11 @@ from census.db import DB_PATH, get_meta, init_db, item_count, set_meta, upsert_i
 
 BASE_URL     = "https://census.daybreakgames.com"
 PAGE_SIZE    = 100      # items per request
-CONCURRENCY  = 10       # parallel requests
+CONCURRENCY  = 1        # parallel requests (sequential — most reliable against Census timeouts)
 WRITE_EVERY  = 1000     # upsert to DB after this many items accumulated
 REPORT_EVERY = 1000     # print progress every N items written
 RETRY_MAX    = 5
-RETRY_SLEEP  = 10.0     # seconds before first retry (doubles each attempt)
+RETRY_SLEEP  = 15.0     # seconds before first retry (doubles each attempt)
 
 
 async def _fetch_page(
@@ -54,7 +54,7 @@ async def _fetch_page(
         for attempt in range(1, RETRY_MAX + 1):
             try:
                 async with session.get(
-                    url, params=params, timeout=aiohttp.ClientTimeout(total=30)
+                    url, params=params, timeout=aiohttp.ClientTimeout(total=120)
                 ) as resp:
                     if resp.status == 429:
                         print(f"  [429] start={start}, sleeping {delay:.0f}s…")
@@ -68,9 +68,19 @@ async def _fetch_page(
                             delay *= 2
                             continue
                         return None
-                    data = await resp.json(content_type=None)
-                    if "error" in data:
-                        print(f"  [flood] start={start}: sleeping {delay:.0f}s…")
+                    try:
+                        data = await resp.json(content_type=None)
+                    except Exception:
+                        # Empty or malformed body — treat like a transient error
+                        if attempt < RETRY_MAX:
+                            print(f"  [retry {attempt}/{RETRY_MAX}] start={start}: bad JSON body, sleeping {delay:.0f}s…")
+                            await asyncio.sleep(delay)
+                            delay *= 2
+                            continue
+                        return None
+                    if "error" in data or "errorCode" in data:
+                        msg = data.get("error") or data.get("errorCode") or "unknown"
+                        print(f"  [api-error] start={start}: {msg}, sleeping {delay:.0f}s…")
                         await asyncio.sleep(delay)
                         delay *= 2
                         continue
@@ -128,7 +138,13 @@ async def main(restart: bool, item_limit: int | None) -> None:
             print("Starting from offset 0.")
 
     sem       = asyncio.Semaphore(CONCURRENCY)
-    headers   = {"User-Agent": "EQ2CensusBot/1.0"}
+    headers   = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        )
+    }
     connector = aiohttp.TCPConnector(limit=CONCURRENCY)
 
     async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
@@ -163,21 +179,41 @@ async def main(restart: bool, item_limit: int | None) -> None:
             for _, page in successful:
                 buffer.extend(page)
 
-            # Check if we've reached the end of data (a successful page shorter than PAGE_SIZE)
-            if any(len(p) < PAGE_SIZE for _, p in successful):
-                reached_end = True
+            # End-of-data detection.
+            # A page returns 0 items when we've gone past the last record.
+            # IMPORTANT: the Census API occasionally returns an empty item_list for
+            # mid-dataset offsets under load — that must NOT be treated as end-of-data.
+            # Guard: only declare end if the empty page's start offset is plausibly
+            # near the real end (within 2 full batches of the known total), OR if we
+            # have no total estimate and ALL successful pages came back empty.
+            empty_starts = [s for s, p in successful if len(p) == 0]
+            if empty_starts:
+                if total:
+                    # Trust the total; ignore empty pages that are clearly mid-dataset
+                    if min(empty_starts) >= total - 2 * CONCURRENCY * PAGE_SIZE:
+                        reached_end = True
+                    else:
+                        print(f"  [warn] empty page(s) at offset(s) {empty_starts} "
+                              f"but total={total:,} — treating as transient gap, continuing")
+                else:
+                    # No total available — require every successful page to be empty
+                    if len(empty_starts) == len(successful):
+                        reached_end = True
 
-            # Flush buffer to DB and save offset
+            # Always advance offset for successful (non-all-failed) batches
+            if successful and not reached_end:
+                offset += CONCURRENCY * PAGE_SIZE
+                # Save offset after every successful batch so interruptions resume correctly
+                set_meta(conn, "download_offset", str(offset))
+
+            # Flush buffer to DB
             if len(buffer) >= WRITE_EVERY or reached_end:
                 if buffer:
                     upsert_items(buffer, conn)
                     written += len(buffer)
                     buffer = []
-                    # Save the next offset to resume from
-                    next_offset = offset + CONCURRENCY * PAGE_SIZE
-                    set_meta(conn, "download_offset", str(next_offset))
                     total_in_db = item_count(conn)
-                    print(f"  Written this run: {written:,}  |  Total in DB: {total_in_db:,}  |  Offset: {next_offset:,}")
+                    print(f"  Written this run: {written:,}  |  Total in DB: {total_in_db:,}  |  Offset: {offset:,}")
 
             if reached_end:
                 break
@@ -187,13 +223,10 @@ async def main(restart: bool, item_limit: int | None) -> None:
                 await asyncio.sleep(30)
                 continue
 
-            offset += CONCURRENCY * PAGE_SIZE
-
     # Flush remainder
     if buffer:
         upsert_items(buffer, conn)
         written += len(buffer)
-        set_meta(conn, "download_offset", str(offset))
 
     if reached_end:
         set_meta(conn, "download_offset", "0")  # reset so next run starts fresh
