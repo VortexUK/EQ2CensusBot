@@ -52,11 +52,13 @@ def _format_count(value: float) -> str:
     return f"{value:.1f}"
 
 
-def _random_insult(data: dict) -> str:
+def _random_insult(data: dict) -> tuple[str, str]:
+    """Returns (article, insult) e.g. ('an', 'ugly ass clown')."""
     w1 = random.choice(data["column1"])
     w2 = random.choice(data["column2"])
     w3 = random.choice(data["column3"])
-    return f"{w1} {w2} {w3}"
+    article = "an" if w1[0].lower() in "aeiou" else "a"
+    return article, f"{w1} {w2} {w3}"
 
 
 def _random_time_metric(minutes_remaining: float, metrics: list[dict]) -> str:
@@ -112,7 +114,8 @@ class FunCog(commands.Cog):
         insult     = _random_insult(insults)
 
         username = interaction.user.display_name
+        article, insult = insult
         await interaction.response.send_message(
             f"The server launches in approximately **{metric_str}**.\n\n"
-            f"You're a {insult}, {username}."
+            f"You're {article} {insult}, {username}."
         )

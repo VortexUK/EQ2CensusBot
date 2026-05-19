@@ -32,11 +32,12 @@ def format_count(value: float) -> str:
     return f"{value:.1f}"
 
 
-def random_insult(insults: dict) -> str:
+def random_insult(insults: dict) -> tuple:
     w1 = random.choice(insults["column1"])
     w2 = random.choice(insults["column2"])
     w3 = random.choice(insults["column3"])
-    return f"{w1} {w2} {w3}"
+    article = "an" if w1[0].lower() in "aeiou" else "a"
+    return article, f"{w1} {w2} {w3}"
 
 
 def random_metric(minutes: float, metrics: list) -> str:
@@ -65,10 +66,10 @@ def main() -> None:
     for i in range(args.count):
         if args.count > 1:
             print(f"--- Example {i + 1} ---")
-        metric_str = random_metric(minutes, metrics)
-        insult     = random_insult(insults)
+        metric_str      = random_metric(minutes, metrics)
+        article, insult = random_insult(insults)
         print(f"The server launches in approximately {metric_str}.")
-        print(f"You're a {insult}, {args.user}.")
+        print(f"You're {article} {insult}, {args.user}.")
         print()
 
 
