@@ -47,7 +47,7 @@ async def _fetch_page(
       None        — all retries exhausted; caller should skip and continue
     """
     url    = f"{BASE_URL}/s:{service_id}/json/get/eq2/item/"
-    params = {"c:start": start, "c:limit": PAGE_SIZE}
+    params = {"c:start": start, "c:limit": PAGE_SIZE, "c:sort": "id:ASC"}
     delay  = RETRY_SLEEP
 
     async with sem:
