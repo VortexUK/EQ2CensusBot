@@ -31,8 +31,10 @@ _OWNER_NAMES = {"vortex", "menludiir", "tovortex"}
 
 
 def _is_owner(user: discord.User | discord.Member) -> bool:
-    if _OWNER_ID and user.id == _OWNER_ID:
-        return True
+    if _OWNER_ID:
+        # If an ID is configured, that is the only check that matters
+        return user.id == _OWNER_ID
+    # Fallback to name matching only when no ID is configured
     if user.name.lower() in _OWNER_NAMES:
         return True
     if isinstance(user, discord.Member) and user.display_name.lower() in _OWNER_NAMES:
