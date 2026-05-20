@@ -77,7 +77,14 @@ const QUALITY: Record<string, QualityStyle> = {
   common:        { color: '#beff93' },
 }
 function qualityStyle(q: string): QualityStyle {
-  return QUALITY[q.toLowerCase()] ?? { color: C_WHITE }
+  const key = q.toLowerCase()
+  if (QUALITY[key]) return QUALITY[key]
+  // Compound quality like "mastercrafted fabled" — use the last recognised word
+  const words = key.split(/\s+/)
+  for (let i = words.length - 1; i >= 0; i--) {
+    if (QUALITY[words[i]]) return QUALITY[words[i]]
+  }
+  return { color: C_WHITE }
 }
 
 const ADORN_COLOR: Record<string, string> = {

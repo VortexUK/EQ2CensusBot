@@ -221,7 +221,14 @@ const TIER_STYLE: Record<string, TierStyle> = {
 }
 
 function tierStyle(tier: string | null): TierStyle {
-  return TIER_STYLE[(tier ?? '').toUpperCase()] ?? { color: 'var(--text)' }
+  const key = (tier ?? '').toUpperCase()
+  if (TIER_STYLE[key]) return TIER_STYLE[key]
+  // Compound tier like "MASTERCRAFTED FABLED" — use the last recognised word
+  const words = key.split(/\s+/)
+  for (let i = words.length - 1; i >= 0; i--) {
+    if (TIER_STYLE[words[i]]) return TIER_STYLE[words[i]]
+  }
+  return { color: 'var(--text)' }
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
