@@ -240,6 +240,9 @@ CREATE TABLE IF NOT EXISTS items (
     class_label          TEXT,              -- e.g. "All Classes", "All Priests", "Guardian"
     class_count          INTEGER,           -- number of classes that can use this item
 
+    -- Resolved tier name: tier if set, otherwise 'COMMON' for tierid 0/1/2
+    tier_display         TEXT,
+
     -- Armor proficiency / spell scroll extras (from typeinfo)
     skill_type           TEXT,              -- e.g. "heavyarmor", "mediumarmor", "magicaffinity"
     spell_target         TEXT,              -- e.g. "Enemy", "Caster", "Group (AE)"
@@ -291,6 +294,7 @@ _MIGRATIONS = [
     ("physical_damage_absorption", "INTEGER"),
     ("class_label",                "TEXT"),
     ("class_count",                "INTEGER"),
+    ("tier_display",               "TEXT"),
     ("skill_type",                 "TEXT"),
     ("spell_target",               "TEXT"),
     ("spell_range",                "TEXT"),
@@ -317,6 +321,7 @@ INSERT OR REPLACE INTO items (
     associated_quest, autoquest, first_discovered,
     visible, typeinfo_name, classes_json, physical_damage_absorption,
     class_label, class_count,
+    tier_display,
     skill_type, spell_target, spell_range, spell_power_cost, spell_resistability,
     flag_heirloom, flag_lore, flag_lore_equip, flag_no_trade, flag_no_value,
     flag_no_zone, flag_prestige, flag_relic, flag_attunable, flag_ornate,
@@ -340,6 +345,7 @@ INSERT OR REPLACE INTO items (
     :associated_quest, :autoquest, :first_discovered,
     :visible, :typeinfo_name, :classes_json, :physical_damage_absorption,
     :class_label, :class_count,
+    :tier_display,
     :skill_type, :spell_target, :spell_range, :spell_power_cost, :spell_resistability,
     :flag_heirloom, :flag_lore, :flag_lore_equip, :flag_no_trade, :flag_no_value,
     :flag_no_zone, :flag_prestige, :flag_relic, :flag_attunable, :flag_ornate,
@@ -410,6 +416,7 @@ def item_to_row(item: dict) -> dict:
         "last_update":          _int_field_zero(item.get("last_update")),
         "tier":                 _str_field(item, "tier"),
         "tierid":               _int_field_zero(item.get("tierid")),
+        "tier_display":         _str_field(item, "tier") or "COMMON",
         "type":                 _str_field(item, "type"),
         "typeid":               _int_field_zero(item.get("typeid")),
         "item_level":           _int_field_zero(item.get("itemlevel")),
