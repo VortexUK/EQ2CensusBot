@@ -26,6 +26,7 @@ interface Character {
 
 // [label, internal_key] — order matches eq2wire paperdoll
 const LEFT_SLOTS: [string, string][] = [
+  ['Charm',      'activate1'],
   ['Cloak',      'cloak'],
   ['Head',       'head'],
   ['Shoulders',  'shoulders'],
@@ -36,8 +37,6 @@ const LEFT_SLOTS: [string, string][] = [
   ['Feet',       'feet'],
   ['Primary',    'primary'],
   ['Secondary',  'secondary'],
-  ['Ranged',     'ranged'],
-  ['Charm',      'activate1'],
 ]
 
 const RIGHT_SLOTS: [string, string][] = [
@@ -50,6 +49,7 @@ const RIGHT_SLOTS: [string, string][] = [
   ['Wrist',      'left_wrist'],
   ['Wrist',      'right_wrist'],
   ['Waist',      'waist'],
+  ['Ranged',     'ranged'],
   ['Food',       'food'],
   ['Drink',      'drink'],
 ]
