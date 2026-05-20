@@ -188,7 +188,7 @@ function parseAdornName(name: string): ParsedAdorn | null {
   if (!m) return null
   const tier = ADORN_QUALITY_TIER[m[3]]
   if (!tier) return null
-  return { short: `${m[1].slice(0, 3)} ${m[2]}`, ...tier }
+  return { short: `${m[1].slice(0, 3)} ${m[2]}`, tierLetter: tier.letter, tierColor: tier.color }
 }
 
 type TierStyle = { color: string; textShadow?: string }
