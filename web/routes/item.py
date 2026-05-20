@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import asyncio
+import io
 import os
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from census.client import CensusClient
+from image.tooltip import render_tooltip
 
 router = APIRouter(tags=["item"])
 _SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
+
+# In-memory PNG cache — render_tooltip is CPU-heavy (PIL), cache the bytes.
+_image_cache: dict[str, bytes] = {}
 
 
 class ItemStatResponse(BaseModel):
@@ -94,3 +101,35 @@ async def get_item(item_id: str) -> ItemResponse:
         flags=item.flags,
         extra_info=item.extra_info,
     )
+
+
+@router.get("/item/{item_id}/image", response_class=Response)
+async def get_item_image(item_id: str) -> Response:
+    """Render the item tooltip as a PNG image (same as Discord bot output)."""
+    try:
+        int(item_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Item ID must be numeric")
+
+    if item_id in _image_cache:
+        return Response(content=_image_cache[item_id], media_type="image/png")
+
+    client = CensusClient(service_id=_SERVICE_ID)
+    try:
+        item = await client.get_item(item_id)
+    finally:
+        await client.close()
+
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
+
+    # render_tooltip is synchronous PIL work — run off the event loop
+    loop = asyncio.get_event_loop()
+    img = await loop.run_in_executor(None, render_tooltip, item)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+
+    _image_cache[item_id] = png_bytes
+    return Response(content=png_bytes, media_type="image/png")
