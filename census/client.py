@@ -522,7 +522,11 @@ class CensusClient:
             if val is None:
                 continue
             if fmt == "duration":
-                rows.append((label, _fmt_duration(float(val))))
+                try:
+                    rows.append((label, _fmt_duration(float(val))))
+                except (TypeError, ValueError):
+                    # Already a pre-formatted string (e.g. '45 minutes')
+                    rows.append((label, str(val)))
             else:
                 rows.append((label, str(val)))
         return rows
