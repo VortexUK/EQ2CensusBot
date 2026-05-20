@@ -312,6 +312,47 @@ class CensusClient:
 
         return CharacterAAs(character_name=char_name, aa_list=aa_entries)
 
+    async def get_guild_equipment_data(
+        self, guild_name: str, world: str
+    ) -> tuple[dict[int, str], list[dict]]:
+        """
+        Fetch the guild's member list with equipment + adornment data.
+        Returns (rank_id→name map, raw member list).
+        Each member dict has 'name', 'guild' (with 'rank'), and 'equipmentslot_list'.
+        """
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
+        params = {
+            "name": guild_name,
+            "world": world,
+            "c:resolve": "members(displayname,guild.rank,equipmentslot_list)",
+            "c:show": "member_list,name,world,rank_list",
+            "c:limit": "1",
+        }
+        print(f"[Census] GET {url} params={params}")
+        try:
+            async with self._session_().get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=60)
+            ) as resp:
+                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                if resp.status != 200:
+                    return {}, []
+                data = await resp.json(content_type=None)
+        except Exception as exc:
+            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            return {}, []
+
+        guild_list = data.get("guild_list", [])
+        if not guild_list:
+            return {}, []
+        guild = guild_list[0]
+
+        rank_map: dict[int, str] = {
+            int(r["id"]): r["name"]
+            for r in (guild.get("rank_list") or [])
+            if isinstance(r, dict) and "id" in r and "name" in r
+        }
+        return rank_map, guild.get("member_list") or []
+
     async def get_character_guild_name(self, character_name: str, world: str) -> Optional[str]:
         """Return the guild name for a character, or None if not in a guild or not found."""
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
