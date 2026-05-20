@@ -5,7 +5,6 @@ import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from census import db as item_db
 from census.client import CensusClient
 
 router = APIRouter(tags=["item"])
@@ -49,21 +48,20 @@ class ItemResponse(BaseModel):
 
 @router.get("/item/{item_id}", response_model=ItemResponse)
 async def get_item(item_id: str) -> ItemResponse:
-    """Return full item detail from the local DB."""
+    """Return full item detail — local DB first, falls back to Census API if missing."""
     try:
-        iid = int(item_id)
+        int(item_id)   # validate it's numeric before passing to client
     except ValueError:
         raise HTTPException(status_code=400, detail="Item ID must be numeric")
 
-    db_row = await item_db.find_by_id(iid)
-    if db_row is None:
-        raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
-
     client = CensusClient(service_id=_SERVICE_ID)
     try:
-        item = client._parse_item(db_row)
+        item = await client.get_item(item_id)
     finally:
         await client.close()
+
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
 
     return ItemResponse(
         id=item.id,
