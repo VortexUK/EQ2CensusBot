@@ -13,12 +13,13 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from web.routes.health import router as health_router
 from web.routes.auth import router as auth_router
+from web.routes.character import router as character_router
 
 _FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 _SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-secret-change-in-production")
 
 
-def create_app() -> FastAPI:
+def create_app(session_secret: str | None = None) -> FastAPI:
     app = FastAPI(
         title="EQ2 TLE Companion",
         version="0.1.0",
@@ -28,7 +29,7 @@ def create_app() -> FastAPI:
     )
 
     # Sessions must be added before CORS so the cookie is available everywhere
-    app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET, https_only=False)
+    app.add_middleware(SessionMiddleware, secret_key=session_secret or _SESSION_SECRET, https_only=False)
 
     app.add_middleware(
         CORSMiddleware,
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
     # API routers
     app.include_router(health_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
+    app.include_router(character_router, prefix="/api")
 
     # Serve the React build in production
     if _FRONTEND_DIST.exists():

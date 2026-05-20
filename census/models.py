@@ -76,6 +76,29 @@ class ItemData:
 
 
 @dataclass
+class EquipmentSlot:
+    slot_name: str
+    item_name: str
+    item_id: Optional[str] = None
+    icon_id: Optional[str] = None
+    tier: Optional[str] = None      # FABLED, LEGENDARY, etc.
+
+
+@dataclass
+class CharacterOverview:
+    id: str
+    name: str
+    level: Optional[int]
+    cls: Optional[str]              # adventurer class
+    race: Optional[str]
+    gender: Optional[str]
+    deity: Optional[str]
+    aa_count: int
+    world: str
+    equipment: list[EquipmentSlot] = field(default_factory=list)
+
+
+@dataclass
 class NodeAA:
     node_id: int
     tree_id: int

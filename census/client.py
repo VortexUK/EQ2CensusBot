@@ -7,7 +7,7 @@ import aiohttp
 
 from census import db as item_db
 from census.constants import ITEM_DISPLAY, STAT_MAP, TYPEINFO_DISPLAY
-from census.models import CharacterAAs, CharacterSpells, GuildData, GuildMember, ItemData, ItemEffect, ItemStat, NodeAA, SpellEntry
+from census.models import CharacterAAs, CharacterOverview, CharacterSpells, EquipmentSlot, GuildData, GuildMember, ItemData, ItemEffect, ItemStat, NodeAA, SpellEntry
 
 BASE_URL       = "https://census.daybreakgames.com"
 _ITEM_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
@@ -160,6 +160,71 @@ class CensusClient:
             name    = guild.get("name", name),
             world   = guild.get("world", world),
             members = members,
+        )
+
+    async def get_character(self, name: str, world: str) -> Optional[CharacterOverview]:
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
+        params = {
+            "name.first": name,
+            "locationdata.world": world,
+            "c:resolve": "equipment(displayname,id,iconid,slot,tier)",
+            "c:show": "name,type,equipmentslot_list,alternateadvancements",
+            "c:limit": "1",
+        }
+        print(f"[Census] GET {url} params={params}")
+        try:
+            async with self._session_().get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
+                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                if resp.status != 200:
+                    return None
+                data = await resp.json(content_type=None)
+        except Exception as exc:
+            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            return None
+
+        char_list = data.get("character_list", [])
+        if not char_list:
+            return None
+        char = char_list[0]
+
+        t = char.get("type") or {}
+        deity_val = t.get("deity")
+
+        # AA count — sum all spent points
+        aas = char.get("alternateadvancements") or {}
+        aa_count = _int(aas.get("pointsspent")) or 0
+
+        # Equipment slots
+        equipment: list[EquipmentSlot] = []
+        for slot in char.get("equipmentslot_list") or []:
+            if not isinstance(slot, dict):
+                continue
+            slot_name = slot.get("slot") or slot.get("name") or ""
+            item = slot.get("item") or slot  # resolved item may be nested or flat
+            item_name = item.get("displayname", "")
+            if not item_name:
+                continue
+            equipment.append(EquipmentSlot(
+                slot_name = slot_name,
+                item_name = item_name,
+                item_id   = str(item["id"]) if item.get("id") else None,
+                icon_id   = str(item["iconid"]) if item.get("iconid") else None,
+                tier      = item.get("tier"),
+            ))
+
+        return CharacterOverview(
+            id        = str(char.get("id", "")),
+            name      = (char.get("name") or {}).get("first", name),
+            level     = _int(t.get("level")),
+            cls       = t.get("class"),
+            race      = t.get("race"),
+            gender    = t.get("gender"),
+            deity     = deity_val if deity_val and str(deity_val).lower() != "none" else None,
+            aa_count  = aa_count,
+            world     = world,
+            equipment = equipment,
         )
 
     async def get_character_aas(self, name: str, world: str) -> Optional[CharacterAAs]:

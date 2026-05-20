@@ -1,0 +1,61 @@
+:root {
+  --bg: #0f1117;
+  --surface: #1c1f2e;
+  --surface-raised: #252840;
+  --border: #2e3150;
+  --text: #e2e4f0;
+  --text-muted: #8b90ab;
+  --accent: #7289da;
+  --accent-hover: #5f73c7;
+
+  /* Item tier colours */
+  --tier-fabled:     #a335ee;
+  --tier-legendary:  #ff8000;
+  --tier-treasured:  #1eff00;
+  --tier-uncommon:   #ffffff;
+  --tier-common:     #9d9d9d;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+input {
+  font-family: inherit;
+  font-size: inherit;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--accent);
+}

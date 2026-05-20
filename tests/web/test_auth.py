@@ -1,25 +1,16 @@
-import json
-from base64 import b64encode
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import itsdangerous
 import pytest
 from httpx import AsyncClient, ASGITransport
 
 from web.app import create_app
 
-_SECRET = "dev-secret-change-in-production"
+_SECRET = "test-secret-fixed"
 
 
 @pytest.fixture
 def app():
-    return create_app()
-
-
-def _make_session_cookie(data: dict) -> str:
-    """Create a valid signed session cookie the same way Starlette does."""
-    payload = b64encode(json.dumps(data).encode()).decode()
-    signer = itsdangerous.TimestampSigner(_SECRET)
-    return signer.sign(payload).decode()
+    return create_app(session_secret=_SECRET)
 
 
 @pytest.mark.asyncio
@@ -31,24 +22,46 @@ async def test_me_unauthenticated(app):
 
 
 @pytest.mark.asyncio
-async def test_me_authenticated(app):
-    """Valid session cookie → returns user data."""
-    session_data = {
-        "user": {
-            "id": "123456789",
-            "username": "testuser",
-            "global_name": "Test User",
-            "avatar": None,
-        }
+async def test_callback_then_me(app):
+    """OAuth callback sets session; /api/auth/me then returns the user."""
+    fake_user = {
+        "id": "123456789",
+        "username": "testuser",
+        "global_name": "Test User",
+        "avatar": None,
     }
-    cookie = _make_session_cookie(session_data)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        client.cookies.set("session", cookie)
-        response = await client.get("/api/auth/me")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == "123456789"
-    assert data["username"] == "testuser"
+
+    mock_token = MagicMock()
+    mock_token.status_code = 200
+    mock_token.json.return_value = {"access_token": "fake-token"}
+
+    mock_user = MagicMock()
+    mock_user.status_code = 200
+    mock_user.json.return_value = fake_user
+
+    mock_http = AsyncMock()
+    mock_http.post = AsyncMock(return_value=mock_token)
+    mock_http.get = AsyncMock(return_value=mock_user)
+
+    with patch("web.routes.auth.httpx.AsyncClient") as MockHttpx:
+        MockHttpx.return_value.__aenter__ = AsyncMock(return_value=mock_http)
+        MockHttpx.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        # Use follow_redirects=True so the callback redirect lands back on /
+        # but we only care that the session cookie gets set
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test", follow_redirects=False
+        ) as client:
+            cb = await client.get("/api/auth/callback?code=fake")
+            assert cb.status_code in (302, 307)
+            session_cookie = cb.cookies.get("session")
+            assert session_cookie is not None, "callback must set a session cookie"
+
+            me = await client.get("/api/auth/me")
+            assert me.status_code == 200
+            data = me.json()
+            assert data["id"] == "123456789"
+            assert data["username"] == "testuser"
 
 
 @pytest.mark.asyncio
