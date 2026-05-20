@@ -163,15 +163,37 @@ function adornColour(color: string) {
   return ADORN_COLOUR[color] ?? '#888'
 }
 
-const TIER_COLOUR: Record<string, string> = {
-  FABLED:    'var(--tier-fabled)',
-  LEGENDARY: 'var(--tier-legendary)',
-  TREASURED: 'var(--tier-treasured)',
-  UNCOMMON:  'var(--tier-uncommon)',
-  COMMON:    'var(--tier-common)',
+type TierStyle = { color: string; textShadow?: string }
+
+const _outline = '-1px 0px 0px #000, 0px 1px 0px #000, 1px 0px 0px #000, 0px -1px 0px #000'
+
+const TIER_STYLE: Record<string, TierStyle> = {
+  MYTHICAL: {
+    color: '#d99fe9',
+    textShadow: `${_outline}, 0px 0px 4px #C859E6, 0px 0px 4px #C859E6`,
+  },
+  FABLED: {
+    color: '#ff939d',
+    textShadow: `${_outline}, 0px 0px 4px #DF535F, 0px 0px 4px #DF535F`,
+  },
+  LEGENDARY: {
+    color: '#ffc993',
+    textShadow: `${_outline}, 0px 0px 4px #D56900, 0px 0px 4px #ffc993`,
+  },
+  MASTERCRAFTED: {
+    color: '#92d7fd',
+    textShadow: `${_outline}, 0px 0px 4px #D56900, 0px 0px 4px #92d7fd`,
+  },
+  TREASURED: {   // same as mastercrafted
+    color: '#92d7fd',
+    textShadow: `${_outline}, 0px 0px 4px #D56900, 0px 0px 4px #92d7fd`,
+  },
+  UNCOMMON: { color: '#a8d4a8' },
+  COMMON:   { color: 'var(--text)' },
 }
-function tierColour(tier: string | null) {
-  return TIER_COLOUR[(tier ?? '').toUpperCase()] ?? 'var(--text)'
+
+function tierStyle(tier: string | null): TierStyle {
+  return TIER_STYLE[(tier ?? '').toUpperCase()] ?? { color: 'var(--text)' }
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -456,7 +478,7 @@ function SlotRow({ label, item, iconSide }: {
     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
       <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', lineHeight: 1 }}>{label}</span>
       {item
-        ? <span style={{ color: tierColour(item.tier), fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{item.name}</span>
+        ? <span style={{ ...tierStyle(item.tier), fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{item.name}</span>
         : <span style={{ color: 'var(--border)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.2 }}>Empty</span>}
       {hasAdorns && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 3px', marginTop: 1 }}>
