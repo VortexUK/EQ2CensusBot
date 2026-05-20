@@ -109,8 +109,11 @@ const RIGHT_SLOTS: [string, string][] = [
   ['Wrist',      'right_wrist'],
   ['Waist',      'waist'],
   ['Ranged',     'ranged'],
-  ['Food',       'food'],
-  ['Drink',      'drink'],
+]
+
+const CONSUMABLE_SLOTS: [string, string][] = [
+  ['Food',  'food'],
+  ['Drink', 'drink'],
 ]
 
 const DISPLAY_TO_BASE: Record<string, string> = {
@@ -277,6 +280,13 @@ function CharacterView({ char }: { char: Character }) {
                 <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="right" />
               ))}
             </div>
+          </div>
+
+          <h2 style={{ ...sectionHeading, marginTop: '1rem' }}>Consumables</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+            {CONSUMABLE_SLOTS.map(([label, key]) => (
+              <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="left" />
+            ))}
           </div>
         </div>
       </div>
