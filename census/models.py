@@ -76,12 +76,19 @@ class ItemData:
 
 
 @dataclass
+class AdornSlot:
+    color: str                      # "White", "Yellow", "Red", etc.
+    adorn_name: Optional[str] = None  # None = empty slot
+
+
+@dataclass
 class EquipmentSlot:
     slot_name: str
     item_name: str
     item_id: Optional[str] = None
     icon_id: Optional[str] = None
     tier: Optional[str] = None      # FABLED, LEGENDARY, etc.
+    adorn_slots: list = field(default_factory=list)  # list[AdornSlot]
 
 
 @dataclass

@@ -3,12 +3,18 @@ import { useParams, Link } from 'react-router-dom'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+interface AdornSlot {
+  color: string
+  adorn_name: string | null
+}
+
 interface EquipmentSlot {
   slot: string
   name: string
   item_id: string | null
   icon_id: string | null
   tier: string | null
+  adorn_slots: AdornSlot[]
 }
 
 interface CharacterStats {
@@ -139,6 +145,20 @@ function buildSlotMap(equipment: EquipmentSlot[]): Map<string, EquipmentSlot> {
     map.set(key, s)
   }
   return map
+}
+
+// Adornment slot colours — matches EQ2 in-game colours
+const ADORN_COLOUR: Record<string, string> = {
+  White:  '#e8e8e8',
+  Yellow: '#e8c840',
+  Red:    '#e05050',
+  Green:  '#50c850',
+  Blue:   '#5090e8',
+  Purple: '#b060e0',
+  Orange: '#e08830',
+}
+function adornColour(color: string) {
+  return ADORN_COLOUR[color] ?? '#888'
 }
 
 const TIER_COLOUR: Record<string, string> = {
@@ -423,21 +443,41 @@ function SlotRow({ label, item, iconSide }: {
   iconSide: 'left' | 'right'
 }) {
   const url = item?.icon_id ? `/icons/${item.icon_id}.png` : null
+  const hasAdorns = (item?.adorn_slots.length ?? 0) > 0
+
   const iconEl = (
     <div style={{ ...iconBox, backgroundImage: `url('/slot-empty-blue.png')`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
       {url && <img src={url} alt={item?.name ?? ''} style={{ width: 40, height: 40, display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
     </div>
   )
   const textEl = (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
       <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', lineHeight: 1 }}>{label}</span>
       {item
-        ? <span style={{ color: tierColour(item.tier), fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>{item.name}</span>
-        : <span style={{ color: 'var(--border)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.3 }}>Empty</span>}
+        ? <span style={{ color: tierColour(item.tier), fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{item.name}</span>
+        : <span style={{ color: 'var(--border)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.2 }}>Empty</span>}
+      {hasAdorns && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 3px', marginTop: 1 }}>
+          {item!.adorn_slots.map((a, i) => (
+            <span key={i} style={{
+              fontSize: '0.62rem', lineHeight: 1, padding: '1px 4px',
+              borderRadius: 2,
+              border: `1px solid ${adornColour(a.color)}`,
+              color: a.adorn_name ? adornColour(a.color) : 'var(--text-muted)',
+              fontStyle: a.adorn_name ? 'normal' : 'italic',
+              opacity: a.adorn_name ? 1 : 0.6,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              maxWidth: 120,
+            }}>
+              {a.adorn_name ?? 'Empty'}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
   return (
-    <div style={{ ...slotRow, flexDirection: iconSide === 'left' ? 'row' : 'row-reverse' }}>
+    <div style={{ ...slotRow, flexDirection: iconSide === 'left' ? 'row' : 'row-reverse', height: 'auto', minHeight: 50, alignItems: 'center' }}>
       {iconEl}{textEl}
     </div>
   )
@@ -452,7 +492,7 @@ const sectionHeading: React.CSSProperties = {
 const slotRow: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: '0.5rem',
   background: 'var(--surface)', border: '1px solid var(--border)',
-  borderRadius: 4, padding: '3px 6px', minWidth: 0, height: 50,
+  borderRadius: 4, padding: '4px 6px', minWidth: 0, minHeight: 50,
 }
 const iconBox: React.CSSProperties = {
   width: 40, height: 40, flexShrink: 0, borderRadius: 3,

@@ -5,11 +5,17 @@ import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from census.client import CensusClient
+from census.models import AdornSlot as _AdornSlot
 
 router = APIRouter(tags=["character"])
 
 _WORLD = os.getenv("EQ2_WORLD", "Varsoon")
 _SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
+
+
+class AdornSlotResponse(BaseModel):
+    color: str
+    adorn_name: str | None = None
 
 
 class EquipmentSlotResponse(BaseModel):
@@ -18,6 +24,7 @@ class EquipmentSlotResponse(BaseModel):
     item_id: str | None = None
     icon_id: str | None = None
     tier: str | None = None
+    adorn_slots: list[AdornSlotResponse] = []
 
 
 class CharacterStats(BaseModel):
@@ -206,11 +213,15 @@ async def get_character(name: str) -> CharacterResponse:
         stats     = _parse_stats(char.stats),
         equipment = [
             EquipmentSlotResponse(
-                slot    = s.slot_name,
-                name    = s.item_name,
-                item_id = s.item_id,
-                icon_id = s.icon_id,
-                tier    = s.tier,
+                slot        = s.slot_name,
+                name        = s.item_name,
+                item_id     = s.item_id,
+                icon_id     = s.icon_id,
+                tier        = s.tier,
+                adorn_slots = [
+                    AdornSlotResponse(color=a.color, adorn_name=a.adorn_name)
+                    for a in s.adorn_slots
+                ],
             )
             for s in char.equipment
         ],

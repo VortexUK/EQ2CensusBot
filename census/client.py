@@ -7,7 +7,7 @@ import aiohttp
 
 from census import db as item_db
 from census.constants import ITEM_DISPLAY, STAT_MAP, TYPEINFO_DISPLAY
-from census.models import CharacterAAs, CharacterOverview, CharacterSpells, EquipmentSlot, GuildData, GuildMember, ItemData, ItemEffect, ItemStat, NodeAA, SpellEntry
+from census.models import AdornSlot, CharacterAAs, CharacterOverview, CharacterSpells, EquipmentSlot, GuildData, GuildMember, ItemData, ItemEffect, ItemStat, NodeAA, SpellEntry
 
 BASE_URL       = "https://census.daybreakgames.com"
 _ITEM_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
@@ -212,23 +212,45 @@ class CensusClient:
             if item_id is None:
                 continue
 
-            # Look up item name + tier from local DB
+            # Look up item name + tier + adornment slot colours from local DB
             db_row = await item_db.find_by_id(item_id)
             if db_row:
                 item_name = db_row.get("displayname") or f"Item #{item_id}"
                 item_tier = db_row.get("tier")
                 icon_id   = str(db_row["iconid"]) if db_row.get("iconid") else None
+                slot_colors: list[str] = [
+                    s["color"].capitalize()
+                    for s in (db_row.get("adornmentslot_list") or [])
+                    if isinstance(s, dict) and s.get("color")
+                ]
             else:
-                item_name = f"Item #{item_id}"
-                item_tier = None
-                icon_id   = None
+                item_name   = f"Item #{item_id}"
+                item_tier   = None
+                icon_id     = None
+                slot_colors = []
+
+            # Equipped adorns come from the Census character data (adornmentlist on item)
+            equipped: dict[str, str] = {}   # color.capitalize() → adorn name
+            for adorn in (item_data.get("adornmentlist") or []):
+                if not isinstance(adorn, dict):
+                    continue
+                color = (adorn.get("slot") or {}).get("color") or adorn.get("color", "")
+                aname = adorn.get("name") or adorn.get("displayname", "")
+                if color and aname:
+                    equipped[color.capitalize()] = aname
+
+            adorn_slots = [
+                AdornSlot(color=c, adorn_name=equipped.get(c))
+                for c in slot_colors
+            ]
 
             equipment.append(EquipmentSlot(
-                slot_name = slot_display,
-                item_name = item_name,
-                item_id   = str(item_id),
-                icon_id   = icon_id,
-                tier      = item_tier,
+                slot_name   = slot_display,
+                item_name   = item_name,
+                item_id     = str(item_id),
+                icon_id     = icon_id,
+                tier        = item_tier,
+                adorn_slots = adorn_slots,
             ))
 
         gender   = t.get("gender", "")
