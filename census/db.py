@@ -19,6 +19,19 @@ def _resolve_db_path() -> Path:
 
 DB_PATH = _resolve_db_path()
 
+
+def _resolve_max_level() -> "int | None":
+    """
+    SERVER_MAX_LEVEL env var caps item lookups by name to items usable at or
+    below this level (e.g. 70 for an Echoes of Faydwer TLE).
+    Unset → no level filtering.
+    """
+    import os
+    v = os.getenv("SERVER_MAX_LEVEL")
+    return int(v) if v else None
+
+SERVER_MAX_LEVEL: "int | None" = _resolve_max_level()
+
 # ---------------------------------------------------------------------------
 # EQ2 class-group constants and label helper
 # ---------------------------------------------------------------------------
@@ -507,22 +520,51 @@ async def find_by_name(name: str, path: Path = DB_PATH) -> Optional[dict]:
         return None
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
-        # Exact match first — highest tier, most recently updated wins
-        async with db.execute(
-            "SELECT raw_json FROM items WHERE displayname_lower = ?"
-            " ORDER BY tierid DESC, last_update DESC LIMIT 1",
-            (name.lower(),),
-        ) as cur:
-            row = await cur.fetchone()
+
+        async def _best(where_clause: str, params: tuple) -> "aiosqlite.Row | None":
+            """
+            Return the best matching row given a WHERE clause + params.
+
+            When SERVER_MAX_LEVEL is set:
+              1. Try items with level_to_use <= max (or no level requirement).
+                 Order: highest level first, then best tier, then most recent.
+              2. If nothing qualifies, fall back to the highest-level item overall
+                 (so the user at least gets something rather than nothing).
+            When SERVER_MAX_LEVEL is not set:
+              Order by tierid DESC, last_update DESC (original behaviour).
+            """
+            if SERVER_MAX_LEVEL is not None:
+                # Phase 1: valid for current expansion
+                async with db.execute(
+                    f"SELECT raw_json FROM items WHERE {where_clause}"
+                    "  AND (level_to_use IS NULL OR level_to_use <= ?)"
+                    "  ORDER BY level_to_use DESC, tierid DESC, last_update DESC LIMIT 1",
+                    params + (SERVER_MAX_LEVEL,),
+                ) as cur:
+                    row = await cur.fetchone()
+                if row:
+                    return row
+                # Phase 2: nothing valid — return highest-level item anyway
+                async with db.execute(
+                    f"SELECT raw_json FROM items WHERE {where_clause}"
+                    "  ORDER BY level_to_use DESC, tierid DESC, last_update DESC LIMIT 1",
+                    params,
+                ) as cur:
+                    return await cur.fetchone()
+            else:
+                async with db.execute(
+                    f"SELECT raw_json FROM items WHERE {where_clause}"
+                    "  ORDER BY tierid DESC, last_update DESC LIMIT 1",
+                    params,
+                ) as cur:
+                    return await cur.fetchone()
+
+        # Exact match first
+        row = await _best("displayname_lower = ?", (name.lower(),))
         if row:
             return json.loads(row["raw_json"])
         # LIKE fallback
-        async with db.execute(
-            "SELECT raw_json FROM items WHERE displayname_lower LIKE ?"
-            " ORDER BY tierid DESC, last_update DESC LIMIT 1",
-            (f"%{name.lower()}%",),
-        ) as cur:
-            row = await cur.fetchone()
+        row = await _best("displayname_lower LIKE ?", (f"%{name.lower()}%",))
         return json.loads(row["raw_json"]) if row else None
 
 
@@ -547,19 +589,33 @@ async def find_by_id(item_id: int, path: Path = DB_PATH) -> Optional[dict]:
 def _find_by_name_sync(name: str, path: Path) -> Optional[dict]:
     if not path.exists():
         return None
+
+    def _best(conn: sqlite3.Connection, where_clause: str, params: tuple) -> Optional[sqlite3.Row]:
+        if SERVER_MAX_LEVEL is not None:
+            row = conn.execute(
+                f"SELECT raw_json FROM items WHERE {where_clause}"
+                "  AND (level_to_use IS NULL OR level_to_use <= ?)"
+                "  ORDER BY level_to_use DESC, tierid DESC, last_update DESC LIMIT 1",
+                params + (SERVER_MAX_LEVEL,),
+            ).fetchone()
+            if row:
+                return row
+            return conn.execute(
+                f"SELECT raw_json FROM items WHERE {where_clause}"
+                "  ORDER BY level_to_use DESC, tierid DESC, last_update DESC LIMIT 1",
+                params,
+            ).fetchone()
+        return conn.execute(
+            f"SELECT raw_json FROM items WHERE {where_clause}"
+            "  ORDER BY tierid DESC, last_update DESC LIMIT 1",
+            params,
+        ).fetchone()
+
     with sqlite3.connect(path) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT raw_json FROM items WHERE displayname_lower = ?"
-            " ORDER BY tierid DESC, last_update DESC LIMIT 1",
-            (name.lower(),),
-        ).fetchone()
+        row = _best(conn, "displayname_lower = ?", (name.lower(),))
         if not row:
-            row = conn.execute(
-                "SELECT raw_json FROM items WHERE displayname_lower LIKE ?"
-                " ORDER BY tierid DESC, last_update DESC LIMIT 1",
-                (f"%{name.lower()}%",),
-            ).fetchone()
+            row = _best(conn, "displayname_lower LIKE ?", (f"%{name.lower()}%",))
         return json.loads(row["raw_json"]) if row else None
 
 
