@@ -154,6 +154,10 @@ function tierColour(tier: string | null) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
+// Module-level cache: survives re-renders and Vite HMR remounts.
+// Keyed by lower-cased character name.
+const _charCache = new Map<string, Character>()
+
 type State =
   | { status: 'loading' }
   | { status: 'ok'; char: Character }
@@ -162,11 +166,16 @@ type State =
 
 export default function CharacterPage() {
   const { name } = useParams<{ name: string }>()
-  const [state, setState] = useState<State>({ status: 'loading' })
+  const [state, setState] = useState<State>(() => {
+    // Initialise from cache so there's never a loading flash on back-navigation.
+    const cached = name ? _charCache.get(name.toLowerCase()) : undefined
+    return cached ? { status: 'ok', char: cached } : { status: 'loading' }
+  })
 
   useEffect(() => {
     if (!name) return
-    setState({ status: 'loading' })
+    // Already have fresh data — don't hit Census again.
+    if (_charCache.has(name.toLowerCase())) return
     fetch(`/api/character/${encodeURIComponent(name)}`, { credentials: 'include' })
       .then(async res => {
         if (res.status === 404) { setState({ status: 'not_found', name }); return }
@@ -175,7 +184,9 @@ export default function CharacterPage() {
           setState({ status: 'error', message: body.detail ?? `HTTP ${res.status}` })
           return
         }
-        setState({ status: 'ok', char: await res.json() })
+        const char: Character = await res.json()
+        _charCache.set(name.toLowerCase(), char)
+        setState({ status: 'ok', char })
       })
       .catch(err => setState({ status: 'error', message: String(err) }))
   }, [name])
