@@ -16,6 +16,7 @@ _SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
 class AdornSlotResponse(BaseModel):
     color: str
     adorn_name: str | None = None
+    adorn_id: str | None = None
 
 
 class EquipmentSlotResponse(BaseModel):
@@ -219,7 +220,7 @@ async def get_character(name: str) -> CharacterResponse:
                 icon_id     = s.icon_id,
                 tier        = s.tier,
                 adorn_slots = [
-                    AdornSlotResponse(color=a.color, adorn_name=a.adorn_name)
+                    AdornSlotResponse(color=a.color, adorn_name=a.adorn_name, adorn_id=a.adorn_id)
                     for a in s.adorn_slots
                 ],
             )

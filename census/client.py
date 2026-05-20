@@ -237,7 +237,11 @@ class CensusClient:
                     adorn_name = adorn_db.get("displayname") if adorn_db else f"Adorn #{adorn_id}"
                 else:
                     adorn_name = None
-                adorn_slots.append(AdornSlot(color=color, adorn_name=adorn_name))
+                adorn_slots.append(AdornSlot(
+                    color=color,
+                    adorn_name=adorn_name,
+                    adorn_id=str(adorn_id) if adorn_id is not None else None,
+                ))
 
             equipment.append(EquipmentSlot(
                 slot_name   = slot_display,

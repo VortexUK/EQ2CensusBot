@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { ItemTooltip, TooltipState } from '../components/ItemTooltip'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface AdornSlot {
   color: string
   adorn_name: string | null
+  adorn_id: string | null
 }
 
 interface EquipmentSlot {
@@ -253,9 +255,18 @@ export default function CharacterPage() {
 
 function CharacterView({ char }: { char: Character }) {
   const bySlot = buildSlotMap(char.equipment)
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+
+  const showTip = useCallback((itemId: string, e: React.MouseEvent) => {
+    setTooltip({ itemId, x: e.clientX, y: e.clientY })
+  }, [])
+  const hideTip = useCallback(() => setTooltip(null), [])
+  const moveTip = useCallback((e: React.MouseEvent) => {
+    if (tooltip) setTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : null)
+  }, [tooltip])
 
   return (
-    <div style={{ marginTop: '1.5rem' }}>
+    <div style={{ marginTop: '1.5rem' }} onMouseMove={moveTip}>
       {/* Full-width general banner */}
       <GeneralBanner char={char} />
 
@@ -272,12 +283,12 @@ function CharacterView({ char }: { char: Character }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {LEFT_SLOTS.map(([label, key]) => (
-                <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="left" />
+                <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="left" onShow={showTip} onHide={hideTip} />
               ))}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {RIGHT_SLOTS.map(([label, key]) => (
-                <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="right" />
+                <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="right" onShow={showTip} onHide={hideTip} />
               ))}
             </div>
           </div>
@@ -285,11 +296,13 @@ function CharacterView({ char }: { char: Character }) {
           <h2 style={{ ...sectionHeading, marginTop: '1rem' }}>Consumables</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
             {CONSUMABLE_SLOTS.map(([label, key]) => (
-              <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="left" />
+              <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="left" onShow={showTip} onHide={hideTip} />
             ))}
           </div>
         </div>
       </div>
+
+      {tooltip && <ItemTooltip state={tooltip} />}
     </div>
   )
 }
@@ -471,10 +484,12 @@ function StatGroup({ title, children }: { title: string; children: React.ReactNo
 
 // ── Paperdoll helpers ─────────────────────────────────────────────────────────
 
-function SlotRow({ label, item, iconSide }: {
+function SlotRow({ label, item, iconSide, onShow, onHide }: {
   label: string
   item: EquipmentSlot | null
   iconSide: 'left' | 'right'
+  onShow: (itemId: string, e: React.MouseEvent) => void
+  onHide: () => void
 }) {
   const url = item?.icon_id ? `/icons/${item.icon_id}.png` : null
   const hasAdorns = (item?.adorn_slots.length ?? 0) > 0
@@ -493,16 +508,22 @@ function SlotRow({ label, item, iconSide }: {
       {hasAdorns && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 3px', marginTop: 1 }}>
           {item!.adorn_slots.map((a, i) => (
-            <span key={i} style={{
-              fontSize: '0.62rem', lineHeight: 1, padding: '1px 4px',
-              borderRadius: 2,
-              border: `1px solid ${adornColour(a.color)}`,
-              color: a.adorn_name ? adornColour(a.color) : 'var(--text-muted)',
-              fontStyle: a.adorn_name ? 'normal' : 'italic',
-              opacity: a.adorn_name ? 1 : 0.6,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              maxWidth: 120,
-            }}>
+            <span
+              key={i}
+              style={{
+                fontSize: '0.62rem', lineHeight: 1, padding: '1px 4px',
+                borderRadius: 2,
+                border: `1px solid ${adornColour(a.color)}`,
+                color: a.adorn_name ? adornColour(a.color) : 'var(--text-muted)',
+                fontStyle: a.adorn_name ? 'normal' : 'italic',
+                opacity: a.adorn_name ? 1 : 0.6,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                maxWidth: 120,
+                cursor: a.adorn_id ? 'default' : undefined,
+              }}
+              onMouseEnter={a.adorn_id ? e => { e.stopPropagation(); onShow(a.adorn_id!, e) } : undefined}
+              onMouseLeave={a.adorn_id ? e => { e.stopPropagation(); onHide() } : undefined}
+            >
               {a.adorn_name ?? 'Empty'}
             </span>
           ))}
@@ -511,7 +532,11 @@ function SlotRow({ label, item, iconSide }: {
     </div>
   )
   return (
-    <div style={{ ...slotRow, flexDirection: iconSide === 'left' ? 'row' : 'row-reverse', height: 'auto', minHeight: 50, alignItems: 'center' }}>
+    <div
+      style={{ ...slotRow, flexDirection: iconSide === 'left' ? 'row' : 'row-reverse', height: 'auto', minHeight: 50, alignItems: 'center' }}
+      onMouseEnter={item?.item_id ? e => onShow(item.item_id!, e) : undefined}
+      onMouseLeave={item?.item_id ? onHide : undefined}
+    >
       {iconEl}{textEl}
     </div>
   )

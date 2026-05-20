@@ -79,6 +79,7 @@ class ItemData:
 class AdornSlot:
     color: str                      # "White", "Yellow", "Red", etc.
     adorn_name: Optional[str] = None  # None = empty slot
+    adorn_id: Optional[str] = None    # item DB id for tooltip lookup
 
 
 @dataclass

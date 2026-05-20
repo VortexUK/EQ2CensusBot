@@ -14,6 +14,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from web.routes.health import router as health_router
 from web.routes.auth import router as auth_router
 from web.routes.character import router as character_router
+from web.routes.item import router as item_router
 
 _FRONTEND_DIST  = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 _ICONS_DIR      = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
@@ -44,6 +45,7 @@ def create_app(session_secret: str | None = None) -> FastAPI:
     app.include_router(health_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
     app.include_router(character_router, prefix="/api")
+    app.include_router(item_router, prefix="/api")
 
     # Item icons — served from local data directory
     if _ICONS_DIR.exists():
