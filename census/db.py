@@ -507,9 +507,10 @@ async def find_by_name(name: str, path: Path = DB_PATH) -> Optional[dict]:
         return None
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
-        # Exact match first
+        # Exact match first — highest tier, most recently updated wins
         async with db.execute(
-            "SELECT raw_json FROM items WHERE displayname_lower = ? LIMIT 1",
+            "SELECT raw_json FROM items WHERE displayname_lower = ?"
+            " ORDER BY tierid DESC, last_update DESC LIMIT 1",
             (name.lower(),),
         ) as cur:
             row = await cur.fetchone()
@@ -517,7 +518,8 @@ async def find_by_name(name: str, path: Path = DB_PATH) -> Optional[dict]:
             return json.loads(row["raw_json"])
         # LIKE fallback
         async with db.execute(
-            "SELECT raw_json FROM items WHERE displayname_lower LIKE ? LIMIT 1",
+            "SELECT raw_json FROM items WHERE displayname_lower LIKE ?"
+            " ORDER BY tierid DESC, last_update DESC LIMIT 1",
             (f"%{name.lower()}%",),
         ) as cur:
             row = await cur.fetchone()
@@ -548,12 +550,14 @@ def _find_by_name_sync(name: str, path: Path) -> Optional[dict]:
     with sqlite3.connect(path) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            "SELECT raw_json FROM items WHERE displayname_lower = ? LIMIT 1",
+            "SELECT raw_json FROM items WHERE displayname_lower = ?"
+            " ORDER BY tierid DESC, last_update DESC LIMIT 1",
             (name.lower(),),
         ).fetchone()
         if not row:
             row = conn.execute(
-                "SELECT raw_json FROM items WHERE displayname_lower LIKE ? LIMIT 1",
+                "SELECT raw_json FROM items WHERE displayname_lower LIKE ?"
+                " ORDER BY tierid DESC, last_update DESC LIMIT 1",
                 (f"%{name.lower()}%",),
             ).fetchone()
         return json.loads(row["raw_json"]) if row else None
