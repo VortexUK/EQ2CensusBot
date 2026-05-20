@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,19 +57,24 @@ type Tab = 'roster' | 'spells' | 'adorns'
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
 
+// Fighters=Red, Scouts=Yellow, Mages=Blue, Priests=Green
 const CLASS_COLOURS: Record<string, string> = {
-  Guardian: '#93b4ff', Berserker: '#93b4ff',
-  Paladin: '#93b4ff', Shadowknight: '#c493ff',
-  Monk: '#93b4ff', Bruiser: '#93b4ff',
-  Ranger: '#beff93', Assassin: '#beff93',
-  Troubador: '#beff93', Dirge: '#beff93',
-  Swashbuckler: '#beff93', Brigand: '#beff93',
-  Wizard: '#ff9393', Warlock: '#ff9393',
-  Conjuror: '#ff9393', Necromancer: '#c493ff',
-  Illusionist: '#c493ff', Coercer: '#c493ff',
-  Templar: '#ffd993', Inquisitor: '#ffd993',
-  Mystic: '#ffd993', Defiler: '#c493ff',
-  Warden: '#beff93', Fury: '#beff93',
+  // Fighters
+  Guardian: '#f87171', Berserker: '#f87171',
+  Paladin: '#f87171', Shadowknight: '#f87171',
+  Monk: '#f87171', Bruiser: '#f87171',
+  // Scouts
+  Ranger: '#fbbf24', Assassin: '#fbbf24',
+  Troubador: '#fbbf24', Dirge: '#fbbf24',
+  Swashbuckler: '#fbbf24', Brigand: '#fbbf24',
+  // Mages
+  Wizard: '#93b4ff', Warlock: '#93b4ff',
+  Conjuror: '#93b4ff', Necromancer: '#93b4ff',
+  Illusionist: '#93b4ff', Coercer: '#93b4ff',
+  // Priests
+  Templar: '#4ade80', Inquisitor: '#4ade80',
+  Mystic: '#4ade80', Defiler: '#4ade80',
+  Warden: '#4ade80', Fury: '#4ade80',
 }
 
 // Tier → colour: below Expert = red tones, Expert+ = green tones
@@ -311,6 +316,7 @@ function AdornCheckTable({ data, filter }: { data: GuildAdornCheck; filter: stri
 
 export default function GuildPage() {
   const { characterName } = useParams<{ characterName: string }>()
+  const navigate = useNavigate()
 
   const [tab, setTab] = useState<Tab>('roster')
   const [filter, setFilter] = useState('')
@@ -338,7 +344,12 @@ export default function GuildPage() {
     fetch(`/api/guild/${encodeURIComponent(characterName)}`)
       .then(async res => {
         if (!res.ok) { setRosterError((await res.json().catch(() => ({}))).detail ?? `Error ${res.status}`); return }
-        setRoster(await res.json())
+        const data = await res.json()
+        setRoster(data)
+        // Replace URL with the actual guild name so it's bookmarkable
+        if (characterName !== data.name) {
+          navigate(`/guild/${encodeURIComponent(data.name)}`, { replace: true })
+        }
       })
       .catch(() => setRosterError('Network error — please try again.'))
       .finally(() => setRosterLoading(false))

@@ -120,14 +120,13 @@ def _int(v) -> int | None:
         return None
 
 
-async def _resolve_guild_name(client: CensusClient, character_name: str) -> str:
-    guild_name = await client.get_character_guild_name(character_name, _WORLD)
-    if not guild_name:
-        raise HTTPException(
-            status_code=404,
-            detail=f"'{character_name}' is not in a guild or was not found on {_WORLD}.",
-        )
-    return guild_name
+async def _resolve_guild_name(client: CensusClient, name: str) -> str:
+    """
+    Accept either a character name (looks up their guild) or a guild name directly.
+    Character lookup is tried first; if it returns nothing, `name` is used as-is.
+    """
+    guild_name = await client.get_character_guild_name(name, _WORLD)
+    return guild_name if guild_name else name
 
 
 # ---------------------------------------------------------------------------
