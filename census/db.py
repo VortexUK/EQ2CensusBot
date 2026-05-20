@@ -240,6 +240,13 @@ CREATE TABLE IF NOT EXISTS items (
     class_label          TEXT,              -- e.g. "All Classes", "All Priests", "Guardian"
     class_count          INTEGER,           -- number of classes that can use this item
 
+    -- Armor proficiency / spell scroll extras (from typeinfo)
+    skill_type           TEXT,              -- e.g. "heavyarmor", "mediumarmor", "magicaffinity"
+    spell_target         TEXT,              -- e.g. "Enemy", "Caster", "Group (AE)"
+    spell_range          TEXT,              -- e.g. "Up to 25.0 meters"
+    spell_power_cost     INTEGER,           -- power cost to cast
+    spell_resistability  TEXT,              -- e.g. "25.2% Easier", "na"
+
     -- Common flags as fast-filter booleans
     flag_heirloom        INTEGER DEFAULT 0,
     flag_lore            INTEGER DEFAULT 0,
@@ -273,6 +280,7 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_visible     ON items(visible);",
     "CREATE INDEX IF NOT EXISTS idx_ti_name     ON items(typeinfo_name);",
     "CREATE INDEX IF NOT EXISTS idx_class_label ON items(class_label);",
+    "CREATE INDEX IF NOT EXISTS idx_skill_type  ON items(skill_type);",
 ]
 
 # Columns added after initial schema — used by init_db() to migrate existing DBs
@@ -283,6 +291,11 @@ _MIGRATIONS = [
     ("physical_damage_absorption", "INTEGER"),
     ("class_label",                "TEXT"),
     ("class_count",                "INTEGER"),
+    ("skill_type",                 "TEXT"),
+    ("spell_target",               "TEXT"),
+    ("spell_range",                "TEXT"),
+    ("spell_power_cost",           "INTEGER"),
+    ("spell_resistability",        "TEXT"),
 ]
 
 _UPSERT_SQL = """
@@ -304,6 +317,7 @@ INSERT OR REPLACE INTO items (
     associated_quest, autoquest, first_discovered,
     visible, typeinfo_name, classes_json, physical_damage_absorption,
     class_label, class_count,
+    skill_type, spell_target, spell_range, spell_power_cost, spell_resistability,
     flag_heirloom, flag_lore, flag_lore_equip, flag_no_trade, flag_no_value,
     flag_no_zone, flag_prestige, flag_relic, flag_attunable, flag_ornate,
     flag_refined, flag_infusable, flag_indestructible,
@@ -326,6 +340,7 @@ INSERT OR REPLACE INTO items (
     :associated_quest, :autoquest, :first_discovered,
     :visible, :typeinfo_name, :classes_json, :physical_damage_absorption,
     :class_label, :class_count,
+    :skill_type, :spell_target, :spell_range, :spell_power_cost, :spell_resistability,
     :flag_heirloom, :flag_lore, :flag_lore_equip, :flag_no_trade, :flag_no_value,
     :flag_no_zone, :flag_prestige, :flag_relic, :flag_attunable, :flag_ornate,
     :flag_refined, :flag_infusable, :flag_indestructible,
@@ -442,6 +457,11 @@ def item_to_row(item: dict) -> dict:
         "physical_damage_absorption":   _int_field_zero(typeinfo.get("physicaldamageabsorption")),
         "class_label":                  compute_class_label(typeinfo.get("classes")),
         "class_count":                  len(typeinfo["classes"]) if typeinfo.get("classes") else None,
+        "skill_type":                   _str_field(typeinfo, "skilltype"),
+        "spell_target":                 _str_field(typeinfo, "spelltarget"),
+        "spell_range":                  _str_field(typeinfo, "spellrange"),
+        "spell_power_cost":             _int_field_zero(typeinfo.get("spellpowercost")),
+        "spell_resistability":          _str_field(typeinfo, "resistability"),
         "flag_heirloom":        _flag(flags, "heirloom"),
         "flag_lore":            _flag(flags, "lore"),
         "flag_lore_equip":      _flag(flags, "lore-equip"),
