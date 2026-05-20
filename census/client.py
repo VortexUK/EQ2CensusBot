@@ -163,7 +163,7 @@ class CensusClient:
         )
 
     # Slots to exclude from the equipment display
-    _SKIP_SLOTS = frozenset({"food", "drink", "ammo", "event slot", "mount adornment", "mount armor"})
+    _SKIP_SLOTS = frozenset({"ammo", "event slot", "mount adornment", "mount armor"})
 
     async def get_character(self, name: str, world: str) -> Optional[CharacterOverview]:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"

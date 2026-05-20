@@ -24,33 +24,70 @@ interface Character {
   equipment: EquipmentSlot[]
 }
 
-// Canonical display name → internal slot name mapping, in paperdoll order
+// [label, internal_key] — order matches eq2wire paperdoll
 const LEFT_SLOTS: [string, string][] = [
-  ['Charm',      'activate1'],
-  ['Charm',      'activate2'],
-  ['Head',       'head'],
-  ['Neck',       'neck'],
-  ['Shoulders',  'shoulders'],
   ['Cloak',      'cloak'],
+  ['Head',       'head'],
+  ['Shoulders',  'shoulders'],
   ['Chest',      'chest'],
-  ['Forearms',   'forearms'],
+  ['Arms',       'forearms'],
   ['Hands',      'hands'],
-  ['Waist',      'waist'],
   ['Legs',       'legs'],
   ['Feet',       'feet'],
-]
-
-const RIGHT_SLOTS: [string, string][] = [
   ['Primary',    'primary'],
   ['Secondary',  'secondary'],
   ['Ranged',     'ranged'],
-  ['Wrist',      'left_wrist'],
-  ['Wrist',      'right_wrist'],
-  ['Finger',     'left_ring'],
-  ['Finger',     'right_ring'],
+  ['Charm',      'activate1'],
+]
+
+const RIGHT_SLOTS: [string, string][] = [
+  ['Charm',      'activate2'],
   ['Ear',        'ears'],
   ['Ear',        'ears2'],
+  ['Neck',       'neck'],
+  ['Ring',       'left_ring'],
+  ['Ring',       'right_ring'],
+  ['Wrist',      'left_wrist'],
+  ['Wrist',      'right_wrist'],
+  ['Waist',      'waist'],
+  ['Food',       'food'],
+  ['Drink',      'drink'],
 ]
+
+// Census displayname → internal key(s) — multi-slot types resolved by encounter order
+const DISPLAY_TO_BASE: Record<string, string> = {
+  Primary: 'primary', Secondary: 'secondary', Ranged: 'ranged',
+  Head: 'head', Chest: 'chest', Shoulders: 'shoulders',
+  Forearms: 'forearms', Hands: 'hands', Legs: 'legs',
+  Feet: 'feet', Waist: 'waist', Neck: 'neck', Cloak: 'cloak',
+  Charm: 'activate', Finger: 'ring', Ear: 'ear', Wrist: 'wrist',
+  Food: 'food', Drink: 'drink',
+}
+const MULTI_SUFFIXES: Record<string, string[]> = {
+  activate: ['activate1', 'activate2'],
+  ring:     ['left_ring', 'right_ring'],
+  ear:      ['ears', 'ears2'],
+  wrist:    ['left_wrist', 'right_wrist'],
+}
+
+function buildSlotMap(equipment: EquipmentSlot[]): Map<string, EquipmentSlot> {
+  const map = new Map<string, EquipmentSlot>()
+  const counters: Record<string, number> = {}
+  for (const s of equipment) {
+    const base = DISPLAY_TO_BASE[s.slot]
+    if (!base) continue
+    const suffixes = MULTI_SUFFIXES[base]
+    let key: string
+    if (suffixes) {
+      counters[base] = (counters[base] ?? 0) + 1
+      key = suffixes[counters[base] - 1] ?? base
+    } else {
+      key = base
+    }
+    map.set(key, s)
+  }
+  return map
+}
 
 const TIER_COLOUR: Record<string, string> = {
   FABLED:    'var(--tier-fabled)',
@@ -59,9 +96,14 @@ const TIER_COLOUR: Record<string, string> = {
   UNCOMMON:  'var(--tier-uncommon)',
   COMMON:    'var(--tier-common)',
 }
+function tierColour(tier: string | null) {
+  return TIER_COLOUR[(tier ?? '').toUpperCase()] ?? 'var(--text)'
+}
 
-function tierColour(tier: string | null): string {
-  return TIER_COLOUR[(tier ?? '').toUpperCase()] ?? 'var(--text-muted)'
+function iconUrl(iconId: string | null): string | null {
+  return iconId
+    ? `https://census.daybreakgames.com/files/eq2/images/icons/icon_${iconId}.png`
+    : null
 }
 
 type State =
@@ -91,9 +133,8 @@ export default function CharacterPage() {
   }, [name])
 
   return (
-    <main style={{ maxWidth: 900, margin: '2rem auto', padding: '0 1rem' }}>
+    <main style={{ maxWidth: 960, margin: '2rem auto', padding: '0 1rem' }}>
       <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
-
       {state.status === 'loading' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Loading…</p>}
       {state.status === 'not_found' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Character <strong>{state.name}</strong> not found.</p>}
       {state.status === 'error' && <p style={{ marginTop: '2rem', color: '#f87171' }}>Error: {state.message}</p>}
@@ -103,95 +144,89 @@ export default function CharacterPage() {
 }
 
 function CharacterView({ char }: { char: Character }) {
-  // Map item_id → slot so we can look up by the canonical internal key.
-  // The API's slot field is the Census displayname (e.g. "Primary", "Finger").
-  // We index by item_id to avoid display-name collisions (two "Finger" slots, two "Ear" etc.)
-  // and build a separate ordered list keyed by our canonical slot names.
-  const byInternalKey = new Map<string, EquipmentSlot>()
-  // Census slot displayname → internal key mapping (matches LEFT_SLOTS / RIGHT_SLOTS)
-  const DISPLAY_TO_KEY: Record<string, string> = {
-    'Primary': 'primary', 'Secondary': 'secondary', 'Ranged': 'ranged',
-    'Head': 'head', 'Chest': 'chest', 'Shoulders': 'shoulders',
-    'Forearms': 'forearms', 'Hands': 'hands', 'Legs': 'legs',
-    'Feet': 'feet', 'Waist': 'waist', 'Neck': 'neck', 'Cloak': 'cloak',
-    'Charm': 'activate',   // handled below with counter
-    'Finger': 'ring',      // handled below with counter
-    'Ear': 'ear',          // handled below with counter
-    'Wrist': 'wrist',      // handled below with counter
-  }
-  const counters: Record<string, number> = {}
-  for (const s of char.equipment) {
-    const base = DISPLAY_TO_KEY[s.slot]
-    if (!base) continue
-    // Multi slots get a numeric suffix: activate1/activate2, left_ring/right_ring etc.
-    let key: string
-    if (['activate', 'ring', 'ear', 'wrist'].includes(base)) {
-      counters[base] = (counters[base] ?? 0) + 1
-      const suffixes: Record<string, string[]> = {
-        activate: ['activate1', 'activate2'],
-        ring:     ['left_ring', 'right_ring'],
-        ear:      ['ears', 'ears2'],
-        wrist:    ['left_wrist', 'right_wrist'],
-      }
-      key = suffixes[base][counters[base] - 1] ?? base
-    } else {
-      key = base
-    }
-    byInternalKey.set(key, s)
-  }
-  const bySlot = byInternalKey
+  const bySlot = buildSlotMap(char.equipment)
 
   return (
     <div style={{ marginTop: '1.5rem' }}>
-      {/* ── Header ── */}
       <h1 style={{ marginBottom: '0.15rem' }}>{char.name}</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
         {[char.world, char.race, char.gender].filter(Boolean).join(' · ')}
       </p>
 
-      {/* ── Summary strip ── */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-        <Chip label="Level" value={char.level ?? '—'} />
-        <Chip label="Class" value={char.cls ?? '—'} />
-        <Chip label="AAs"   value={char.aa_count} />
-        {char.deity   && <Chip label="Deity" value={char.deity} />}
+      {/* Summary chips */}
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.75rem' }}>
+        <Chip label="Level"    value={char.level ?? '—'} />
+        <Chip label="Class"    value={char.cls ?? '—'} />
+        <Chip label="AAs"      value={char.aa_count} />
+        {char.deity    && <Chip label="Deity"    value={char.deity} />}
         {char.ts_class && <Chip label="Crafting" value={`${char.ts_class} ${char.ts_level ?? ''}`} />}
       </div>
 
-      {/* ── Paperdoll ── */}
+      {/* Paperdoll */}
       <h2 style={sectionHeading}>Equipment</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-        <SlotColumn slots={LEFT_SLOTS}  bySlot={bySlot} />
-        <SlotColumn slots={RIGHT_SLOTS} bySlot={bySlot} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+        {/* Left column — icon on the LEFT */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {LEFT_SLOTS.map(([label, key]) => (
+            <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="left" />
+          ))}
+        </div>
+        {/* Right column — icon on the RIGHT */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {RIGHT_SLOTS.map(([label, key]) => (
+            <SlotRow key={key} label={label} item={bySlot.get(key) ?? null} iconSide="right" />
+          ))}
+        </div>
       </div>
     </div>
   )
 }
 
-function SlotColumn({
-  slots,
-  bySlot,
+function SlotRow({
+  label,
+  item,
+  iconSide,
 }: {
-  slots: [string, string][]
-  bySlot: Map<string, EquipmentSlot>
+  label: string
+  item: EquipmentSlot | null
+  iconSide: 'left' | 'right'
 }) {
+  const url = iconUrl(item?.icon_id ?? null)
+
+  const iconEl = (
+    <div style={iconBox}>
+      {url ? (
+        <img
+          src={url}
+          alt={item?.name ?? ''}
+          style={{ width: 40, height: 40 }}
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+      ) : null}
+    </div>
+  )
+
+  const textEl = (
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', lineHeight: 1 }}>
+        {label}
+      </span>
+      {item ? (
+        <span style={{ color: tierColour(item.tier), fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+          {item.name}
+        </span>
+      ) : (
+        <span style={{ color: 'var(--border)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.3 }}>
+          Empty
+        </span>
+      )}
+    </div>
+  )
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-      {slots.map(([label, key]) => {
-        const item = bySlot.get(key)
-        return (
-          <div key={key} style={slotRow}>
-            <span style={slotLabel}>{label}</span>
-            {item ? (
-              <span style={{ color: tierColour(item.tier), fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {item.name}
-              </span>
-            ) : (
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Empty</span>
-            )}
-          </div>
-        )
-      })}
+    <div style={{ ...slotRow, flexDirection: iconSide === 'left' ? 'row' : 'row-reverse' }}>
+      {iconEl}
+      {textEl}
     </div>
   )
 }
@@ -206,7 +241,7 @@ function Chip({ label, value }: { label: string; value: string | number }) {
 }
 
 const sectionHeading: React.CSSProperties = {
-  fontSize: '0.8rem',
+  fontSize: '0.78rem',
   textTransform: 'uppercase',
   letterSpacing: '0.07em',
   color: 'var(--text-muted)',
@@ -219,16 +254,20 @@ const slotRow: React.CSSProperties = {
   gap: '0.5rem',
   background: 'var(--surface)',
   border: '1px solid var(--border)',
-  borderRadius: 5,
-  padding: '0.3rem 0.6rem',
+  borderRadius: 4,
+  padding: '3px 6px',
   minWidth: 0,
+  height: 50,
 }
 
-const slotLabel: React.CSSProperties = {
-  minWidth: 72,
+const iconBox: React.CSSProperties = {
+  width: 40,
+  height: 40,
   flexShrink: 0,
-  color: 'var(--text-muted)',
-  fontSize: '0.78rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
+  background: 'var(--surface-raised)',
+  borderRadius: 3,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
 }
