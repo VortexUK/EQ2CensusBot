@@ -15,7 +15,8 @@ from web.routes.health import router as health_router
 from web.routes.auth import router as auth_router
 from web.routes.character import router as character_router
 
-_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+_FRONTEND_DIST  = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+_ICONS_DIR      = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
 _SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-secret-change-in-production")
 
 
@@ -43,6 +44,10 @@ def create_app(session_secret: str | None = None) -> FastAPI:
     app.include_router(health_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
     app.include_router(character_router, prefix="/api")
+
+    # Item icons — served from local data directory
+    if _ICONS_DIR.exists():
+        app.mount("/icons", StaticFiles(directory=_ICONS_DIR), name="icons")
 
     # Serve the React build in production
     if _FRONTEND_DIST.exists():

@@ -101,9 +101,7 @@ function tierColour(tier: string | null) {
 }
 
 function iconUrl(iconId: string | null): string | null {
-  return iconId
-    ? `https://census.daybreakgames.com/files/eq2/images/icons/icon_${iconId}.png`
-    : null
+  return iconId ? `/icons/${iconId}.png` : null
 }
 
 type State =
@@ -194,15 +192,20 @@ function SlotRow({
   const url = iconUrl(item?.icon_id ?? null)
 
   const iconEl = (
-    <div style={iconBox}>
-      {url ? (
+    <div style={{
+      ...iconBox,
+      backgroundImage: `url('/slot-empty-blue.png')`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }}>
+      {url && (
         <img
           src={url}
           alt={item?.name ?? ''}
-          style={{ width: 40, height: 40 }}
+          style={{ width: 40, height: 40, display: 'block' }}
           onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
         />
-      ) : null}
+      )}
     </div>
   )
 
