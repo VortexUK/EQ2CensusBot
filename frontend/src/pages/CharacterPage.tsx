@@ -242,43 +242,71 @@ function CharacterView({ char }: { char: Character }) {
 
 // ── General banner (full width, above equipment) ──────────────────────────────
 
+// Each column holds a top row and an optional bottom row: [label, value]
+type BannerCol = [[string, string], [string, string] | null]
+
 function GeneralBanner({ char }: { char: Character }) {
   const s = char.stats
 
-  // Build the stat cells: [label, display value]
-  const cells: [string, string][] = [
-    ['Level', `${char.level ?? '—'} ${char.cls ?? ''}`.trim()],
-    ...(char.ts_class ? [['Tradeskill', `${char.ts_level ?? '—'} ${char.ts_class}`] as [string, string]] : []),
-    ...(char.deity    ? [['Deity',      char.deity] as [string, string]] : []),
-    ['AAs',        char.aa_count.toLocaleString()],
-    ...(s.health_max   != null ? [['Health',     s.health_max.toLocaleString()]          as [string, string]] : []),
-    ...(s.power_max    != null ? [['Power',      s.power_max.toLocaleString()]           as [string, string]] : []),
-    ...(s.run_speed    != null ? [['Run Speed',  `${Math.round(s.run_speed)}%`]          as [string, string]] : []),
-    ...(s.status_points != null ? [['Status',   s.status_points.toLocaleString()]        as [string, string]] : []),
+  const columns: BannerCol[] = [
+    [
+      ['Level',      `${char.level ?? '—'} ${char.cls ?? ''}`.trim()],
+      char.ts_class ? ['Tradeskill', `${char.ts_level ?? '—'} ${char.ts_class}`] : null,
+    ],
+    [
+      ['AAs',    char.aa_count.toLocaleString()],
+      char.deity ? ['Deity', char.deity] : null,
+    ],
+    [
+      ['Health', s.health_max  != null ? s.health_max.toLocaleString()  : '—'],
+      ['Power',  s.power_max   != null ? s.power_max.toLocaleString()   : '—'],
+    ],
+    [
+      ['Run Speed', s.run_speed     != null ? `${Math.round(s.run_speed)}%`       : '—'],
+      ['Status',    s.status_points != null ? s.status_points.toLocaleString()    : '—'],
+    ],
   ]
 
   return (
     <div style={{
       background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 6, padding: '0.75rem 1rem',
+      borderRadius: 6, padding: '0.5rem 1rem',
+      display: 'flex', alignItems: 'stretch',
     }}>
-      {/* Name + subtitle row */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '0.6rem' }}>
-        <h1 style={{ fontSize: '1.4rem', margin: 0 }}>{char.name}</h1>
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+      {/* Identity: name + subtitle, separated by a divider */}
+      <div style={{
+        paddingRight: '1.25rem', marginRight: '1.25rem',
+        borderRight: '1px solid var(--border)',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <div style={{ fontSize: '1.4rem', fontWeight: 700, lineHeight: 1.2 }}>{char.name}</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.15rem' }}>
           {[char.world, char.race, char.gender].filter(Boolean).join(' · ')}
-        </span>
+        </div>
       </div>
 
-      {/* Stat chips */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
-        {cells.map(([label, val]) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
-            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>{label}</span>
-            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{val}</span>
-          </div>
-        ))}
-      </div>
+      {/* Stat columns, each divided */}
+      {columns.map(([top, bottom], i) => (
+        <div key={i} style={{
+          flex: 1,
+          paddingLeft: '1rem', paddingRight: i < columns.length - 1 ? '1rem' : 0,
+          borderRight: i < columns.length - 1 ? '1px solid var(--border)' : undefined,
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.2rem',
+        }}>
+          <BannerStat label={top[0]} value={top[1]} />
+          {bottom && <BannerStat label={bottom[0]} value={bottom[1]} />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function BannerStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem', whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>{label}</span>
+      <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{value}</span>
     </div>
   )
 }
