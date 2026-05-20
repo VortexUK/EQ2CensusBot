@@ -312,6 +312,36 @@ class CensusClient:
 
         return CharacterAAs(character_name=char_name, aa_list=aa_entries)
 
+    async def get_character_guild_name(self, character_name: str, world: str) -> Optional[str]:
+        """Return the guild name for a character, or None if not in a guild or not found."""
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
+        params = {
+            "name.first": character_name,
+            "locationdata.world": world,
+            "c:show": "name,guild",
+            "c:limit": "1",
+        }
+        print(f"[Census] GET {url} params={params}")
+        try:
+            async with self._session_().get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
+                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                if resp.status != 200:
+                    return None
+                data = await resp.json(content_type=None)
+        except Exception as exc:
+            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            return None
+
+        char_list = data.get("character_list", [])
+        if not char_list:
+            return None
+        guild = char_list[0].get("guild")
+        if not guild or not isinstance(guild, dict):
+            return None
+        return guild.get("name") or None
+
     async def get_character_spells(self, name: str, world: str) -> Optional[CharacterSpells]:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {

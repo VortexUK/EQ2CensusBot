@@ -41,6 +41,12 @@ function ClaimStrip() {
           >
             {primary.character_name}
           </Link>
+          <Link
+            to={`/guild/${encodeURIComponent(primary.character_name)}`}
+            style={linkBtn}
+          >
+            Guild
+          </Link>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Primary</span>
           <Link to="/claim" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: 'auto' }}>manage</Link>
         </div>
