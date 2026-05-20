@@ -2,9 +2,10 @@
 nixPkgs = ["python311Full", "nodejs_20"]
 
 [phases.install]
+env = { PIP_BREAK_SYSTEM_PACKAGES = "1" }
 cmds = [
-  "python3.11 -m ensurepip --upgrade --break-system-packages",
-  "python3.11 -m pip install -r requirements.txt --break-system-packages",
+  "python3.11 -m ensurepip --upgrade",
+  "python3.11 -m pip install -r requirements.txt",
   "cd frontend && npm install"
 ]
 
