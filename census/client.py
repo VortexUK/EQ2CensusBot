@@ -212,37 +212,32 @@ class CensusClient:
             if item_id is None:
                 continue
 
-            # Look up item name + tier + adornment slot colours from local DB
+            # Look up item name + tier from local DB
             db_row = await item_db.find_by_id(item_id)
             if db_row:
                 item_name = db_row.get("displayname") or f"Item #{item_id}"
                 item_tier = db_row.get("tier")
                 icon_id   = str(db_row["iconid"]) if db_row.get("iconid") else None
-                slot_colors: list[str] = [
-                    s["color"].capitalize()
-                    for s in (db_row.get("adornmentslot_list") or [])
-                    if isinstance(s, dict) and s.get("color")
-                ]
             else:
-                item_name   = f"Item #{item_id}"
-                item_tier   = None
-                icon_id     = None
-                slot_colors = []
+                item_name = f"Item #{item_id}"
+                item_tier = None
+                icon_id   = None
 
-            # Equipped adorns come from the Census character data (adornmentlist on item)
-            equipped: dict[str, str] = {}   # color.capitalize() → adorn name
-            for adorn in (item_data.get("adornmentlist") or []):
+            # Adornment slots come from the Census character equipment data.
+            # Each entry: {"color": "white", "id": 12345} = equipped,
+            #             {"color": "turquoise"}           = empty slot.
+            adorn_slots: list[AdornSlot] = []
+            for adorn in (item_data.get("adornment_list") or []):
                 if not isinstance(adorn, dict):
                     continue
-                color = (adorn.get("slot") or {}).get("color") or adorn.get("color", "")
-                aname = adorn.get("name") or adorn.get("displayname", "")
-                if color and aname:
-                    equipped[color.capitalize()] = aname
-
-            adorn_slots = [
-                AdornSlot(color=c, adorn_name=equipped.get(c))
-                for c in slot_colors
-            ]
+                color     = adorn.get("color", "").capitalize()
+                adorn_id  = _int(adorn.get("id"))
+                if adorn_id is not None:
+                    adorn_db   = await item_db.find_by_id(adorn_id)
+                    adorn_name = adorn_db.get("displayname") if adorn_db else f"Adorn #{adorn_id}"
+                else:
+                    adorn_name = None
+                adorn_slots.append(AdornSlot(color=color, adorn_name=adorn_name))
 
             equipment.append(EquipmentSlot(
                 slot_name   = slot_display,

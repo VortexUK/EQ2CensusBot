@@ -149,13 +149,15 @@ function buildSlotMap(equipment: EquipmentSlot[]): Map<string, EquipmentSlot> {
 
 // Adornment slot colours — matches EQ2 in-game colours
 const ADORN_COLOUR: Record<string, string> = {
-  White:  '#e8e8e8',
-  Yellow: '#e8c840',
-  Red:    '#e05050',
-  Green:  '#50c850',
-  Blue:   '#5090e8',
-  Purple: '#b060e0',
-  Orange: '#e08830',
+  White:     '#e8e8e8',
+  Yellow:    '#e8c840',
+  Red:       '#e05050',
+  Green:     '#50c850',
+  Blue:      '#5090e8',
+  Purple:    '#b060e0',
+  Orange:    '#e08830',
+  Turquoise: '#30c8c0',
+  Black:     '#a0a0a0',  // render dark slots in mid-grey so they're visible
 }
 function adornColour(color: string) {
   return ADORN_COLOUR[color] ?? '#888'
