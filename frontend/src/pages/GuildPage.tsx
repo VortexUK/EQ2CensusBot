@@ -41,6 +41,7 @@ interface MemberSpellTiers {
   rank_id: number | null
   tiers: Record<string, number>
   total: number
+  spell_names: Record<string, string[]>
 }
 
 interface GuildSpellCheck {
@@ -298,10 +299,17 @@ const TIER_SHORT: Record<string, string> = {
   Expert: 'Expert', Master: 'Master', Grandmaster: 'GM',
 }
 
+interface SpellTooltip {
+  x: number
+  y: number
+  tier: string
+  names: string[]
+}
+
 function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSpellCheck; filter: string; hiddenRanks: Set<string>; myChars: Set<string> }) {
-  // sortKey is 'rank' | 'name' | 'total' | a tier name
   const [sortKey, setSortKey] = useState<string>('rank')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [tooltip, setTooltip] = useState<SpellTooltip | null>(null)
 
   function handleSort(key: string) {
     if (key === sortKey) {
@@ -357,52 +365,109 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
     )
   }
 
+  function showTooltip(e: React.MouseEvent<HTMLTableCellElement>, tier: string, names: string[]) {
+    if (names.length === 0) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    // Position above the cell, centred horizontally
+    setTooltip({
+      x: Math.min(rect.left + rect.width / 2, window.innerWidth - 160),
+      y: rect.top - 6,
+      tier,
+      names,
+    })
+  }
+
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
-          <SortTh label="Name"  colKey="name" />
-          <SortTh label="Rank"  colKey="rank" />
-          {data.tiers.map(t => (
-            <SortTh key={t} label={TIER_SHORT[t] ?? t} colKey={t} align="right" color={TIER_COLOURS[t]?.text} />
-          ))}
-          <SortTh label="Total" colKey="total" align="right" />
-        </tr>
-      </thead>
-      <tbody>
-        {sorted.map(m => (
-          <tr key={m.name} style={{ borderBottom: '1px solid var(--border)', background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
-            <td style={TD}>
-              <Link to={`/character/${encodeURIComponent(m.name)}`}
-                style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
-                {m.name}
-              </Link>
-              {myChars.has(m.name.toLowerCase()) && (
-                <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: '#c8a96e', verticalAlign: 'middle' }}>★</span>
-              )}
-            </td>
-            <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
-            {data.tiers.map(t => {
-              const count = m.tiers[t] ?? 0
-              const tc = TIER_COLOURS[t]
-              return (
-                <td key={t} style={{
-                  ...TD, textAlign: 'right',
-                  color: count > 0 ? (tc?.text ?? 'var(--text)') : 'var(--text-muted)',
-                  background: count > 0 ? (tc?.bg ?? 'transparent') : 'transparent',
-                  fontWeight: count > 0 ? 500 : 400,
-                }}>
-                  {count > 0 ? count : '—'}
-                </td>
-              )
-            })}
-            <td style={{ ...TD, textAlign: 'right', fontWeight: 600, color: 'var(--text)' }}>
-              {m.total}
-            </td>
+    <>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
+            <SortTh label="Name"  colKey="name" />
+            <SortTh label="Rank"  colKey="rank" />
+            {data.tiers.map(t => (
+              <SortTh key={t} label={TIER_SHORT[t] ?? t} colKey={t} align="right" color={TIER_COLOURS[t]?.text} />
+            ))}
+            <SortTh label="Total" colKey="total" align="right" />
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {sorted.map(m => (
+            <tr key={m.name} style={{ borderBottom: '1px solid var(--border)', background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
+              <td style={TD}>
+                <Link to={`/character/${encodeURIComponent(m.name)}`}
+                  style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
+                  {m.name}
+                </Link>
+                {myChars.has(m.name.toLowerCase()) && (
+                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: '#c8a96e', verticalAlign: 'middle' }}>★</span>
+                )}
+              </td>
+              <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
+              {data.tiers.map(t => {
+                const count = m.tiers[t] ?? 0
+                const tc = TIER_COLOURS[t]
+                const names = m.spell_names?.[t] ?? []
+                return (
+                  <td
+                    key={t}
+                    onMouseEnter={count > 0 ? e => showTooltip(e, t, names) : undefined}
+                    onMouseLeave={count > 0 ? () => setTooltip(null) : undefined}
+                    style={{
+                      ...TD, textAlign: 'right',
+                      color: count > 0 ? (tc?.text ?? 'var(--text)') : 'var(--text-muted)',
+                      background: count > 0 ? (tc?.bg ?? 'transparent') : 'transparent',
+                      fontWeight: count > 0 ? 500 : 400,
+                      cursor: count > 0 ? 'default' : undefined,
+                    }}
+                  >
+                    {count > 0 ? count : '—'}
+                  </td>
+                )
+              })}
+              <td style={{ ...TD, textAlign: 'right', fontWeight: 600, color: 'var(--text)' }}>
+                {m.total}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Spell name tooltip — fixed so it escapes the scrollable table container */}
+      {tooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: 'translate(-50%, -100%)',
+            background: '#1a1d26',
+            border: `1px solid ${TIER_COLOURS[tooltip.tier]?.text ?? 'var(--border)'}`,
+            borderRadius: 6,
+            padding: '0.5rem 0.8rem',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            maxWidth: 280,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+          }}
+        >
+          <div style={{
+            fontSize: '0.68rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: TIER_COLOURS[tooltip.tier]?.text ?? 'var(--text-muted)',
+            fontWeight: 700,
+            marginBottom: '0.35rem',
+          }}>
+            {tooltip.tier} · {tooltip.names.length}
+          </div>
+          {tooltip.names.map((name, i) => (
+            <div key={i} style={{ fontSize: '0.83rem', color: 'var(--text)', lineHeight: 1.65 }}>
+              {name}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   )
 }
 

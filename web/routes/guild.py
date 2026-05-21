@@ -92,8 +92,9 @@ class MemberSpellTiers(BaseModel):
     name: str
     rank: str | None = None
     rank_id: int | None = None
-    tiers: dict[str, int]   # tier_name → count  (all _TIER_ORDER keys present)
+    tiers: dict[str, int]              # tier_name → count  (all _TIER_ORDER keys present)
     total: int
+    spell_names: dict[str, list[str]] = {}  # tier_name → spell names, sorted by level desc
 
 
 class GuildSpellCheckResponse(BaseModel):
@@ -240,13 +241,23 @@ def _build_spell_check_from_overviews(
         count = Counter(e.tier for e in entries)
         tiers_with_data.update(count.keys())
 
+        # Group names by tier, sorted by level descending
+        names_by_tier: dict[str, list[tuple[int, str]]] = {}
+        for e in entries:
+            names_by_tier.setdefault(e.tier, []).append((e.level, e.name))
+        spell_names = {
+            tier: [n for _, n in sorted(pairs, key=lambda x: -x[0])]
+            for tier, pairs in names_by_tier.items()
+        }
+
         rank_label, rank_id = member_rank.get(ov.name, (None, None))
         out_members.append(MemberSpellTiers(
-            name    = ov.name,
-            rank    = rank_label,
-            rank_id = rank_id,
-            tiers   = {t: count.get(t, 0) for t in _TIER_ORDER},
-            total   = sum(count.values()),
+            name        = ov.name,
+            rank        = rank_label,
+            rank_id     = rank_id,
+            tiers       = {t: count.get(t, 0) for t in _TIER_ORDER},
+            total       = sum(count.values()),
+            spell_names = spell_names,
         ))
 
     out_members.sort(key=lambda m: (
