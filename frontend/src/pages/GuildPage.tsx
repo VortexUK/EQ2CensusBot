@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useClaim } from '../hooks/useClaim'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -520,8 +520,7 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function GuildPage() {
-  const { characterName } = useParams<{ characterName: string }>()
-  const navigate = useNavigate()
+  const { guildName } = useParams<{ guildName: string }>()
   const claimState = useClaim()
 
   const myChars = useMemo<Set<string>>(() => {
@@ -553,36 +552,33 @@ export default function GuildPage() {
 
   // Load roster + info on mount
   useEffect(() => {
-    if (!characterName) return
+    if (!guildName) return
     setRosterLoading(true)
     setRosterError(null)
 
     // Fetch roster and info in parallel
     Promise.all([
-      fetch(`/api/guild/${encodeURIComponent(characterName)}`),
-      fetch(`/api/guild/${encodeURIComponent(characterName)}/info`),
+      fetch(`/api/guild/${encodeURIComponent(guildName)}`),
+      fetch(`/api/guild/${encodeURIComponent(guildName)}/info`),
     ]).then(async ([rosterRes, infoRes]) => {
       if (!rosterRes.ok) {
         setRosterError((await rosterRes.json().catch(() => ({}))).detail ?? `Error ${rosterRes.status}`)
       } else {
         const data = await rosterRes.json()
         setRoster(data)
-        if (characterName !== data.name) {
-          navigate(`/guild/${encodeURIComponent(data.name)}`, { replace: true })
-        }
       }
       if (infoRes.ok) setInfo(await infoRes.json())
     })
       .catch(() => setRosterError('Network error — please try again.'))
       .finally(() => setRosterLoading(false))
-  }, [characterName])
+  }, [guildName])
 
   // Load spell check when tab first selected
   function loadSpells() {
-    if (spells || spellsLoading || !characterName) return
+    if (spells || spellsLoading || !guildName) return
     setSpellsLoading(true)
     setSpellsError(null)
-    fetch(`/api/guild/${encodeURIComponent(characterName)}/spell-check`)
+    fetch(`/api/guild/${encodeURIComponent(guildName)}/spell-check`)
       .then(async res => {
         if (!res.ok) { setSpellsError((await res.json().catch(() => ({}))).detail ?? `Error ${res.status}`); return }
         setSpells(await res.json())
@@ -593,10 +589,10 @@ export default function GuildPage() {
 
   // Load adorn check when tab first selected
   function loadAdorns() {
-    if (adorns || adornsLoading || !characterName) return
+    if (adorns || adornsLoading || !guildName) return
     setAdornsLoading(true)
     setAdornsError(null)
-    fetch(`/api/guild/${encodeURIComponent(characterName)}/adorn-check`)
+    fetch(`/api/guild/${encodeURIComponent(guildName)}/adorn-check`)
       .then(async res => {
         if (!res.ok) { setAdornsError((await res.json().catch(() => ({}))).detail ?? `Error ${res.status}`); return }
         setAdorns(await res.json())
@@ -612,7 +608,7 @@ export default function GuildPage() {
     if (t === 'adorns') loadAdorns()
   }
 
-  const guildName = roster?.name ?? spells?.guild_name ?? adorns?.guild_name ?? '…'
+  const guildDisplayName = roster?.name ?? spells?.guild_name ?? adorns?.guild_name ?? '…'
   const guildWorld = roster?.world ?? ''
   const memberCount = roster?.members.length
 
@@ -663,7 +659,7 @@ export default function GuildPage() {
           backgroundClip: 'text',
           display: 'inline-block',
         }}>
-          {guildName}
+          {guildDisplayName}
         </h1>
         {guildWorld && (
           <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '1rem' }}>

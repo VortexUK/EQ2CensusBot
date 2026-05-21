@@ -401,17 +401,17 @@ class CensusClient:
         self, name: str, world: str
     ) -> Optional[tuple[GuildData, list[CharacterOverview]]]:
         """
-        Fetch guild with full member profiles (type + stats + equipment).
+        Fetch guild with full member profiles (type + stats + equipment + spell IDs).
         Returns (GuildData, list[CharacterOverview]) for cache pre-warming.
-        Note: spell data is NOT included here — the Census guild-member resolve
-        does not support nested spell resolution.  Use get_character_spells per
-        member for spell data.
+        Spell IDs are raw integers stored in CharacterOverview.spell_ids; callers
+        should resolve them against the local spells DB rather than making
+        per-character Census calls.
         """
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
         params = {
             "name": name,
             "world": world,
-            "c:resolve": "members(displayname,type,stats,guild.rank,equipmentslot_list)",
+            "c:resolve": "members(displayname,type,stats,guild.rank,equipmentslot_list,spell_list)",
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
@@ -470,6 +470,20 @@ class CensusClient:
             raw_stats = m.get("stats") or {}
             equipment = await self._parse_equipment(m.get("equipmentslot_list") or [])
 
+            # Spell IDs: Census returns a flat list of dicts with at minimum {"id": <int>}
+            # when spell_list is included in the member resolve.
+            raw_spell_list = m.get("spell_list") or []
+            spell_ids: list[int] = []
+            for s in raw_spell_list:
+                if isinstance(s, dict):
+                    sid = _int(s.get("id"))
+                elif isinstance(s, (int, str)):
+                    sid = _int(s)
+                else:
+                    sid = None
+                if sid is not None:
+                    spell_ids.append(sid)
+
             overviews.append(CharacterOverview(
                 id        = str(m.get("id", "")),
                 name      = member_name,
@@ -484,6 +498,7 @@ class CensusClient:
                 ts_level  = _int(t.get("ts_level")),
                 stats     = raw_stats,
                 equipment = equipment,
+                spell_ids = spell_ids,
             ))
 
         return (

@@ -107,6 +107,7 @@ class CharacterOverview:
     ts_level: Optional[int] = None
     stats: dict = field(default_factory=dict)
     equipment: list[EquipmentSlot] = field(default_factory=list)
+    spell_ids: list[int] = field(default_factory=list)   # raw spell IDs from Census
 
 
 @dataclass

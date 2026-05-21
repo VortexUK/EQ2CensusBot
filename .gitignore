@@ -222,6 +222,9 @@ data/items/items.db
 data/items/items.db-wal
 data/items/items.db-shm
 
+# Spell database (generated locally via scripts/download_spells.py)
+data/spells/
+
 # Census API dump files (analysis artifacts)
 example_items.json
 

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from census.client import CensusClient
 from census.models import CharacterOverview, SpellEntry
+from census.spells_db import DB_PATH as _SPELLS_DB, find_by_ids as _spell_find_by_ids
 from web.cache import character_cache, guild_cache
 
 router = APIRouter(tags=["guild"])
@@ -136,18 +137,6 @@ def _int(v) -> int | None:
         return None
 
 
-async def _resolve_guild_name(client: CensusClient, name: str) -> str:
-    """
-    Accept either a character name (looks up their guild) or a guild name directly.
-    Character lookup is tried first; if it fails or returns nothing, `name` is used as-is.
-    """
-    try:
-        guild_name = await client.get_character_guild_name(name, _WORLD)
-    except Exception:
-        guild_name = None  # Census error — fall back to treating input as a guild name
-    return guild_name if guild_name else name
-
-
 # ---------------------------------------------------------------------------
 # Cache pre-warming helpers
 # ---------------------------------------------------------------------------
@@ -204,47 +193,56 @@ def _prewarm_adorn_cache(
     ))
 
 
-def _prewarm_spell_cache(
-    cache_key: str,
+def _build_spell_check_from_overviews(
     guild_name: str,
-    spell_map: dict[str, list],
+    guild_world: str,
+    overviews: list[CharacterOverview],
     member_rank: dict[str, tuple],
-) -> None:
+) -> GuildSpellCheckResponse | None:
     """
-    Build and store GuildSpellCheckResponse from the raw spell_list data
-    returned by the guild member resolve.  If spell_map is empty (Census
-    didn't include spell_list in the guild resolve), the cache is left empty
-    and the spell-check endpoint will fall back to per-character calls.
+    Build a GuildSpellCheckResponse from CharacterOverview.spell_ids using
+    a single bulk lookup against the local spells DB.  Returns None if the
+    DB is unavailable or no members had any spell IDs.
     """
-    if not spell_map:
-        return  # Census didn't supply spell data via guild resolve — skip
+    if not _SPELLS_DB.exists():
+        return None
+
+    # Collect all unique IDs across every member in one shot
+    all_ids: list[int] = []
+    for ov in overviews:
+        all_ids.extend(ov.spell_ids)
+
+    if not all_ids:
+        return None
+
+    # One DB query for the whole guild
+    spell_db: dict[int, dict] = _spell_find_by_ids(list(set(all_ids)))
 
     out_members: list[MemberSpellTiers] = []
     tiers_with_data: set[str] = set()
 
-    for member_name, raw_spells in spell_map.items():
+    for ov in overviews:
         entries: list[SpellEntry] = []
-        for spell in raw_spells:
-            level = _int(spell.get("level")) or 0
-            spell_type = spell.get("type", "")
-            if level == 0 or spell_type not in ("spells", "arts"):
+        for sid in ov.spell_ids:
+            row = spell_db.get(sid)
+            if row is None:
                 continue
-            if spell.get("given_by") in ("alternateadvancement", "class"):
+            if not row.get("passes_spellcheck"):
                 continue
             entries.append(SpellEntry(
-                name       = spell.get("name", ""),
-                tier       = spell.get("tier_name", "Unknown"),
-                spell_type = spell_type,
-                level      = level,
+                name       = row["name"],
+                tier       = row["tier_name"] or "Unknown",
+                spell_type = row["type"] or "",
+                level      = row["level"] or 0,
             ))
 
         entries = _unique_highest(entries)
         count = Counter(e.tier for e in entries)
         tiers_with_data.update(count.keys())
 
-        rank_label, rank_id = member_rank.get(member_name, (None, None))
+        rank_label, rank_id = member_rank.get(ov.name, (None, None))
         out_members.append(MemberSpellTiers(
-            name    = member_name,
+            name    = ov.name,
             rank    = rank_label,
             rank_id = rank_id,
             tiers   = {t: count.get(t, 0) for t in _TIER_ORDER},
@@ -256,20 +254,35 @@ def _prewarm_spell_cache(
         if member_rank.get(m.name, (None, None))[1] is not None else 9999,
         m.name,
     ))
-    active_tiers = [t for t in _TIER_ORDER if t in tiers_with_data]
 
-    guild_cache.set(cache_key, GuildSpellCheckResponse(
+    return GuildSpellCheckResponse(
         guild_name = guild_name,
-        world      = _WORLD,
-        tiers      = active_tiers,
+        world      = guild_world,
+        tiers      = [t for t in _TIER_ORDER if t in tiers_with_data],
         members    = out_members,
-    ))
+    )
+
+
+def _prewarm_spell_cache(
+    cache_key: str,
+    guild_name: str,
+    overviews: list[CharacterOverview],
+    member_rank: dict[str, tuple],
+) -> None:
+    """
+    Build and store GuildSpellCheckResponse from CharacterOverview.spell_ids
+    using the local spells DB.  No-op if DB is unavailable or IDs are empty.
+    """
+    result = _build_spell_check_from_overviews(guild_name, _WORLD, overviews, member_rank)
+    if result is not None:
+        guild_cache.set(cache_key, result)
 
 
 async def _bg_refresh_guild(guild_name: str) -> None:
     """
     Background task: re-fetch all guild data and update every related cache.
-    Uses get_guild_full for equipment/stats/roster, then per-character calls for spells.
+    Uses get_guild_full for equipment/stats/roster; spell IDs come from the
+    same single Census call and are resolved against the local spells DB.
     Fired by any guild endpoint when its cached data is stale.
     """
     world_lower = _WORLD.lower()
@@ -280,16 +293,10 @@ async def _bg_refresh_guild(guild_name: str) -> None:
             if not full or not full[0].members:
                 return
             guild_data, overviews = full
-            member_rank: dict[str, tuple] = {m.name: (m.rank, m.rank_id) for m in guild_data.members}
-
-            # Per-character spell fetches (Census doesn't support this via guild resolve)
-            sem = asyncio.Semaphore(8)
-            async def _fetch_spells(name: str):
-                async with sem:
-                    return name, await client.get_character_spells(name, _WORLD)
-            spell_results = await asyncio.gather(*[_fetch_spells(m.name) for m in guild_data.members])
         finally:
             await client.close()
+
+        member_rank: dict[str, tuple] = {m.name: (m.rank, m.rank_id) for m in guild_data.members}
 
         # Per-character caches
         for ov in overviews:
@@ -301,37 +308,8 @@ async def _bg_refresh_guild(guild_name: str) -> None:
         # Adorn cache
         _prewarm_adorn_cache(f"adorns:{guild_name.lower()}:{world_lower}", guild_name, overviews, member_rank)
 
-        # Spell cache — built from per-character results
-        out_spell_members: list[MemberSpellTiers] = []
-        tiers_with_data: set[str] = set()
-        spell_failed = 0
-        for name, spells_obj in spell_results:
-            if spells_obj is None:
-                spell_failed += 1
-                continue
-            entries = _unique_highest(spells_obj.entries)
-            count = Counter(e.tier for e in entries)
-            tiers_with_data.update(count.keys())
-            rank, rank_id = member_rank.get(name, (None, None))
-            out_spell_members.append(MemberSpellTiers(
-                name=name, rank=rank, rank_id=rank_id,
-                tiers={t: count.get(t, 0) for t in _TIER_ORDER},
-                total=sum(count.values()),
-            ))
-        out_spell_members.sort(key=lambda m: (
-            member_rank.get(m.name, (None, 9999))[1]
-            if member_rank.get(m.name, (None, None))[1] is not None else 9999,
-            m.name,
-        ))
-        if spell_failed:
-            print(f"[Cache] Background spell refresh: {spell_failed}/{len(spell_results)} fetches failed for {guild_name} — skipping spell cache update")
-        else:
-            guild_cache.set(f"spells:{guild_name.lower()}:{world_lower}", GuildSpellCheckResponse(
-                guild_name = guild_data.name,
-                world      = guild_data.world,
-                tiers      = [t for t in _TIER_ORDER if t in tiers_with_data],
-                members    = out_spell_members,
-            ))
+        # Spell cache — resolved from local DB using IDs already in the guild response
+        _prewarm_spell_cache(f"spells:{guild_name.lower()}:{world_lower}", guild_data.name, overviews, member_rank)
 
         # Roster cache
         members_sorted = sorted(
@@ -405,12 +383,11 @@ def _overview_to_char_response(ov: CharacterOverview):  # → CharacterResponse
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.get("/guild/{character_name}/info", response_model=GuildInfoResponse)
-async def get_guild_info(character_name: str) -> GuildInfoResponse:
+@router.get("/guild/{guild_name}/info", response_model=GuildInfoResponse)
+async def get_guild_info(guild_name: str) -> GuildInfoResponse:
     """Return lightweight guild metadata (no member list)."""
     client = CensusClient(service_id=_SERVICE_ID)
     try:
-        guild_name = await _resolve_guild_name(client, character_name)
         cache_key = f"info:{guild_name.lower()}:{_WORLD.lower()}"
         cached, is_stale = guild_cache.get_stale(cache_key)
         if cached is not None:
@@ -438,17 +415,16 @@ async def get_guild_info(character_name: str) -> GuildInfoResponse:
     return result
 
 
-@router.get("/guild/{character_name}", response_model=GuildResponse)
-async def get_guild_for_character(character_name: str) -> GuildResponse:
+@router.get("/guild/{guild_name}", response_model=GuildResponse)
+async def get_guild(guild_name: str) -> GuildResponse:
     """
-    Return the guild roster for the guild that *character_name* belongs to.
+    Return the guild roster for the named guild.
     Sorted by rank then level descending.  Only members with census data.
     Also pre-warms the per-character cache from the single enriched guild call
     so that subsequent /character lookups are served from cache instantly.
     """
     client = CensusClient(service_id=_SERVICE_ID)
     try:
-        guild_name = await _resolve_guild_name(client, character_name)
         cache_key = f"roster:{guild_name.lower()}:{_WORLD.lower()}"
         cached, is_stale = guild_cache.get_stale(cache_key)
         if cached is not None:
@@ -467,14 +443,14 @@ async def get_guild_for_character(character_name: str) -> GuildResponse:
         m.name: (m.rank, m.rank_id) for m in guild_data.members
     }
 
-    # Populate character + adorn caches from the single API response
-    # (spell cache is populated lazily on first spell-check request)
+    # Populate character, adorn, and spell caches from the single API response
     for ov in overviews:
         try:
             character_cache.set(f"{ov.name.lower()}:{world_lower}", _overview_to_char_response(ov))
         except Exception as exc:
             print(f"[Cache] Failed to pre-warm character {ov.name}: {exc}")
     _prewarm_adorn_cache(f"adorns:{guild_name.lower()}:{world_lower}", guild_name, overviews, member_rank)
+    _prewarm_spell_cache(f"spells:{guild_name.lower()}:{world_lower}", guild_name, overviews, member_rank)
 
     members = sorted(
         guild_data.members,
@@ -497,17 +473,16 @@ async def get_guild_for_character(character_name: str) -> GuildResponse:
     return result
 
 
-@router.get("/guild/{character_name}/spell-check", response_model=GuildSpellCheckResponse)
-async def guild_spell_check(character_name: str) -> GuildSpellCheckResponse:
+@router.get("/guild/{guild_name}/spell-check", response_model=GuildSpellCheckResponse)
+async def guild_spell_check(guild_name: str) -> GuildSpellCheckResponse:
     """
     Spell tier summary for every guild member.
     Responds instantly from cache; fires a full guild background refresh when stale.
-    On cache miss, uses get_guild_full (warms adorns + characters) then fetches
-    spells per-character (Census does not support spell resolve on guild members).
+    On cache miss, uses get_guild_full (warms adorns + characters) then resolves
+    spell IDs against the local spells DB — no per-character Census calls needed.
     """
     client = CensusClient(service_id=_SERVICE_ID)
     try:
-        guild_name = await _resolve_guild_name(client, character_name)
         cache_key = f"spells:{guild_name.lower()}:{_WORLD.lower()}"
         cached, is_stale = guild_cache.get_stale(cache_key)
         if cached is not None:
@@ -515,22 +490,16 @@ async def guild_spell_check(character_name: str) -> GuildSpellCheckResponse:
                 asyncio.create_task(_bg_refresh_guild(guild_name))
             return cached
 
-        # Cache miss — fetch full guild data then individual spell lists
+        # Cache miss — one Census call gets roster + equipment + spell IDs
         full = await client.get_guild_full(guild_name, _WORLD)
         if not full or not full[0].members:
             raise HTTPException(status_code=404, detail=f"Guild '{guild_name}' not found on {_WORLD}.")
         guild_data, overviews = full
-        member_rank: dict[str, tuple] = {m.name: (m.rank, m.rank_id) for m in guild_data.members}
-
-        sem = asyncio.Semaphore(8)
-        async def fetch_spells(name: str):
-            async with sem:
-                return name, await client.get_character_spells(name, _WORLD)
-        spell_results = await asyncio.gather(*[fetch_spells(m.name) for m in guild_data.members])
     finally:
         await client.close()
 
     world_lower = _WORLD.lower()
+    member_rank: dict[str, tuple] = {m.name: (m.rank, m.rank_id) for m in guild_data.members}
 
     # Warm character + adorn caches from the guild data we already have
     for ov in overviews:
@@ -540,46 +509,17 @@ async def guild_spell_check(character_name: str) -> GuildSpellCheckResponse:
             pass
     _prewarm_adorn_cache(f"adorns:{guild_name.lower()}:{world_lower}", guild_name, overviews, member_rank)
 
-    # Build spell response
-    out_members: list[MemberSpellTiers] = []
-    tiers_with_data: set[str] = set()
-    failed = 0
-    for name, spells_obj in spell_results:
-        if spells_obj is None:
-            failed += 1
-            continue
-        entries = _unique_highest(spells_obj.entries)
-        count = Counter(e.tier for e in entries)
-        tiers_with_data.update(count.keys())
-        rank, rank_id = member_rank.get(name, (None, None))
-        out_members.append(MemberSpellTiers(
-            name=name, rank=rank, rank_id=rank_id,
-            tiers={t: count.get(t, 0) for t in _TIER_ORDER},
-            total=sum(count.values()),
-        ))
-    out_members.sort(key=lambda m: (
-        member_rank.get(m.name, (None, 9999))[1]
-        if member_rank.get(m.name, (None, None))[1] is not None else 9999,
-        m.name,
-    ))
+    # Build spell response from local DB (single bulk lookup — no Census calls)
+    result = _build_spell_check_from_overviews(guild_data.name, guild_data.world, overviews, member_rank)
+    if result is None:
+        raise HTTPException(status_code=503, detail="Spells database unavailable — run scripts/download_spells.py first.")
 
-    result = GuildSpellCheckResponse(
-        guild_name = guild_data.name,
-        world      = guild_data.world,
-        tiers      = [t for t in _TIER_ORDER if t in tiers_with_data],
-        members    = out_members,
-    )
-    if failed:
-        # Some Census calls failed (likely timeout) — return partial data but don't cache
-        # so the next request retries all fetches rather than serving stale partial results
-        print(f"[SpellCheck] {failed}/{len(spell_results)} fetches failed for {guild_name} — skipping cache")
-    else:
-        guild_cache.set(cache_key, result)
+    guild_cache.set(cache_key, result)
     return result
 
 
-@router.get("/guild/{character_name}/adorn-check", response_model=GuildAdornCheckResponse)
-async def guild_adorn_check(character_name: str) -> GuildAdornCheckResponse:
+@router.get("/guild/{guild_name}/adorn-check", response_model=GuildAdornCheckResponse)
+async def guild_adorn_check(guild_name: str) -> GuildAdornCheckResponse:
     """
     Adornment slot summary for every guild member.
     Responds instantly from cache; fires a full guild background refresh when stale.
@@ -587,7 +527,6 @@ async def guild_adorn_check(character_name: str) -> GuildAdornCheckResponse:
     """
     client = CensusClient(service_id=_SERVICE_ID)
     try:
-        guild_name = await _resolve_guild_name(client, character_name)
         cache_key = f"adorns:{guild_name.lower()}:{_WORLD.lower()}"
         cached, is_stale = guild_cache.get_stale(cache_key)
         if cached is not None:

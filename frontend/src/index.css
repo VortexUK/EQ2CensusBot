@@ -55,6 +55,16 @@ button {
   font-size: inherit;
 }
 
+/* Top-ribbon nav links */
+.nav-ribbon-link:hover {
+  color: #c8a96e !important;
+  border-bottom-color: #c8a96e !important;
+}
+.nav-ribbon-link.active {
+  color: #e8d5a3 !important;
+  border-bottom-color: #c8a96e !important;
+}
+
 input {
   font-family: inherit;
   font-size: inherit;

@@ -632,10 +632,12 @@ function SlotRow({ label, item, iconSide, onShow, onHide, highlight }: {
   )
   const textEl = (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
-      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', lineHeight: 1 }}>{label}</span>
-      {item
-        ? <span style={{ ...tierStyle(item.tier), fontWeight: 500, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>{item.name}</span>
-        : <span style={{ color: 'var(--border)', fontSize: '0.82rem', fontStyle: 'italic', lineHeight: 1.2 }}>Empty</span>}
+      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>{label} – </span>
+        {item
+          ? <span style={{ ...tierStyle(item.tier), fontWeight: 500, fontSize: '0.88rem' }}>{item.name}</span>
+          : <span style={{ color: 'var(--border)', fontSize: '0.82rem', fontStyle: 'italic' }}>Empty</span>}
+      </div>
       {hasAdorns && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 3px', marginTop: 1 }}>
           {item!.adorn_slots.map((a, i) => {
