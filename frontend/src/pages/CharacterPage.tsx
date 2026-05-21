@@ -178,6 +178,8 @@ const ADORN_QUALITY_TIER: Record<string, { letter: string; color: string }> = {
   Mastercrafted: { letter: 'T', color: '#92d7fd' },
   Uncommon:      { letter: 'U', color: '#a8d4a8' },
   Common:        { letter: 'C', color: 'var(--text)' },
+  Greater:       { letter: 'L', color: '#ffc993' },
+  Lesser:        { letter: 'T', color: '#92d7fd' },
 }
 const _ADORN_RE = /^(\w+)\s+Adornment\s+of\s+(.+?)\s*\((.+?)\)\s*$/i
 
@@ -452,7 +454,18 @@ function GeneralBanner({ char }: { char: Character }) {
         display: 'flex', flexDirection: 'column', justifyContent: 'center',
         flexShrink: 0,
       }}>
-        <div style={{ fontSize: '1.4rem', fontWeight: 700, lineHeight: 1.2 }}>{char.name}</div>
+        <div style={{
+          fontFamily: "'Cinzel', serif",
+          fontSize: '1.6rem',
+          fontWeight: 700,
+          lineHeight: 1.2,
+          letterSpacing: '0.04em',
+          background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 40%, #c8a96e 70%, #a07840 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          display: 'inline-block',
+        }}>{char.name}</div>
         <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.15rem' }}>
           {[char.world, char.race, char.gender].filter(Boolean).join(' · ')}
         </div>

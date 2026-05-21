@@ -1,16 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { avatarUrl, useAuth } from '../hooks/useAuth'
+import { useAuth } from '../hooks/useAuth'
 import { useClaim } from '../hooks/useClaim'
 
-async function logout() {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
-  window.location.reload()
-}
+// ── My Characters section ─────────────────────────────────────────────────────
 
-// ── Claim status strip ────────────────────────────────────────────────────────
-
-function ClaimStrip() {
+function MyCharacters() {
   const claimState = useClaim()
 
   if (claimState.status === 'loading' || claimState.status === 'unauthenticated') return null
@@ -20,61 +15,123 @@ function ClaimStrip() {
   const primary = approved.find(c => c.is_primary === 1) ?? approved[0] ?? null
   const alts = approved.filter(c => c !== primary)
 
-  // No claims at all
-  if (approved.length === 0 && !pending) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}>
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No character claimed.</span>
-        <Link to="/claim" style={linkBtn}>Claim character</Link>
-      </div>
-    )
-  }
-
   return (
-    <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-      {/* Primary character — prominent */}
-      {primary && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <Link
-            to={`/character/${encodeURIComponent(primary.character_name)}`}
-            style={{ ...linkBtn, background: 'var(--accent)', fontWeight: 600, fontSize: '0.95rem' }}
-          >
-            {primary.character_name}
-          </Link>
-          <Link
-            to={`/guild/${encodeURIComponent(primary.character_name)}`}
-            style={linkBtn}
-          >
-            Guild
-          </Link>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Primary</span>
-          <Link to="/claim" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: 'auto' }}>manage</Link>
+    <div>
+      <div style={{
+        display: 'flex', alignItems: 'baseline', gap: '0.75rem',
+        marginBottom: '0.75rem',
+      }}>
+        <h2 style={{
+          fontFamily: "'Cinzel', serif",
+          fontSize: '1rem',
+          fontWeight: 600,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'rgba(200,169,110,0.85)',
+        }}>
+          My Characters
+        </h2>
+        <Link to="/claim" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+          manage
+        </Link>
+      </div>
+
+      {approved.length === 0 && !pending && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No character claimed.</span>
+          <Link to="/claim" style={linkBtn}>Claim character</Link>
         </div>
       )}
 
-      {/* Alt characters — smaller */}
-      {alts.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', paddingLeft: '0.25rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Alts:</span>
-          {alts.map(c => (
+      {/* Primary */}
+      {primary && (
+        <div style={{ marginBottom: '0.5rem', lineHeight: 1.3 }}>
+          <Link
+            to={`/character/${encodeURIComponent(primary.character_name)}`}
+            style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: '1.15rem',
+              fontWeight: 700,
+              color: '#ffc993',
+              textShadow: '0 0 8px #D56900, 0 0 20px rgba(213,105,0,0.35)',
+              textDecoration: 'none',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {primary.character_name}
+          </Link>
+          {primary.guild_name ? (
             <Link
-              key={c.id}
-              to={`/character/${encodeURIComponent(c.character_name)}`}
-              style={{ ...linkBtn, fontSize: '0.82rem', padding: '0.25rem 0.7rem' }}
+              to={`/guild/${encodeURIComponent(primary.guild_name)}`}
+              style={{
+                marginLeft: '0.6rem',
+                fontSize: '0.78rem',
+                color: 'var(--text-muted)',
+                textDecoration: 'none',
+                fontFamily: "'Cinzel', serif",
+                letterSpacing: '0.03em',
+              }}
             >
-              {c.character_name}
+              &lt;{primary.guild_name}&gt;
             </Link>
+          ) : (
+            <span style={{ marginLeft: '0.6rem', fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: "'Cinzel', serif" }}>
+              &lt;&gt;
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Alts */}
+      {alts.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', paddingLeft: '0.05rem' }}>
+          {alts.map(c => (
+            <div key={c.id} style={{ lineHeight: 1.3 }}>
+              <Link
+                to={`/character/${encodeURIComponent(c.character_name)}`}
+                style={{
+                  fontFamily: "'Cinzel', serif",
+                  fontSize: '0.92rem',
+                  fontWeight: 600,
+                  color: '#93d9ff',
+                  textShadow: '0 0 6px #D56900, 0 0 16px rgba(213,105,0,0.25)',
+                  textDecoration: 'none',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                {c.character_name}
+              </Link>
+              {c.guild_name ? (
+                <Link
+                  to={`/guild/${encodeURIComponent(c.guild_name)}`}
+                  style={{
+                    marginLeft: '0.5rem',
+                    fontSize: '0.72rem',
+                    color: 'var(--text-muted)',
+                    textDecoration: 'none',
+                    fontFamily: "'Cinzel', serif",
+                    letterSpacing: '0.03em',
+                  }}
+                >
+                  &lt;{c.guild_name}&gt;
+                </Link>
+              ) : (
+                <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: "'Cinzel', serif" }}>
+                  &lt;&gt;
+                </span>
+              )}
+            </div>
           ))}
         </div>
       )}
 
-      {/* Pending claim */}
+      {/* Pending */}
       {pending && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-            ⏳ Pending: <em>{pending.character_name}</em>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            ⏳ {pending.character_name}
           </span>
-          <Link to="/claim" style={{ ...linkBtn, fontSize: '0.82rem' }}>View</Link>
+          <Link to="/claim" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>· pending</Link>
         </div>
       )}
     </div>
@@ -86,72 +143,85 @@ function ClaimStrip() {
 function HomePage() {
   const auth = useAuth()
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const [charSearch, setCharSearch] = useState('')
+  const [guildSearch, setGuildSearch] = useState('')
 
-  function handleSearch(e: React.FormEvent) {
+  function handleCharSearch(e: React.FormEvent) {
     e.preventDefault()
-    const name = search.trim()
+    const name = charSearch.trim()
     if (name) navigate(`/character/${encodeURIComponent(name)}`)
   }
 
+  function handleGuildSearch(e: React.FormEvent) {
+    e.preventDefault()
+    const name = guildSearch.trim()
+    if (name) navigate(`/guild/${encodeURIComponent(name)}`)
+  }
+
   return (
-    <main style={{ maxWidth: 640, margin: '4rem auto', padding: '0 1rem' }}>
-      <h1 style={{ marginBottom: '0.25rem' }}>EQ2 TLE Companion</h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-        Character lookup for the Time-Locked Expansion server
-      </p>
+    <main style={{ maxWidth: 820, margin: '0 auto', padding: '1.5rem 1.5rem 4rem' }}>
 
-      <form onSubmit={handleSearch} style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
-        <input
-          type="text"
-          placeholder="Character name…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ flex: 1 }}
-        />
-        <button type="submit" style={btnStyle('var(--accent)')}>
-          Look up
-        </button>
-      </form>
+      {/* Title — centered over both columns */}
+      <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+        <h1 style={{
+          fontFamily: "'Cinzel', serif",
+          fontSize: '2.6rem',
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          lineHeight: 1.1,
+          marginBottom: '0.5rem',
+          background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 40%, #c8a96e 70%, #a07840 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          display: 'inline-block',
+        }}>
+          Lore <span style={{ fontWeight: 300, opacity: 0.8 }}>&</span> Legend
+        </h1>
+        <p style={{
+          color: 'var(--text-muted)',
+          fontSize: '0.95rem',
+          lineHeight: 1.6,
+          marginTop: '0.25rem',
+        }}>
+          Guild companion for <em>Woushi</em> — track characters, spells,
+          gear and guild rosters across the realm of Norrath.
+        </p>
+      </div>
 
-      {auth.status === 'loading' && (
-        <p style={{ color: 'var(--text-muted)' }}>Loading…</p>
-      )}
+      {/* Two-column body */}
+      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
-      {auth.status === 'unauthenticated' && (
-        <a href="/api/auth/login" style={btnStyle('#5865F2')}>
-          Sign in with Discord
-        </a>
-      )}
-
-      {auth.status === 'authenticated' && (
-        <div>
-          {/* User row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <img
-              src={avatarUrl(auth.user)}
-              alt="avatar"
-              style={{ width: 40, height: 40, borderRadius: '50%' }}
-            />
-            <span>{auth.user.global_name ?? auth.user.username}</span>
-            <button onClick={logout} style={{ ...btnStyle('var(--surface-raised)'), marginLeft: 'auto' }}>
-              Sign out
-            </button>
-          </div>
-
-          {/* Claim status */}
-          <ClaimStrip />
-
-          {/* Admin link */}
-          {auth.user.is_admin && (
-            <div style={{ marginTop: '1rem' }}>
-              <Link to="/admin" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                ⚙ Admin panel
-              </Link>
-            </div>
-          )}
+        {/* Left — My Characters */}
+        <div style={{ flex: '1 1 200px', minWidth: 180 }}>
+          {auth.status === 'authenticated' && <MyCharacters />}
         </div>
-      )}
+
+        {/* Right — Search */}
+        <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          <form onSubmit={handleCharSearch} style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              placeholder="Character name…"
+              value={charSearch}
+              onChange={e => setCharSearch(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button type="submit" style={btnStyle('var(--accent)')}>Look up</button>
+          </form>
+          <form onSubmit={handleGuildSearch} style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              placeholder="Guild name…"
+              value={guildSearch}
+              onChange={e => setGuildSearch(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button type="submit" style={btnStyle('var(--surface-raised)')}>Guild roster</button>
+          </form>
+        </div>
+
+      </div>
     </main>
   )
 }

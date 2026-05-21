@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from census.client import CensusClient
+from web.cache import claim_cache
 from web.db import get_active_claims, set_primary, submit_claim, withdraw_claim
 
 router = APIRouter(tags=["claim"])
@@ -38,6 +40,7 @@ class ClaimResponse(BaseModel):
     reviewed_at: int | None = None
     note: str | None = None
     is_primary: int = 0
+    guild_name: str | None = None
 
 
 class ClaimsResponse(BaseModel):
@@ -54,15 +57,80 @@ class SubmitClaimRequest(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.get("/claim/me", response_model=ClaimsResponse)
-async def get_my_claims(request: Request) -> ClaimsResponse:
-    """Return all approved characters and any pending claim for the current user."""
-    user = _require_user(request)
-    data = await get_active_claims(user["id"])
-    return ClaimsResponse(
-        approved=[ClaimResponse(**c) for c in data["approved"]],
+async def _build_claims_response(discord_id: str) -> tuple[ClaimsResponse, bool]:
+    """
+    Fetch claim + guild data from DB/Census.
+    Returns (response, cacheable) — cacheable is False if any Census guild
+    fetch failed, meaning the result should not be stored (retry next request).
+    """
+    data = await get_active_claims(discord_id)
+    approved_raw = data["approved"]
+
+    client = CensusClient(service_id=_SERVICE_ID)
+    try:
+        # return_exceptions=True so a Census timeout/error comes back as an
+        # Exception instance rather than propagating and losing all results
+        guild_results = await asyncio.gather(
+            *[client.get_character_guild_name(c["character_name"], _WORLD) for c in approved_raw],
+            return_exceptions=True,
+        )
+    finally:
+        await client.close()
+
+    # Any Exception in guild_results means that fetch failed (not the same as
+    # a character genuinely having no guild, which returns None)
+    any_failed = any(isinstance(gn, BaseException) for gn in guild_results)
+    if any_failed:
+        failed_names = [
+            c["character_name"] for c, gn in zip(approved_raw, guild_results)
+            if isinstance(gn, BaseException)
+        ]
+        print(f"[Claims] Guild fetch failed for: {failed_names} — result will not be cached")
+
+    approved = [
+        ClaimResponse(**{**c, "guild_name": gn if isinstance(gn, str) else None})
+        for c, gn in zip(approved_raw, guild_results)
+    ]
+    result = ClaimsResponse(
+        approved=approved,
         pending=ClaimResponse(**data["pending"]) if data["pending"] else None,
     )
+    return result, not any_failed
+
+
+async def _refresh_claim_cache(discord_id: str) -> None:
+    """Background task: silently rebuild the claim cache for a user."""
+    try:
+        result, cacheable = await _build_claims_response(discord_id)
+        if cacheable:
+            claim_cache.set(f"claims:{discord_id}", result)
+        else:
+            print(f"[Cache] Background claim refresh for {discord_id}: some fetches failed, skipping cache update")
+    except Exception as exc:
+        print(f"[Cache] Background claim refresh failed for {discord_id}: {exc}")
+
+
+@router.get("/claim/me", response_model=ClaimsResponse)
+async def get_my_claims(request: Request) -> ClaimsResponse:
+    """
+    Return all approved characters and any pending claim for the current user.
+    Always responds instantly from cache.  If the cache is stale (>5 min) a
+    background refresh is fired so the *next* request is also instant.
+    """
+    user = _require_user(request)
+    cache_key = f"claims:{user['id']}"
+
+    cached, is_stale = claim_cache.get_stale(cache_key)
+    if cached is not None:
+        if is_stale:
+            asyncio.create_task(_refresh_claim_cache(user["id"]))
+        return cached
+
+    # First-ever load for this user — fetch synchronously (no cache to serve yet)
+    result, cacheable = await _build_claims_response(user["id"])
+    if cacheable:
+        claim_cache.set(cache_key, result)
+    return result
 
 
 @router.post("/claim", response_model=ClaimResponse, status_code=201)
@@ -96,6 +164,7 @@ async def create_claim(body: SubmitClaimRequest, request: Request) -> ClaimRespo
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
+    asyncio.create_task(_refresh_claim_cache(user["id"]))
     return ClaimResponse(**claim)
 
 
@@ -105,6 +174,7 @@ async def remove_claim(claim_id: int, request: Request) -> dict:
     user = _require_user(request)
     if not await withdraw_claim(claim_id, user["id"]):
         raise HTTPException(status_code=404, detail="Claim not found or already inactive")
+    asyncio.create_task(_refresh_claim_cache(user["id"]))
     return {"ok": True}
 
 
@@ -114,4 +184,5 @@ async def set_primary_claim(claim_id: int, request: Request) -> dict:
     user = _require_user(request)
     if not await set_primary(user["id"], claim_id):
         raise HTTPException(status_code=404, detail="Claim not found, not approved, or not yours")
+    asyncio.create_task(_refresh_claim_cache(user["id"]))
     return {"ok": True}

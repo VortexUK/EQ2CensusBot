@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useClaim } from '../hooks/useClaim'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,9 +22,23 @@ interface GuildData {
   members: GuildMember[]
 }
 
+interface GuildInfo {
+  name: string
+  world: string
+  dateformed: number | null
+  description: string | null
+  alignment: string | null
+  type: string | null
+  level: number | null
+  members: number | null
+  accounts: number | null
+  achievement_count: number
+}
+
 interface MemberSpellTiers {
   name: string
   rank: string | null
+  rank_id: number | null
   tiers: Record<string, number>
   total: number
 }
@@ -43,6 +58,7 @@ interface AdornColorStats {
 interface MemberAdornStats {
   name: string
   rank: string | null
+  rank_id: number | null
   adorns: Record<string, AdornColorStats>
 }
 
@@ -117,6 +133,21 @@ const TD: React.CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
+// ── Guild info stat chip ──────────────────────────────────────────────────────
+
+function InfoStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+      <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
+        {label}
+      </span>
+      <span style={{ fontSize: '0.92rem', color: 'var(--text)', fontWeight: 500 }}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
 // ── Tab button ────────────────────────────────────────────────────────────────
 
 function TabBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
@@ -141,30 +172,93 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
 
 // ── Roster table ──────────────────────────────────────────────────────────────
 
-function RosterTable({ members, filter }: { members: GuildMember[]; filter: string }) {
-  const filtered = useMemo(() => {
+type RosterSortKey = 'rank' | 'name' | 'level' | 'aa' | 'ts_level' | 'deity'
+
+const ROSTER_COLS: { label: string; key: RosterSortKey; align?: 'right' }[] = [
+  { label: 'Name',             key: 'name'     },
+  { label: 'Rank',             key: 'rank'     },
+  { label: 'Class (Level)',    key: 'level'    },
+  { label: 'AA',               key: 'aa',      align: 'right' },
+  { label: 'Tradeskill (Lvl)', key: 'ts_level' },
+  { label: 'Deity',            key: 'deity'    },
+]
+
+function rosterSortValue(m: GuildMember, key: RosterSortKey): string | number {
+  switch (key) {
+    case 'rank':     return m.rank_id ?? 9999
+    case 'name':     return m.name.toLowerCase()
+    case 'level':    return m.level ?? -1
+    case 'aa':       return m.aa_level ?? -1
+    case 'ts_level': return m.ts_level ?? -1
+    case 'deity':    return (m.deity ?? '').toLowerCase()
+  }
+}
+
+function RosterTable({ members, filter, hiddenRanks, myChars }: { members: GuildMember[]; filter: string; hiddenRanks: Set<string>; myChars: Set<string> }) {
+  const [sortKey, setSortKey] = useState<RosterSortKey>('rank')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleSort(key: RosterSortKey) {
+    if (key === sortKey) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      // Numeric columns default to descending (highest first); others ascending
+      setSortDir(['level', 'aa', 'ts_level'].includes(key) ? 'desc' : 'asc')
+    }
+  }
+
+  const sorted = useMemo(() => {
     const q = filter.trim().toLowerCase()
-    if (!q) return members
-    return members.filter(m =>
-      m.name.toLowerCase().includes(q) ||
-      (m.cls ?? '').toLowerCase().includes(q) ||
-      (m.rank ?? '').toLowerCase().includes(q),
-    )
-  }, [members, filter])
+    const base = members.filter(m => {
+      if (m.rank && hiddenRanks.has(m.rank)) return false
+      if (!q) return true
+      return m.name.toLowerCase().includes(q) ||
+        (m.cls ?? '').toLowerCase().includes(q) ||
+        (m.rank ?? '').toLowerCase().includes(q)
+    })
+
+    base.sort((a, b) => {
+      const av = rosterSortValue(a, sortKey)
+      const bv = rosterSortValue(b, sortKey)
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return base
+  }, [members, filter, hiddenRanks, sortKey, sortDir])
 
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead>
         <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
-          {['Name', 'Rank', 'Class (Level)', 'AA', 'Tradeskill (Level)', 'Deity'].map(h => (
-            <th key={h} style={{ ...TH, textAlign: h === 'AA' ? 'right' : 'left' }}>{h}</th>
-          ))}
+          {ROSTER_COLS.map(col => {
+            const active = sortKey === col.key
+            return (
+              <th
+                key={col.key}
+                onClick={() => handleSort(col.key)}
+                style={{
+                  ...TH,
+                  textAlign: col.align ?? 'left',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  color: active ? 'var(--accent)' : 'var(--text-muted)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {col.label}
+                <span style={{ marginLeft: '0.3rem', opacity: active ? 1 : 0.3, fontSize: '0.65rem' }}>
+                  {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
+                </span>
+              </th>
+            )
+          })}
         </tr>
       </thead>
       <tbody>
-        {filtered.length === 0 ? (
+        {sorted.length === 0 ? (
           <tr><td colSpan={6} style={{ ...TD, textAlign: 'center', color: 'var(--text-muted)' }}>No members match your filter.</td></tr>
-        ) : filtered.map(m => {
+        ) : sorted.map(m => {
           const clsLabel = m.cls
             ? m.level != null ? `${m.cls} (${m.level})` : m.cls
             : '—'
@@ -174,12 +268,15 @@ function RosterTable({ members, filter }: { members: GuildMember[]; filter: stri
               : m.ts_class
             : '—'
           return (
-            <tr key={m.name} style={{ borderBottom: '1px solid var(--border)' }}>
+            <tr key={m.name} style={{ borderBottom: '1px solid var(--border)', background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
               <td style={TD}>
                 <Link to={`/character/${encodeURIComponent(m.name)}`}
                   style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
                   {m.name}
                 </Link>
+                {myChars.has(m.name.toLowerCase()) && (
+                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: '#c8a96e', verticalAlign: 'middle' }}>★</span>
+                )}
               </td>
               <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
               <td style={{ ...TD, color: m.cls ? (CLASS_COLOURS[m.cls] ?? 'var(--text)') : 'var(--text-muted)' }}>{clsLabel}</td>
@@ -196,46 +293,93 @@ function RosterTable({ members, filter }: { members: GuildMember[]; filter: stri
 
 // ── Spell check table ─────────────────────────────────────────────────────────
 
-function SpellCheckTable({ data, filter }: { data: GuildSpellCheck; filter: string }) {
-  const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    if (!q) return data.members
-    return data.members.filter(m =>
-      m.name.toLowerCase().includes(q) || (m.rank ?? '').toLowerCase().includes(q),
-    )
-  }, [data.members, filter])
+const TIER_SHORT: Record<string, string> = {
+  Apprentice: 'App', Journeyman: 'Journ', Adept: 'Adept',
+  Expert: 'Expert', Master: 'Master', Grandmaster: 'GM',
+}
 
-  // Abbreviated tier headers
-  const tierShort: Record<string, string> = {
-    Apprentice: 'App', Journeyman: 'Journ', Adept: 'Adept',
-    Expert: 'Expert', Master: 'Master', Grandmaster: 'GM',
+function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSpellCheck; filter: string; hiddenRanks: Set<string>; myChars: Set<string> }) {
+  // sortKey is 'rank' | 'name' | 'total' | a tier name
+  const [sortKey, setSortKey] = useState<string>('rank')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleSort(key: string) {
+    if (key === sortKey) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'name' || key === 'rank' ? 'asc' : 'desc')
+    }
+  }
+
+  function sortValue(m: MemberSpellTiers): string | number {
+    if (sortKey === 'rank')  return m.rank_id ?? 9999
+    if (sortKey === 'name')  return m.name.toLowerCase()
+    if (sortKey === 'total') return m.total
+    return m.tiers[sortKey] ?? 0
+  }
+
+  const sorted = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    const base = data.members.filter(m => {
+      if (m.rank && hiddenRanks.has(m.rank)) return false
+      if (!q) return true
+      return m.name.toLowerCase().includes(q) || (m.rank ?? '').toLowerCase().includes(q)
+    })
+
+    base.sort((a, b) => {
+      const av = sortValue(a), bv = sortValue(b)
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return base
+  }, [data.members, filter, hiddenRanks, sortKey, sortDir])
+
+  function SortTh({ label, colKey, align, color }: { label: string; colKey: string; align?: 'right'; color?: string }) {
+    const active = sortKey === colKey
+    return (
+      <th
+        onClick={() => handleSort(colKey)}
+        style={{
+          ...TH,
+          textAlign: align ?? 'left',
+          cursor: 'pointer',
+          userSelect: 'none',
+          color: active ? 'var(--accent)' : (color ?? 'var(--text-muted)'),
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label}
+        <span style={{ marginLeft: '0.3rem', opacity: active ? 1 : 0.3, fontSize: '0.65rem' }}>
+          {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
+        </span>
+      </th>
+    )
   }
 
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead>
         <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
-          <th style={TH}>Name</th>
-          <th style={TH}>Rank</th>
-          {data.tiers.map(t => {
-            const tc = TIER_COLOURS[t]
-            return (
-              <th key={t} style={{ ...TH, textAlign: 'right', color: tc?.text ?? 'var(--text-muted)' }}>
-                {tierShort[t] ?? t}
-              </th>
-            )
-          })}
-          <th style={{ ...TH, textAlign: 'right', color: 'var(--text-muted)' }}>Total</th>
+          <SortTh label="Name"  colKey="name" />
+          <SortTh label="Rank"  colKey="rank" />
+          {data.tiers.map(t => (
+            <SortTh key={t} label={TIER_SHORT[t] ?? t} colKey={t} align="right" color={TIER_COLOURS[t]?.text} />
+          ))}
+          <SortTh label="Total" colKey="total" align="right" />
         </tr>
       </thead>
       <tbody>
-        {filtered.map(m => (
-          <tr key={m.name} style={{ borderBottom: '1px solid var(--border)' }}>
+        {sorted.map(m => (
+          <tr key={m.name} style={{ borderBottom: '1px solid var(--border)', background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
             <td style={TD}>
               <Link to={`/character/${encodeURIComponent(m.name)}`}
                 style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
                 {m.name}
               </Link>
+              {myChars.has(m.name.toLowerCase()) && (
+                <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: '#c8a96e', verticalAlign: 'middle' }}>★</span>
+              )}
             </td>
             <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
             {data.tiers.map(t => {
@@ -264,37 +408,98 @@ function SpellCheckTable({ data, filter }: { data: GuildSpellCheck; filter: stri
 
 // ── Adorn check table ─────────────────────────────────────────────────────────
 
-function AdornCheckTable({ data, filter }: { data: GuildAdornCheck; filter: string }) {
-  const filtered = useMemo(() => {
+function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAdornCheck; filter: string; hiddenRanks: Set<string>; myChars: Set<string> }) {
+  const [sortKey, setSortKey] = useState<string>('rank')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleSort(key: string) {
+    if (key === sortKey) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'name' || key === 'rank' ? 'asc' : 'desc')
+    }
+  }
+
+  // Only show colour columns where at least one member has a filled adorn of that colour
+  const activeColors = useMemo(() =>
+    data.colors.filter(c =>
+      data.members.some(m => (m.adorns[c]?.filled ?? 0) > 0)
+    ),
+  [data])
+
+  // Returns a sort value: for colour columns, use fill % (0–1), missing = -1
+  function sortValue(m: MemberAdornStats): string | number {
+    if (sortKey === 'rank') return m.rank_id ?? 9999
+    if (sortKey === 'name') return m.name.toLowerCase()
+    const s = m.adorns[sortKey]
+    if (!s || s.total === 0) return -1
+    return s.filled / s.total
+  }
+
+  const sorted = useMemo(() => {
     const q = filter.trim().toLowerCase()
-    if (!q) return data.members
-    return data.members.filter(m =>
-      m.name.toLowerCase().includes(q) || (m.rank ?? '').toLowerCase().includes(q),
+    const base = data.members.filter(m => {
+      if (m.rank && hiddenRanks.has(m.rank)) return false
+      if (!q) return true
+      return m.name.toLowerCase().includes(q) || (m.rank ?? '').toLowerCase().includes(q)
+    })
+
+    base.sort((a, b) => {
+      const av = sortValue(a), bv = sortValue(b)
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return base
+  }, [data.members, filter, hiddenRanks, sortKey, sortDir])
+
+  function SortTh({ label, colKey, align }: { label: string; colKey: string; align?: 'right' }) {
+    const active = sortKey === colKey
+    return (
+      <th
+        onClick={() => handleSort(colKey)}
+        style={{
+          ...TH,
+          textAlign: align ?? 'left',
+          cursor: 'pointer',
+          userSelect: 'none',
+          color: active ? 'var(--accent)' : 'var(--text-muted)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label}
+        <span style={{ marginLeft: '0.3rem', opacity: active ? 1 : 0.3, fontSize: '0.65rem' }}>
+          {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
+        </span>
+      </th>
     )
-  }, [data.members, filter])
+  }
 
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead>
         <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
-          <th style={TH}>Name</th>
-          <th style={TH}>Rank</th>
-          {data.colors.map(c => (
-            <th key={c} style={{ ...TH, textAlign: 'right' }}>{c}</th>
+          <SortTh label="Name" colKey="name" />
+          <SortTh label="Rank" colKey="rank" />
+          {activeColors.map(c => (
+            <SortTh key={c} label={c} colKey={c} align="right" />
           ))}
         </tr>
       </thead>
       <tbody>
-        {filtered.map(m => (
-          <tr key={m.name} style={{ borderBottom: '1px solid var(--border)' }}>
+        {sorted.map(m => (
+          <tr key={m.name} style={{ borderBottom: '1px solid var(--border)', background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
             <td style={TD}>
               <Link to={`/character/${encodeURIComponent(m.name)}`}
                 style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
                 {m.name}
               </Link>
+              {myChars.has(m.name.toLowerCase()) && (
+                <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: '#c8a96e', verticalAlign: 'middle' }}>★</span>
+              )}
             </td>
             <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
-            {data.colors.map(c => {
+            {activeColors.map(c => {
               const stats = m.adorns[c]
               if (!stats) return (
                 <td key={c} style={{ ...TD, textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
@@ -317,9 +522,19 @@ function AdornCheckTable({ data, filter }: { data: GuildAdornCheck; filter: stri
 export default function GuildPage() {
   const { characterName } = useParams<{ characterName: string }>()
   const navigate = useNavigate()
+  const claimState = useClaim()
+
+  const myChars = useMemo<Set<string>>(() => {
+    if (claimState.status !== 'ready') return new Set()
+    return new Set(claimState.data.approved.map(c => c.character_name.toLowerCase()))
+  }, [claimState])
 
   const [tab, setTab] = useState<Tab>('roster')
   const [filter, setFilter] = useState('')
+  const [hiddenRanks, setHiddenRanks] = useState<Set<string>>(new Set())
+
+  // Guild info state
+  const [info, setInfo] = useState<GuildInfo | null>(null)
 
   // Roster state
   const [roster, setRoster] = useState<GuildData | null>(null)
@@ -336,21 +551,28 @@ export default function GuildPage() {
   const [adornsError, setAdornsError] = useState<string | null>(null)
   const [adornsLoading, setAdornsLoading] = useState(false)
 
-  // Load roster on mount
+  // Load roster + info on mount
   useEffect(() => {
     if (!characterName) return
     setRosterLoading(true)
     setRosterError(null)
-    fetch(`/api/guild/${encodeURIComponent(characterName)}`)
-      .then(async res => {
-        if (!res.ok) { setRosterError((await res.json().catch(() => ({}))).detail ?? `Error ${res.status}`); return }
-        const data = await res.json()
+
+    // Fetch roster and info in parallel
+    Promise.all([
+      fetch(`/api/guild/${encodeURIComponent(characterName)}`),
+      fetch(`/api/guild/${encodeURIComponent(characterName)}/info`),
+    ]).then(async ([rosterRes, infoRes]) => {
+      if (!rosterRes.ok) {
+        setRosterError((await rosterRes.json().catch(() => ({}))).detail ?? `Error ${rosterRes.status}`)
+      } else {
+        const data = await rosterRes.json()
         setRoster(data)
-        // Replace URL with the actual guild name so it's bookmarkable
         if (characterName !== data.name) {
           navigate(`/guild/${encodeURIComponent(data.name)}`, { replace: true })
         }
-      })
+      }
+      if (infoRes.ok) setInfo(await infoRes.json())
+    })
       .catch(() => setRosterError('Network error — please try again.'))
       .finally(() => setRosterLoading(false))
   }, [characterName])
@@ -391,10 +613,28 @@ export default function GuildPage() {
   }
 
   const guildName = roster?.name ?? spells?.guild_name ?? adorns?.guild_name ?? '…'
-  const guildWorld = roster?.world ?? _world()
+  const guildWorld = roster?.world ?? ''
   const memberCount = roster?.members.length
 
-  function _world() { return '' }
+  // Unique ranks ordered by rank_id, derived from roster
+  const ranksOrdered = useMemo(() => {
+    if (!roster) return []
+    const seen = new Map<string, number>()
+    for (const m of roster.members) {
+      if (m.rank && !seen.has(m.rank)) seen.set(m.rank, m.rank_id ?? 9999)
+    }
+    return [...seen.entries()]
+      .sort((a, b) => a[1] - b[1])
+      .map(([name]) => name)
+  }, [roster])
+
+  function toggleRank(rank: string) {
+    setHiddenRanks(prev => {
+      const next = new Set(prev)
+      next.has(rank) ? next.delete(rank) : next.add(rank)
+      return next
+    })
+  }
 
   const isLoading = tab === 'roster' ? rosterLoading
     : tab === 'spells' ? spellsLoading
@@ -406,22 +646,56 @@ export default function GuildPage() {
 
   return (
     <main style={{ maxWidth: 1000, margin: '3rem auto', padding: '0 1rem' }}>
-      <Link
-        to={characterName ? `/character/${encodeURIComponent(characterName)}` : '/'}
-        style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}
-      >
-        ← {characterName ? `Back to ${characterName}` : 'Back'}
-      </Link>
+      <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
 
       {/* Header */}
-      {(roster || spells || adorns) && (
-        <div style={{ margin: '1rem 0 1rem' }}>
-          <h1 style={{ margin: '0 0 0.2rem', fontSize: '1.6rem' }}>{guildName}</h1>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            {guildWorld}{memberCount != null ? ` · ${memberCount} members with census data` : ''}
-          </span>
-        </div>
-      )}
+      <div style={{ margin: '1rem 0 1.5rem' }}>
+        <h1 style={{
+          fontFamily: "'Cinzel', serif",
+          fontSize: '2.2rem',
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          lineHeight: 1.1,
+          marginBottom: '0.25rem',
+          background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 40%, #c8a96e 70%, #a07840 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          display: 'inline-block',
+        }}>
+          {guildName}
+        </h1>
+        {guildWorld && (
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '1rem' }}>
+            {guildWorld}{memberCount != null ? ` · ${memberCount} members` : ''}
+          </div>
+        )}
+
+        {/* Guild info panel */}
+        {info && (
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: '0.85rem 1.1rem',
+          }}>
+            {info.level    != null && <InfoStat label="Guild Level"  value={String(info.level)} />}
+            {info.members  != null && <InfoStat label="Characters"   value={String(info.members)} />}
+            {info.accounts != null && <InfoStat label="Accounts"     value={String(info.accounts)} />}
+            {info.achievement_count > 0 && <InfoStat label="Achievements" value={String(info.achievement_count)} />}
+            {info.alignment && <InfoStat label="Alignment" value={info.alignment} />}
+            {info.type      && <InfoStat label="Type"      value={info.type} />}
+            {info.dateformed && (
+              <InfoStat label="Founded" value={new Date(info.dateformed * 1000).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })} />
+            )}
+            {info.description && (
+              <div style={{ width: '100%', paddingTop: '0.4rem', borderTop: '1px solid var(--border)', marginTop: '0.2rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description</span>
+                <p style={{ fontSize: '0.88rem', color: 'var(--text)', marginTop: '0.2rem', lineHeight: 1.5 }}>{info.description}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
@@ -430,9 +704,9 @@ export default function GuildPage() {
         <TabBtn label="Adorn Check"  active={tab === 'adorns'} onClick={() => switchTab('adorns')} />
       </div>
 
-      {/* Filter */}
+      {/* Filters */}
       {!isLoading && !error && (
-        <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
           <input
             type="text"
             placeholder="Filter by name, class or rank…"
@@ -440,6 +714,44 @@ export default function GuildPage() {
             onChange={e => setFilter(e.target.value)}
             style={{ maxWidth: 300, boxSizing: 'border-box' }}
           />
+          {ranksOrdered.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: '0.2rem' }}>
+                Ranks
+              </span>
+              {ranksOrdered.map(rank => {
+                const hidden = hiddenRanks.has(rank)
+                return (
+                  <button
+                    key={rank}
+                    onClick={() => toggleRank(rank)}
+                    style={{
+                      padding: '0.2rem 0.65rem',
+                      borderRadius: 20,
+                      border: `1px solid ${hidden ? 'var(--border)' : 'rgba(200,169,110,0.45)'}`,
+                      background: hidden ? 'transparent' : 'rgba(200,169,110,0.1)',
+                      color: hidden ? 'var(--text-muted)' : 'rgba(232,213,163,0.9)',
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      textDecoration: hidden ? 'line-through' : 'none',
+                      opacity: hidden ? 0.5 : 1,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {rank}
+                  </button>
+                )
+              })}
+              {hiddenRanks.size > 0 && (
+                <button
+                  onClick={() => setHiddenRanks(new Set())}
+                  style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem 0.3rem' }}
+                >
+                  reset
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -468,13 +780,13 @@ export default function GuildPage() {
           borderRadius: 8,
         }}>
           {tab === 'roster' && roster && (
-            <RosterTable members={roster.members} filter={filter} />
+            <RosterTable members={roster.members} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
           {tab === 'spells' && spells && (
-            <SpellCheckTable data={spells} filter={filter} />
+            <SpellCheckTable data={spells} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
           {tab === 'adorns' && adorns && (
-            <AdornCheckTable data={adorns} filter={filter} />
+            <AdornCheckTable data={adorns} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
         </div>
       )}

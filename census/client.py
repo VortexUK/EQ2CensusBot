@@ -165,6 +165,56 @@ class CensusClient:
     # Slots to exclude from the equipment display
     _SKIP_SLOTS = frozenset({"ammo", "event slot", "mount adornment", "mount armor"})
 
+    async def _parse_equipment(self, raw_slots: list) -> list[EquipmentSlot]:
+        """Parse a Census equipmentslot_list into EquipmentSlot dataclass objects."""
+        equipment: list[EquipmentSlot] = []
+        for slot in raw_slots:
+            if not isinstance(slot, dict):
+                continue
+            slot_display = slot.get("displayname", "")
+            if slot_display.lower() in self._SKIP_SLOTS:
+                continue
+            item_data = slot.get("item")
+            if not isinstance(item_data, dict):
+                continue
+            item_id = _int(item_data.get("id"))
+            if item_id is None:
+                continue
+            db_row = await item_db.find_by_id(item_id)
+            if db_row:
+                item_name = db_row.get("displayname") or f"Item #{item_id}"
+                item_tier = str(db_row.get("tier") or "")
+                icon_id   = str(db_row["iconid"]) if db_row.get("iconid") else None
+            else:
+                item_name = f"Item #{item_id}"
+                item_tier = ""
+                icon_id   = None
+            adorn_slots: list[AdornSlot] = []
+            for adorn in (item_data.get("adornment_list") or []):
+                if not isinstance(adorn, dict):
+                    continue
+                color    = adorn.get("color", "").capitalize()
+                adorn_id = _int(adorn.get("id"))
+                if adorn_id is not None:
+                    adorn_db   = await item_db.find_by_id(adorn_id)
+                    adorn_name = adorn_db.get("displayname") if adorn_db else None
+                else:
+                    adorn_name = None
+                adorn_slots.append(AdornSlot(
+                    color      = color,
+                    adorn_name = adorn_name,
+                    adorn_id   = str(adorn_id) if adorn_id is not None else None,
+                ))
+            equipment.append(EquipmentSlot(
+                slot_name   = slot_display,
+                item_name   = item_name,
+                item_id     = str(item_id),
+                icon_id     = icon_id,
+                tier        = item_tier or None,
+                adorn_slots = adorn_slots,
+            ))
+        return equipment
+
     async def get_character(self, name: str, world: str) -> Optional[CharacterOverview]:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
@@ -197,64 +247,19 @@ class CensusClient:
         # aa_level in type is the total AA level shown in-game
         aa_count = _int(t.get("aa_level")) or 0
 
-        # Equipment — items come back with only an id; look up names in local DB
-        equipment: list[EquipmentSlot] = []
-        for slot in char.get("equipmentslot_list") or []:
-            if not isinstance(slot, dict):
-                continue
-            slot_display = slot.get("displayname", "")
-            if slot_display.lower() in self._SKIP_SLOTS:
-                continue
-            item_data = slot.get("item")
-            if not isinstance(item_data, dict):
-                continue
-            item_id = _int(item_data.get("id"))
-            if item_id is None:
-                continue
-
-            # Look up item name + tier from local DB
-            db_row = await item_db.find_by_id(item_id)
-            if db_row:
-                item_name = db_row.get("displayname") or f"Item #{item_id}"
-                item_tier = db_row.get("tier")
-                icon_id   = str(db_row["iconid"]) if db_row.get("iconid") else None
-            else:
-                item_name = f"Item #{item_id}"
-                item_tier = None
-                icon_id   = None
-
-            # Adornment slots come from the Census character equipment data.
-            # Each entry: {"color": "white", "id": 12345} = equipped,
-            #             {"color": "turquoise"}           = empty slot.
-            adorn_slots: list[AdornSlot] = []
-            for adorn in (item_data.get("adornment_list") or []):
-                if not isinstance(adorn, dict):
-                    continue
-                color     = adorn.get("color", "").capitalize()
-                adorn_id  = _int(adorn.get("id"))
-                if adorn_id is not None:
-                    adorn_db   = await item_db.find_by_id(adorn_id)
-                    adorn_name = adorn_db.get("displayname") if adorn_db else f"Adorn #{adorn_id}"
-                else:
-                    adorn_name = None
-                adorn_slots.append(AdornSlot(
-                    color=color,
-                    adorn_name=adorn_name,
-                    adorn_id=str(adorn_id) if adorn_id is not None else None,
-                ))
-
-            equipment.append(EquipmentSlot(
-                slot_name   = slot_display,
-                item_name   = item_name,
-                item_id     = str(item_id),
-                icon_id     = icon_id,
-                tier        = item_tier,
-                adorn_slots = adorn_slots,
-            ))
+        equipment = await self._parse_equipment(char.get("equipmentslot_list") or [])
 
         gender   = t.get("gender", "")
         ts_class = t.get("ts_class", "")
         raw_stats = char.get("stats") or {}
+        # In the direct character call, 'ability' and 'personal_status_points' are
+        # top-level on the character object rather than nested inside 'stats'.
+        # Merge them in so _parse_stats always finds them in the same place.
+        if "ability" not in raw_stats and char.get("ability"):
+            raw_stats = {**raw_stats, "ability": char["ability"]}
+        if "personal_status_points" not in raw_stats and char.get("personal_status_points"):
+            raw_stats = {**raw_stats, "personal_status_points": char["personal_status_points"]}
+
         return CharacterOverview(
             id        = str(char.get("id", "")),
             name      = (char.get("name") or {}).get("first", name),
@@ -353,8 +358,149 @@ class CensusClient:
         }
         return rank_map, guild.get("member_list") or []
 
+    async def get_guild_info(self, name: str, world: str) -> Optional[dict]:
+        """Return lightweight guild metadata (no member resolve)."""
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
+        params = {
+            "name": name,
+            "world": world,
+            "c:show": "name,world,dateformed,description,alignment,type,level,members,accounts,achievement_list",
+            "c:limit": "1",
+        }
+        print(f"[Census] GET {url} params={params}")
+        try:
+            async with self._session_().get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=15)
+            ) as resp:
+                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                if resp.status != 200:
+                    return None
+                data = await resp.json(content_type=None)
+        except Exception as exc:
+            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            return None
+
+        guild_list = data.get("guild_list", [])
+        if not guild_list:
+            return None
+        g = guild_list[0]
+        return {
+            "name":              g.get("name", name),
+            "world":             g.get("world", world),
+            "dateformed":        g.get("dateformed"),
+            "description":       g.get("description") or None,
+            "alignment":         g.get("alignment") or None,
+            "type":              g.get("type") or None,
+            "level":             _int(g.get("level")),
+            "members":           _int(g.get("members")),
+            "accounts":          _int(g.get("accounts")),
+            "achievement_count": len(g.get("achievement_list") or []),
+        }
+
+    async def get_guild_full(
+        self, name: str, world: str
+    ) -> Optional[tuple[GuildData, list[CharacterOverview]]]:
+        """
+        Fetch guild with full member profiles (type + stats + equipment).
+        Returns (GuildData, list[CharacterOverview]) for cache pre-warming.
+        Note: spell data is NOT included here — the Census guild-member resolve
+        does not support nested spell resolution.  Use get_character_spells per
+        member for spell data.
+        """
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
+        params = {
+            "name": name,
+            "world": world,
+            "c:resolve": "members(displayname,type,stats,guild.rank,equipmentslot_list)",
+            "c:show": "member_list,name,world,rank_list",
+            "c:limit": "1",
+        }
+        print(f"[Census] GET {url} params={params}")
+        try:
+            async with self._session_().get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=60)
+            ) as resp:
+                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                if resp.status != 200:
+                    return None
+                data = await resp.json(content_type=None)
+        except Exception as exc:
+            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            return None
+
+        guild_list = data.get("guild_list", [])
+        if not guild_list:
+            return None
+        guild = guild_list[0]
+
+        rank_map: dict[int, str] = {
+            int(r["id"]): r["name"]
+            for r in (guild.get("rank_list") or [])
+            if isinstance(r, dict) and "id" in r and "name" in r
+        }
+
+        members: list[GuildMember] = []
+        overviews: list[CharacterOverview] = []
+
+        for m in guild.get("member_list") or []:
+            t = m.get("type")
+            if not isinstance(t, dict):
+                continue
+            raw_rank  = _int((m.get("guild") or {}).get("rank"))
+            deity_val = t.get("deity")
+            # Guild member resolve puts the character name in 'name' or 'displayname'
+            member_name = m.get("name") or m.get("displayname", "Unknown")
+            gender   = t.get("gender", "")
+            ts_class = t.get("ts_class", "")
+
+            members.append(GuildMember(
+                name     = member_name,
+                level    = _int(t.get("level")),
+                cls      = t.get("class"),
+                ts_class = ts_class,
+                ts_level = _int(t.get("ts_level")),
+                aa_level = _int(t.get("aa_level")),
+                deity    = deity_val if deity_val and str(deity_val).lower() != "none" else None,
+                rank     = rank_map.get(raw_rank) if raw_rank is not None else None,
+                rank_id  = raw_rank,
+            ))
+
+            # In guild resolves 'ability' and 'personal_status_points' live inside
+            # the 'stats' dict already — no merge needed (unlike direct character calls).
+            raw_stats = m.get("stats") or {}
+            equipment = await self._parse_equipment(m.get("equipmentslot_list") or [])
+
+            overviews.append(CharacterOverview(
+                id        = str(m.get("id", "")),
+                name      = member_name,
+                level     = _int(t.get("level")),
+                cls       = t.get("class"),
+                race      = t.get("race"),
+                gender    = gender.capitalize() if gender else None,
+                deity     = deity_val if deity_val and str(deity_val).lower() != "none" else None,
+                aa_count  = _int(t.get("aa_level")) or 0,
+                world     = world,
+                ts_class  = ts_class.capitalize() if ts_class else None,
+                ts_level  = _int(t.get("ts_level")),
+                stats     = raw_stats,
+                equipment = equipment,
+            ))
+
+        return (
+            GuildData(
+                name    = guild.get("name", name),
+                world   = guild.get("world", world),
+                members = members,
+            ),
+            overviews,
+        )
+
     async def get_character_guild_name(self, character_name: str, world: str) -> Optional[str]:
-        """Return the guild name for a character, or None if not in a guild or not found."""
+        """
+        Return the guild name for a character, or None if not in a guild.
+        Raises on Census API/network errors so callers can distinguish
+        'character has no guild' (returns None) from 'fetch failed' (raises).
+        """
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
             "name.first": character_name,
@@ -369,18 +515,18 @@ class CensusClient:
             ) as resp:
                 print(f"[Census] HTTP {resp.status} url={resp.url}")
                 if resp.status != 200:
-                    return None
+                    raise RuntimeError(f"Census HTTP {resp.status} for guild lookup of {character_name!r}")
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
-            return None
+            print(f"[Census] API error fetching guild for {character_name!r}: {type(exc).__name__}: {exc!r}")
+            raise  # re-raise so callers can detect the failure
 
         char_list = data.get("character_list", [])
         if not char_list:
-            return None
+            return None  # character not found — not a fetch error
         guild = char_list[0].get("guild")
         if not guild or not isinstance(guild, dict):
-            return None
+            return None  # character genuinely has no guild
         return guild.get("name") or None
 
     async def get_character_spells(self, name: str, world: str) -> Optional[CharacterSpells]:

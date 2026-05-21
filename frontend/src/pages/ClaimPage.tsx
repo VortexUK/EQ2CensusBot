@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { avatarUrl, useAuth } from '../hooks/useAuth'
+import { useAuth } from '../hooks/useAuth'
 import { Claim, useClaim } from '../hooks/useClaim'
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ export default function ClaimPage() {
       <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
       <h1 style={{ margin: '0.75rem 0 0.25rem' }}>My Characters</h1>
       <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-        Link your Discord account to your EQ2 characters on {import.meta.env.VITE_EQ2_WORLD ?? 'Varsoon'}.
+        Link your Discord account to your EQ2 characters on {import.meta.env.VITE_EQ2_WORLD ?? 'Woushi'}.
         Each claim is reviewed by a guild officer before being approved.
       </p>
 
@@ -210,7 +210,8 @@ export default function ClaimPage() {
       )}
 
       {auth.status === 'authenticated' && claimState.status === 'ready' && (() => {
-        const { approved, pending } = claimState.data
+        const { pending } = claimState.data
+        const approved = [...claimState.data.approved].sort((a, b) => b.is_primary - a.is_primary)
         const hasAny = approved.length > 0 || pending !== null
 
         return (
@@ -287,13 +288,6 @@ export default function ClaimPage() {
         )
       })()}
 
-      {/* Footer */}
-      {auth.status === 'authenticated' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '2rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-          <img src={avatarUrl(auth.user)} alt="" style={{ width: 24, height: 24, borderRadius: '50%' }} />
-          <span>Signed in as <strong>{auth.user.global_name ?? auth.user.username}</strong></span>
-        </div>
-      )}
     </main>
   )
 }

@@ -9,6 +9,7 @@ export interface Claim {
   reviewed_at: number | null
   note: string | null
   is_primary: number   // 1 = primary, 0 = alt
+  guild_name: string | null
 }
 
 export interface ClaimsData {

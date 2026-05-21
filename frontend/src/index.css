@@ -1,8 +1,8 @@
 :root {
   --bg: #0f1117;
-  --surface: #1c1f2e;
-  --surface-raised: #252840;
-  --border: #2e3150;
+  --surface: rgba(28, 31, 46, 0.82);
+  --surface-raised: rgba(37, 40, 64, 0.88);
+  --border: rgba(46, 49, 80, 0.85);
   --text: #e2e4f0;
   --text-muted: #8b90ab;
   --accent: #7289da;
@@ -22,12 +22,22 @@
   padding: 0;
 }
 
+/* Background image fixed to viewport */
+html {
+  background:
+    url('./web_bg.png') center center / cover no-repeat fixed;
+  background-color: #0a0c14;
+}
+
 body {
-  background: var(--bg);
+  position: relative;
+  z-index: 1;
+  background: transparent;
   color: var(--text);
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.5;
+  min-height: 100vh;
 }
 
 a {

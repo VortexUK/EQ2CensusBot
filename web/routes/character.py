@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import os
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from census.client import CensusClient
 from census.models import AdornSlot as _AdornSlot
+from web.cache import character_cache
 
 router = APIRouter(tags=["character"])
 
@@ -187,18 +189,8 @@ class CharacterResponse(BaseModel):
     equipment: list[EquipmentSlotResponse] = []
 
 
-@router.get("/character/{name}", response_model=CharacterResponse)
-async def get_character(name: str) -> CharacterResponse:
-    """Fetch a character's overview from the EQ2 Census API."""
-    client = CensusClient(service_id=_SERVICE_ID)
-    try:
-        char = await client.get_character(name, _WORLD)
-    finally:
-        await client.close()
-
-    if char is None:
-        raise HTTPException(status_code=404, detail=f"Character '{name}' not found on {_WORLD}")
-
+def _build_char_response(char) -> CharacterResponse:
+    """Convert a CharacterOverview into a CharacterResponse (shared by endpoint + guild pre-warming)."""
     return CharacterResponse(
         id        = char.id,
         name      = char.name,
@@ -227,3 +219,45 @@ async def get_character(name: str) -> CharacterResponse:
             for s in char.equipment
         ],
     )
+
+
+async def _bg_refresh_character(name: str, cache_key: str) -> None:
+    """Background task: silently re-fetch a character and update the cache."""
+    try:
+        client = CensusClient(service_id=_SERVICE_ID)
+        try:
+            char = await client.get_character(name, _WORLD)
+        finally:
+            await client.close()
+        if char is not None:
+            character_cache.set(cache_key, _build_char_response(char))
+    except Exception as exc:
+        print(f"[Cache] Background character refresh failed for {name}: {exc}")
+
+
+@router.get("/character/{name}", response_model=CharacterResponse)
+async def get_character(name: str) -> CharacterResponse:
+    """
+    Fetch a character's overview from the EQ2 Census API.
+    Always responds instantly from cache; fires a background refresh when stale.
+    """
+    cache_key = f"{name.lower()}:{_WORLD.lower()}"
+    cached, is_stale = character_cache.get_stale(cache_key)
+    if cached is not None:
+        if is_stale:
+            asyncio.create_task(_bg_refresh_character(name, cache_key))
+        return cached
+
+    # Cache miss — fetch synchronously
+    client = CensusClient(service_id=_SERVICE_ID)
+    try:
+        char = await client.get_character(name, _WORLD)
+    finally:
+        await client.close()
+
+    if char is None:
+        raise HTTPException(status_code=404, detail=f"Character '{name}' not found on {_WORLD}")
+
+    result = _build_char_response(char)
+    character_cache.set(cache_key, result)
+    return result
