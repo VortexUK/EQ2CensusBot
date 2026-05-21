@@ -118,6 +118,7 @@ class MemberAdornStats(BaseModel):
     rank: str | None = None
     rank_id: int | None = None
     adorns: dict[str, AdornColorStats]  # colour → stats
+    missing: dict[str, list[str]] = {}  # colour → slot names with empty adorn of that colour
 
 
 class GuildAdornCheckResponse(BaseModel):
@@ -153,8 +154,11 @@ def _prewarm_adorn_cache(
     out_members: list[MemberAdornStats] = []
 
     for ov in overviews:
-        colour_stats: dict[str, list[int]] = {}  # colour → [filled, total]
+        colour_stats: dict[str, list[int]] = {}   # colour → [filled, total]
+        missing_slots: dict[str, list[str]] = {}  # colour → slot names with empty adorn
         for eq_slot in ov.equipment:
+            # Capitalise the slot name for display (e.g. "ring" → "Ring")
+            slot_label = eq_slot.slot_name.title() if eq_slot.slot_name else "Unknown"
             for adorn_slot in eq_slot.adorn_slots:
                 colour = adorn_slot.color
                 if not colour:
@@ -164,6 +168,8 @@ def _prewarm_adorn_cache(
                     colour_stats[colour] = [0, 0]
                 if filled:
                     colour_stats[colour][0] += 1
+                else:
+                    missing_slots.setdefault(colour, []).append(slot_label)
                 colour_stats[colour][1] += 1
                 all_colours.add(colour)
 
@@ -176,6 +182,7 @@ def _prewarm_adorn_cache(
             rank    = rank_label,
             rank_id = rank_id,
             adorns  = {c: AdornColorStats(filled=v[0], total=v[1]) for c, v in colour_stats.items()},
+            missing = missing_slots,
         ))
 
     out_members.sort(key=lambda m: (
