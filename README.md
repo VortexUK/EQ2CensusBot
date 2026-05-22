@@ -25,6 +25,8 @@ A React + FastAPI site served at `http://localhost:8000` (dev: `http://localhost
 ### Features
 
 - **Character sheet** — full stat panel, paperdoll with tier-coloured item names, adornment chips, item and adorn tooltips on hover, stat-to-item highlight (hover a stat on the left to see which items contribute it)
+- **Spells tab** — full deduplicated spell/art list in a two-column layout; each spell shows its icon (backdrop + foreground layered) and a row of 6 tier pip icons lit to its current tier (Apprentice → Journeyman → Adept → Expert → Master → Grandmaster); sidebar shows spells in lowest→highest tier order with progress bars for "Raid Ready" (≥ Expert) and "Fully Mastered" (≥ Master); spell blocklist support hides spells that cannot be upgraded
+- **AAs tab** — AA profile selector (Class / Subclass / Shadows / Heroic / Trade); renders the visual AA tree with tier badges and shows per-tree point totals
 - **Item tooltips** — rendered in HTML matching the in-game style, with quality glow colours, stats, effects, adornment slots, and flags
 - **Discord login** — OAuth2 sign-in via Discord
 - **Character claiming** — users link their Discord account to their EQ2 character; claims require admin approval before taking effect
@@ -50,6 +52,8 @@ census/
   models.py              # Dataclasses: ItemData, EquipmentSlot, AdornSlot, CharacterOverview, …
   constants.py           # STAT_MAP, class groups, ARCHETYPES, CLASS_GROUPS
   db.py                  # Item catalogue SQLite DB (data/items/items.db)
+  item_parser.py         # Item data parsing helpers (extracted from client.py)
+  spells_db.py           # Local SQLite spell catalogue helpers
 
 image/
   tooltip.py             # PIL item tooltip renderer (2× supersampling)
@@ -57,6 +61,7 @@ image/
 
 web/
   app.py                 # FastAPI application factory
+  config.py              # Centralised env config (SERVICE_ID, WORLD)
   db.py                  # Users / character_claims SQLite DB (data/users.db)
   routes/
     health.py            # GET /api/health
@@ -65,6 +70,11 @@ web/
     item.py              # GET /api/item/{item_id}
     claim.py             # GET|POST|DELETE /api/claim  (character claiming)
     admin.py             # GET /api/admin/claims  +  approve/reject endpoints
+    aa.py                # GET /api/character/{name}/aas
+    characters.py        # GET /api/characters/search
+    guild.py             # Guild endpoints (spellcheck, adorn check, roster)
+    guild_officer.py     # Officer claim-review endpoints
+    item_watch.py        # Item watch endpoints
 
 frontend/
   src/
@@ -72,6 +82,8 @@ frontend/
     pages/
       HomePage.tsx       # Search + login + claim status strip
       CharacterPage.tsx  # Full character sheet with stat panel, paperdoll, tooltips
+      CharacterAAsTab.tsx  # AA tree tab
+      CharacterSpellsTab.tsx  # Spells tab
       ClaimPage.tsx      # Claim submission / status / change character
       AdminPage.tsx      # Admin claim queue + history
     hooks/
@@ -86,6 +98,10 @@ data/
     icons/               # Item icon PNGs
   users.db               # Users + character claims (created automatically)
   AAs/                   # AA tree JSON files and node icons
+  spells/
+    spells.db            # Local spell catalogue (SQLite, seeded by download_spells.py)
+    blocklist.json       # Spell names to hide from spell tab and /spellcheck
+    icons/               # Spell icon PNGs (0–1177.png)
 
 scripts/                 # Local preview and download scripts (see below)
 ```
@@ -188,6 +204,9 @@ python scripts/preview_aacheck.py Menludiir Templar # render a specific tree
 # Data downloads
 python scripts/download_aa_trees.py               # fetch all AA tree JSONs from Census
 python scripts/download_aa_icons.py               # fetch all AA node icon PNGs
+python scripts/download_spell_icons.py            # download all spell icon PNGs
+python scripts/download_spell_icons.py --start N  # resume from icon N
+python scripts/preview_spellcheck.py Sihtric --debug  # show each counted spell
 ```
 
 ---
@@ -198,3 +217,15 @@ python scripts/download_aa_icons.py               # fetch all AA node icon PNGs
 - Item lookup supports display name, numeric ID, or in-game link (`\aITEM 12345 ...`)
 - Game link IDs are signed 32-bit integers; the client converts negative values to unsigned automatically
 - The `example` service ID is rate-limited — register at the Census site for production use
+
+---
+
+## Spell Blocklist
+
+To hide a spell from the character Spells tab and the `/spellcheck` Discord command, add its base name (without Roman-numeral rank) to `data/spells/blocklist.json`:
+
+```json
+{ "blocked": ["Fighting Chance", "Some Other Spell"] }
+```
+
+The file is re-read on every request — no restart required.
