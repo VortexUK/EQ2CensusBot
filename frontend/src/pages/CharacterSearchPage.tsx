@@ -38,6 +38,20 @@ interface CharSearchResponse {
   per_page: number
 }
 
+// ── Shared form-control style (dark theme, matches inputs) ───────────────────
+
+const CTRL: React.CSSProperties = {
+  padding: '0.42rem 0.6rem',
+  borderRadius: 6,
+  border: '1px solid var(--border)',
+  background: 'var(--surface-raised)',
+  color: 'var(--text)',
+  fontSize: '0.88rem',
+  lineHeight: '1.4',
+  appearance: 'auto',        // keep native arrow on selects
+  colorScheme: 'dark',       // tells the browser to use its dark-mode option list
+}
+
 // ── Shared table styles (match rest of app) ───────────────────────────────────
 
 const TH: React.CSSProperties = {
@@ -157,64 +171,64 @@ export default function CharacterSearchPage() {
             <select
               value={classValue}
               onChange={e => setClassValue(e.target.value)}
-              style={{ minWidth: 180, fontSize: '0.88rem' }}
+              style={{ ...CTRL, minWidth: 190 }}
             >
               <option value="">Any Class</option>
 
               <optgroup label="Fighter">
                 <option value="3,4,6,7,9,10">All Fighters</option>
-                <option value="3,4">  · Warrior</option>
-                <option value="3">    Guardian</option>
-                <option value="4">    Berserker</option>
-                <option value="6,7">  · Brawler</option>
-                <option value="6">    Monk</option>
-                <option value="7">    Bruiser</option>
-                <option value="9,10"> · Crusader</option>
-                <option value="9">    Shadowknight</option>
-                <option value="10">   Paladin</option>
+                <option value="3,4">{'  '}· Warrior</option>
+                <option value="3">{'    '}Guardian</option>
+                <option value="4">{'    '}Berserker</option>
+                <option value="6,7">{'  '}· Brawler</option>
+                <option value="6">{'    '}Monk</option>
+                <option value="7">{'    '}Bruiser</option>
+                <option value="9,10">{'  '}· Crusader</option>
+                <option value="9">{'    '}Shadowknight</option>
+                <option value="10">{'    '}Paladin</option>
               </optgroup>
 
               <optgroup label="Priest">
                 <option value="13,14,16,17,19,20">All Priests</option>
-                <option value="13,14"> · Cleric</option>
-                <option value="13">    Templar</option>
-                <option value="14">    Inquisitor</option>
-                <option value="16,17"> · Druid</option>
-                <option value="16">    Warden</option>
-                <option value="17">    Fury</option>
-                <option value="19,20"> · Shaman</option>
-                <option value="19">    Mystic</option>
-                <option value="20">    Defiler</option>
+                <option value="13,14">{'  '}· Cleric</option>
+                <option value="13">{'    '}Templar</option>
+                <option value="14">{'    '}Inquisitor</option>
+                <option value="16,17">{'  '}· Druid</option>
+                <option value="16">{'    '}Warden</option>
+                <option value="17">{'    '}Fury</option>
+                <option value="19,20">{'  '}· Shaman</option>
+                <option value="19">{'    '}Mystic</option>
+                <option value="20">{'    '}Defiler</option>
               </optgroup>
 
               <optgroup label="Mage">
                 <option value="23,24,26,27,29,30,44">All Mages</option>
-                <option value="23,24"> · Sorcerer</option>
-                <option value="23">    Wizard</option>
-                <option value="24">    Warlock</option>
-                <option value="26,27"> · Enchanter</option>
-                <option value="26">    Illusionist</option>
-                <option value="27">    Coercer</option>
-                <option value="29,30"> · Summoner</option>
-                <option value="29">    Conjuror</option>
-                <option value="30">    Necromancer</option>
-                <option value="44">  · Shaper</option>
-                <option value="44">    Channeler</option>
+                <option value="23,24">{'  '}· Sorcerer</option>
+                <option value="23">{'    '}Wizard</option>
+                <option value="24">{'    '}Warlock</option>
+                <option value="26,27">{'  '}· Enchanter</option>
+                <option value="26">{'    '}Illusionist</option>
+                <option value="27">{'    '}Coercer</option>
+                <option value="29,30">{'  '}· Summoner</option>
+                <option value="29">{'    '}Conjuror</option>
+                <option value="30">{'    '}Necromancer</option>
+                <option value="44">{'  '}· Shaper</option>
+                <option value="44">{'    '}Channeler</option>
               </optgroup>
 
               <optgroup label="Scout">
                 <option value="33,34,36,37,39,40,42">All Scouts</option>
-                <option value="33,34"> · Rogue</option>
-                <option value="33">    Swashbuckler</option>
-                <option value="34">    Brigand</option>
-                <option value="36,37"> · Bard</option>
-                <option value="36">    Troubador</option>
-                <option value="37">    Dirge</option>
-                <option value="39,40"> · Predator</option>
-                <option value="39">    Ranger</option>
-                <option value="40">    Assassin</option>
-                <option value="42">  · Animalist</option>
-                <option value="42">    Beastlord</option>
+                <option value="33,34">{'  '}· Rogue</option>
+                <option value="33">{'    '}Swashbuckler</option>
+                <option value="34">{'    '}Brigand</option>
+                <option value="36,37">{'  '}· Bard</option>
+                <option value="36">{'    '}Troubador</option>
+                <option value="37">{'    '}Dirge</option>
+                <option value="39,40">{'  '}· Predator</option>
+                <option value="39">{'    '}Ranger</option>
+                <option value="40">{'    '}Assassin</option>
+                <option value="42">{'  '}· Animalist</option>
+                <option value="42">{'    '}Beastlord</option>
               </optgroup>
             </select>
           </div>
@@ -230,7 +244,7 @@ export default function CharacterSearchPage() {
               placeholder="e.g. 60"
               value={minLevel}
               onChange={e => setMinLevel(e.target.value)}
-              style={{ width: 90, fontSize: '0.88rem' }}
+              style={{ ...CTRL, width: 90 }}
             />
           </div>
 
@@ -245,7 +259,7 @@ export default function CharacterSearchPage() {
               placeholder="e.g. 95"
               value={maxLevel}
               onChange={e => setMaxLevel(e.target.value)}
-              style={{ width: 90, fontSize: '0.88rem' }}
+              style={{ ...CTRL, width: 90 }}
             />
           </div>
 
@@ -257,7 +271,7 @@ export default function CharacterSearchPage() {
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as 'level' | 'aa' | 'name')}
-              style={{ fontSize: '0.88rem' }}
+              style={CTRL}
             >
               <option value="level">Level</option>
               <option value="aa">AA</option>
