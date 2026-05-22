@@ -91,7 +91,7 @@ class CensusClient:
         params = {
             "name": name,
             "world": world,
-            "c:resolve": "members(displayname,type.aa_level,type.deity,type.level,type.class,guild.rank,guild.status,type.ts_class,type.ts_level,type.playedtime)",
+            "c:resolve": "members(displayname,type.aa_level,type.deity,type.level,type.class,guild.rank,guild.status,type.ts_class,type.ts_level,playedtime)",
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
@@ -140,7 +140,7 @@ class CensusClient:
                 rank         = rank_map.get(raw_rank) if raw_rank is not None else None,
                 rank_id      = raw_rank,
                 guild_status = guild_status,
-                played_time  = _int(t.get("playedtime")),
+                played_time  = _int(m.get("playedtime")),
             ))
         return GuildData(
             name    = guild.get("name", name),
@@ -431,7 +431,7 @@ class CensusClient:
         params = {
             "name": name,
             "world": world,
-            "c:resolve": "members(displayname,type,stats,guild.rank,guild.status,equipmentslot_list,spell_list)",
+            "c:resolve": "members(displayname,type,stats,guild.rank,guild.status,playedtime,equipmentslot_list,spell_list)",
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
@@ -488,7 +488,7 @@ class CensusClient:
                 rank         = rank_map.get(raw_rank) if raw_rank is not None else None,
                 rank_id      = raw_rank,
                 guild_status = guild_status,
-                played_time  = _int(t.get("playedtime")),
+                played_time  = _int(m.get("playedtime")),
             ))
 
             # In guild resolves 'ability' and 'personal_status_points' live inside
