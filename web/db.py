@@ -54,6 +54,23 @@ CREATE TABLE IF NOT EXISTS character_claims (
 
 CREATE INDEX IF NOT EXISTS idx_claims_discord ON character_claims(discord_id);
 CREATE INDEX IF NOT EXISTS idx_claims_status  ON character_claims(status);
+
+CREATE TABLE IF NOT EXISTS item_watch (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_name      TEXT    NOT NULL,
+    character_name  TEXT    NOT NULL,
+    item_id         INTEGER NOT NULL,
+    item_name       TEXT    NOT NULL,
+    added_by        TEXT    NOT NULL REFERENCES users(discord_id),
+    added_by_name   TEXT    NOT NULL,
+    added_at        INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    first_seen_at   INTEGER,        -- first time we saw them wearing it (NULL = never)
+    last_seen_at    INTEGER,        -- most recent check where they had it equipped
+    last_checked_at INTEGER,        -- most recent check (any result)
+    UNIQUE(guild_name, character_name, item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_watch_guild ON item_watch(guild_name);
 """
 
 # Claim statuses:
@@ -396,3 +413,114 @@ async def delete_claims_for_user(
         count = cur.rowcount
         await db.commit()
     return count
+
+
+# ---------------------------------------------------------------------------
+# Item watch helpers
+# ---------------------------------------------------------------------------
+
+async def add_item_watch(
+    guild_name: str,
+    character_name: str,
+    item_id: int,
+    item_name: str,
+    added_by: str,
+    added_by_name: str,
+    path: Path = DB_PATH,
+) -> dict:
+    """
+    Add a new item watch entry.
+    Raises ValueError on duplicate (same guild + character + item_id).
+    Returns the new row dict.
+    """
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        try:
+            cur = await db.execute(
+                """
+                INSERT INTO item_watch
+                    (guild_name, character_name, item_id, item_name, added_by, added_by_name)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (guild_name, character_name, item_id, item_name, added_by, added_by_name),
+            )
+        except Exception as exc:
+            if "UNIQUE" in str(exc):
+                raise ValueError(
+                    f"'{item_name}' is already being watched for {character_name}."
+                ) from exc
+            raise
+        new_id = cur.lastrowid
+        await db.commit()
+        async with db.execute("SELECT * FROM item_watch WHERE id = ?", (new_id,)) as cur2:
+            row = await cur2.fetchone()
+    return dict(row)
+
+
+async def list_item_watches(
+    guild_name: str,
+    path: Path = DB_PATH,
+) -> list[dict]:
+    """Return all item watch entries for a guild, ordered by added_at descending."""
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM item_watch WHERE guild_name = ? ORDER BY added_at DESC",
+            (guild_name,),
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def remove_item_watch(
+    watch_id: int,
+    guild_name: str,
+    path: Path = DB_PATH,
+) -> bool:
+    """Delete an item watch entry. Scoped to guild_name for safety. Returns True if deleted."""
+    async with aiosqlite.connect(path) as db:
+        cur = await db.execute(
+            "DELETE FROM item_watch WHERE id = ? AND guild_name = ?",
+            (watch_id, guild_name),
+        )
+        deleted = cur.rowcount > 0
+        await db.commit()
+    return deleted
+
+
+async def update_item_watch_check(
+    watch_id: int,
+    seen: bool,
+    path: Path = DB_PATH,
+) -> None:
+    """
+    Record the result of an equipment check.
+    Updates last_checked_at always.
+    Updates last_seen_at (and first_seen_at if not yet set) only when seen=True.
+    """
+    now = "strftime('%s','now')"
+    if seen:
+        await _run(
+            path,
+            f"""
+            UPDATE item_watch SET
+                last_checked_at = {now},
+                last_seen_at    = {now},
+                first_seen_at   = COALESCE(first_seen_at, {now})
+            WHERE id = ?
+            """,
+            (watch_id,),
+        )
+    else:
+        await _run(
+            path,
+            f"UPDATE item_watch SET last_checked_at = {now} WHERE id = ?",
+            (watch_id,),
+        )
+
+
+async def _run(path: Path, sql: str, params: tuple = ()) -> None:
+    """Execute a single write statement."""
+    async with aiosqlite.connect(path) as db:
+        await db.execute(sql, params)
+        await db.commit()

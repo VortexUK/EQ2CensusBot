@@ -12,7 +12,11 @@ from census.client import CensusClient
 from census.models import CharacterOverview, SpellEntry
 from census.spells_db import DB_PATH as _SPELLS_DB, find_by_ids as _spell_find_by_ids
 from web.cache import character_cache, guild_cache
-from web.db import get_active_claims, get_claim_by_id, list_claims, review_claim
+from web.db import (
+    add_item_watch, get_active_claims, get_claim_by_id,
+    list_claims, list_item_watches, remove_item_watch,
+    review_claim, update_item_watch_check,
+)
 from web.routes.claim import _refresh_claim_cache
 
 router = APIRouter(tags=["guild"])
@@ -147,6 +151,26 @@ class GuildClaimItem(BaseModel):
 
 class RejectNoteRequest(BaseModel):
     note: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Models — item watch
+# ---------------------------------------------------------------------------
+
+class ItemWatchEntry(BaseModel):
+    id: int
+    character_name: str
+    item_id: int
+    item_name: str
+    added_by_name: str
+    added_at: int
+    first_seen_at: int | None = None
+    last_seen_at: int | None = None
+    last_checked_at: int | None = None
+
+class AddItemWatchRequest(BaseModel):
+    character_name: str
+    item_name: str       # resolved server-side to item_id + canonical display name
 
 
 # ---------------------------------------------------------------------------
@@ -735,4 +759,148 @@ async def officer_reject_claim(
     if not result:
         raise HTTPException(status_code=404, detail="Claim not found")
     asyncio.create_task(_refresh_claim_cache(result["discord_id"]))
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Item watch endpoints
+# ---------------------------------------------------------------------------
+
+async def _check_watch(watch: dict) -> None:
+    """
+    Check whether the watched character currently has the item equipped,
+    using the character_cache.  Updates the DB regardless of result.
+    """
+    name_key = f"{watch['character_name'].lower()}:{_WORLD.lower()}"
+    cached, _ = character_cache.get_stale(name_key)
+    if cached is None:
+        return   # no data available yet — skip, will check later
+    item_id_str = str(watch["item_id"])
+    seen = any(s.item_id == item_id_str for s in cached.equipment)
+    await update_item_watch_check(watch["id"], seen)
+
+
+async def _check_all_watches(guild_name: str) -> None:
+    """Background task: check every watch entry for a guild against the cache."""
+    watches = await list_item_watches(guild_name)
+    for w in watches:
+        try:
+            await _check_watch(w)
+        except Exception:
+            pass
+
+
+@router.get("/guild/{guild_name}/item-watch", response_model=list[ItemWatchEntry])
+async def get_item_watches(guild_name: str, request: Request) -> list[ItemWatchEntry]:
+    """
+    List all item watch entries for this guild.
+    Triggers a background equipment check for all entries so statuses
+    are updated against the latest cached character data.
+    Officer access required.
+    """
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if not await _officer_chars(user["id"], guild_name):
+        raise HTTPException(status_code=403, detail="Officer access required")
+
+    watches = await list_item_watches(guild_name)
+    # Fire background check to freshen statuses; return current DB state immediately
+    asyncio.create_task(_check_all_watches(guild_name))
+    return [ItemWatchEntry(**w) for w in watches]
+
+
+@router.post("/guild/{guild_name}/item-watch", response_model=ItemWatchEntry, status_code=201)
+async def add_item_watch_entry(
+    guild_name: str,
+    body: AddItemWatchRequest,
+    request: Request,
+) -> ItemWatchEntry:
+    """
+    Add a new item watch.  The item_name is resolved against the local items DB
+    (falling back to the Census API) to get a canonical display name and ID.
+    Returns 409 if the same item is already being watched for that character.
+    Officer access required.
+    """
+    import asyncio as _asyncio
+    from census import db as item_db
+
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if not await _officer_chars(user["id"], guild_name):
+        raise HTTPException(status_code=403, detail="Officer access required")
+
+    # Validate character is in this guild
+    rank_map = await _roster_rank_map(guild_name)
+    char_key = body.character_name.strip().lower()
+    if char_key not in rank_map:
+        raise HTTPException(
+            status_code=404,
+            detail=f"'{body.character_name}' is not a member of {guild_name}.",
+        )
+
+    # Resolve item — local DB first, then Census
+    item_name = body.item_name.strip()
+    raw = await item_db.find_by_name(item_name)
+    if raw is None:
+        # Try Census live
+        client = CensusClient(service_id=_SERVICE_ID)
+        try:
+            raw = await client.get_raw_item(item_name)
+            if raw:
+                item_list = raw.get("item_list") or []
+                raw = item_list[0] if item_list else None
+        finally:
+            await client.close()
+    if raw is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Item '{item_name}' not found. Check the spelling.",
+        )
+
+    item_id   = int(raw["id"])
+    item_name = raw.get("displayname") or item_name
+
+    # Canonical character name from roster (correct capitalisation)
+    canon_name = next(
+        (n for n in rank_map if n == char_key),
+        body.character_name.strip(),
+    )
+    # Try to get properly capitalised name from the cached roster response
+    roster_cache_key = f"roster:{guild_name.lower()}:{_WORLD.lower()}"
+    roster, _ = guild_cache.get_stale(roster_cache_key)
+    if roster:
+        match = next((m.name for m in roster.members if m.name.lower() == char_key), None)
+        if match:
+            canon_name = match
+
+    try:
+        row = await add_item_watch(
+            guild_name     = guild_name,
+            character_name = canon_name,
+            item_id        = item_id,
+            item_name      = item_name,
+            added_by       = user["id"],
+            added_by_name  = user.get("global_name") or user.get("username", "Unknown"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    # Immediately check if the character is already wearing it
+    asyncio.create_task(_check_watch(row))
+
+    return ItemWatchEntry(**row)
+
+
+@router.delete("/guild/{guild_name}/item-watch/{watch_id}", status_code=200)
+async def delete_item_watch(guild_name: str, watch_id: int, request: Request) -> dict:
+    """Remove an item watch entry.  Officer access required."""
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if not await _officer_chars(user["id"], guild_name):
+        raise HTTPException(status_code=403, detail="Officer access required")
+    if not await remove_item_watch(watch_id, guild_name):
+        raise HTTPException(status_code=404, detail="Watch entry not found")
     return {"ok": True}

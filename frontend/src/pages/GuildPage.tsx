@@ -82,7 +82,19 @@ interface GuildClaimItem {
   is_own: boolean
 }
 
-type Tab = 'roster' | 'spells' | 'adorns' | 'claims'
+interface ItemWatchEntry {
+  id: number
+  character_name: string
+  item_id: number
+  item_name: string
+  added_by_name: string
+  added_at: number
+  first_seen_at: number | null
+  last_seen_at: number | null
+  last_checked_at: number | null
+}
+
+type Tab = 'roster' | 'spells' | 'adorns' | 'claims' | 'watch'
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
 
@@ -863,6 +875,208 @@ function ClaimRequestsTab({
   )
 }
 
+// ── Item watch tab (officers only) ───────────────────────────────────────────
+
+function watchStatus(w: ItemWatchEntry): { icon: string; label: string; colour: string } {
+  if (w.last_checked_at === null) {
+    return { icon: '⏳', label: 'Not yet checked', colour: 'var(--text-muted)' }
+  }
+  if (w.last_seen_at !== null && w.last_seen_at === w.last_checked_at) {
+    return { icon: '🟢', label: 'Currently wearing', colour: '#22c55e' }
+  }
+  if (w.last_seen_at !== null) {
+    const ago = Math.floor((Date.now() / 1000 - w.last_seen_at) / 3600)
+    const label = ago < 1 ? 'last seen just now' : ago < 24 ? `last seen ${ago}h ago` : `last seen ${Math.floor(ago / 24)}d ago`
+    return { icon: '🟡', label, colour: '#eab308' }
+  }
+  return { icon: '🔴', label: 'Never seen wearing it', colour: '#ef4444' }
+}
+
+function relativeTime(unix: number): string {
+  const diff = Math.floor((Date.now() / 1000 - unix) / 3600)
+  if (diff < 1)  return 'just now'
+  if (diff < 24) return `${diff}h ago`
+  return `${Math.floor(diff / 24)}d ago`
+}
+
+function ItemWatchTab({ guildName }: { guildName: string }) {
+  const [watches, setWatches]   = useState<ItemWatchEntry[] | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  const [charInput, setCharInput] = useState('')
+  const [itemInput, setItemInput] = useState('')
+  const [adding, setAdding]     = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<number | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/guild/${encodeURIComponent(guildName)}/item-watch`, { credentials: 'include' })
+      .then(async res => {
+        if (!res.ok) { setError((await res.json().catch(() => ({}))).detail ?? `Error ${res.status}`); return }
+        setWatches(await res.json())
+      })
+      .catch(() => setError('Network error — please try again.'))
+      .finally(() => setLoading(false))
+  }, [guildName])
+
+  async function handleAdd() {
+    const char = charInput.trim()
+    const item = itemInput.trim()
+    if (!char || !item) return
+    setAdding(true)
+    setAddError(null)
+    try {
+      const res = await fetch(`/api/guild/${encodeURIComponent(guildName)}/item-watch`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ character_name: char, item_name: item }),
+      })
+      if (!res.ok) {
+        const detail = (await res.json().catch(() => ({}))).detail ?? 'Failed to add watch'
+        setAddError(detail)
+        return
+      }
+      const entry: ItemWatchEntry = await res.json()
+      setWatches(prev => prev ? [entry, ...prev] : [entry])
+      setCharInput('')
+      setItemInput('')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function handleRemove(id: number) {
+    setRemoving(id)
+    try {
+      const res = await fetch(`/api/guild/${encodeURIComponent(guildName)}/item-watch/${id}`, {
+        method: 'DELETE', credentials: 'include',
+      })
+      if (!res.ok) { alert((await res.json().catch(() => ({}))).detail ?? 'Failed'); return }
+      setWatches(prev => prev ? prev.filter(w => w.id !== id) : prev)
+    } finally {
+      setRemoving(null)
+    }
+  }
+
+  if (loading) return <p style={{ color: 'var(--text-muted)', padding: '1rem' }}>Loading item watches…</p>
+  if (error)   return <p style={{ color: '#f87171', padding: '1rem' }}>{error}</p>
+
+  return (
+    <div style={{ padding: '0.85rem 1rem' }}>
+
+      {/* Add form */}
+      <div style={{
+        display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start',
+        marginBottom: '1.1rem',
+        paddingBottom: '1rem',
+        borderBottom: '1px solid var(--border)',
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Character</label>
+          <input
+            type="text"
+            placeholder="e.g. Sihtric"
+            value={charInput}
+            onChange={e => setCharInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            style={{ width: 160, fontSize: '0.88rem' }}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Item name</label>
+          <input
+            type="text"
+            placeholder="e.g. Faded Black Hood"
+            value={itemInput}
+            onChange={e => setItemInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            style={{ width: 240, fontSize: '0.88rem' }}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ fontSize: '0.7rem', color: 'transparent', userSelect: 'none' }}>_</label>
+          <button
+            onClick={handleAdd}
+            disabled={adding || !charInput.trim() || !itemInput.trim()}
+            style={{
+              padding: '0.42rem 1rem', borderRadius: 6, cursor: 'pointer',
+              background: 'rgba(var(--accent-rgb,99,210,130),0.15)',
+              color: 'var(--accent)',
+              border: '1px solid rgba(var(--accent-rgb,99,210,130),0.35)',
+              fontSize: '0.88rem', fontWeight: 600,
+              opacity: adding || !charInput.trim() || !itemInput.trim() ? 0.5 : 1,
+            }}
+          >
+            {adding ? 'Adding…' : '+ Add Watch'}
+          </button>
+        </div>
+        {addError && (
+          <div style={{ width: '100%', color: '#f87171', fontSize: '0.83rem', marginTop: '0.2rem' }}>
+            {addError}
+          </div>
+        )}
+      </div>
+
+      {/* Watch list */}
+      {watches && watches.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1.5rem 0' }}>
+          No items being watched for this guild yet.
+        </div>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
+              <th style={TH}>Item</th>
+              <th style={TH}>Character</th>
+              <th style={TH}>Added by</th>
+              <th style={TH}>Added</th>
+              <th style={TH}>Status</th>
+              <th style={{ ...TH, width: 48 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {(watches ?? []).map(w => {
+              const { icon, label, colour } = watchStatus(w)
+              return (
+                <tr key={w.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ ...TD, fontWeight: 500, color: 'var(--text)' }}>{w.item_name}</td>
+                  <td style={{ ...TD, color: 'var(--accent)' }}>{w.character_name}</td>
+                  <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.82rem' }}>{w.added_by_name}</td>
+                  <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.82rem' }}>{relativeTime(w.added_at)}</td>
+                  <td style={{ ...TD, color: colour, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                    {icon} {label}
+                  </td>
+                  <td style={{ ...TD, textAlign: 'right', padding: '0.3rem 0.5rem' }}>
+                    <button
+                      onClick={() => handleRemove(w.id)}
+                      disabled={removing === w.id}
+                      title="Remove watch"
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid var(--border)',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.78rem',
+                        padding: '0.2rem 0.45rem',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {removing === w.id ? '…' : '✕'}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function GuildPage() {
@@ -989,7 +1203,7 @@ export default function GuildPage() {
   const isLoading = tab === 'roster' ? rosterLoading
     : tab === 'spells' ? spellsLoading
     : tab === 'adorns' ? adornsLoading
-    : false   // claims tab handles its own loading state
+    : false   // claims / watch tabs handle their own loading state
 
   const error = tab === 'roster' ? rosterError
     : tab === 'spells' ? spellsError
@@ -1057,10 +1271,13 @@ export default function GuildPage() {
         {isOfficer && (
           <TabBtn label="Claim Requests" active={tab === 'claims'} onClick={() => switchTab('claims')} />
         )}
+        {isOfficer && (
+          <TabBtn label="Item Watch" active={tab === 'watch'} onClick={() => switchTab('watch')} />
+        )}
       </div>
 
-      {/* Filters — hidden on claims tab */}
-      {tab !== 'claims' && !isLoading && !error && (
+      {/* Filters — hidden on claims and watch tabs */}
+      {tab !== 'claims' && tab !== 'watch' && !isLoading && !error && (
         <div style={{ marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
           <input
             type="text"
@@ -1127,7 +1344,7 @@ export default function GuildPage() {
       )}
 
       {/* Tables */}
-      {tab !== 'claims' && !isLoading && !error && (
+      {tab !== 'claims' && tab !== 'watch' && !isLoading && !error && (
         <div style={{
           overflowX: 'auto',
           background: 'var(--surface)',
@@ -1154,6 +1371,17 @@ export default function GuildPage() {
           borderRadius: 8,
         }}>
           <ClaimRequestsTab guildName={guildName} currentDiscordId={currentDiscordId} />
+        </div>
+      )}
+
+      {/* Item watch — officers only, self-contained loading */}
+      {tab === 'watch' && isOfficer && guildName && (
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+        }}>
+          <ItemWatchTab guildName={guildName} />
         </div>
       )}
     </main>
