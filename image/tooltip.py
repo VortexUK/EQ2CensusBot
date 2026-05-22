@@ -262,6 +262,25 @@ class _TooltipRenderer:
                 y = _draw_effect(draw, eff, fonts, y, x, content_w, canvas,
                                  name_color=eff_color, glow_info=eff_glow)
 
+        # Set bonuses
+        if item.set_bonuses:
+            y += SECTION_GAP
+            set_header = f"Set Bonus: {item.set_name}" if item.set_name else "Set Bonus"
+            draw.text((x, y), set_header, font=fonts["bold"], fill=C_GOLD)
+            y += _lh(fonts["bold"]) + LINE_GAP
+            for bonus in item.set_bonuses:
+                req_line = f"({bonus.required_items}) {bonus.effect}"
+                for line in _wrap(req_line, fonts["bold"], content_w):
+                    draw.text((x, y), line, font=fonts["bold"], fill=C_WHITE)
+                    y += _lh(fonts["bold"])
+                for desc in bonus.lines:
+                    indent_x = x + _z(12)
+                    wrap_w = content_w - _z(12)
+                    for line in _wrap(desc, fonts["regular"], wrap_w):
+                        draw.text((indent_x, y), "• " + line, font=fonts["regular"], fill=C_BODY)
+                        y += _lh(fonts["regular"]) + 1
+                y += LINE_GAP
+
         # Adornment slots
         if item.adornment_slots:
             y += SECTION_GAP

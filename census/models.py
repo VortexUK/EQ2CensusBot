@@ -53,6 +53,13 @@ class GuildData:
 
 
 @dataclass
+class SetBonusEntry:
+    required_items: int
+    effect: str            # "Applies Focus: ..." header line
+    lines: list[str]       # descriptiontag_1, descriptiontag_2, …
+
+
+@dataclass
 class ItemData:
     id: str
     name: str
@@ -73,6 +80,8 @@ class ItemData:
     game_link: Optional[str] = None
     container_slots: Optional[int] = None
     extra_info: list[tuple[str, str]] = field(default_factory=list)  # (label, value) rows
+    set_name: Optional[str] = None
+    set_bonuses: list[SetBonusEntry] = field(default_factory=list)
 
 
 @dataclass
@@ -118,9 +127,16 @@ class NodeAA:
 
 
 @dataclass
+class AAProfile:
+    name: str
+    aa_list: list[NodeAA]
+
+
+@dataclass
 class CharacterAAs:
     character_name: str
     aa_list: list[NodeAA]
+    profiles: list['AAProfile'] = field(default_factory=list)
 
     def for_tree(self, tree_id: int) -> dict[int, int]:
         """Return {node_id: tier} for all nodes in the given tree."""

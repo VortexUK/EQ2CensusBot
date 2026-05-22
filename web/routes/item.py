@@ -137,6 +137,12 @@ class ItemEffectResponse(BaseModel):
     lines: list[EffectLineResponse]
 
 
+class SetBonusResponse(BaseModel):
+    required_items: int
+    effect: str
+    lines: list[str]
+
+
 class ItemResponse(BaseModel):
     id: str
     name: str
@@ -155,6 +161,8 @@ class ItemResponse(BaseModel):
     adornment_slots: list[str] = []
     flags: list[str] = []
     extra_info: list[tuple[str, str]] = []
+    set_name: str | None = None
+    set_bonuses: list[SetBonusResponse] = []
 
 
 # ---------------------------------------------------------------------------
@@ -503,4 +511,13 @@ async def get_item(item_id: str) -> ItemResponse:
         adornment_slots=item.adornment_slots,
         flags=item.flags,
         extra_info=item.extra_info,
+        set_name=item.set_name,
+        set_bonuses=[
+            SetBonusResponse(
+                required_items=b.required_items,
+                effect=b.effect,
+                lines=b.lines,
+            )
+            for b in item.set_bonuses
+        ],
     )

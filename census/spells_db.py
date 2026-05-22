@@ -14,6 +14,7 @@ faster and removing the c:resolve overhead.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
@@ -99,6 +100,10 @@ CREATE TABLE IF NOT EXISTS spells (
     icon_id         INTEGER,
     icon_backdrop   INTEGER,
 
+    -- Spell effects: JSON array of {description, indentation} objects
+    -- Populated from effect_list[] in the Census /spell/ response.
+    effects         TEXT,
+
     -- Metadata
     last_update     INTEGER
 );
@@ -126,6 +131,7 @@ INSERT OR REPLACE INTO spells (
     cast_secs, recast_secs, recovery_secs,
     target_type, aoe_radius, max_targets,
     description, icon_id, icon_backdrop,
+    effects,
     last_update
 ) VALUES (
     :id, :name, :name_lower, :base_name, :base_name_lower,
@@ -134,6 +140,7 @@ INSERT OR REPLACE INTO spells (
     :cast_secs, :recast_secs, :recovery_secs,
     :target_type, :aoe_radius, :max_targets,
     :description, :icon_id, :icon_backdrop,
+    :effects,
     :last_update
 )
 """
@@ -182,6 +189,30 @@ def _passes_spellcheck(row: dict) -> int:
     return 1
 
 
+def _parse_effects(spell: dict) -> str:
+    """Extract effect_list into a compact JSON string.
+
+    Always returns a JSON string (never None):
+      - Non-empty array  → the effect lines
+      - '[]'             → processed, genuinely no effects in Census
+    """
+    raw = spell.get("effect_list")
+    if not isinstance(raw, list):
+        return "[]"
+    effects = []
+    for e in raw:
+        if not isinstance(e, dict):
+            continue
+        desc = str(e.get("description") or "").strip()
+        if not desc:
+            continue
+        effects.append({
+            "description": desc,
+            "indentation": int(e.get("indentation") or 0),
+        })
+    return json.dumps(effects)
+
+
 def spell_to_row(spell: dict) -> dict:
     """Convert a raw Census /spell/ dict into a flat DB row dict."""
     icon   = spell.get("icon") or {}
@@ -219,6 +250,7 @@ def spell_to_row(spell: dict) -> dict:
         "description":      _str(desc),
         "icon_id":          _int(icon.get("id")),
         "icon_backdrop":    _int(icon.get("backdrop")),
+        "effects":          _parse_effects(spell),
         "last_update":      _int(spell.get("last_update")),
     }
     row["passes_spellcheck"] = _passes_spellcheck(row)
@@ -239,6 +271,10 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     conn.execute(_CREATE_TABLE)
     for idx in _CREATE_INDEXES:
         conn.execute(idx)
+    # Idempotent migration: add effects column if missing (pre-existing DBs)
+    existing_cols = {r[1] for r in conn.execute("PRAGMA table_info(spells)").fetchall()}
+    if "effects" not in existing_cols:
+        conn.execute("ALTER TABLE spells ADD COLUMN effects TEXT;")
     conn.commit()
     return conn
 
@@ -276,7 +312,8 @@ _SELECT_COLS = (
     "passes_spellcheck, "
     "cast_secs, recast_secs, recovery_secs, "
     "target_type, aoe_radius, max_targets, "
-    "description, icon_id, icon_backdrop, last_update"
+    "description, icon_id, icon_backdrop, "
+    "effects, last_update"
 )
 
 
@@ -308,6 +345,56 @@ def find_by_ids(spell_ids: list[int], path: Path = DB_PATH) -> dict[int, dict]:
             spell_ids,
         ).fetchall()
     return {row["id"]: _row_to_dict(row) for row in rows}
+
+
+def find_by_crc(crc: int, tier: Optional[int] = None, path: Path = DB_PATH) -> Optional[dict]:
+    """Return the spell row for the given CRC and AA rank tier.
+
+    AA nodes reference spells by CRC; multiple rows share a CRC — one per
+    rank (tier).  Pass the character's spent tier to get the right values.
+    Falls back to the highest available tier if the exact one isn't found.
+    """
+    if not path.exists():
+        return None
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        if tier is not None:
+            row = conn.execute(
+                f"SELECT {_SELECT_COLS} FROM spells WHERE crc = ? AND tier = ? LIMIT 1",
+                (crc, tier),
+            ).fetchone()
+            if row:
+                return _row_to_dict(row)
+        # Fallback: highest available tier
+        row = conn.execute(
+            f"SELECT {_SELECT_COLS} FROM spells WHERE crc = ? ORDER BY tier DESC LIMIT 1",
+            (crc,),
+        ).fetchone()
+    return _row_to_dict(row) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Spell blocklist
+# ---------------------------------------------------------------------------
+
+_BLOCKLIST_PATH: Path = Path(__file__).resolve().parent.parent / "data" / "spells" / "blocklist.json"
+
+
+def load_blocklist(path: Path = _BLOCKLIST_PATH) -> frozenset[str]:
+    """Return the set of blocked base-spell names (lowercased, Roman suffixes already stripped).
+
+    Re-reads the file on every call so changes take effect without a restart.
+    The file is tiny so the overhead is negligible.
+    """
+    if not path.exists():
+        return frozenset()
+    try:
+        import json as _json
+        data = _json.loads(path.read_text(encoding="utf-8"))
+        names: list = data.get("blocked", []) if isinstance(data, dict) else data
+        return frozenset(strip_roman(n).lower() for n in names if isinstance(n, str))
+    except Exception:
+        return frozenset()
 
 
 def find_by_name(name: str, path: Path = DB_PATH) -> list[dict]:

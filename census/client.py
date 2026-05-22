@@ -7,7 +7,7 @@ import aiohttp
 
 from census import db as item_db
 from census.constants import ITEM_DISPLAY, STAT_MAP, TYPEINFO_DISPLAY
-from census.models import AdornSlot, CharacterAAs, CharacterOverview, CharacterSpells, EquipmentSlot, GuildData, GuildMember, ItemData, ItemEffect, ItemStat, NodeAA, SpellEntry
+from census.models import AAProfile, AdornSlot, CharacterAAs, CharacterOverview, CharacterSpells, EquipmentSlot, GuildData, GuildMember, ItemData, ItemEffect, ItemStat, NodeAA, SetBonusEntry, SpellEntry
 
 BASE_URL       = "https://census.daybreakgames.com"
 _ITEM_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
@@ -220,7 +220,7 @@ class CensusClient:
         params = {
             "name.first": name,
             "locationdata.world": world,
-            "c:show": "name,type,stats,equipmentslot_list",
+            "c:show": "name,type,stats,equipmentslot_list,spell_list",
             "c:limit": "1",
         }
         print(f"[Census] GET {url} params={params}")
@@ -260,6 +260,17 @@ class CensusClient:
         if "personal_status_points" not in raw_stats and char.get("personal_status_points"):
             raw_stats = {**raw_stats, "personal_status_points": char["personal_status_points"]}
 
+        spell_ids: list[int] = []
+        for s in char.get("spell_list") or []:
+            if isinstance(s, dict):
+                sid = _int(s.get("id"))
+            elif isinstance(s, (int, str)):
+                sid = _int(s)
+            else:
+                sid = None
+            if sid is not None:
+                spell_ids.append(sid)
+
         return CharacterOverview(
             id        = str(char.get("id", "")),
             name      = (char.get("name") or {}).get("first", name),
@@ -274,6 +285,7 @@ class CensusClient:
             ts_level  = _int(t.get("ts_level")),
             stats     = raw_stats,
             equipment = equipment,
+            spell_ids = spell_ids,
         )
 
     async def get_character_aas(self, name: str, world: str) -> Optional[CharacterAAs]:
@@ -281,7 +293,7 @@ class CensusClient:
         params = {
             "name.first": name,
             "locationdata.world": world,
-            "c:show": "name,alternateadvancements",
+            "c:show": "name,alternateadvancements,orderedalternateadvancement_list",
             "c:limit": "1",
         }
         print(f"[Census] GET {url} params={params}")
@@ -315,7 +327,26 @@ class CensusClient:
                 continue
             aa_entries.append(NodeAA(node_id=node_id, tree_id=tree_id, tier=tier))
 
-        return CharacterAAs(character_name=char_name, aa_list=aa_entries)
+        # Parse AA profiles (orderedalternateadvancement_list).
+        # Each entry is one point spent: {treeID, id, order}.
+        # Count occurrences of each (treeID, id) pair to reconstruct tier counts.
+        from collections import Counter
+        profiles: list[AAProfile] = []
+        for prof_raw in char.get("orderedalternateadvancement_list") or []:
+            prof_name = str(prof_raw.get("profilename") or "Profile")
+            counts: Counter = Counter()
+            for entry in prof_raw.get("alternateadvancement_list") or []:
+                node_id = _int(entry.get("id"))
+                tree_id = _int(entry.get("treeID"))
+                if node_id is not None and tree_id is not None:
+                    counts[(tree_id, node_id)] += 1
+            prof_nodes = [
+                NodeAA(node_id=nid, tree_id=tid, tier=count)
+                for (tid, nid), count in counts.items()
+            ]
+            profiles.append(AAProfile(name=prof_name, aa_list=prof_nodes))
+
+        return CharacterAAs(character_name=char_name, aa_list=aa_entries, profiles=profiles)
 
     async def get_guild_equipment_data(
         self, guild_name: str, world: str
@@ -779,6 +810,8 @@ class CensusClient:
             game_link       = item.get("gamelink"),
             container_slots = _int(typeinfo.get("slots")),
             extra_info      = self._parse_extra_info(item, typeinfo),
+            set_name        = _parse_set_name(item),
+            set_bonuses     = _parse_set_bonuses(item),
         )
 
     def _parse_stats(self, modifiers: dict) -> list[ItemStat]:
@@ -889,6 +922,50 @@ class CensusClient:
                 if label:
                     flags.append(label)
         return flags
+
+
+# ------------------------------------------------------------------
+# Set-bonus helpers
+# ------------------------------------------------------------------
+
+def _parse_set_name(item: dict) -> Optional[str]:
+    """Return the set display name from setbonus_info, or None."""
+    info = item.get("setbonus_info")
+    if not isinstance(info, dict):
+        return None
+    return info.get("displayname") or None
+
+
+def _parse_set_bonuses(item: dict) -> list[SetBonusEntry]:
+    """
+    Parse setbonus_list into SetBonusEntry objects.
+    Entries without an 'effect' key are placeholder/empty tiers and are skipped.
+    Result is sorted ascending by required_items.
+    """
+    raw = item.get("setbonus_list") or []
+    entries: list[SetBonusEntry] = []
+    for bonus in raw:
+        if not isinstance(bonus, dict):
+            continue
+        effect = (bonus.get("effect") or "").strip()
+        if not effect:
+            continue   # skip empty/placeholder tiers
+        lines: list[str] = []
+        i = 1
+        while True:
+            tag = bonus.get(f"descriptiontag_{i}")
+            if tag is None:
+                break
+            if str(tag).strip():
+                lines.append(str(tag).strip())
+            i += 1
+        entries.append(SetBonusEntry(
+            required_items=int(bonus.get("requireditems", 0)),
+            effect=effect,
+            lines=lines,
+        ))
+    entries.sort(key=lambda e: e.required_items)
+    return entries
 
 
 # ------------------------------------------------------------------

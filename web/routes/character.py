@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
+from collections import Counter
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from census.client import CensusClient
 from census.models import AdornSlot as _AdornSlot
+from census.spells_db import DB_PATH as _SPELLS_DB, find_by_ids as _spell_find_by_ids, load_blocklist as _load_spell_blocklist
 from web.cache import character_cache
 
 router = APIRouter(tags=["character"])
@@ -187,6 +190,7 @@ class CharacterResponse(BaseModel):
     ts_level: int | None = None
     stats: CharacterStats = CharacterStats()
     equipment: list[EquipmentSlotResponse] = []
+    spell_ids: list[int] = []
 
 
 def _build_char_response(char) -> CharacterResponse:
@@ -218,6 +222,7 @@ def _build_char_response(char) -> CharacterResponse:
             )
             for s in char.equipment
         ],
+        spell_ids = char.spell_ids,
     )
 
 
@@ -261,3 +266,121 @@ async def get_character(name: str) -> CharacterResponse:
     result = _build_char_response(char)
     character_cache.set(cache_key, result)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Character spell list
+# ---------------------------------------------------------------------------
+
+_TIER_ORDER = ["Apprentice", "Journeyman", "Adept", "Expert", "Master", "Grandmaster"]
+
+_ROMAN_SUFFIX = re.compile(
+    r'\s+(?:XX|XIX|XVIII|XVII|XVI|XV|XIV|XIII|XII|XI|X'
+    r'|IX|VIII|VII|VI|V|IV|III|II|I)$',
+    re.IGNORECASE,
+)
+
+
+def _base_name(name: str) -> str:
+    return _ROMAN_SUFFIX.sub("", name.strip())
+
+
+def _unique_highest_rows(rows: list[dict]) -> list[dict]:
+    """For each base spell name+type, keep only the highest-level DB row."""
+    best: dict[tuple, dict] = {}
+    for r in rows:
+        key = (_base_name(r["name"]), r.get("type") or "")
+        if key not in best or (r.get("level") or 0) > (best[key].get("level") or 0):
+            best[key] = r
+    return list(best.values())
+
+
+class SpellEntryResponse(BaseModel):
+    name:           str
+    tier:           str
+    level:          int
+    spell_type:     str
+    icon_id:        int | None = None
+    icon_backdrop:  int | None = None
+
+
+class CharacterSpellsResponse(BaseModel):
+    character_name: str
+    spells:         list[SpellEntryResponse]
+    tier_counts:    dict[str, int]       # all _TIER_ORDER keys present
+    tiers_present:  list[str]            # ordered subset that have > 0 spells
+
+
+@router.get("/character/{name}/spells", response_model=CharacterSpellsResponse)
+async def get_character_spells(name: str) -> CharacterSpellsResponse:
+    """Return a character's deduplicated spell list resolved from the local spells DB.
+
+    Spell IDs come from the character record that was already fetched (and cached)
+    when the character page loaded — no extra Census call needed.
+    """
+    if not _SPELLS_DB.exists():
+        raise HTTPException(status_code=503, detail="Spells database not available")
+
+    # Use the cached character record (populated on first character page load).
+    # Fall back to fetching if somehow the cache was cold.
+    cache_key = f"{name.lower()}:{_WORLD.lower()}"
+    cached, _ = character_cache.get_stale(cache_key)
+
+    if cached is not None:
+        char_name = cached.name
+        spell_ids = cached.spell_ids
+    else:
+        client = CensusClient(service_id=_SERVICE_ID)
+        try:
+            char = await client.get_character(name, _WORLD)
+        finally:
+            await client.close()
+        if char is None:
+            raise HTTPException(status_code=404, detail=f"Character '{name}' not found on {_WORLD}")
+        result = _build_char_response(char)
+        character_cache.set(cache_key, result)
+        char_name = result.name
+        spell_ids = result.spell_ids
+
+    if not spell_ids:
+        return CharacterSpellsResponse(
+            character_name=char_name, spells=[], tier_counts={t: 0 for t in _TIER_ORDER}, tiers_present=[]
+        )
+
+    # Bulk DB lookup — one query for all IDs
+    spell_db: dict[int, dict] = _spell_find_by_ids(spell_ids)
+
+    # Looser filter than passes_spellcheck: include arts given_by='class' (combat arts
+    # for scouts/fighters are flagged that way but are absolutely valid character spells).
+    # Only exclude AA-granted abilities and zero-level junk.
+    blocklist = _load_spell_blocklist()
+    rows = [
+        r for r in spell_db.values()
+        if (r.get("level") or 0) > 0
+        and r.get("type") in ("spells", "arts")
+        and r.get("given_by") != "alternateadvancement"
+        and _base_name(r.get("name") or "").lower() not in blocklist
+    ]
+
+    # Deduplicate: per base name+type keep the highest-level entry (highest rank)
+    rows = _unique_highest_rows(rows)
+    rows.sort(key=lambda r: r.get("level") or 0)
+
+    count = Counter(r.get("tier_name") or "Unknown" for r in rows)
+
+    return CharacterSpellsResponse(
+        character_name = char_name,
+        spells         = [
+            SpellEntryResponse(
+                name          = r["name"],
+                tier          = r.get("tier_name") or "Unknown",
+                level         = r.get("level") or 0,
+                spell_type    = r.get("type") or "",
+                icon_id       = r.get("icon_id"),
+                icon_backdrop = r.get("icon_backdrop"),
+            )
+            for r in rows
+        ],
+        tier_counts    = {t: count.get(t, 0) for t in _TIER_ORDER},
+        tiers_present  = [t for t in _TIER_ORDER if count.get(t, 0) > 0],
+    )

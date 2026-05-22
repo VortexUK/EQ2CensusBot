@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ItemTooltip, TooltipState, getCachedItem, prefetchItem } from '../components/ItemTooltip'
+import { AATree, AATreeData } from '../components/AATree'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,52 @@ interface Character {
   ts_level: number | null
   stats: CharacterStats
   equipment: EquipmentSlot[]
+}
+
+// ── Spell types ──────────────────────────────────────────────────────────────
+
+interface SpellEntry {
+  name:          string
+  tier:          string
+  level:         number
+  spell_type:    string
+  icon_id:       number | null
+  icon_backdrop: number | null
+}
+
+interface CharacterSpellsData {
+  character_name: string
+  spells:         SpellEntry[]
+  tier_counts:    Record<string, number>
+  tiers_present:  string[]
+}
+
+// ── AA types ─────────────────────────────────────────────────────────────────
+
+interface CharAATree {
+  tree_id:     number
+  tree_type:   string
+  tree_name:   string
+  spent:       Record<string, number>   // node_id str → tier
+  total_spent: number
+}
+
+interface CharAAProfile {
+  name:  string
+  trees: CharAATree[]
+}
+
+interface CharAAsResponse {
+  character_name: string
+  total_spent:    number
+  trees:          CharAATree[]
+  profiles:       CharAAProfile[]
+}
+
+interface AAConfig {
+  xpac:               string
+  aa_cap:             number
+  unlocked_tree_types: string[]
 }
 
 // ── Paperdoll slot config ────────────────────────────────────────────────────
@@ -269,6 +316,18 @@ function statMatches(panelLabel: string, itemStatName: string): boolean {
 // Keyed by lower-cased character name.
 const _charCache = new Map<string, Character>()
 
+// Spell data cache — keyed by lower-cased character name.
+const _spellsCache = new Map<string, CharacterSpellsData>()
+
+// AA data cache — keyed by lower-cased character name.
+// Populated on first AA tab open; reused on every subsequent tab switch.
+interface AACacheEntry {
+  charAAs:  CharAAsResponse
+  config:   AAConfig
+  treeData: Map<number, AATreeData>
+}
+const _aaCache = new Map<string, AACacheEntry>()
+
 type State =
   | { status: 'loading' }
   | { status: 'ok'; char: Character }
@@ -315,10 +374,13 @@ export default function CharacterPage() {
 
 // ── Character view ────────────────────────────────────────────────────────────
 
+type ActiveTab = 'equipment' | 'aas' | 'spells'
+
 function CharacterView({ char }: { char: Character }) {
   const bySlot = buildSlotMap(char.equipment)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [hoveredStat, setHoveredStat] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<ActiveTab>('equipment')
   // Tracks when background prefetch completes so highlights re-evaluate.
   const [, setItemsReady] = useState(false)
 
@@ -372,42 +434,85 @@ function CharacterView({ char }: { char: Character }) {
       {/* Full-width general banner */}
       <GeneralBanner char={char} />
 
-      {/* Below: stats panel + paperdoll side by side */}
-      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', marginTop: '1rem' }}>
-        {/* Left: detailed stats */}
-        <div style={{ width: 260, flexShrink: 0 }}>
-          <StatsPanel char={char}
-            onStatHover={setHoveredStat}
-            onStatLeave={() => setHoveredStat(null)} />
-        </div>
+      {/* Tab bar */}
+      <div style={{
+        display: 'flex', gap: 0,
+        borderBottom: '1px solid var(--border)',
+        marginTop: '1rem',
+      }}>
+        {(['equipment', 'aas', 'spells'] as ActiveTab[]).map(tab => {
+          const label = tab === 'equipment' ? 'Equipment & Stats'
+                      : tab === 'aas'       ? 'Alternate Advancements'
+                      :                       'Spells'
+          const active = tab === activeTab
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                background: active ? 'var(--surface)' : 'transparent',
+                border: 'none',
+                borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+                color: active ? 'var(--text)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                fontSize: '0.82rem',
+                fontWeight: active ? 600 : 400,
+                letterSpacing: '0.04em',
+                padding: '7px 16px',
+                marginBottom: '-1px',
+                transition: 'color 0.15s, border-color 0.15s',
+              }}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
 
-        {/* Right: paperdoll */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 style={sectionHeading}>Equipment</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {LEFT_SLOTS.map(([label, key]) => {
+      {/* Equipment & Stats tab */}
+      {activeTab === 'equipment' && (
+        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', marginTop: '1rem' }}>
+          {/* Left: detailed stats */}
+          <div style={{ width: 260, flexShrink: 0 }}>
+            <StatsPanel char={char}
+              onStatHover={setHoveredStat}
+              onStatLeave={() => setHoveredStat(null)} />
+          </div>
+
+          {/* Right: paperdoll */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={sectionHeading}>Equipment</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {LEFT_SLOTS.map(([label, key]) => {
+                  const item = bySlot.get(key) ?? null
+                  return <SlotRow key={key} label={label} item={item} iconSide="left" onShow={showTip} onHide={hideTip} highlight={getHighlight(item)} />
+                })}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {RIGHT_SLOTS.map(([label, key]) => {
+                  const item = bySlot.get(key) ?? null
+                  return <SlotRow key={key} label={label} item={item} iconSide="right" onShow={showTip} onHide={hideTip} highlight={getHighlight(item)} />
+                })}
+              </div>
+            </div>
+
+            <h2 style={{ ...sectionHeading, marginTop: '1rem' }}>Consumables</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+              {CONSUMABLE_SLOTS.map(([label, key]) => {
                 const item = bySlot.get(key) ?? null
                 return <SlotRow key={key} label={label} item={item} iconSide="left" onShow={showTip} onHide={hideTip} highlight={getHighlight(item)} />
               })}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {RIGHT_SLOTS.map(([label, key]) => {
-                const item = bySlot.get(key) ?? null
-                return <SlotRow key={key} label={label} item={item} iconSide="right" onShow={showTip} onHide={hideTip} highlight={getHighlight(item)} />
-              })}
-            </div>
-          </div>
-
-          <h2 style={{ ...sectionHeading, marginTop: '1rem' }}>Consumables</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
-            {CONSUMABLE_SLOTS.map(([label, key]) => {
-              const item = bySlot.get(key) ?? null
-              return <SlotRow key={key} label={label} item={item} iconSide="left" onShow={showTip} onHide={hideTip} highlight={getHighlight(item)} />
-            })}
           </div>
         </div>
-      </div>
+      )}
+
+      {/* AAs tab */}
+      {activeTab === 'aas' && <AAsTab charName={char.name} aaCount={char.aa_count} />}
+
+      {/* Spells tab */}
+      {activeTab === 'spells' && <SpellsTab charName={char.name} />}
 
       {tooltip && <ItemTooltip state={tooltip} />}
     </div>
@@ -698,6 +803,639 @@ function SlotRow({ label, item, iconSide, onShow, onHide, highlight }: {
       onMouseLeave={item?.item_id ? onHide : undefined}
     >
       {iconEl}{textEl}
+    </div>
+  )
+}
+
+// ── AA Tab ────────────────────────────────────────────────────────────────────
+
+type AATabState =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ok'; charAAs: CharAAsResponse; config: AAConfig; treeData: Map<number, AATreeData> }
+
+const _TREE_TYPE_LABEL: Record<string, string> = {
+  class:              'Class',
+  subclass:           'Subclass',
+  shadows:            'Shadows',
+  heroic:             'Heroic',
+  tradeskill:         'Tradeskill',
+  tradeskill_general: 'Tradeskill (General)',
+  warder:             'Warder',
+  prestige:           'Prestige',
+  dragon:             'Dragon',
+  reign_of_shadows:   'Reign of Shadows',
+  far_seas:           'Far Seas',
+}
+
+// 'current' = live AAs; number = index into charAAs.profiles
+type ActiveProfile = 'current' | number
+
+function AAsTab({ charName, aaCount }: { charName: string; aaCount: number }) {
+  const cacheKey = charName.toLowerCase()
+  const cached   = _aaCache.get(cacheKey)
+
+  const [state, setState] = useState<AATabState>(
+    cached ? { status: 'ok', ...cached } : { status: 'loading' }
+  )
+  const [selectedTreeId, setSelectedTreeId]     = useState<number | null>(
+    cached ? (cached.charAAs.trees[0]?.tree_id ?? null) : null
+  )
+  const [activeProfile, setActiveProfile] = useState<ActiveProfile>('current')
+
+  useEffect(() => {
+    // Already cached — nothing to fetch
+    if (_aaCache.has(cacheKey)) return
+
+    let cancelled = false
+
+    async function load() {
+      try {
+        const [aasRes, configRes] = await Promise.all([
+          fetch(`/api/character/${encodeURIComponent(charName)}/aas`),
+          fetch('/api/aa/config'),
+        ])
+        if (!aasRes.ok)    throw new Error(`AAs: HTTP ${aasRes.status}`)
+        if (!configRes.ok) throw new Error(`Config: HTTP ${configRes.status}`)
+
+        const charAAs: CharAAsResponse = await aasRes.json()
+        const config:  AAConfig        = await configRes.json()
+
+        // Filter trees to only those unlocked in the current xpac
+        const unlocked = new Set(config.unlocked_tree_types)
+        const visibleTrees = charAAs.trees.filter(t =>
+          unlocked.size === 0 || unlocked.has(t.tree_type)
+        )
+
+        // Fetch full node data for each visible tree in parallel
+        const treeResponses = await Promise.all(
+          visibleTrees.map(t =>
+            fetch(`/api/aa/tree/${t.tree_id}`)
+              .then(r => r.ok ? r.json() as Promise<AATreeData> : null)
+              .catch(() => null)
+          )
+        )
+
+        if (cancelled) return
+
+        const treeData = new Map<number, AATreeData>()
+        for (const td of treeResponses) {
+          if (td) treeData.set(td.tree_id, td)
+        }
+
+        const entry: AACacheEntry = { charAAs: { ...charAAs, trees: visibleTrees }, config, treeData }
+        _aaCache.set(cacheKey, entry)
+        setState({ status: 'ok', ...entry })
+        setSelectedTreeId(prev => prev ?? (visibleTrees[0]?.tree_id ?? null))
+      } catch (err) {
+        if (!cancelled) setState({ status: 'error', message: String(err) })
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [charName, cacheKey])
+
+  if (state.status === 'loading') {
+    return <p style={{ marginTop: '1.5rem', color: 'var(--text-muted)' }}>Loading AA data…</p>
+  }
+  if (state.status === 'error') {
+    return <p style={{ marginTop: '1.5rem', color: '#f87171' }}>Error: {state.message}</p>
+  }
+
+  const { charAAs, config, treeData } = state
+
+  // Determine which set of trees (current or a profile) to display.
+  // Profile trees are filtered to the same unlocked types as the current view.
+  const unlocked = new Set(config.unlocked_tree_types)
+  const profileTrees: CharAATree[] | null =
+    activeProfile === 'current' ? null :
+    (charAAs.profiles[activeProfile as number]?.trees ?? null)
+
+  // Active tree list: profile trees (filtered) or current trees (already filtered during load).
+  const visibleTrees: CharAATree[] = profileTrees
+    ? profileTrees.filter(t => unlocked.size === 0 || unlocked.has(t.tree_type))
+    : charAAs.trees
+
+  const activeCt = visibleTrees.find(t => t.tree_id === selectedTreeId) ?? visibleTrees[0]
+  const activeTd = activeCt ? treeData.get(activeCt.tree_id) : undefined
+
+  // Sum only the shown trees.
+  const spentInView = visibleTrees.reduce((sum, t) => sum + t.total_spent, 0)
+
+  const earnedPct = config.aa_cap > 0
+    ? Math.min(100, Math.round((aaCount / config.aa_cap) * 100))
+    : null
+  const spentPct = aaCount > 0
+    ? Math.min(100, Math.round((spentInView / aaCount) * 100))
+    : null
+
+  return (
+    <div style={{ marginTop: '1rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+
+      {/* ── Left sidebar ── */}
+      <div style={{ width: 240, flexShrink: 0 }}>
+
+        {/* Profile selector */}
+        {charAAs.profiles.length > 0 && (
+          <div style={{ marginBottom: '0.75rem' }}>
+            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent)', fontWeight: 600, marginBottom: 4 }}>
+              Profile
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {(['current', ...charAAs.profiles.map((_, i) => i)] as ActiveProfile[]).map(pid => {
+                const isActive = activeProfile === pid
+                const label    = pid === 'current' ? 'Current' : charAAs.profiles[pid as number].name
+                return (
+                  <button
+                    key={String(pid)}
+                    onClick={() => setActiveProfile(pid)}
+                    style={{
+                      textAlign: 'left',
+                      background: isActive ? 'var(--accent)' : 'var(--surface)',
+                      border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+                      borderRadius: 4,
+                      color: isActive ? '#000' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '0.78rem',
+                      fontWeight: isActive ? 600 : 400,
+                      padding: '4px 8px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      transition: 'background 0.12s, border-color 0.12s',
+                    }}
+                    title={label}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Expansion */}
+        {config.xpac && (
+          <StatGroup title="Expansion">
+            <div style={{ padding: '3px 0', fontSize: '0.83rem', color: 'var(--text)' }}>
+              {config.xpac}
+            </div>
+            {config.aa_cap > 0 && (
+              <div style={{ padding: '1px 0 3px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {config.aa_cap.toLocaleString()} AA cap
+              </div>
+            )}
+          </StatGroup>
+        )}
+
+        {/* Progress */}
+        <StatGroup title="Alternate Advancements">
+          <AAProgressBar
+            label="Earned"
+            value={aaCount}
+            max={config.aa_cap > 0 ? config.aa_cap : null}
+            pct={earnedPct}
+          />
+          <AAProgressBar
+            label="Spent"
+            value={spentInView}
+            max={aaCount}
+            pct={spentPct}
+          />
+        </StatGroup>
+
+        {/* Per-tree breakdown */}
+        {visibleTrees.length > 0 && (
+          <StatGroup title="By Tree">
+            {visibleTrees.map(ct => (
+              <StatRow
+                key={ct.tree_id}
+                label={ct.tree_name}
+                value={ct.total_spent.toLocaleString()}
+              />
+            ))}
+          </StatGroup>
+        )}
+
+      </div>
+
+      {/* ── Right: sub-tabs + tree ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+
+        {visibleTrees.length === 0 && (
+          <p style={{ color: 'var(--text-muted)' }}>No AA data available.</p>
+        )}
+
+        {visibleTrees.length > 0 && (
+          <>
+            {/* Tree sub-tabs */}
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: '2px',
+              borderBottom: '1px solid var(--border)',
+              marginBottom: '0.75rem',
+            }}>
+              {visibleTrees.map(ct => {
+                const active    = ct.tree_id === (activeCt?.tree_id)
+                const typeLabel = _TREE_TYPE_LABEL[ct.tree_type] ?? ct.tree_type
+                return (
+                  <button
+                    key={ct.tree_id}
+                    onClick={() => setSelectedTreeId(ct.tree_id)}
+                    style={{
+                      background: active ? 'var(--surface)' : 'transparent',
+                      border: 'none',
+                      borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+                      color: active ? 'var(--text)' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '5px 12px',
+                      marginBottom: '-1px',
+                      fontSize: '0.8rem',
+                      fontWeight: active ? 600 : 400,
+                      transition: 'color 0.12s, border-color 0.12s',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={`${typeLabel} · ${ct.total_spent} pts`}
+                  >
+                    {ct.tree_name}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Active tree */}
+            {activeCt && (
+              <div>
+                {/* Type label */}
+                <div style={{ marginBottom: '0.4rem', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)' }}>
+                  {_TREE_TYPE_LABEL[activeCt.tree_type] ?? activeCt.tree_type}
+                </div>
+
+                {/* Tree at 60% of the right column */}
+                <div style={{ width: '60%' }}>
+                  {activeTd ? (
+                    <AATree tree={activeTd} spent={activeCt.spent} />
+                  ) : (
+                    <div style={{
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 4, padding: '1rem',
+                      color: 'var(--text-muted)', fontSize: '0.82rem',
+                    }}>
+                      Tree data unavailable (tree #{activeCt.tree_id})
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+      </div>
+    </div>
+  )
+}
+
+// ── Spells tab ────────────────────────────────────────────────────────────────
+
+const SPELL_TIER_ORDER = ['Apprentice', 'Journeyman', 'Adept', 'Expert', 'Master', 'Grandmaster']
+
+const SPELL_TIER_ICON: Record<string, string> = {
+  Apprentice:  'spell_app',
+  Journeyman:  'spell_jour',
+  Adept:       'spell_ad',
+  Expert:      'spell_exp',
+  Master:      'spell_m',
+  Grandmaster: 'spell_gm',
+}
+
+const SPELL_TIER_COLOURS: Record<string, { text: string; bg: string }> = {
+  Apprentice:  { text: '#ef4444', bg: 'rgba(239,68,68,0.12)'   },
+  Journeyman:  { text: '#f97316', bg: 'rgba(249,115,22,0.12)'  },
+  Adept:       { text: '#eab308', bg: 'rgba(234,179,8,0.12)'   },
+  Expert:      { text: '#84cc16', bg: 'rgba(132,204,22,0.12)'  },
+  Master:      { text: '#22c55e', bg: 'rgba(34,197,94,0.12)'   },
+  Grandmaster: { text: '#10b981', bg: 'rgba(16,185,129,0.15)'  },
+}
+
+const _SPELL_TH: React.CSSProperties = {
+  padding: '0.4rem 0.6rem',
+  fontSize: '0.7rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  color: 'var(--text-muted)',
+  fontWeight: 600,
+  whiteSpace: 'nowrap',
+  textAlign: 'left',
+}
+const _SPELL_TD: React.CSSProperties = {
+  padding: '0.35rem 0.6rem',
+  fontSize: '0.88rem',
+  whiteSpace: 'nowrap',
+}
+
+function SpellProgressBar({ label, subtitle, value, total, pct, color }: {
+  label:    string
+  subtitle: string
+  value:    number
+  total:    number
+  pct:      number
+  color:    string
+}) {
+  const clamped = Math.min(100, pct)
+  const done    = clamped >= 100
+  return (
+    <div style={{ padding: '5px 0 7px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
+        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: done ? color : 'var(--text)' }}>{label}</span>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{value}/{total}</span>
+      </div>
+      <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden', marginBottom: 2 }}>
+        <div style={{ height: '100%', width: `${clamped}%`, borderRadius: 3, background: color, transition: 'width 0.3s' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{subtitle}</span>
+        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: done ? color : 'var(--text-muted)' }}>
+          {Math.round(pct)}%
+        </span>
+      </div>
+    </div>
+  )
+}
+
+type SpellsTabState =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ok'; data: CharacterSpellsData }
+
+function SpellsTab({ charName }: { charName: string }) {
+  const cacheKey = charName.toLowerCase()
+  const cached   = _spellsCache.get(cacheKey)
+
+  const [state, setState]         = useState<SpellsTabState>(
+    cached ? { status: 'ok', data: cached } : { status: 'loading' }
+  )
+  const [search, setSearch]       = useState('')
+  const [tierFilter, setTierFilter] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (_spellsCache.has(cacheKey)) return
+    let cancelled = false
+    fetch(`/api/character/${encodeURIComponent(charName)}/spells`)
+      .then(async res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json() as Promise<CharacterSpellsData>
+      })
+      .then(data => {
+        if (cancelled) return
+        _spellsCache.set(cacheKey, data)
+        setState({ status: 'ok', data })
+      })
+      .catch(err => { if (!cancelled) setState({ status: 'error', message: String(err) }) })
+    return () => { cancelled = true }
+  }, [charName, cacheKey])
+
+  if (state.status === 'loading') {
+    return <p style={{ marginTop: '1.5rem', color: 'var(--text-muted)' }}>Loading spell data…</p>
+  }
+  if (state.status === 'error') {
+    return <p style={{ marginTop: '1.5rem', color: '#f87171' }}>Error: {state.message}</p>
+  }
+
+  const { data } = state
+  const totalSpells    = data.spells.length
+  const expertOrBetter = (data.tier_counts['Expert'] ?? 0) + (data.tier_counts['Master'] ?? 0) + (data.tier_counts['Grandmaster'] ?? 0)
+  const masterOrBetter = (data.tier_counts['Master'] ?? 0) + (data.tier_counts['Grandmaster'] ?? 0)
+  const raidReadyPct   = totalSpells > 0 ? expertOrBetter / totalSpells * 100 : 0
+  const masteredPct    = totalSpells > 0 ? masterOrBetter / totalSpells * 100 : 0
+
+  // Filter the list
+  const q = search.trim().toLowerCase()
+  const filtered = data.spells.filter(s => {
+    if (tierFilter.size > 0 && !tierFilter.has(s.tier)) return false
+    if (q) return s.name.toLowerCase().includes(q)
+    return true
+  })
+
+  function toggleTier(tier: string) {
+    setTierFilter(prev => {
+      const next = new Set(prev)
+      next.has(tier) ? next.delete(tier) : next.add(tier)
+      return next
+    })
+  }
+
+  return (
+    <div style={{ marginTop: '1rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+
+      {/* ── Left sidebar ── */}
+      <div style={{ width: 240, flexShrink: 0 }}>
+        <StatGroup title="By Tier">
+          {SPELL_TIER_ORDER.map(tier => {
+            const count    = data.tier_counts[tier] ?? 0
+            if (count === 0) return null
+            const tc       = SPELL_TIER_COLOURS[tier]
+            const isActive = tierFilter.has(tier)
+            return (
+              <div
+                key={tier}
+                onClick={() => toggleTier(tier)}
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                  padding: '3px 0', borderBottom: '1px solid var(--border)',
+                  cursor: 'pointer',
+                  opacity: tierFilter.size > 0 && !isActive ? 0.35 : 1,
+                  transition: 'opacity 0.12s',
+                }}
+              >
+                <span style={{ fontSize: '0.78rem', color: tc?.text ?? 'var(--text)', fontWeight: isActive ? 700 : 400 }}>
+                  {tier}
+                </span>
+                <span style={{
+                  fontSize: '0.85rem', fontWeight: 600,
+                  color: tc?.text ?? 'var(--text)',
+                  background: isActive ? (tc?.bg ?? 'transparent') : 'transparent',
+                  borderRadius: 3, padding: '0 4px',
+                }}>
+                  {count}
+                </span>
+              </div>
+            )
+          })}
+          {/* Total row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0 1px', marginTop: 2 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{totalSpells}</span>
+          </div>
+        </StatGroup>
+
+        {/* Progress bars */}
+        <StatGroup title="Readiness">
+          <SpellProgressBar
+            label="Raid Ready"
+            subtitle="Expert or better"
+            value={expertOrBetter}
+            total={totalSpells}
+            pct={raidReadyPct}
+            color="#84cc16"
+          />
+          <SpellProgressBar
+            label="Fully Mastered"
+            subtitle="Master or better"
+            value={masterOrBetter}
+            total={totalSpells}
+            pct={masteredPct}
+            color="#22c55e"
+          />
+        </StatGroup>
+
+        {tierFilter.size > 0 && (
+          <button
+            onClick={() => setTierFilter(new Set())}
+            style={{
+              width: '100%', padding: '4px 0', fontSize: '0.75rem',
+              color: 'var(--text-muted)', background: 'none',
+              border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer',
+              marginTop: 4,
+            }}
+          >
+            Clear tier filter
+          </button>
+        )}
+      </div>
+
+      {/* ── Right: spell list (2 columns) ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <input
+          type="text"
+          placeholder="Search spells…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ marginBottom: '0.75rem', width: 260, boxSizing: 'border-box' }}
+        />
+
+        {filtered.length === 0 ? (
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6,
+            padding: '1.5rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.88rem',
+          }}>
+            No spells match your filter.
+          </div>
+        ) : (() => {
+          const mid = Math.ceil(filtered.length / 2)
+          const cols = [filtered.slice(0, mid), filtered.slice(mid)]
+
+          const renderTable = (rows: SpellEntry[]) => (
+            <div style={{
+              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6,
+              overflow: 'hidden', flex: 1, minWidth: 0,
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised, var(--surface))' }}>
+                    <th style={{ ..._SPELL_TH, width: 36, textAlign: 'right' }}>Lvl</th>
+                    <th style={_SPELL_TH}>Name</th>
+                    <th style={{ ..._SPELL_TH, textAlign: 'right', paddingRight: '0.5rem' }}>Tier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((s, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ ..._SPELL_TD, textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.8rem', width: 36 }}>
+                        {s.level}
+                      </td>
+                      <td style={{ ..._SPELL_TD, fontWeight: 500 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          {(s.icon_id != null || s.icon_backdrop != null) && (
+                            <div style={{ position: 'relative', width: 18, height: 18, flexShrink: 0 }}>
+                              {s.icon_backdrop != null && s.icon_backdrop > 0 && (
+                                <img
+                                  src={`/spell-icons/${s.icon_backdrop}.png`}
+                                  alt=""
+                                  style={{ position: 'absolute', inset: 0, width: 18, height: 18 }}
+                                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                />
+                              )}
+                              {s.icon_id != null && s.icon_id > 0 && (
+                                <img
+                                  src={`/spell-icons/${s.icon_id}.png`}
+                                  alt=""
+                                  style={{ position: 'absolute', inset: 0, width: 18, height: 18 }}
+                                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                />
+                              )}
+                            </div>
+                          )}
+                          <span style={{ fontSize: '0.82rem' }}>{s.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ ..._SPELL_TD, textAlign: 'right', paddingRight: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                          {SPELL_TIER_ORDER.map(t => {
+                            const base = SPELL_TIER_ICON[t]
+                            const filename = t === s.tier ? `${base}-lit.png` : `${base}.png`
+                            return (
+                              <img
+                                key={t}
+                                src={`/spell-icons/${filename}`}
+                                alt={t}
+                                title={t}
+                                style={{ width: 14, height: 14 }}
+                              />
+                            )
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+
+          return (
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+              {cols.map((col, ci) => renderTable(col))}
+            </div>
+          )
+        })()}
+      </div>
+    </div>
+  )
+}
+
+// ── AA progress bar ───────────────────────────────────────────────────────────
+
+function AAProgressBar({ label, value, max, pct }: {
+  label: string
+  value: number
+  max:   number | null
+  pct:   number | null
+}) {
+  const filled  = pct !== null && pct >= 100
+  const barColor = filled ? '#22cc22' : 'var(--accent)'
+  return (
+    <div style={{ padding: '4px 0 6px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {label}
+        </span>
+        <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+          {value.toLocaleString()}{max !== null ? ` / ${max.toLocaleString()}` : ''}
+        </span>
+      </div>
+      {pct !== null && (
+        <>
+          <div style={{ height: 5, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${pct}%`, borderRadius: 3,
+              background: barColor, transition: 'width 0.3s ease',
+            }} />
+          </div>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'right', marginTop: 2 }}>
+            {pct}%
+          </div>
+        </>
+      )}
     </div>
   )
 }

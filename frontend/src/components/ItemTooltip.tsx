@@ -24,6 +24,12 @@ interface ItemEffect {
   lines: EffectLine[]
 }
 
+interface SetBonus {
+  required_items: number
+  effect: string
+  lines: string[]
+}
+
 interface ItemDetail {
   id: string
   name: string
@@ -42,6 +48,8 @@ interface ItemDetail {
   adornment_slots: string[]
   flags: string[]
   extra_info: [string, string][]
+  set_name: string | null
+  set_bonuses: SetBonus[]
 }
 
 export interface TooltipState {
@@ -274,6 +282,27 @@ function TooltipContent({ item, qs }: { item: ItemDetail; qs: QualityStyle }) {
           <div style={{ color: C_GOLD, fontWeight: 'bold', marginBottom: 4 }}>Effects:</div>
           {item.effects.map((eff, i) => (
             <EffectBlock key={i} eff={eff} qs={qs} showName={!isConsumable} />
+          ))}
+        </Section>
+      )}
+
+      {/* Set bonuses */}
+      {item.set_bonuses && item.set_bonuses.length > 0 && (
+        <Section>
+          <div style={{ color: C_GOLD, fontWeight: 'bold', marginBottom: 4 }}>
+            Set Bonus: {item.set_name}
+          </div>
+          {item.set_bonuses.map((bonus, i) => (
+            <div key={i} style={{ marginBottom: i < item.set_bonuses.length - 1 ? 5 : 0 }}>
+              <div style={{ color: C_WHITE, fontWeight: 'bold' }}>
+                ({bonus.required_items}) {bonus.effect}
+              </div>
+              {bonus.lines.map((line, j) => (
+                <div key={j} style={{ color: C_BODY, paddingLeft: 10, fontSize: '0.8rem' }}>
+                  {'• '}{line}
+                </div>
+              ))}
+            </div>
           ))}
         </Section>
       )}

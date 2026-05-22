@@ -9,6 +9,7 @@ from discord.ext import commands
 
 from census.client import CensusClient
 from census.models import CharacterSpells, SpellEntry
+from census.spells_db import load_blocklist as _load_spell_blocklist
 
 _TIER_ORDER = ["Apprentice", "Journeyman", "Adept", "Expert", "Master", "Grandmaster"]
 _COL_SEP = "  "
@@ -35,8 +36,15 @@ def _unique_highest(entries: list[SpellEntry]) -> list[SpellEntry]:
     return list(best.values())
 
 
+def _apply_blocklist(entries: list[SpellEntry]) -> list[SpellEntry]:
+    blocklist = _load_spell_blocklist()
+    if not blocklist:
+        return entries
+    return [e for e in entries if _base_name(e.name).lower() not in blocklist]
+
+
 def _build_details(data: CharacterSpells) -> str:
-    entries = _unique_highest(data.entries)
+    entries = _unique_highest(_apply_blocklist(data.entries))
     tier_order = {t: i for i, t in enumerate(_TIER_ORDER)}
     entries.sort(key=lambda e: (tier_order.get(e.tier, 99), e.level, e.name))
 
@@ -66,7 +74,7 @@ def _build_details(data: CharacterSpells) -> str:
 
 
 def _build_table(data: CharacterSpells) -> str:
-    entries = _unique_highest(data.entries)
+    entries = _unique_highest(_apply_blocklist(data.entries))
 
     count: Counter[str] = Counter(e.tier for e in entries)
     all_tiers = [t for t in _TIER_ORDER if count[t]]

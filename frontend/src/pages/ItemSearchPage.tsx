@@ -341,7 +341,7 @@ export default function ItemSearchPage() {
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
-      <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textDecoration: 'none' }}>
+      <Link to="/" style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', textDecoration: 'none' }}>
         ← Back
       </Link>
 

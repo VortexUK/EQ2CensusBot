@@ -20,6 +20,7 @@ from web.routes.claim import router as claim_router
 from web.routes.admin import router as admin_router
 from web.routes.guild import router as guild_router
 from web.routes.characters import router as characters_router
+from web.routes.aa import router as aa_router
 from web import db as users_db
 
 
@@ -69,7 +70,9 @@ def _ensure_item_stats() -> None:
         print(f"[startup] item_stats init/backfill error: {exc}", flush=True)
 
 _FRONTEND_DIST  = Path(__file__).resolve().parent.parent / "frontend" / "dist"
-_ICONS_DIR      = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
+_ICONS_DIR           = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
+_AA_ASSETS_DIR       = Path(__file__).resolve().parent.parent / "data" / "AAs"
+_SPELL_ICONS_DIR     = Path(__file__).resolve().parent.parent / "data" / "spells" / "icons"
 _SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-secret-change-in-production")
 
 
@@ -112,10 +115,19 @@ def create_app(session_secret: str | None = None) -> FastAPI:
     app.include_router(admin_router, prefix="/api")
     app.include_router(guild_router, prefix="/api")
     app.include_router(characters_router, prefix="/api")
+    app.include_router(aa_router, prefix="/api")
 
     # Item icons — served from local data directory
     if _ICONS_DIR.exists():
         app.mount("/icons", StaticFiles(directory=_ICONS_DIR), name="icons")
+
+    # AA assets (backgrounds, node icons)
+    if _AA_ASSETS_DIR.exists():
+        app.mount("/aa-assets", StaticFiles(directory=_AA_ASSETS_DIR), name="aa-assets")
+
+    # Spell icons
+    if _SPELL_ICONS_DIR.exists():
+        app.mount("/spell-icons", StaticFiles(directory=_SPELL_ICONS_DIR), name="spell-icons")
 
     # Serve the React build in production
     if _FRONTEND_DIST.exists():

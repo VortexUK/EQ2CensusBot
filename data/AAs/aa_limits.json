@@ -1,0 +1,62 @@
+{
+  "Shattered Lands": {
+    "aa_cap": 0,
+    "notes": "No Alternate Advancement system exists",
+    "unlocked_trees": []
+  },
+  "Desert of Flames": {
+    "aa_cap": 0,
+    "notes": "No AA system yet",
+    "unlocked_trees": []
+  },
+  "Kingdom of Sky": {
+    "aa_cap": 50,
+    "notes": "AA system introduced — one class tree per archetype",
+    "unlocked_trees": ["class"]
+  },
+  "Echoes of Faydwer": {
+    "aa_cap": 100,
+    "notes": "Subclass (Expertise) trees added — one per class",
+    "unlocked_trees": ["class", "subclass"]
+  },
+  "Rise of Kunark": {
+    "aa_cap": 140,
+    "notes": "AA cap increased, no new tree types",
+    "unlocked_trees": ["class", "subclass"]
+  },
+  "The Shadow Odyssey": {
+    "aa_cap": 200,
+    "notes": "Shadows tree added — one per class, cross-archetype nodes",
+    "unlocked_trees": ["class", "subclass", "shadows"]
+  },
+  "Sentinel's Fate": {
+    "aa_cap": 250,
+    "notes": "AA cap increased, no new tree types",
+    "unlocked_trees": ["class", "subclass", "shadows"]
+  },
+  "Destiny of Velious": {
+    "aa_cap": 300,
+    "notes": "Heroic AA tree added — one per archetype",
+    "unlocked_trees": ["class", "subclass", "shadows", "heroic"]
+  },
+  "Age of Discovery": {
+    "aa_cap": 320,
+    "notes": "Tradeskill AA trees added; Beastlord class introduced with Warder trees",
+    "unlocked_trees": ["class", "subclass", "shadows", "heroic", "tradeskill", "tradeskill_general", "warder"]
+  },
+  "Chains of Eternity": {
+    "aa_cap": 320,
+    "notes": "Prestige trees added — two per class (conversion + expertise)",
+    "unlocked_trees": ["class", "subclass", "shadows", "heroic", "tradeskill", "tradeskill_general", "warder", "prestige"]
+  },
+  "Tears of Veeshan": {
+    "aa_cap": 350,
+    "notes": "Dragon AA trees added",
+    "unlocked_trees": ["class", "subclass", "shadows", "heroic", "tradeskill", "tradeskill_general", "warder", "prestige", "dragon"]
+  },
+  "Altar of Malice": {
+    "aa_cap": 350,
+    "notes": "No new tree types",
+    "unlocked_trees": ["class", "subclass", "shadows", "heroic", "tradeskill", "tradeskill_general", "warder", "prestige", "dragon"]
+  }
+}

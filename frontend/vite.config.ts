@@ -13,6 +13,14 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/aa-assets': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/spell-icons': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
   build: {
