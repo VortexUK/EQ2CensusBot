@@ -5,10 +5,11 @@ import CharacterPage from './pages/CharacterPage'
 import ClaimPage from './pages/ClaimPage'
 import AdminPage from './pages/AdminPage'
 import GuildPage from './pages/GuildPage'
+import ItemPage from './pages/ItemPage'
 import CharacterSearchPage from './pages/CharacterSearchPage'
+import ItemSearchPage from './pages/ItemSearchPage'
 import {
   GuildSearchPage,
-  ItemSearchPage,
   SpellSearchPage,
   AASearchPage,
 } from './pages/SearchPage'
@@ -135,6 +136,7 @@ function App() {
         <Route path="/aa"         element={<AASearchPage />} />
         <Route path="/character/:name" element={<CharacterPage />} />
         <Route path="/guild/:guildName" element={<GuildPage />} />
+        <Route path="/item/:itemId"    element={<ItemPage />} />
         <Route path="/claim" element={<ClaimPage />} />
         <Route path="/admin" element={<AdminPage />} />
       </Route>

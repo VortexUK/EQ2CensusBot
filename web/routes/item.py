@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import json
 import os
+import sqlite3
+from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+import aiosqlite
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from census.client import CensusClient
 from census.constants import ARCHETYPES, CLASS_GROUPS
+from census.db import DB_PATH
 
 router = APIRouter(tags=["item"])
 _SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
@@ -79,6 +84,208 @@ class ItemResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoint
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Item search models
+# ---------------------------------------------------------------------------
+
+class ItemSearchResult(BaseModel):
+    id: int
+    name: str
+    tier: str | None = None
+    slot: str | None = None
+    item_type: str | None = None
+    level: int | None = None
+    class_label: str | None = None
+    icon_id: int | None = None
+    stats: list[str] = []          # canonical stat names present on this item
+
+
+class ItemSearchResponse(BaseModel):
+    results: list[ItemSearchResult]
+    total: int
+    page: int
+    per_page: int
+
+
+# ---------------------------------------------------------------------------
+# Item filter options (distinct values for dropdowns)
+# ---------------------------------------------------------------------------
+
+class ItemFilterOptions(BaseModel):
+    tiers: list[str]
+    slots: list[str]
+    item_types: list[str]
+
+
+@router.get("/items/filters", response_model=ItemFilterOptions)
+async def get_item_filters() -> ItemFilterOptions:
+    """Return distinct tier / slot / type values for filter dropdowns."""
+    if not DB_PATH.exists():
+        return ItemFilterOptions(tiers=[], slots=[], item_types=[])
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT DISTINCT tier_display FROM items "
+            "WHERE visible=1 AND tier_display IS NOT NULL "
+            "ORDER BY tier_display"
+        ) as cur:
+            tiers = [r[0] for r in await cur.fetchall()]
+
+        async with db.execute(
+            "SELECT DISTINCT slot FROM items "
+            "WHERE visible=1 AND slot IS NOT NULL "
+            "ORDER BY slot"
+        ) as cur:
+            slots = [r[0] for r in await cur.fetchall()]
+
+        async with db.execute(
+            "SELECT DISTINCT typeinfo_name FROM items "
+            "WHERE visible=1 AND typeinfo_name IS NOT NULL "
+            "ORDER BY typeinfo_name"
+        ) as cur:
+            item_types = [r[0] for r in await cur.fetchall()]
+
+    return ItemFilterOptions(tiers=tiers, slots=slots, item_types=item_types)
+
+
+# ---------------------------------------------------------------------------
+# Item search endpoint
+# ---------------------------------------------------------------------------
+
+@router.get("/items/search", response_model=ItemSearchResponse)
+async def search_items(
+    name:       str | None            = None,
+    tier:       str | None            = None,   # exact tier_display match
+    slot:       str | None            = None,   # exact slot match
+    item_type:  str | None            = None,   # typeinfo_name LIKE
+    class_name: str | None            = None,   # lowercase class key in classes_json
+    min_level:  int | None            = None,
+    max_level:  int | None            = None,
+    has_stat:   list[str]             = Query(default=[]),  # canonical stat names
+    sort_by:    str                   = "name",  # name | level | tier
+    sort_dir:   str                   = "asc",
+    page:       int                   = 1,
+) -> ItemSearchResponse:
+    """
+    Search the local items DB with optional filters.
+    At least one filter must be provided.
+    """
+    per_page = 50
+
+    # Require at least one meaningful filter
+    if not any([name, tier, slot, item_type, class_name,
+                min_level is not None, max_level is not None, has_stat]):
+        return ItemSearchResponse(results=[], total=0, page=1, per_page=per_page)
+
+    if not DB_PATH.exists():
+        raise HTTPException(status_code=503, detail="Item database not available")
+
+    # ── Build WHERE clause ────────────────────────────────────────────────────
+    conditions: list[str] = ["i.visible = 1"]
+    params: list = []
+
+    if name:
+        conditions.append("i.displayname_lower LIKE ?")
+        params.append(f"%{name.lower()}%")
+
+    if tier:
+        conditions.append("i.tier_display = ?")
+        params.append(tier)
+
+    if slot:
+        conditions.append("i.slot = ?")
+        params.append(slot)
+
+    if item_type:
+        conditions.append("i.typeinfo_name LIKE ?")
+        params.append(f"%{item_type}%")
+
+    if class_name:
+        # classes_json is a JSON object keyed by lowercase class name
+        conditions.append("LOWER(i.classes_json) LIKE ?")
+        params.append(f'%"{class_name.lower()}"%')
+
+    if min_level is not None:
+        conditions.append("i.level_to_use >= ?")
+        params.append(min_level)
+
+    if max_level is not None:
+        conditions.append("i.level_to_use <= ?")
+        params.append(max_level)
+
+    where = " AND ".join(conditions)
+
+    # ── Stats JOINs (one per required stat) ──────────────────────────────────
+    stat_joins = ""
+    for i, stat in enumerate(has_stat):
+        alias = f"s{i}"
+        stat_joins += f" JOIN item_stats {alias} ON i.id = {alias}.item_id AND {alias}.stat = ?"
+        params.append(stat)
+
+    # ── Sort ──────────────────────────────────────────────────────────────────
+    order_col = {
+        "level": "i.level_to_use",
+        "tier":  "i.tierid",
+        "name":  "i.displayname_lower",
+    }.get(sort_by, "i.displayname_lower")
+    direction = "DESC" if sort_dir == "desc" else "ASC"
+    # secondary sort always by name asc
+    order_clause = f"{order_col} {direction}, i.displayname_lower ASC"
+
+    offset = (page - 1) * per_page
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Total count
+        count_sql = (
+            f"SELECT COUNT(DISTINCT i.id) FROM items i{stat_joins} WHERE {where}"
+        )
+        async with db.execute(count_sql, params) as cur:
+            total = (await cur.fetchone())[0]
+
+        # Paged results
+        select_sql = (
+            f"SELECT DISTINCT i.id, i.displayname, i.tier_display, i.slot, "
+            f"i.typeinfo_name, i.level_to_use, i.class_label, i.icon_id "
+            f"FROM items i{stat_joins} "
+            f"WHERE {where} "
+            f"ORDER BY {order_clause} "
+            f"LIMIT {per_page} OFFSET {offset}"
+        )
+        async with db.execute(select_sql, params) as cur:
+            rows = await cur.fetchall()
+
+        # For each result, fetch its stat names
+        results: list[ItemSearchResult] = []
+        for row in rows:
+            item_id = row["id"]
+            async with db.execute(
+                "SELECT stat FROM item_stats WHERE item_id = ? ORDER BY stat",
+                (item_id,),
+            ) as scur:
+                stat_names = [r[0] for r in await scur.fetchall()]
+
+            results.append(ItemSearchResult(
+                id         = item_id,
+                name       = row["displayname"],
+                tier       = row["tier_display"],
+                slot       = row["slot"],
+                item_type  = row["typeinfo_name"],
+                level      = row["level_to_use"],
+                class_label= row["class_label"],
+                icon_id    = row["icon_id"],
+                stats      = stat_names,
+            ))
+
+    return ItemSearchResponse(
+        results=results,
+        total=total,
+        page=page,
+        per_page=per_page,
+    )
+
 
 @router.get("/item/{item_id}", response_model=ItemResponse)
 async def get_item(item_id: str) -> ItemResponse:

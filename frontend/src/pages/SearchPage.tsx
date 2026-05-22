@@ -108,17 +108,6 @@ export function GuildSearchPage() {
   )
 }
 
-export function ItemSearchPage() {
-  return (
-    <SearchPage config={{
-      title: 'Item Search',
-      subtitle: 'Search for any item by name to view its stats, effects and quality tier.',
-      placeholder: 'Item name…',
-      getTarget: q => `/item/${encodeURIComponent(q)}`,
-    }} />
-  )
-}
-
 export function SpellSearchPage() {
   return (
     <SearchPage config={{

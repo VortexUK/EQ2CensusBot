@@ -284,6 +284,26 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_ti_name     ON items(typeinfo_name);",
     "CREATE INDEX IF NOT EXISTS idx_class_label ON items(class_label);",
     "CREATE INDEX IF NOT EXISTS idx_skill_type  ON items(skill_type);",
+    "CREATE INDEX IF NOT EXISTS idx_tier_disp   ON items(tier_display);",
+]
+
+# ---------------------------------------------------------------------------
+# item_stats table  (one row per item × canonical stat name)
+# ---------------------------------------------------------------------------
+
+_CREATE_ITEM_STATS = """
+CREATE TABLE IF NOT EXISTS item_stats (
+    item_id  INTEGER NOT NULL,
+    stat     TEXT    NOT NULL,   -- canonical display name e.g. "Ability Mod"
+    value    REAL    NOT NULL,
+    PRIMARY KEY (item_id, stat)
+);
+"""
+
+_CREATE_STAT_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_stat_name  ON item_stats(stat);",
+    "CREATE INDEX IF NOT EXISTS idx_stat_item  ON item_stats(item_id);",
+    "CREATE INDEX IF NOT EXISTS idx_stat_nv    ON item_stats(stat, value);",
 ]
 
 # Columns added after initial schema — used by init_db() to migrate existing DBs
@@ -391,6 +411,41 @@ def _int_field_zero(v: Any) -> Optional[int]:
         return int(v)
     except (ValueError, TypeError):
         return None
+
+
+def extract_item_stats(raw: dict) -> dict[str, float]:
+    """
+    Return a mapping of canonical stat display-name → value extracted from the
+    Census ``modifiers`` dict stored in raw_json.
+
+    Multiple API tag names that resolve to the same display name (e.g.
+    ``arcane``/``elemental``/``noxious`` → "Resistances") keep only the first
+    non-zero value encountered.
+    """
+    # Import lazily to avoid circular import at module level
+    from census.constants import STAT_MAP   # noqa: PLC0415
+
+    modifiers = raw.get("modifiers") or {}
+    result: dict[str, float] = {}
+    for tag, mod in modifiers.items():
+        if not isinstance(mod, dict):
+            continue
+        key = tag.lower()
+        mapping = STAT_MAP.get(key)
+        if mapping:
+            display_name = mapping[0]
+        else:
+            api_dn = (mod.get("displayname") or "").strip()
+            if api_dn.lower() == "all":
+                display_name = "Ability Mod"
+            elif len(api_dn) > 3:
+                display_name = api_dn
+            else:
+                continue  # no usable name → skip
+        value = float(mod.get("value") or 0)
+        if value and display_name not in result:
+            result[display_name] = value
+    return result
 
 
 def item_to_row(item: dict) -> dict:
@@ -506,6 +561,10 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
             conn.execute(f"ALTER TABLE items ADD COLUMN {col_name} {col_def}")
     for idx in _CREATE_INDEXES:
         conn.execute(idx)
+    # Stats side-table
+    conn.execute(_CREATE_ITEM_STATS)
+    for idx in _CREATE_STAT_INDEXES:
+        conn.execute(idx)
     conn.commit()
     return conn
 
@@ -524,6 +583,19 @@ def upsert_items(items: list[dict], conn: sqlite3.Connection) -> int:
     """Upsert a batch of raw Census item dicts. Returns number inserted/replaced."""
     rows = [item_to_row(item) for item in items]
     conn.executemany(_UPSERT_SQL, rows)
+    # Maintain item_stats side-table
+    stat_rows: list[tuple] = []
+    for item in items:
+        item_id = item.get("id")
+        if item_id is None:
+            continue
+        for stat_name, value in extract_item_stats(item).items():
+            stat_rows.append((item_id, stat_name, value))
+    if stat_rows:
+        conn.executemany(
+            "INSERT OR REPLACE INTO item_stats (item_id, stat, value) VALUES (?, ?, ?)",
+            stat_rows,
+        )
     conn.commit()
     return len(rows)
 
