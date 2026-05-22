@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useClaim } from '../hooks/useClaim'
+import { useAuth } from '../hooks/useAuth'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -71,7 +72,17 @@ interface GuildAdornCheck {
   members: MemberAdornStats[]
 }
 
-type Tab = 'roster' | 'spells' | 'adorns'
+interface GuildClaimItem {
+  id: number
+  discord_id: string
+  discord_name: string
+  avatar: string | null
+  character_name: string
+  requested_at: number
+  is_own: boolean
+}
+
+type Tab = 'roster' | 'spells' | 'adorns' | 'claims'
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
 
@@ -668,16 +679,203 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
   )
 }
 
+// ── Claim requests tab (officers only) ───────────────────────────────────────
+
+function discordAvatarUrl(discordId: string, avatar: string | null): string {
+  if (avatar) return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png`
+  const index = Number(BigInt(discordId) >> 22n) % 6
+  return `https://cdn.discordapp.com/embed/avatars/${index}.png`
+}
+
+function ClaimRequestsTab({
+  guildName,
+  currentDiscordId,
+}: {
+  guildName: string
+  currentDiscordId: string
+}) {
+  const [claims, setClaims]     = useState<GuildClaimItem[] | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  const [busy, setBusy]         = useState<number | null>(null)   // claim ID being actioned
+  const [rejectId, setRejectId] = useState<number | null>(null)   // claim ID open for reject note
+  const [rejectNote, setRejectNote] = useState('')
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/guild/${encodeURIComponent(guildName)}/claims`, { credentials: 'include' })
+      .then(async res => {
+        if (!res.ok) { setError((await res.json().catch(() => ({}))).detail ?? `Error ${res.status}`); return }
+        setClaims(await res.json())
+      })
+      .catch(() => setError('Network error — please try again.'))
+      .finally(() => setLoading(false))
+  }, [guildName])
+
+  async function handleApprove(id: number) {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/guild/${encodeURIComponent(guildName)}/claims/${id}/approve`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) { alert((await res.json().catch(() => ({}))).detail ?? 'Failed'); return }
+      setClaims(prev => prev ? prev.filter(c => c.id !== id) : prev)
+    } finally { setBusy(null) }
+  }
+
+  async function handleReject(id: number, note: string) {
+    setBusy(id)
+    try {
+      const res = await fetch(`/api/guild/${encodeURIComponent(guildName)}/claims/${id}/reject`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: note.trim() || null }),
+      })
+      if (!res.ok) { alert((await res.json().catch(() => ({}))).detail ?? 'Failed'); return }
+      setClaims(prev => prev ? prev.filter(c => c.id !== id) : prev)
+      setRejectId(null)
+      setRejectNote('')
+    } finally { setBusy(null) }
+  }
+
+  if (loading) return <p style={{ color: 'var(--text-muted)', padding: '1rem' }}>Loading claim requests…</p>
+  if (error)   return <p style={{ color: '#f87171', padding: '1rem' }}>{error}</p>
+  if (!claims) return null
+
+  if (claims.length === 0) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+        No pending claim requests for this guild.
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '0.75rem 1rem' }}>
+      {claims.map(c => {
+        const isOwn    = c.discord_id === currentDiscordId
+        const isBusy   = busy === c.id
+        const rejecting = rejectId === c.id
+        const age = Math.floor((Date.now() / 1000 - c.requested_at) / 3600)
+        const ageStr = age < 1 ? 'just now' : age < 24 ? `${age}h ago` : `${Math.floor(age / 24)}d ago`
+
+        return (
+          <div key={c.id} style={{
+            display: 'flex', alignItems: 'flex-start', gap: '0.85rem',
+            padding: '0.85rem 0',
+            borderBottom: '1px solid var(--border)',
+          }}>
+            {/* Discord avatar */}
+            <img
+              src={discordAvatarUrl(c.discord_id, c.avatar)}
+              alt=""
+              style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, marginTop: 2 }}
+            />
+
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text)' }}>{c.discord_name}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>is claiming</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{c.character_name}</span>
+                {isOwn && (
+                  <span style={{
+                    fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem',
+                    borderRadius: 4, background: 'rgba(200,169,110,0.15)',
+                    color: '#c8a96e', border: '1px solid rgba(200,169,110,0.3)',
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                  }}>Your claim</span>
+                )}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                Submitted {ageStr}
+              </div>
+
+              {/* Reject note input */}
+              {rejecting && (
+                <div style={{ marginTop: '0.6rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Reason (optional)…"
+                    value={rejectNote}
+                    onChange={e => setRejectNote(e.target.value)}
+                    style={{ flex: 1, minWidth: 160, fontSize: '0.85rem' }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleReject(c.id, rejectNote)}
+                    disabled={isBusy}
+                    style={{
+                      padding: '0.3rem 0.8rem', borderRadius: 5, cursor: 'pointer',
+                      background: 'rgba(239,68,68,0.15)', color: '#f87171',
+                      border: '1px solid rgba(239,68,68,0.35)', fontSize: '0.85rem',
+                    }}
+                  >
+                    {isBusy ? '…' : 'Confirm reject'}
+                  </button>
+                  <button
+                    onClick={() => { setRejectId(null); setRejectNote('') }}
+                    style={{
+                      padding: '0.3rem 0.7rem', borderRadius: 5, cursor: 'pointer',
+                      background: 'transparent', color: 'var(--text-muted)',
+                      border: '1px solid var(--border)', fontSize: '0.85rem',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons — hidden for own claims and while reject form is open */}
+            {!isOwn && !rejecting && (
+              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                <button
+                  onClick={() => handleApprove(c.id)}
+                  disabled={isBusy}
+                  style={{
+                    padding: '0.3rem 0.85rem', borderRadius: 5, cursor: 'pointer',
+                    background: 'rgba(34,197,94,0.15)', color: '#22c55e',
+                    border: '1px solid rgba(34,197,94,0.35)', fontSize: '0.85rem', fontWeight: 600,
+                  }}
+                >
+                  {isBusy ? '…' : 'Approve'}
+                </button>
+                <button
+                  onClick={() => { setRejectId(c.id); setRejectNote('') }}
+                  disabled={isBusy}
+                  style={{
+                    padding: '0.3rem 0.75rem', borderRadius: 5, cursor: 'pointer',
+                    background: 'transparent', color: 'var(--text-muted)',
+                    border: '1px solid var(--border)', fontSize: '0.85rem',
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function GuildPage() {
   const { guildName } = useParams<{ guildName: string }>()
   const claimState = useClaim()
+  const auth = useAuth()
 
   const myChars = useMemo<Set<string>>(() => {
     if (claimState.status !== 'ready') return new Set()
     return new Set(claimState.data.approved.map(c => c.character_name.toLowerCase()))
   }, [claimState])
+
+  const [isOfficer, setIsOfficer] = useState(false)
 
   const [tab, setTab] = useState<Tab>('roster')
   const [filter, setFilter] = useState('')
@@ -701,24 +899,27 @@ export default function GuildPage() {
   const [adornsError, setAdornsError] = useState<string | null>(null)
   const [adornsLoading, setAdornsLoading] = useState(false)
 
-  // Load roster + info on mount
+  // Load roster + info + officer status on mount
   useEffect(() => {
     if (!guildName) return
     setRosterLoading(true)
     setRosterError(null)
 
-    // Fetch roster and info in parallel
     Promise.all([
-      fetch(`/api/guild/${encodeURIComponent(guildName)}`),
-      fetch(`/api/guild/${encodeURIComponent(guildName)}/info`),
-    ]).then(async ([rosterRes, infoRes]) => {
+      fetch(`/api/guild/${encodeURIComponent(guildName)}`, { credentials: 'include' }),
+      fetch(`/api/guild/${encodeURIComponent(guildName)}/info`, { credentials: 'include' }),
+      fetch(`/api/guild/${encodeURIComponent(guildName)}/officer-status`, { credentials: 'include' }),
+    ]).then(async ([rosterRes, infoRes, officerRes]) => {
       if (!rosterRes.ok) {
         setRosterError((await rosterRes.json().catch(() => ({}))).detail ?? `Error ${rosterRes.status}`)
       } else {
-        const data = await rosterRes.json()
-        setRoster(data)
+        setRoster(await rosterRes.json())
       }
       if (infoRes.ok) setInfo(await infoRes.json())
+      if (officerRes.ok) {
+        const d = await officerRes.json()
+        setIsOfficer(d.is_officer === true)
+      }
     })
       .catch(() => setRosterError('Network error — please try again.'))
       .finally(() => setRosterLoading(false))
@@ -759,6 +960,8 @@ export default function GuildPage() {
     if (t === 'adorns') loadAdorns()
   }
 
+  const currentDiscordId = auth.status === 'authenticated' ? auth.user.id : ''
+
   const guildDisplayName = roster?.name ?? spells?.guild_name ?? adorns?.guild_name ?? '…'
   const guildWorld = roster?.world ?? ''
   const memberCount = roster?.members.length
@@ -785,11 +988,13 @@ export default function GuildPage() {
 
   const isLoading = tab === 'roster' ? rosterLoading
     : tab === 'spells' ? spellsLoading
-    : adornsLoading
+    : tab === 'adorns' ? adornsLoading
+    : false   // claims tab handles its own loading state
 
   const error = tab === 'roster' ? rosterError
     : tab === 'spells' ? spellsError
-    : adornsError
+    : tab === 'adorns' ? adornsError
+    : null
 
   return (
     <main style={{ maxWidth: 1000, margin: '3rem auto', padding: '0 1rem' }}>
@@ -845,14 +1050,17 @@ export default function GuildPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <TabBtn label="Roster"       active={tab === 'roster'} onClick={() => switchTab('roster')} />
         <TabBtn label="Spell Check"  active={tab === 'spells'} onClick={() => switchTab('spells')} />
         <TabBtn label="Adorn Check"  active={tab === 'adorns'} onClick={() => switchTab('adorns')} />
+        {isOfficer && (
+          <TabBtn label="Claim Requests" active={tab === 'claims'} onClick={() => switchTab('claims')} />
+        )}
       </div>
 
-      {/* Filters */}
-      {!isLoading && !error && (
+      {/* Filters — hidden on claims tab */}
+      {tab !== 'claims' && !isLoading && !error && (
         <div style={{ marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
           <input
             type="text"
@@ -919,7 +1127,7 @@ export default function GuildPage() {
       )}
 
       {/* Tables */}
-      {!isLoading && !error && (
+      {tab !== 'claims' && !isLoading && !error && (
         <div style={{
           overflowX: 'auto',
           background: 'var(--surface)',
@@ -935,6 +1143,17 @@ export default function GuildPage() {
           {tab === 'adorns' && adorns && (
             <AdornCheckTable data={adorns} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
+        </div>
+      )}
+
+      {/* Claim requests — officers only, self-contained loading */}
+      {tab === 'claims' && isOfficer && guildName && (
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+        }}>
+          <ClaimRequestsTab guildName={guildName} currentDiscordId={currentDiscordId} />
         </div>
       )}
     </main>
