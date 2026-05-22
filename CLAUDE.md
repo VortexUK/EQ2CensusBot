@@ -13,6 +13,7 @@ A Discord bot and web companion site (FastAPI + React/TypeScript) that queries t
 | `census/constants.py` | `STAT_MAP` (stat display names/groups), class frozensets (`FIGHTERS`, `PRIESTS`, `SCOUTS`, `MAGES`, `ARTISANS`), `ARCHETYPES`, `CLASS_GROUPS`, `TYPEINFO_DISPLAY`, `ITEM_DISPLAY` |
 | `census/item_parser.py` | Item data parsing (parse_item, parse_stats, parse_effects, parse_flags, _armor_type, _slot_type, _fmt_duration, parse_set_bonuses) extracted from client.py |
 | `census/spells_db.py` | Local SQLite spell catalogue: strip_roman, unique_highest_entries, load_blocklist, find_by_ids, find_by_crc (@lru_cache maxsize=4096), spell_to_row, upsert_spells |
+| `census/recipes_db.py` | Local SQLite recipe catalogue (~70k rows): recipe_to_row, upsert_recipes, find_by_id, find_by_name, find_by_output_id. Secondary components stored as JSON array. Download with scripts/download_recipes.py |
 | `image/tooltip.py` | PIL renderer for item tooltips. Renders at 2× then downsamples (SCALE=2, ZOOM=1.3). Width is `round(368 * ZOOM)`. |
 | `image/aa_tree.py` | AA tree renderers and coordinate systems. See AA tree notes below. |
 | `bot/bot.py` | Registers all cogs, syncs slash commands to three specific guild IDs (648253204760625160, 955890381847928892, 1502314690041221260) for instant propagation plus a global sync. |
@@ -115,8 +116,9 @@ Detects from xcoord sets, max ycoord, `ofyclassification`, and node `classificat
 - Blocklist applied via `load_blocklist()` (re-read each call from data/spells/blocklist.json)
 
 ### Web endpoint filter (`/api/character/{name}/spells`)
-- level > 0, type in (spells, arts), given_by != alternateadvancement
-- **Includes** given_by='class' entries (combat arts for scouts/fighters)
+- level > 0, type in (spells, arts), given_by == 'spellscroll'
+- given_by='spellscroll' covers both mage spells and fighter/scout combat arts once scribed
+- given_by='class' entries are auto-granted fixed-tier abilities (Invisibility, base combat art ranks etc.) — excluded
 - Blocklist applied via `load_blocklist()`
 
 ## Spell blocklist
@@ -147,6 +149,9 @@ python scripts/download_spells.py --guild "Guild Name"  # seed spell cache DB fo
 python scripts/download_spells.py --guild "Guild Name" --refresh  # force re-fetch all
 python scripts/download_spell_icons.py               # download all spell icon PNGs
 python scripts/download_spell_icons.py --start N     # resume from icon N
+python scripts/download_recipes.py                   # download all ~70k recipes into data/recipes/recipes.db
+python scripts/download_recipes.py --limit 500       # test run (500 recipes)
+python scripts/download_recipes.py --restart         # ignore saved offset, re-download from scratch
 ```
 
 ## Deployment

@@ -1,50 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { StatGroup } from './CharacterPage'
-
-// ── Spell types ───────────────────────────────────────────────────────────────
-
-export interface SpellEntry {
-  name:          string
-  tier:          string
-  level:         number
-  spell_type:    string
-  icon_id:       number | null
-  icon_backdrop: number | null
-}
-
-export interface CharacterSpellsData {
-  character_name: string
-  spells:         SpellEntry[]
-  tier_counts:    Record<string, number>
-  tiers_present:  string[]
-}
-
-// ── Spell data cache ──────────────────────────────────────────────────────────
-// Module-level: survives re-renders and Vite HMR remounts.
-// Keyed by lower-cased character name.
-export const _spellsCache = new Map<string, CharacterSpellsData>()
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-export const SPELL_TIER_ORDER = ['Apprentice', 'Journeyman', 'Adept', 'Expert', 'Master', 'Grandmaster']
-
-export const SPELL_TIER_ICON: Record<string, string> = {
-  Apprentice:  'spell_app',
-  Journeyman:  'spell_jour',
-  Adept:       'spell_ad',
-  Expert:      'spell_exp',
-  Master:      'spell_m',
-  Grandmaster: 'spell_gm',
-}
-
-export const SPELL_TIER_COLOURS: Record<string, { text: string; bg: string }> = {
-  Apprentice:  { text: '#ef4444', bg: 'rgba(239,68,68,0.12)'   },
-  Journeyman:  { text: '#f97316', bg: 'rgba(249,115,22,0.12)'  },
-  Adept:       { text: '#eab308', bg: 'rgba(234,179,8,0.12)'   },
-  Expert:      { text: '#84cc16', bg: 'rgba(132,204,22,0.12)'  },
-  Master:      { text: '#22c55e', bg: 'rgba(34,197,94,0.12)'   },
-  Grandmaster: { text: '#10b981', bg: 'rgba(16,185,129,0.15)'  },
-}
+import {
+  type SpellEntry,
+  type CharacterSpellsData,
+  type Ingredient,
+  type UpgradeMaterialsData,
+  _spellsCache,
+  _materialsCache,
+  SPELL_TIER_ORDER,
+  SPELL_TIER_ICON,
+  SPELL_TIER_COLOURS,
+} from './spellConstants'
 
 const _SPELL_TH: React.CSSProperties = {
   padding: '0.4rem 0.6rem',
@@ -90,6 +56,219 @@ function SpellProgressBar({ label, subtitle, value, total, pct, color }: {
         </span>
       </div>
     </div>
+  )
+}
+
+// ── Upgrade materials section ─────────────────────────────────────────────────
+
+const _CAT_COLOUR: Record<string, string> = {
+  primary:   '#c8a96e',   // gold  — the key component
+  secondary: '#94a3b8',   // slate — stackable mats
+  fuel:      '#64748b',   // muted — bulk fuel
+}
+
+const _TIER_COLOUR: Record<string, string> = {
+  Fabled:        '#ff99ff',
+  Legendary:     '#ffc993',
+  Treasured:     '#93d9ff',
+  Mastercrafted: '#93d9ff',
+  Handcrafted:   '#beff93',
+  Uncommon:      '#beff93',
+  Common:        'var(--text)',
+}
+
+function IngredientTooltip({ ing }: { ing: Ingredient }) {
+  const tierColour = _TIER_COLOUR[ing.tier ?? ''] ?? 'var(--text)'
+  return (
+    <div style={{
+      position: 'absolute', zIndex: 9999,
+      left: '100%', top: 0, marginLeft: 8,
+      width: 220,
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 6,
+      boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+      padding: '0.6rem 0.75rem',
+      pointerEvents: 'none',
+    }}>
+      {/* Header: icon + name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        {ing.icon_id ? (
+          <img
+            src={`/icons/${ing.icon_id}.png`}
+            alt=""
+            width={32} height={32}
+            style={{ borderRadius: 3, border: '1px solid var(--border)', flexShrink: 0 }}
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
+        ) : (
+          <div style={{ width: 32, height: 32, borderRadius: 3, background: 'var(--border)', flexShrink: 0 }} />
+        )}
+        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: tierColour, lineHeight: 1.3 }}>
+          {ing.name}
+        </span>
+      </div>
+      {/* Tier badge */}
+      {ing.tier && (
+        <div style={{ fontSize: '0.7rem', color: tierColour, marginBottom: ing.description ? 4 : 0 }}>
+          {ing.tier}
+        </div>
+      )}
+      {/* Description */}
+      {ing.description && (
+        <div style={{
+          fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.4,
+          maxHeight: 80, overflow: 'hidden',
+        }}>
+          {ing.description}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IngredientRow({ ing }: { ing: Ingredient }) {
+  const [hovered, setHovered] = useState(false)
+  const catColour = _CAT_COLOUR[ing.category] ?? 'var(--text)'
+
+  return (
+    <div
+      style={{ position: 'relative' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        padding: '3px 0',
+        borderBottom: '1px solid var(--border)',
+        cursor: ing.item_id ? 'default' : undefined,
+      }}>
+        {/* Icon */}
+        <div style={{ width: 20, height: 20, flexShrink: 0 }}>
+          {ing.icon_id ? (
+            <img
+              src={`/icons/${ing.icon_id}.png`}
+              alt=""
+              width={20} height={20}
+              style={{ borderRadius: 2, display: 'block' }}
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+          ) : (
+            <div style={{ width: 20, height: 20, borderRadius: 2, background: 'var(--border)' }} />
+          )}
+        </div>
+        {/* Name */}
+        <span style={{
+          fontSize: '0.76rem', color: catColour, flex: 1,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {ing.name}
+        </span>
+        {/* Quantity */}
+        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: catColour, flexShrink: 0 }}>
+          {ing.quantity.toLocaleString()}
+        </span>
+      </div>
+      {hovered && <IngredientTooltip ing={ing} />}
+    </div>
+  )
+}
+
+function MaterialsSection({ charName }: { charName: string }) {
+  const cacheKey = charName.toLowerCase()
+  const cached   = _materialsCache.get(cacheKey)
+
+  const [data, setData]       = useState<UpgradeMaterialsData | null>(cached ?? null)
+  const [loading, setLoading] = useState(!cached)
+  const [error, setError]     = useState<string | null>(null)
+
+  useEffect(() => {
+    if (_materialsCache.has(cacheKey)) return
+    let cancelled = false
+    fetch(`/api/character/${encodeURIComponent(charName)}/upgrade-materials`)
+      .then(async res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json() as Promise<UpgradeMaterialsData>
+      })
+      .then(d => {
+        if (cancelled) return
+        _materialsCache.set(cacheKey, d)
+        setData(d)
+        setLoading(false)
+      })
+      .catch(err => {
+        if (!cancelled) {
+          console.error('[upgrade-materials] fetch failed:', err)
+          setError(String(err))
+          setLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [charName, cacheKey])
+
+  if (loading) return (
+    <StatGroup title="Upgrade Materials">
+      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '4px 0' }}>Loading…</p>
+    </StatGroup>
+  )
+  if (error || !data) return null
+  if (data.spells_needing_upgrade === 0) return (
+    <StatGroup title="Upgrade Materials">
+      <p style={{ fontSize: '0.78rem', color: '#22c55e', margin: '4px 0' }}>
+        All spells at Expert or better ✓
+      </p>
+    </StatGroup>
+  )
+
+  const missing = data.spells_needing_upgrade - data.spells_with_recipe
+
+  return (
+    <StatGroup title="Upgrade Materials">
+      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 6, lineHeight: 1.4 }}>
+        Expert recipes for{' '}
+        <span style={{ color: 'var(--text)', fontWeight: 600 }}>{data.spells_with_recipe}</span>
+        {' '}of{' '}
+        <span style={{ color: 'var(--text)', fontWeight: 600 }}>{data.spells_needing_upgrade}</span>
+        {' '}upgradeable spells
+        {missing > 0 && <span style={{ color: '#f97316' }}> ({missing} no recipe)</span>}
+      </div>
+
+      {(() => {
+        // Group by crafting tier: tier_num = floor(item_level / 10) + 1
+        // Items with no item_level fall into tier 0 (shown last as "Unknown")
+        const tierOf = (ing: Ingredient) =>
+          ing.item_level != null ? Math.floor(ing.item_level / 10) + 1 : 0
+
+        const groups = new Map<number, Ingredient[]>()
+        for (const ing of data.ingredients) {
+          const t = tierOf(ing)
+          if (!groups.has(t)) groups.set(t, [])
+          groups.get(t)!.push(ing)
+        }
+
+        // Sort groups: highest tier first; tier 0 (unknown) last
+        const sortedTiers = [...groups.keys()].sort((a, b) =>
+          a === 0 ? 1 : b === 0 ? -1 : b - a
+        )
+
+        return sortedTiers.map(t => (
+          <div key={t} style={{ marginBottom: 6 }}>
+            <div style={{
+              fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.07em',
+              textTransform: 'uppercase', color: 'var(--text-muted)',
+              padding: '3px 0 2px',
+              borderBottom: '1px solid var(--border)',
+              marginBottom: 1,
+            }}>
+              {t === 0 ? 'Unknown' : `T${t}`}
+            </div>
+            {groups.get(t)!.map(ing => (
+              <IngredientRow key={ing.name} ing={ing} />
+            ))}
+          </div>
+        ))
+      })()}
+    </StatGroup>
   )
 }
 
@@ -221,6 +400,8 @@ export function SpellsTab({ charName }: { charName: string }) {
           />
         </StatGroup>
 
+        <MaterialsSection charName={charName} />
+
         {tierFilter.size > 0 && (
           <button
             onClick={() => setTierFilter(new Set())}
@@ -327,7 +508,7 @@ export function SpellsTab({ charName }: { charName: string }) {
 
           return (
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              {cols.map((col, _ci) => renderTable(col))}
+              {cols.map((col, ci) => <React.Fragment key={ci}>{renderTable(col)}</React.Fragment>)}
             </div>
           )
         })()}
