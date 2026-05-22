@@ -1394,7 +1394,7 @@ function SpellsTab({ charName }: { charName: string }) {
 
           return (
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              {cols.map((col, ci) => renderTable(col))}
+              {cols.map((col, _ci) => renderTable(col))}
             </div>
           )
         })()}
