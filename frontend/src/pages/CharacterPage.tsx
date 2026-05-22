@@ -82,6 +82,7 @@ interface Character {
   world: string
   ts_class: string | null
   ts_level: number | null
+  guild_name: string | null
   stats: CharacterStats
   equipment: EquipmentSlot[]
 }
@@ -517,6 +518,21 @@ function GeneralBanner({ char }: { char: Character }) {
         <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.15rem' }}>
           {[char.world, char.race, char.gender].filter(Boolean).join(' · ')}
         </div>
+        {char.guild_name && (
+          <Link
+            to={`/guild/${encodeURIComponent(char.guild_name)}`}
+            style={{
+              display: 'inline-block',
+              marginTop: '0.2rem',
+              fontSize: '0.82rem',
+              color: 'var(--accent)',
+              textDecoration: 'none',
+              fontWeight: 500,
+            }}
+          >
+            ⚔ {char.guild_name}
+          </Link>
+        )}
       </div>
 
       {/* Stat columns, each divided */}

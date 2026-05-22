@@ -15,6 +15,8 @@ interface GuildMember {
   deity: string | null
   rank: string | null
   rank_id: number | null
+  guild_status: number | null
+  played_time: number | null
 }
 
 interface GuildData {
@@ -197,25 +199,41 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
 
 // ── Roster table ──────────────────────────────────────────────────────────────
 
-type RosterSortKey = 'rank' | 'name' | 'level' | 'aa' | 'ts_level' | 'deity'
+function fmtPlayTime(secs: number | null): string {
+  if (secs == null) return '—'
+  const h = Math.floor(secs / 3600)
+  if (h === 0) return '<1h'
+  return h.toLocaleString() + 'h'
+}
+
+function fmtGuildStatus(pts: number | null): string {
+  if (pts == null) return '—'
+  return pts.toLocaleString()
+}
+
+type RosterSortKey = 'rank' | 'name' | 'level' | 'aa' | 'ts_level' | 'deity' | 'guild_status' | 'played_time'
 
 const ROSTER_COLS: { label: string; key: RosterSortKey; align?: 'right' }[] = [
-  { label: 'Name',             key: 'name'     },
-  { label: 'Rank',             key: 'rank'     },
-  { label: 'Class (Level)',    key: 'level'    },
-  { label: 'AA',               key: 'aa',      align: 'right' },
-  { label: 'Tradeskill (Lvl)', key: 'ts_level' },
-  { label: 'Deity',            key: 'deity'    },
+  { label: 'Name',             key: 'name'         },
+  { label: 'Rank',             key: 'rank'         },
+  { label: 'Class (Level)',    key: 'level'        },
+  { label: 'AA',               key: 'aa',          align: 'right' },
+  { label: 'Tradeskill (Lvl)', key: 'ts_level'     },
+  { label: 'Deity',            key: 'deity'        },
+  { label: 'Guild Status',     key: 'guild_status', align: 'right' },
+  { label: 'Play Time',        key: 'played_time',  align: 'right' },
 ]
 
 function rosterSortValue(m: GuildMember, key: RosterSortKey): string | number {
   switch (key) {
-    case 'rank':     return m.rank_id ?? 9999
-    case 'name':     return m.name.toLowerCase()
-    case 'level':    return m.level ?? -1
-    case 'aa':       return m.aa_level ?? -1
-    case 'ts_level': return m.ts_level ?? -1
-    case 'deity':    return (m.deity ?? '').toLowerCase()
+    case 'rank':         return m.rank_id ?? 9999
+    case 'name':         return m.name.toLowerCase()
+    case 'level':        return m.level ?? -1
+    case 'aa':           return m.aa_level ?? -1
+    case 'ts_level':     return m.ts_level ?? -1
+    case 'deity':        return (m.deity ?? '').toLowerCase()
+    case 'guild_status': return m.guild_status ?? -1
+    case 'played_time':  return m.played_time ?? -1
   }
 }
 
@@ -229,7 +247,7 @@ function RosterTable({ members, filter, hiddenRanks, myChars }: { members: Guild
     } else {
       setSortKey(key)
       // Numeric columns default to descending (highest first); others ascending
-      setSortDir(['level', 'aa', 'ts_level'].includes(key) ? 'desc' : 'asc')
+      setSortDir(['level', 'aa', 'ts_level', 'guild_status', 'played_time'].includes(key) ? 'desc' : 'asc')
     }
   }
 
@@ -282,7 +300,7 @@ function RosterTable({ members, filter, hiddenRanks, myChars }: { members: Guild
       </thead>
       <tbody>
         {sorted.length === 0 ? (
-          <tr><td colSpan={6} style={{ ...TD, textAlign: 'center', color: 'var(--text-muted)' }}>No members match your filter.</td></tr>
+          <tr><td colSpan={8} style={{ ...TD, textAlign: 'center', color: 'var(--text-muted)' }}>No members match your filter.</td></tr>
         ) : sorted.map(m => {
           const clsLabel = m.cls
             ? m.level != null ? `${m.cls} (${m.level})` : m.cls
@@ -308,6 +326,8 @@ function RosterTable({ members, filter, hiddenRanks, myChars }: { members: Guild
               <td style={{ ...TD, textAlign: 'right', color: 'var(--text-muted)' }}>{m.aa_level ?? '—'}</td>
               <td style={{ ...TD, color: 'var(--text-muted)' }}>{tsLabel}</td>
               <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.82rem' }}>{m.deity ?? '—'}</td>
+              <td style={{ ...TD, textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{fmtGuildStatus(m.guild_status)}</td>
+              <td style={{ ...TD, textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{fmtPlayTime(m.played_time)}</td>
             </tr>
           )
         })}

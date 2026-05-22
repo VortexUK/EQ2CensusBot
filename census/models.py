@@ -43,6 +43,8 @@ class GuildMember:
     deity: Optional[str]
     rank: Optional[str]
     rank_id: Optional[int]   # numeric rank for sort order
+    guild_status: Optional[int] = None   # status points contributed to the guild
+    played_time: Optional[int] = None    # total /played seconds
 
 
 @dataclass
@@ -114,6 +116,7 @@ class CharacterOverview:
     world: str
     ts_class: Optional[str] = None  # tradeskill class
     ts_level: Optional[int] = None
+    guild_name: Optional[str] = None  # guild the character belongs to (None = no guild)
     stats: dict = field(default_factory=dict)
     equipment: list[EquipmentSlot] = field(default_factory=list)
     spell_ids: list[int] = field(default_factory=list)   # raw spell IDs from Census

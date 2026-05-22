@@ -56,6 +56,8 @@ class GuildMemberResponse(BaseModel):
     deity: str | None = None
     rank: str | None = None
     rank_id: int | None = None
+    guild_status: int | None = None   # status points contributed to the guild
+    played_time: int | None = None    # total /played seconds
 
 
 class GuildResponse(BaseModel):
@@ -359,6 +361,7 @@ async def _bg_refresh_guild(guild_name: str) -> None:
                     ts_class=m.ts_class, ts_level=m.ts_level,
                     aa_level=m.aa_level, deity=m.deity,
                     rank=m.rank, rank_id=m.rank_id,
+                    guild_status=m.guild_status, played_time=m.played_time,
                 )
                 for m in members_sorted
             ],
@@ -464,6 +467,7 @@ async def get_guild(guild_name: str) -> GuildResponse:
                 ts_class=m.ts_class, ts_level=m.ts_level,
                 aa_level=m.aa_level, deity=m.deity,
                 rank=m.rank, rank_id=m.rank_id,
+                guild_status=m.guild_status, played_time=m.played_time,
             )
             for m in members
         ],

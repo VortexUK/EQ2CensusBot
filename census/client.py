@@ -91,7 +91,7 @@ class CensusClient:
         params = {
             "name": name,
             "world": world,
-            "c:resolve": "members(displayname,type.aa_level,type.deity,type.level,type.class,guild.rank,type.ts_class,type.ts_level)",
+            "c:resolve": "members(displayname,type.aa_level,type.deity,type.level,type.class,guild.rank,guild.status,type.ts_class,type.ts_level,type.playedtime)",
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
@@ -125,18 +125,22 @@ class CensusClient:
             t = m.get("type")
             if not isinstance(t, dict):
                 continue
-            raw_rank = _int((m.get("guild") or {}).get("rank"))
-            deity_val = t.get("deity")
+            guild_sec    = m.get("guild") or {}
+            raw_rank     = _int(guild_sec.get("rank"))
+            guild_status = _int(guild_sec.get("status"))
+            deity_val    = t.get("deity")
             members.append(GuildMember(
-                name     = m.get("name") or m.get("displayname", "Unknown"),
-                level    = _int(t.get("level")),
-                cls      = t.get("class"),
-                ts_class = t.get("ts_class"),
-                ts_level = _int(t.get("ts_level")),
-                aa_level = _int(t.get("aa_level")),
-                deity    = deity_val if deity_val and str(deity_val).lower() != "none" else None,
-                rank     = rank_map.get(raw_rank) if raw_rank is not None else None,
-                rank_id  = raw_rank,
+                name         = m.get("name") or m.get("displayname", "Unknown"),
+                level        = _int(t.get("level")),
+                cls          = t.get("class"),
+                ts_class     = t.get("ts_class"),
+                ts_level     = _int(t.get("ts_level")),
+                aa_level     = _int(t.get("aa_level")),
+                deity        = deity_val if deity_val and str(deity_val).lower() != "none" else None,
+                rank         = rank_map.get(raw_rank) if raw_rank is not None else None,
+                rank_id      = raw_rank,
+                guild_status = guild_status,
+                played_time  = _int(t.get("playedtime")),
             ))
         return GuildData(
             name    = guild.get("name", name),
@@ -202,7 +206,7 @@ class CensusClient:
         params = {
             "name.first": name,
             "locationdata.world": world,
-            "c:show": "name,type,stats,equipmentslot_list,spell_list",
+            "c:show": "name,type,stats,equipmentslot_list,spell_list,guild",
             "c:limit": "1",
         }
         print(f"[Census] GET {url} params={params}")
@@ -253,21 +257,25 @@ class CensusClient:
             if sid is not None:
                 spell_ids.append(sid)
 
+        guild_raw  = char.get("guild")
+        guild_name = guild_raw.get("name") if isinstance(guild_raw, dict) else None
+
         return CharacterOverview(
-            id        = str(char.get("id", "")),
-            name      = (char.get("name") or {}).get("first", name),
-            level     = _int(t.get("level")),
-            cls       = t.get("class"),
-            race      = t.get("race"),
-            gender    = gender.capitalize() if gender else None,
-            deity     = deity_val if deity_val and str(deity_val).lower() != "none" else None,
-            aa_count  = aa_count,
-            world     = world,
-            ts_class  = ts_class.capitalize() if ts_class else None,
-            ts_level  = _int(t.get("ts_level")),
-            stats     = raw_stats,
-            equipment = equipment,
-            spell_ids = spell_ids,
+            id         = str(char.get("id", "")),
+            name       = (char.get("name") or {}).get("first", name),
+            level      = _int(t.get("level")),
+            cls        = t.get("class"),
+            race       = t.get("race"),
+            gender     = gender.capitalize() if gender else None,
+            deity      = deity_val if deity_val and str(deity_val).lower() != "none" else None,
+            aa_count   = aa_count,
+            world      = world,
+            ts_class   = ts_class.capitalize() if ts_class else None,
+            ts_level   = _int(t.get("ts_level")),
+            guild_name = guild_name or None,
+            stats      = raw_stats,
+            equipment  = equipment,
+            spell_ids  = spell_ids,
         )
 
     async def get_character_aas(self, name: str, world: str) -> Optional[CharacterAAs]:
@@ -423,7 +431,7 @@ class CensusClient:
         params = {
             "name": name,
             "world": world,
-            "c:resolve": "members(displayname,type,stats,guild.rank,equipmentslot_list,spell_list)",
+            "c:resolve": "members(displayname,type,stats,guild.rank,guild.status,equipmentslot_list,spell_list)",
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
@@ -454,27 +462,33 @@ class CensusClient:
         members: list[GuildMember] = []
         overviews: list[CharacterOverview] = []
 
+        guild_name_str = guild.get("name", name)
+
         for m in guild.get("member_list") or []:
             t = m.get("type")
             if not isinstance(t, dict):
                 continue
-            raw_rank  = _int((m.get("guild") or {}).get("rank"))
-            deity_val = t.get("deity")
+            guild_sec    = m.get("guild") or {}
+            raw_rank     = _int(guild_sec.get("rank"))
+            guild_status = _int(guild_sec.get("status"))
+            deity_val    = t.get("deity")
             # Guild member resolve puts the character name in 'name' or 'displayname'
             member_name = m.get("name") or m.get("displayname", "Unknown")
             gender   = t.get("gender", "")
             ts_class = t.get("ts_class", "")
 
             members.append(GuildMember(
-                name     = member_name,
-                level    = _int(t.get("level")),
-                cls      = t.get("class"),
-                ts_class = ts_class,
-                ts_level = _int(t.get("ts_level")),
-                aa_level = _int(t.get("aa_level")),
-                deity    = deity_val if deity_val and str(deity_val).lower() != "none" else None,
-                rank     = rank_map.get(raw_rank) if raw_rank is not None else None,
-                rank_id  = raw_rank,
+                name         = member_name,
+                level        = _int(t.get("level")),
+                cls          = t.get("class"),
+                ts_class     = ts_class,
+                ts_level     = _int(t.get("ts_level")),
+                aa_level     = _int(t.get("aa_level")),
+                deity        = deity_val if deity_val and str(deity_val).lower() != "none" else None,
+                rank         = rank_map.get(raw_rank) if raw_rank is not None else None,
+                rank_id      = raw_rank,
+                guild_status = guild_status,
+                played_time  = _int(t.get("playedtime")),
             ))
 
             # In guild resolves 'ability' and 'personal_status_points' live inside
@@ -497,20 +511,21 @@ class CensusClient:
                     spell_ids.append(sid)
 
             overviews.append(CharacterOverview(
-                id        = str(m.get("id", "")),
-                name      = member_name,
-                level     = _int(t.get("level")),
-                cls       = t.get("class"),
-                race      = t.get("race"),
-                gender    = gender.capitalize() if gender else None,
-                deity     = deity_val if deity_val and str(deity_val).lower() != "none" else None,
-                aa_count  = _int(t.get("aa_level")) or 0,
-                world     = world,
-                ts_class  = ts_class.capitalize() if ts_class else None,
-                ts_level  = _int(t.get("ts_level")),
-                stats     = raw_stats,
-                equipment = equipment,
-                spell_ids = spell_ids,
+                id         = str(m.get("id", "")),
+                name       = member_name,
+                level      = _int(t.get("level")),
+                cls        = t.get("class"),
+                race       = t.get("race"),
+                gender     = gender.capitalize() if gender else None,
+                deity      = deity_val if deity_val and str(deity_val).lower() != "none" else None,
+                aa_count   = _int(t.get("aa_level")) or 0,
+                world      = world,
+                ts_class   = ts_class.capitalize() if ts_class else None,
+                ts_level   = _int(t.get("ts_level")),
+                guild_name = guild_name_str or None,
+                stats      = raw_stats,
+                equipment  = equipment,
+                spell_ids  = spell_ids,
             ))
 
         return (

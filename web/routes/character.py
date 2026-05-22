@@ -191,6 +191,7 @@ class CharacterResponse(BaseModel):
     world: str
     ts_class: str | None = None
     ts_level: int | None = None
+    guild_name: str | None = None
     stats: CharacterStats = CharacterStats()
     equipment: list[EquipmentSlotResponse] = []
     spell_ids: list[int] = []
@@ -199,19 +200,20 @@ class CharacterResponse(BaseModel):
 def _build_char_response(char) -> CharacterResponse:
     """Convert a CharacterOverview into a CharacterResponse (shared by endpoint + guild pre-warming)."""
     return CharacterResponse(
-        id        = char.id,
-        name      = char.name,
-        level     = char.level,
-        cls       = char.cls,
-        race      = char.race,
-        gender    = char.gender,
-        deity     = char.deity,
-        aa_count  = char.aa_count,
-        world     = char.world,
-        ts_class  = char.ts_class,
-        ts_level  = char.ts_level,
-        stats     = _parse_stats(char.stats),
-        equipment = [
+        id         = char.id,
+        name       = char.name,
+        level      = char.level,
+        cls        = char.cls,
+        race       = char.race,
+        gender     = char.gender,
+        deity      = char.deity,
+        aa_count   = char.aa_count,
+        world      = char.world,
+        ts_class   = char.ts_class,
+        ts_level   = char.ts_level,
+        guild_name = char.guild_name,
+        stats      = _parse_stats(char.stats),
+        equipment  = [
             EquipmentSlotResponse(
                 slot        = s.slot_name,
                 name        = s.item_name,
