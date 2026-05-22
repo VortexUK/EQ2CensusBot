@@ -1,137 +1,300 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useClaim } from '../hooks/useClaim'
+import type { Claim } from '../hooks/useClaim'
 
-// ── My Characters section ─────────────────────────────────────────────────────
+// ── Class colours (adventure archetype) ──────────────────────────────────────
+
+const CLASS_COLOURS: Record<string, string> = {
+  // Fighters
+  Guardian: '#f87171', Berserker: '#f87171',
+  Paladin: '#f87171', Shadowknight: '#f87171',
+  Monk: '#f87171', Bruiser: '#f87171',
+  // Scouts
+  Ranger: '#fbbf24', Assassin: '#fbbf24',
+  Troubador: '#fbbf24', Dirge: '#fbbf24',
+  Swashbuckler: '#fbbf24', Brigand: '#fbbf24',
+  // Mages
+  Wizard: '#93b4ff', Warlock: '#93b4ff',
+  Conjuror: '#93b4ff', Necromancer: '#93b4ff',
+  Illusionist: '#93b4ff', Coercer: '#93b4ff',
+  // Priests
+  Templar: '#4ade80', Inquisitor: '#4ade80',
+  Mystic: '#4ade80', Defiler: '#4ade80',
+  Warden: '#4ade80', Fury: '#4ade80',
+}
+
+// ── Character detail (fetched from Census cache) ──────────────────────────────
+
+interface CharDetail {
+  cls: string | null
+  level: number | null
+  ts_class: string | null
+  ts_level: number | null
+}
+
+// ── Character card ────────────────────────────────────────────────────────────
+
+function CharacterCard({ claim, detail, isPrimary }: {
+  claim: Claim
+  detail: CharDetail | null
+  isPrimary: boolean
+}) {
+  const accentColour = detail?.cls ? (CLASS_COLOURS[detail.cls] ?? '#c8a96e') : '#c8a96e'
+
+  return (
+    <Link
+      to={`/character/${encodeURIComponent(claim.character_name)}`}
+      style={{ textDecoration: 'none', display: 'block' }}
+    >
+      <div style={{
+        position: 'relative',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderLeft: `3px solid ${accentColour}`,
+        borderRadius: 8,
+        padding: '1.1rem 1.2rem 1.1rem 1.15rem',
+        cursor: 'pointer',
+        transition: 'border-color 0.15s, background 0.15s',
+        overflow: 'hidden',
+      }}
+        onMouseEnter={e => {
+          ;(e.currentTarget as HTMLDivElement).style.borderColor = accentColour
+          ;(e.currentTarget as HTMLDivElement).style.background = 'var(--surface-raised)'
+        }}
+        onMouseLeave={e => {
+          ;(e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'
+          ;(e.currentTarget as HTMLDivElement).style.background = 'var(--surface)'
+          ;(e.currentTarget as HTMLDivElement).style.borderLeftColor = accentColour
+        }}
+      >
+
+        {/* Primary star */}
+        {isPrimary && (
+          <span style={{
+            position: 'absolute', top: '0.7rem', right: '0.8rem',
+            fontSize: '0.7rem', color: '#c8a96e', opacity: 0.8,
+            letterSpacing: '0.04em',
+          }}>
+            ★ Primary
+          </span>
+        )}
+
+        {/* Character name */}
+        <div style={{
+          fontFamily: "'Cinzel', serif",
+          fontSize: '1.25rem',
+          fontWeight: 700,
+          letterSpacing: '0.04em',
+          lineHeight: 1.15,
+          marginBottom: '0.2rem',
+          color: isPrimary ? '#ffc993' : '#93d9ff',
+          textShadow: isPrimary
+            ? '0 0 10px rgba(213,105,0,0.4)'
+            : '0 0 8px rgba(0,120,180,0.35)',
+        }}>
+          {claim.character_name}
+        </div>
+
+        {/* Guild */}
+        <div style={{
+          fontSize: '0.8rem',
+          color: 'var(--text-muted)',
+          fontFamily: "'Cinzel', serif",
+          letterSpacing: '0.03em',
+          marginBottom: '0.8rem',
+          minHeight: '1em',
+        }}>
+          {claim.guild_name
+            ? <span onClick={e => { e.preventDefault(); e.stopPropagation() }}>
+                <Link
+                  to={`/guild/${encodeURIComponent(claim.guild_name)}`}
+                  style={{ color: 'rgba(200,169,110,0.7)', textDecoration: 'none' }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  &lt;{claim.guild_name}&gt;
+                </Link>
+              </span>
+            : <span style={{ opacity: 0.4 }}>&lt;No guild&gt;</span>
+          }
+        </div>
+
+        {/* Stats row */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.28rem' }}>
+          {/* Adventure */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+            <span style={{
+              fontSize: '0.67rem', textTransform: 'uppercase', letterSpacing: '0.07em',
+              color: 'var(--text-muted)', width: 68, flexShrink: 0,
+            }}>
+              Adventure
+            </span>
+            {detail ? (
+              <span style={{
+                fontSize: '0.92rem', fontWeight: 600,
+                color: detail.cls ? (CLASS_COLOURS[detail.cls] ?? 'var(--text)') : 'var(--text-muted)',
+              }}>
+                {detail.cls ?? '—'}
+                {detail.level != null && (
+                  <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.82rem', marginLeft: '0.35rem' }}>
+                    ({detail.level})
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', opacity: 0.5 }}>loading…</span>
+            )}
+          </div>
+
+          {/* Tradeskill */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+            <span style={{
+              fontSize: '0.67rem', textTransform: 'uppercase', letterSpacing: '0.07em',
+              color: 'var(--text-muted)', width: 68, flexShrink: 0,
+            }}>
+              Tradeskill
+            </span>
+            {detail ? (
+              <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                {detail.ts_class
+                  ? `${detail.ts_class.charAt(0).toUpperCase()}${detail.ts_class.slice(1)}`
+                  : '—'
+                }
+                {detail.ts_level != null && (
+                  <span style={{ fontWeight: 400, fontSize: '0.82rem', marginLeft: '0.35rem' }}>
+                    ({detail.ts_level})
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', opacity: 0.5 }}>loading…</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+// ── My Characters grid ────────────────────────────────────────────────────────
 
 function MyCharacters() {
   const claimState = useClaim()
+  const [details, setDetails] = useState<Record<string, CharDetail>>({})
 
-  if (claimState.status === 'loading' || claimState.status === 'unauthenticated') return null
-  if (claimState.status === 'error') return null
+  useEffect(() => {
+    if (claimState.status !== 'ready') return
+    const approved = claimState.data.approved
+    if (approved.length === 0) return
+
+    // Fetch class/level data for all approved characters in parallel
+    Promise.all(
+      approved.map(c =>
+        fetch(`/api/character/${encodeURIComponent(c.character_name)}`, { credentials: 'include' })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => ({
+            name: c.character_name,
+            detail: data ? {
+              cls: data.cls ?? null,
+              level: data.level ?? null,
+              ts_class: data.ts_class ?? null,
+              ts_level: data.ts_level ?? null,
+            } : null,
+          }))
+          .catch(() => ({ name: c.character_name, detail: null }))
+      )
+    ).then(results => {
+      const map: Record<string, CharDetail> = {}
+      for (const r of results) {
+        if (r.detail) map[r.name] = r.detail
+      }
+      setDetails(map)
+    })
+  }, [claimState.status === 'ready' ? claimState.data.approved.map(c => c.character_name).join(',') : ''])
+
+  if (claimState.status === 'loading') return (
+    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }}>
+      Loading…
+    </p>
+  )
+  if (claimState.status === 'unauthenticated' || claimState.status === 'error') return null
 
   const { approved, pending } = claimState.data
   const primary = approved.find(c => c.is_primary === 1) ?? approved[0] ?? null
-  const alts = approved.filter(c => c !== primary)
+
+  if (approved.length === 0 && !pending) {
+    return (
+      <div style={{ textAlign: 'center', marginTop: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+          You haven't claimed a character yet.
+        </p>
+        <Link
+          to="/claim"
+          style={{
+            display: 'inline-block',
+            padding: '0.5rem 1.4rem',
+            background: 'rgba(var(--accent-rgb,99,210,130),0.12)',
+            color: 'var(--accent)',
+            border: '1px solid rgba(var(--accent-rgb,99,210,130),0.35)',
+            borderRadius: 6,
+            textDecoration: 'none',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+          }}
+        >
+          Claim a character
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div>
-      <div style={{
-        display: 'flex', alignItems: 'baseline', gap: '0.75rem',
-        marginBottom: '0.75rem',
-      }}>
+      {/* Section header */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '1.1rem' }}>
         <h2 style={{
           fontFamily: "'Cinzel', serif",
-          fontSize: '1rem',
+          fontSize: '0.88rem',
           fontWeight: 600,
-          letterSpacing: '0.08em',
+          letterSpacing: '0.1em',
           textTransform: 'uppercase',
-          color: 'rgba(200,169,110,0.85)',
+          color: 'rgba(200,169,110,0.7)',
+          margin: 0,
         }}>
           My Characters
         </h2>
-        <Link to="/claim" style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+        <Link to="/claim" style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textDecoration: 'none' }}>
           manage
         </Link>
       </div>
 
-      {approved.length === 0 && !pending && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No character claimed.</span>
-          <Link to="/claim" style={linkBtn}>Claim character</Link>
-        </div>
-      )}
+      {/* Cards grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+        gap: '0.85rem',
+      }}>
+        {approved.map(c => (
+          <CharacterCard
+            key={c.id}
+            claim={c}
+            detail={details[c.character_name] ?? null}
+            isPrimary={c === primary}
+          />
+        ))}
+      </div>
 
-      {/* Primary */}
-      {primary && (
-        <div style={{ marginBottom: '0.5rem', lineHeight: 1.3 }}>
-          <Link
-            to={`/character/${encodeURIComponent(primary.character_name)}`}
-            style={{
-              fontFamily: "'Cinzel', serif",
-              fontSize: '1.15rem',
-              fontWeight: 700,
-              color: '#ffc993',
-              textShadow: '0 0 8px #D56900, 0 0 20px rgba(213,105,0,0.35)',
-              textDecoration: 'none',
-              letterSpacing: '0.04em',
-            }}
-          >
-            {primary.character_name}
-          </Link>
-          {primary.guild_name ? (
-            <Link
-              to={`/guild/${encodeURIComponent(primary.guild_name)}`}
-              style={{
-                marginLeft: '0.6rem',
-                fontSize: '0.78rem',
-                color: 'var(--text-muted)',
-                textDecoration: 'none',
-                fontFamily: "'Cinzel', serif",
-                letterSpacing: '0.03em',
-              }}
-            >
-              &lt;{primary.guild_name}&gt;
-            </Link>
-          ) : (
-            <span style={{ marginLeft: '0.6rem', fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: "'Cinzel', serif" }}>
-              &lt;&gt;
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Alts */}
-      {alts.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', paddingLeft: '0.05rem' }}>
-          {alts.map(c => (
-            <div key={c.id} style={{ lineHeight: 1.3 }}>
-              <Link
-                to={`/character/${encodeURIComponent(c.character_name)}`}
-                style={{
-                  fontFamily: "'Cinzel', serif",
-                  fontSize: '0.92rem',
-                  fontWeight: 600,
-                  color: '#93d9ff',
-                  textShadow: '0 0 6px #D56900, 0 0 16px rgba(213,105,0,0.25)',
-                  textDecoration: 'none',
-                  letterSpacing: '0.03em',
-                }}
-              >
-                {c.character_name}
-              </Link>
-              {c.guild_name ? (
-                <Link
-                  to={`/guild/${encodeURIComponent(c.guild_name)}`}
-                  style={{
-                    marginLeft: '0.5rem',
-                    fontSize: '0.72rem',
-                    color: 'var(--text-muted)',
-                    textDecoration: 'none',
-                    fontFamily: "'Cinzel', serif",
-                    letterSpacing: '0.03em',
-                  }}
-                >
-                  &lt;{c.guild_name}&gt;
-                </Link>
-              ) : (
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: "'Cinzel', serif" }}>
-                  &lt;&gt;
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Pending */}
+      {/* Pending claim notice */}
       {pending && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-            ⏳ {pending.character_name}
-          </span>
-          <Link to="/claim" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>· pending</Link>
+        <div style={{
+          marginTop: '1rem',
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          fontSize: '0.83rem', color: 'var(--text-muted)',
+        }}>
+          <span>⏳</span>
+          <span style={{ fontStyle: 'italic' }}>{pending.character_name}</span>
+          <Link to="/claim" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>· pending approval</Link>
         </div>
       )}
     </div>
@@ -140,29 +303,14 @@ function MyCharacters() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-function HomePage() {
+export default function HomePage() {
   const auth = useAuth()
-  const navigate = useNavigate()
-  const [charSearch, setCharSearch] = useState('')
-  const [guildSearch, setGuildSearch] = useState('')
-
-  function handleCharSearch(e: React.FormEvent) {
-    e.preventDefault()
-    const name = charSearch.trim()
-    if (name) navigate(`/character/${encodeURIComponent(name)}`)
-  }
-
-  function handleGuildSearch(e: React.FormEvent) {
-    e.preventDefault()
-    const name = guildSearch.trim()
-    if (name) navigate(`/guild/${encodeURIComponent(name)}`)
-  }
 
   return (
-    <main style={{ maxWidth: 820, margin: '0 auto', padding: '1.5rem 1.5rem 4rem' }}>
+    <main style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
 
-      {/* Title — centered over both columns */}
-      <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+      {/* Title */}
+      <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
         <h1 style={{
           fontFamily: "'Cinzel', serif",
           fontSize: '2.6rem',
@@ -178,81 +326,15 @@ function HomePage() {
         }}>
           Lore <span style={{ fontWeight: 300, opacity: 0.8 }}>&</span> Legend
         </h1>
-        <p style={{
-          color: 'var(--text-muted)',
-          fontSize: '0.95rem',
-          lineHeight: 1.6,
-          marginTop: '0.25rem',
-        }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginTop: '0.25rem' }}>
           Guild companion for <em>Woushi</em> — track characters, spells,
           gear and guild rosters across the realm of Norrath.
         </p>
       </div>
 
-      {/* Two-column body */}
-      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      {/* Characters */}
+      {auth.status === 'authenticated' && <MyCharacters />}
 
-        {/* Left — My Characters */}
-        <div style={{ flex: '1 1 200px', minWidth: 180 }}>
-          {auth.status === 'authenticated' && <MyCharacters />}
-        </div>
-
-        {/* Right — Search */}
-        <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          <form onSubmit={handleCharSearch} style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              type="text"
-              placeholder="Character name…"
-              value={charSearch}
-              onChange={e => setCharSearch(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button type="submit" style={btnStyle('var(--accent)')}>Look up</button>
-          </form>
-          <form onSubmit={handleGuildSearch} style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              type="text"
-              placeholder="Guild name…"
-              value={guildSearch}
-              onChange={e => setGuildSearch(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button type="submit" style={btnStyle('var(--surface-raised)')}>Guild roster</button>
-          </form>
-        </div>
-
-      </div>
     </main>
   )
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-function btnStyle(bg: string): React.CSSProperties {
-  return {
-    display: 'inline-block',
-    padding: '0.5rem 1.2rem',
-    background: bg,
-    color: 'var(--text)',
-    borderRadius: 6,
-    border: '1px solid var(--border)',
-    cursor: 'pointer',
-    fontSize: '0.95rem',
-    whiteSpace: 'nowrap',
-  }
-}
-
-const linkBtn: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '0.35rem 0.9rem',
-  background: 'var(--surface)',
-  color: 'var(--text)',
-  borderRadius: 6,
-  border: '1px solid var(--border)',
-  cursor: 'pointer',
-  fontSize: '0.85rem',
-  textDecoration: 'none',
-  whiteSpace: 'nowrap',
-}
-
-export default HomePage
