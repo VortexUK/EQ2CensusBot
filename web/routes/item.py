@@ -18,6 +18,44 @@ _SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
 
 
 # ---------------------------------------------------------------------------
+# Filter normalisation constants
+# ---------------------------------------------------------------------------
+
+# Canonical tier display names, ordered highest → lowest quality.
+# DB stores tiers in ALL-CAPS; _TIER_DB_MAP converts them for display.
+_CANONICAL_TIERS = [
+    "Celestial", "Ethereal", "Mythical", "Fabled",
+    "Legendary", "Treasured", "Uncommon",
+    "Mastercrafted", "Handcrafted", "Common",
+]
+_TIER_ORDER_IDX  = {t: i for i, t in enumerate(_CANONICAL_TIERS)}
+_TIER_DB_MAP     = {t.upper(): t for t in _CANONICAL_TIERS}  # e.g. "FABLED" → "Fabled"
+
+# typeinfo_name values to exclude from the item-type filter
+_ITEM_TYPE_SKIP = frozenset(["spellscroll", "recipescroll", "coinpurse", "equipmentinfuser"])
+
+# typeinfo_name raw → display name (renames + merges)
+_ITEM_TYPE_RENAME = {
+    "houseitem":     "House Item",
+    "itemcontainer": "Container",   # merged with 'container'
+    "itempattern":   "Pattern",
+}
+
+# display name → list of raw DB typeinfo_name values (for search)
+_ITEM_TYPE_DB_MAP: dict[str, list[str]] = {
+    "Container": ["container", "itemcontainer"],
+    "House Item": ["houseitem"],
+    "Pattern":   ["itempattern", "pattern"],
+}
+
+# Slot names to suppress (mount/horse equipment, not applicable on TLE)
+_SLOT_SKIP = frozenset([
+    "Barding", "Breeching", "Hackamore", "Reins",
+    "Saddle", "Shoes", "Stirrup", "Textures",
+])
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -126,26 +164,51 @@ async def get_item_filters() -> ItemFilterOptions:
         return ItemFilterOptions(tiers=[], slots=[], item_types=[])
 
     async with aiosqlite.connect(DB_PATH) as db:
+        # ── Tiers ──────────────────────────────────────────────────────────
+        # Map raw ALL-CAPS DB values to canonical display names; skip
+        # compound tiers like "MASTERCRAFTED FABLED"; sort by quality order.
         async with db.execute(
             "SELECT DISTINCT tier_display FROM items "
-            "WHERE visible=1 AND tier_display IS NOT NULL "
-            "ORDER BY tier_display"
+            "WHERE visible=1 AND tier_display IS NOT NULL"
         ) as cur:
-            tiers = [r[0] for r in await cur.fetchall()]
+            raw_tiers = [r[0] for r in await cur.fetchall()]
 
+        seen_tiers: set[str] = set()
+        tiers: list[str] = []
+        for raw in raw_tiers:
+            display = _TIER_DB_MAP.get(raw)   # only single canonical tiers match
+            if display and display not in seen_tiers:
+                seen_tiers.add(display)
+                tiers.append(display)
+        tiers.sort(key=lambda t: _TIER_ORDER_IDX.get(t, 99))
+
+        # ── Slots ──────────────────────────────────────────────────────────
         async with db.execute(
             "SELECT DISTINCT slot FROM items "
             "WHERE visible=1 AND slot IS NOT NULL "
             "ORDER BY slot"
         ) as cur:
-            slots = [r[0] for r in await cur.fetchall()]
+            slots = [r[0] for r in await cur.fetchall() if r[0] not in _SLOT_SKIP]
 
+        # ── Item types ─────────────────────────────────────────────────────
+        # Rename / skip / capitalise raw typeinfo_name values; deduplicate.
         async with db.execute(
             "SELECT DISTINCT typeinfo_name FROM items "
-            "WHERE visible=1 AND typeinfo_name IS NOT NULL "
-            "ORDER BY typeinfo_name"
+            "WHERE visible=1 AND typeinfo_name IS NOT NULL"
         ) as cur:
-            item_types = [r[0] for r in await cur.fetchall()]
+            raw_types = [r[0] for r in await cur.fetchall()]
+
+        seen_types: set[str] = set()
+        for raw in raw_types:
+            if raw in _ITEM_TYPE_SKIP:
+                continue
+            display = _ITEM_TYPE_RENAME.get(raw)
+            if display is None:
+                # Capitalise first letter, leave rest as-is
+                display = raw[0].upper() + raw[1:] if raw else raw
+            if display not in seen_types:
+                seen_types.add(display)
+        item_types = sorted(seen_types)
 
     return ItemFilterOptions(tiers=tiers, slots=slots, item_types=item_types)
 
@@ -191,16 +254,33 @@ async def search_items(
         where_params.append(f"%{name.lower()}%")
 
     if tier:
-        conditions.append("i.tier_display = ?")
-        where_params.append(tier)
+        # Frontend sends the canonical display name (e.g. "Fabled").
+        # Convert to uppercase to match the DB, then use LIKE so that
+        # compound tiers ("MASTERCRAFTED FABLED") are included.
+        # Exception: "COMMON" must be an exact match to avoid matching "UNCOMMON".
+        db_tier = tier.upper()
+        if db_tier == "COMMON":
+            conditions.append("i.tier_display = ?")
+            where_params.append("COMMON")
+        else:
+            conditions.append("i.tier_display LIKE ?")
+            where_params.append(f"%{db_tier}%")
 
     if slot:
         conditions.append("i.slot = ?")
         where_params.append(slot)
 
     if item_type:
-        conditions.append("i.typeinfo_name LIKE ?")
-        where_params.append(f"%{item_type}%")
+        # Map display name back to raw DB typeinfo_name value(s)
+        raw_types = _ITEM_TYPE_DB_MAP.get(item_type)
+        if raw_types:
+            placeholders = ",".join("?" * len(raw_types))
+            conditions.append(f"LOWER(i.typeinfo_name) IN ({placeholders})")
+            where_params.extend(raw_types)          # already lowercase
+        else:
+            # General case: compare lowercase (DB values are all-lowercase)
+            conditions.append("LOWER(i.typeinfo_name) = ?")
+            where_params.append(item_type.lower())
 
     if class_name:
         # classes_json is a JSON object keyed by lowercase class name

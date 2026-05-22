@@ -37,15 +37,34 @@ const STAT_OPTIONS_SECONDARY = [
   'Attack Speed',
 ]
 
-// ── Quality colour map ────────────────────────────────────────────────────────
+// ── Quality colour map ─────────────────────────────────────────────────────────
+// Keys match the raw DB tier_display values (ALL-CAPS).
 
 const TIER_COLOUR: Record<string, string> = {
-  'Fabled':       '#ff99ff',
-  'Legendary':    '#ffc993',
-  'Treasured':    '#93d9ff',
-  'Mastercrafted':'#93d9ff',
-  'Handcrafted':  '#beff93',
-  'COMMON':       'var(--text-muted)',
+  'CELESTIAL':              '#ffe566',
+  'ETHEREAL':               '#e8bbff',
+  'MYTHICAL':               '#ffb6ff',
+  'FABLED':                 '#ff99ff',
+  'MASTERCRAFTED FABLED':   '#ff99ff',
+  'LEGENDARY':              '#ffc993',
+  'MASTERCRAFTED LEGENDARY':'#ffc993',
+  'TREASURED':              '#93d9ff',
+  'MASTERCRAFTED TREASURED':'#93d9ff',
+  'UNCOMMON':               '#beff93',
+  'MASTERCRAFTED':          '#93d9ff',
+  'MASTERCRAFTED MYTHICAL': '#ffb6ff',
+  'MASTERCRAFTED CELESTIAL':'#ffe566',
+  'HANDCRAFTED':            '#beff93',
+  'COMMON':                 'var(--text-muted)',
+}
+
+/** Title-case each word of an ALL-CAPS DB tier string: "FABLED" → "Fabled". */
+function displayTier(tier: string | null): string {
+  if (!tier) return '—'
+  return tier
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
 }
 
 // ── Class hierarchy for dropdown ──────────────────────────────────────────────
@@ -345,7 +364,7 @@ export default function ItemSearchPage() {
               <select value={tier} onChange={e => setTier(e.target.value)} style={{ ...CTRL, minWidth: 130 }}>
                 <option value="">Any</option>
                 {filterOpts.tiers.map(t => (
-                  <option key={t} value={t}>{t === 'COMMON' ? 'Common' : t}</option>
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
             </Field>
@@ -686,7 +705,7 @@ function ItemTable({
                 </Link>
               </td>
               <td style={{ ...TD, color: TIER_COLOUR[item.tier ?? ''] ?? 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 500 }}>
-                {item.tier === 'COMMON' ? 'Common' : (item.tier ?? '—')}
+                {displayTier(item.tier)}
               </td>
               <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.82rem' }}>
                 {item.slot ?? (item.item_type ?? '—')}
@@ -713,8 +732,12 @@ function ItemTable({
                   </td>
                 )
               })}
-              <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.8rem', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {item.class_label ?? '—'}
+              <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.8rem', maxWidth: 160, whiteSpace: 'normal', lineHeight: '1.45' }}>
+                {item.class_label
+                  ? item.class_label.split(' / ').map((part, i) => (
+                      <span key={i} style={{ display: 'block' }}>{part}</span>
+                    ))
+                  : '—'}
               </td>
               <td style={{ ...TD, fontSize: '0.78rem', color: 'var(--text-muted)', maxWidth: 260 }}>
                 <StatPills stats={item.stats} highlight={statFilters.map(f => f.stat)} />
