@@ -141,9 +141,10 @@ interface ItemSearchResponse {
 }
 
 interface FilterOptions {
-  tiers:      string[]
-  slots:      string[]
-  item_types: string[]
+  tiers:             string[]
+  slots:             string[]
+  item_types:        string[]
+  server_max_level?: number | null
 }
 
 // ── Shared control style ──────────────────────────────────────────────────────
@@ -221,10 +222,17 @@ export default function ItemSearchPage() {
   // Filter options from server
   const [filterOpts, setFilterOpts] = useState<FilterOptions>({ tiers: [], slots: [], item_types: [] })
 
+  // On mount: load filter opts and apply level defaults from SERVER_MAX_LEVEL.
   useEffect(() => {
     fetch('/api/items/filters', { credentials: 'include' })
       .then(r => r.json())
-      .then(setFilterOpts)
+      .then((opts: FilterOptions) => {
+        setFilterOpts(opts)
+        if (opts.server_max_level) {
+          setMaxLevel(String(opts.server_max_level))
+          setMinLevel(String(opts.server_max_level - 9))
+        }
+      })
       .catch(() => {})
   }, [])
 

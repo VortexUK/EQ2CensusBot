@@ -16,6 +16,37 @@ from census.db import DB_PATH
 router = APIRouter(tags=["item"])
 _SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
 
+# ---------------------------------------------------------------------------
+# Class-label decomposition
+# ---------------------------------------------------------------------------
+# Full archetypes first so they are preferred over their constituent parts.
+# This mirrors the ordered list in census/db.py (_ARCHETYPES) but uses the
+# display names that ItemData.classes carries (title-case, from Census API).
+_ARCHETYPE_DECOMP: list[tuple[frozenset, str]] = [
+    # ── Full archetypes ──────────────────────────────────────────────────────
+    (frozenset(["Guardian","Berserker","Monk","Bruiser","Shadowknight","Paladin"]),
+     "All Fighters"),
+    (frozenset(["Templar","Inquisitor","Fury","Warden","Mystic","Defiler","Channeler"]),
+     "All Priests"),
+    (frozenset(["Troubador","Dirge","Assassin","Ranger","Swashbuckler","Brigand","Beastlord"]),
+     "All Scouts"),
+    (frozenset(["Coercer","Illusionist","Conjuror","Necromancer","Wizard","Warlock"]),
+     "All Mages"),
+    # ── Sub-archetypes ───────────────────────────────────────────────────────
+    (frozenset(["Guardian",     "Berserker"]),      "All Warriors"),
+    (frozenset(["Shadowknight", "Paladin"]),         "All Crusaders"),
+    (frozenset(["Monk",         "Bruiser"]),         "All Brawlers"),
+    (frozenset(["Templar",      "Inquisitor"]),      "All Clerics"),
+    (frozenset(["Fury",         "Warden"]),          "All Druids"),
+    (frozenset(["Mystic",       "Defiler"]),         "All Shamans"),
+    (frozenset(["Troubador",    "Dirge"]),           "All Bards"),
+    (frozenset(["Assassin",     "Ranger"]),          "All Predators"),
+    (frozenset(["Swashbuckler", "Brigand"]),         "All Rogues"),
+    (frozenset(["Coercer",      "Illusionist"]),     "All Enchanters"),
+    (frozenset(["Conjuror",     "Necromancer"]),     "All Summoners"),
+    (frozenset(["Wizard",       "Warlock"]),         "All Sorcerers"),
+]
+
 
 # ---------------------------------------------------------------------------
 # Filter normalisation constants
@@ -64,17 +95,24 @@ def _format_classes(classes: list[str]) -> str:
     if not classes:
         return ""
     class_set = frozenset(classes)
-    for group_set, group_name in CLASS_GROUPS.items():
-        if class_set == group_set:
-            return group_name
-    remaining = class_set
+    # Exact match first (handles single archetypes, All Classes, etc.)
+    match = CLASS_GROUPS.get(class_set)
+    if match:
+        return match
+    # Greedy decomposition: full archetypes first, then sub-archetypes.
+    # _ARCHETYPE_DECOMP is ordered largest → smallest so larger groups are
+    # consumed before their constituent sub-groups.
+    remaining: set[str] = set(class_set)
     matched: list[str] = []
-    for archetype_set, archetype_name in ARCHETYPES:
+    for archetype_set, archetype_name in _ARCHETYPE_DECOMP:
         if archetype_set <= remaining:
             matched.append(archetype_name)
             remaining -= archetype_set
-    if not remaining and matched:
-        return ", ".join(matched)
+    if not remaining:
+        return " / ".join(matched)
+    # Some classes didn't fit any group — append them individually
+    if matched:
+        return " / ".join(matched + sorted(remaining))
     return ", ".join(sorted(classes))
 
 
@@ -155,13 +193,21 @@ class ItemFilterOptions(BaseModel):
     tiers: list[str]
     slots: list[str]
     item_types: list[str]
+    server_max_level: int | None = None
+
+
+def _get_server_max_level() -> int | None:
+    """Read SERVER_MAX_LEVEL at request time so dotenv is always loaded first."""
+    raw = os.getenv("SERVER_MAX_LEVEL", "").strip()
+    return int(raw) if raw.isdigit() else None
 
 
 @router.get("/items/filters", response_model=ItemFilterOptions)
 async def get_item_filters() -> ItemFilterOptions:
     """Return distinct tier / slot / type values for filter dropdowns."""
+    server_max_level = _get_server_max_level()
     if not DB_PATH.exists():
-        return ItemFilterOptions(tiers=[], slots=[], item_types=[])
+        return ItemFilterOptions(tiers=[], slots=[], item_types=[], server_max_level=server_max_level)
 
     async with aiosqlite.connect(DB_PATH) as db:
         # ── Tiers ──────────────────────────────────────────────────────────
@@ -210,7 +256,12 @@ async def get_item_filters() -> ItemFilterOptions:
                 seen_types.add(display)
         item_types = sorted(seen_types)
 
-    return ItemFilterOptions(tiers=tiers, slots=slots, item_types=item_types)
+    return ItemFilterOptions(
+        tiers=tiers,
+        slots=slots,
+        item_types=item_types,
+        server_max_level=server_max_level,
+    )
 
 
 # ---------------------------------------------------------------------------
