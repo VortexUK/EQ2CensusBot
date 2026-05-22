@@ -544,6 +544,111 @@ class CensusClient:
             return None  # character genuinely has no guild
         return guild.get("name") or None
 
+    async def search_characters(
+        self,
+        world: str,
+        class_ids: list[int],
+        min_level: int | None = None,
+        max_level: int | None = None,
+        sort_by: str = "level",
+        sort_dir: str = "desc",
+        page: int = 1,
+        per_page: int = 100,
+    ) -> dict:
+        """
+        Search characters on the given world with optional class/level filters.
+        For multiple class_ids (archetype queries), runs parallel Census calls
+        and combines results server-side.
+        Returns: {results, total, page, per_page}
+        """
+        import asyncio as _asyncio
+
+        queries: list[int | None] = class_ids if class_ids else [None]
+        tasks = [self._search_chars_single(world, cid, min_level) for cid in queries]
+        results_lists = await _asyncio.gather(*tasks)
+
+        all_results: list[dict] = []
+        seen: set[str] = set()
+        for rlist in results_lists:
+            for r in rlist:
+                if r["name"] not in seen:
+                    seen.add(r["name"])
+                    all_results.append(r)
+
+        # Apply max_level filter server-side (Census can only do >= efficiently)
+        if max_level is not None:
+            all_results = [r for r in all_results if (r.get("level") or 0) <= max_level]
+
+        # Sort
+        reverse = sort_dir.lower() == "desc"
+        if sort_by == "name":
+            all_results.sort(key=lambda r: (r.get("name") or "").lower(), reverse=reverse)
+        elif sort_by == "aa":
+            all_results.sort(key=lambda r: r.get("aa_level") or 0, reverse=reverse)
+        else:  # level (default)
+            all_results.sort(key=lambda r: r.get("level") or 0, reverse=reverse)
+
+        total = len(all_results)
+        start = (page - 1) * per_page
+        return {
+            "results": all_results[start : start + per_page],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+
+    async def _search_chars_single(
+        self,
+        world: str,
+        class_id: int | None,
+        min_level: int | None,
+    ) -> list[dict]:
+        """Single Census character search call.  Used by search_characters."""
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
+        params: dict[str, str] = {
+            "locationdata.world": world,
+            "c:show": "displayname,type,guild",
+            "c:limit": "200",
+        }
+        if class_id is not None:
+            params["type.classid"] = str(class_id)
+        if min_level is not None:
+            # ] prefix = "greater than or equal" in Census filter syntax
+            # aiohttp percent-encodes ] as %5D which Census accepts fine
+            params["type.level"] = f"]{min_level}"
+
+        print(f"[Census] GET {url} params={params}")
+        try:
+            async with self._session_().get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
+                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                if resp.status != 200:
+                    return []
+                data = await resp.json(content_type=None)
+        except Exception as exc:
+            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            return []
+
+        results: list[dict] = []
+        for char in data.get("character_list") or []:
+            t = char.get("type") or {}
+            guild = char.get("guild") or {}
+            guild_name = guild.get("name") if isinstance(guild, dict) else None
+            name = char.get("displayname") or (char.get("name") or {}).get("first", "")
+            if not name:
+                continue
+            results.append({
+                "name":       name,
+                "cls":        t.get("class"),
+                "class_id":   _int(t.get("classid")),
+                "level":      _int(t.get("level")),
+                "aa_level":   _int(t.get("aa_level")),
+                "race":       t.get("race"),
+                "guild_name": guild_name or None,
+            })
+        return results
+
     async def get_character_spells(self, name: str, world: str) -> Optional[CharacterSpells]:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {

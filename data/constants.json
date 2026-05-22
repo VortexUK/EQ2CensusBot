@@ -1,0 +1,3361 @@
+{
+  "constants_list": [
+    {
+      "minadventurelevel": 1,
+      "race_list": [
+        {
+          "displayname": "Barbarian",
+          "id": 0,
+          "name": "barbarian"
+        },
+        {
+          "displayname": "Dark Elf",
+          "id": 1,
+          "name": "darkelf"
+        },
+        {
+          "displayname": "Dwarf",
+          "id": 2,
+          "name": "dwarf"
+        },
+        {
+          "displayname": "Erudite",
+          "id": 3,
+          "name": "erudite"
+        },
+        {
+          "displayname": "Froglok",
+          "id": 4,
+          "name": "froglok"
+        },
+        {
+          "displayname": "Gnome",
+          "id": 5,
+          "name": "gnome"
+        },
+        {
+          "displayname": "Half Elf",
+          "id": 6,
+          "name": "halfelf"
+        },
+        {
+          "displayname": "Halfling",
+          "id": 7,
+          "name": "halfling"
+        },
+        {
+          "displayname": "High Elf",
+          "id": 8,
+          "name": "highelf"
+        },
+        {
+          "displayname": "Human",
+          "id": 9,
+          "name": "human"
+        },
+        {
+          "displayname": "Iksar",
+          "id": 10,
+          "name": "iksar"
+        },
+        {
+          "displayname": "Kerran",
+          "id": 11,
+          "name": "kerran"
+        },
+        {
+          "displayname": "Ogre",
+          "id": 12,
+          "name": "ogre"
+        },
+        {
+          "displayname": "Ratonga",
+          "id": 13,
+          "name": "ratonga"
+        },
+        {
+          "displayname": "Troll",
+          "id": 14,
+          "name": "troll"
+        },
+        {
+          "displayname": "Wood Elf",
+          "id": 15,
+          "name": "woodelf"
+        },
+        {
+          "displayname": "Fae",
+          "id": 16,
+          "name": "fae_light"
+        },
+        {
+          "displayname": "Arasai",
+          "id": 17,
+          "name": "fae_dark"
+        },
+        {
+          "displayname": "Sarnak",
+          "id": 18,
+          "name": "sarnak"
+        },
+        {
+          "displayname": "Freeblood",
+          "id": 19,
+          "name": "vampire"
+        },
+        {
+          "displayname": "Aerakyn",
+          "id": 20,
+          "name": "aerakyn"
+        },
+        {
+          "displayname": "Vah Shir",
+          "id": 21,
+          "name": "vahshir"
+        }
+      ],
+      "generalspellproperty_list": [
+        {
+          "displayname": "Health Regen",
+          "id": 0,
+          "name": "hpregen"
+        },
+        {
+          "displayname": "Power Regen",
+          "id": 1,
+          "name": "manaregen"
+        },
+        {
+          "displayname": "Health Regen",
+          "id": 2,
+          "name": "hpregenppt"
+        },
+        {
+          "displayname": "Power Regen",
+          "id": 3,
+          "name": "mpregenppt"
+        },
+        {
+          "displayname": "Combat Health Regen",
+          "id": 4,
+          "name": "combathpregenppt"
+        },
+        {
+          "displayname": "Combat Power Regen",
+          "id": 5,
+          "name": "combatmpregenppt"
+        },
+        {
+          "displayname": "Max Health",
+          "id": 6,
+          "name": "maxhp"
+        },
+        {
+          "displayname": "Max Health",
+          "id": 7,
+          "name": "maxhpperc"
+        },
+        {
+          "displayname": "Max Health",
+          "id": 8,
+          "name": "maxhppercfinal"
+        },
+        {
+          "displayname": "Run Speed",
+          "id": 9,
+          "name": "speed"
+        },
+        {
+          "displayname": "Slow",
+          "id": 10,
+          "name": "slow"
+        },
+        {
+          "displayname": "Mount Speed",
+          "id": 11,
+          "name": "mountspeed"
+        },
+        {
+          "displayname": "Mount Speed Override",
+          "id": 12,
+          "name": "mountspeedoverride"
+        },
+        {
+          "displayname": "Air Speed",
+          "id": 13,
+          "name": "mountairspeed"
+        },
+        {
+          "displayname": "Air Speed Override",
+          "id": 14,
+          "name": "mountairspeedoverride"
+        },
+        {
+          "displayname": "Leap Climb Rate",
+          "id": 15,
+          "name": "leapspeed"
+        },
+        {
+          "displayname": "Leap Time",
+          "id": 16,
+          "name": "leaptime"
+        },
+        {
+          "displayname": "Glide Efficiency",
+          "id": 17,
+          "name": "glideefficiency"
+        },
+        {
+          "displayname": "Combat Run Speed",
+          "id": 18,
+          "name": "offensivespeed"
+        },
+        {
+          "displayname": "Haste",
+          "id": 19,
+          "name": "attackspeed"
+        },
+        {
+          "displayname": "Max Power",
+          "id": 20,
+          "name": "maxmana"
+        },
+        {
+          "displayname": "Max Power",
+          "id": 21,
+          "name": "maxmanaperc"
+        },
+        {
+          "displayname": "All Attributes",
+          "id": 22,
+          "name": "maxattperc"
+        },
+        {
+          "displayname": "Blurs Vision",
+          "id": 23,
+          "name": "blurvision"
+        },
+        {
+          "displayname": "Magic Level Immunity",
+          "id": 24,
+          "name": "magiclevelimmunity"
+        },
+        {
+          "displayname": "Hate Gain",
+          "id": 25,
+          "name": "hategainmod"
+        },
+        {
+          "displayname": "Combat XP",
+          "id": 26,
+          "name": "combatexpmod"
+        },
+        {
+          "displayname": "Tradeskill XP",
+          "id": 27,
+          "name": "tradeskillexpmod"
+        },
+        {
+          "displayname": "AA XP Gain",
+          "id": 28,
+          "name": "achievementexpmod"
+        },
+        {
+          "displayname": "Status Earned",
+          "id": 29,
+          "name": "statusbonusmod"
+        },
+        {
+          "displayname": "Size",
+          "id": 30,
+          "name": "sizemod"
+        },
+        {
+          "displayname": "DPS",
+          "id": 31,
+          "name": "dps"
+        },
+        {
+          "displayname": "Stealth",
+          "id": 32,
+          "name": "stealth"
+        },
+        {
+          "displayname": "Invisibility",
+          "id": 33,
+          "name": "invis"
+        },
+        {
+          "displayname": "See Stealth",
+          "id": 34,
+          "name": "seestealth"
+        },
+        {
+          "displayname": "See Invisible",
+          "id": 35,
+          "name": "seeinvis"
+        },
+        {
+          "displayname": "Effective Level",
+          "id": 36,
+          "name": "effectivelevelmod"
+        },
+        {
+          "displayname": "Extra Riposte",
+          "id": 37,
+          "name": "ripostechance"
+        },
+        {
+          "displayname": "Parry",
+          "id": 38,
+          "name": "parrychance"
+        },
+        {
+          "displayname": "Dodge",
+          "id": 39,
+          "name": "dodgechance"
+        },
+        {
+          "displayname": "AE Auto",
+          "id": 40,
+          "name": "aeautoattackchance"
+        },
+        {
+          "displayname": "Multi Attack",
+          "id": 41,
+          "name": "doubleattackchance"
+        },
+        {
+          "displayname": "Spell Doublecast",
+          "id": 42,
+          "name": "spelldoubleattackchance"
+        },
+        {
+          "displayname": "Ability Doublecast",
+          "id": 43,
+          "name": "abilitydoubleattackchance"
+        },
+        {
+          "displayname": "Flurry",
+          "id": 44,
+          "name": "flurry"
+        },
+        {
+          "displayname": "Melee Multiplier",
+          "id": 45,
+          "name": "meleedamagemultiplier"
+        },
+        {
+          "displayname": "Bountiful Harvest",
+          "id": 46,
+          "name": "extraharvestchance"
+        },
+        {
+          "displayname": "Block Chance",
+          "id": 47,
+          "name": "blockchance"
+        },
+        {
+          "displayname": "Combat Health Regen",
+          "id": 48,
+          "name": "itemhpregenppt"
+        },
+        {
+          "displayname": "Combat Power Regen",
+          "id": 49,
+          "name": "itemppregenppt"
+        },
+        {
+          "displayname": "Crit Chance",
+          "id": 50,
+          "name": "critchance"
+        },
+        {
+          "displayname": "Crit Avoidance",
+          "id": 51,
+          "name": "critavoidance"
+        },
+        {
+          "displayname": "Beneficial Crit",
+          "id": 52,
+          "name": "beneficialcritchance"
+        },
+        {
+          "displayname": "Crit Bonus",
+          "id": 53,
+          "name": "critbonus"
+        },
+        {
+          "displayname": "Potency",
+          "id": 54,
+          "name": "basemodifier"
+        },
+        {
+          "displayname": "Unconscious Health",
+          "id": 55,
+          "name": "unconscioushpmod"
+        },
+        {
+          "displayname": "Reuse Speed",
+          "id": 56,
+          "name": "spelltimereusepct"
+        },
+        {
+          "displayname": "Recovery Speed",
+          "id": 57,
+          "name": "spelltimerecoverypct"
+        },
+        {
+          "displayname": "Casting Speed",
+          "id": 58,
+          "name": "spelltimecastpct"
+        },
+        {
+          "displayname": "Spell Reuse Speed",
+          "id": 59,
+          "name": "spelltimereusespellonly"
+        },
+        {
+          "displayname": "Melee Range",
+          "id": 60,
+          "name": "meleeweaponrange"
+        },
+        {
+          "displayname": "Ranged Weapon Range",
+          "id": 61,
+          "name": "rangedweaponrange"
+        },
+        {
+          "displayname": "Falling Damage Reduction",
+          "id": 62,
+          "name": "fallingdamagereduction"
+        },
+        {
+          "displayname": "Riposte Damage",
+          "id": 63,
+          "name": "ripostedamage"
+        },
+        {
+          "displayname": "Minimum Block",
+          "id": 64,
+          "name": "minimumdeflectionchance"
+        },
+        {
+          "displayname": "Movement Weave",
+          "id": 65,
+          "name": "movementweave"
+        },
+        {
+          "displayname": "Combat HP Regen",
+          "id": 66,
+          "name": "combathpregen"
+        },
+        {
+          "displayname": "Combat Mana Regen",
+          "id": 67,
+          "name": "combatmanaregen"
+        },
+        {
+          "displayname": "Contest Speed",
+          "id": 68,
+          "name": "contestspeedboost"
+        },
+        {
+          "displayname": "Tracking avoidance",
+          "id": 69,
+          "name": "trackingavoidance"
+        },
+        {
+          "displayname": "Stealthed Movement",
+          "id": 70,
+          "name": "stealthinvisspeedmod"
+        },
+        {
+          "displayname": "Loot Coin",
+          "id": 71,
+          "name": "loot_coin"
+        },
+        {
+          "displayname": "Mitigation Increase",
+          "id": 72,
+          "name": "armormitigationincrease"
+        },
+        {
+          "displayname": "Ammo Conservation",
+          "id": 73,
+          "name": "ammoconservation"
+        },
+        {
+          "displayname": "Strikethrough",
+          "id": 74,
+          "name": "strikethrough"
+        },
+        {
+          "displayname": "Status Bonus",
+          "id": 75,
+          "name": "statusbonus"
+        },
+        {
+          "displayname": "Accuracy",
+          "id": 76,
+          "name": "accuracy"
+        },
+        {
+          "displayname": "Counter Strike",
+          "id": 77,
+          "name": "counterstrike"
+        },
+        {
+          "displayname": "Shield Bash",
+          "id": 78,
+          "name": "shieldbash"
+        },
+        {
+          "displayname": "Weapon Damage",
+          "id": 79,
+          "name": "weapondamagebonus"
+        },
+        {
+          "displayname": "Weapon Damage Bonus Melee Only",
+          "id": 80,
+          "name": "weapondamagebonusmeleeonly"
+        },
+        {
+          "displayname": "Riposte Chance",
+          "id": 81,
+          "name": "additionalripostechance"
+        },
+        {
+          "displayname": "Critical Mitigation",
+          "id": 82,
+          "name": "criticalmitigation"
+        },
+        {
+          "displayname": "Toughness",
+          "id": 83,
+          "name": "pvptoughness"
+        },
+        {
+          "displayname": "Lethality",
+          "id": 84,
+          "name": "pvplethality"
+        },
+        {
+          "displayname": "Stamina Bonus",
+          "id": 85,
+          "name": "staminabonus"
+        },
+        {
+          "displayname": "Wisdom Mitigation Bonus",
+          "id": 86,
+          "name": "wisdommitbonus"
+        },
+        {
+          "displayname": "Applied Heals",
+          "id": 87,
+          "name": "healreceive"
+        },
+        {
+          "displayname": "Applied Heals",
+          "id": 88,
+          "name": "healreceiveperc"
+        },
+        {
+          "displayname": "Applied Power",
+          "id": 89,
+          "name": "powerreceiveperc"
+        },
+        {
+          "displayname": "PvP Critical Mitigation",
+          "id": 90,
+          "name": "pvpcriticalmitigation"
+        },
+        {
+          "displayname": "Base Avoidance Bonus",
+          "id": 91,
+          "name": "baseavoidancebonus"
+        },
+        {
+          "displayname": "Combat Savagery Regen",
+          "id": 92,
+          "name": "incombatsavageryregen"
+        },
+        {
+          "displayname": "Savagery Regen",
+          "id": 93,
+          "name": "outofcombatsavageryregen"
+        },
+        {
+          "displayname": "Savagery Regen",
+          "id": 94,
+          "name": "savageryregen"
+        },
+        {
+          "displayname": "Savagery Gain",
+          "id": 95,
+          "name": "savagerygainmod"
+        },
+        {
+          "displayname": "Max Savagery",
+          "id": 96,
+          "name": "maxsavagerylevel"
+        },
+        {
+          "displayname": "Combat Dissonance Regen",
+          "id": 97,
+          "name": "incombatdissonanceregen"
+        },
+        {
+          "displayname": "Dissonance Regen",
+          "id": 98,
+          "name": "outofcombatdissonanceregen"
+        },
+        {
+          "displayname": "Dissonance Regen",
+          "id": 99,
+          "name": "dissonanceregen"
+        },
+        {
+          "displayname": "Dissonance Gain",
+          "id": 100,
+          "name": "dissonancegainmod"
+        },
+        {
+          "displayname": "AE Auto Attack Avoid Chance",
+          "id": 101,
+          "name": "aeautoattackavoidchance"
+        },
+        {
+          "displayname": "Agnostic Damage",
+          "id": 102,
+          "name": "agnosticdamagebonus"
+        },
+        {
+          "displayname": "Agnostic Heal",
+          "id": 103,
+          "name": "agnostichealbonus"
+        },
+        {
+          "displayname": "Fervor",
+          "id": 104,
+          "name": "fervor"
+        },
+        {
+          "displayname": "Resolve",
+          "id": 105,
+          "name": "resolve"
+        },
+        {
+          "displayname": "Combat Mitigation",
+          "id": 106,
+          "name": "combatmitigation"
+        },
+        {
+          "displayname": "Ability Mitigation",
+          "id": 107,
+          "name": "abilitymitigation"
+        },
+        {
+          "displayname": "Multi Attack Avoidance",
+          "id": 108,
+          "name": "doubleattackmitigation"
+        },
+        {
+          "displayname": "Doublecast Avoidance",
+          "id": 109,
+          "name": "spelldoubleattackmitigation"
+        },
+        {
+          "displayname": "Ability Doublecast Avoidance",
+          "id": 110,
+          "name": "abilitydoubleattackmitigation"
+        },
+        {
+          "displayname": "Damage Per Second Mitigation",
+          "id": 111,
+          "name": "dpsmitigation"
+        },
+        {
+          "displayname": "Fervor Mitigation",
+          "id": 112,
+          "name": "fervormitigation"
+        },
+        {
+          "displayname": "Flurry Avoidance",
+          "id": 113,
+          "name": "flurrymitigation"
+        },
+        {
+          "displayname": "Weapon Damage Bonus Mitigation",
+          "id": 114,
+          "name": "weapondamagebonusmitigation"
+        },
+        {
+          "displayname": "Melee Weapon Damage Bonus Mitigation",
+          "id": 115,
+          "name": "weapondamagebonusmeleeonlymitigation"
+        },
+        {
+          "displayname": "Ability Modifier Mitigation",
+          "id": 116,
+          "name": "abilitymodifiermitigation"
+        },
+        {
+          "displayname": "Melee Damage Multiplier Mitigation",
+          "id": 117,
+          "name": "meleedamagemultipliermitigation"
+        },
+        {
+          "displayname": "Heal Received Potency Mitigation",
+          "id": 118,
+          "name": "healreceivedability"
+        },
+        {
+          "displayname": "Heal Received Crit Bonus Mitigation",
+          "id": 119,
+          "name": "healreceivedcritbonus"
+        },
+        {
+          "displayname": "Heal Received Fervor Mitigation",
+          "id": 120,
+          "name": "healreceivedfervor"
+        },
+        {
+          "displayname": "Power Received Fervor Mitigation",
+          "id": 121,
+          "name": "powerreceivedfervor"
+        },
+        {
+          "displayname": "Heal Received Normalized Mitigation",
+          "id": 122,
+          "name": "healreceivednormalized"
+        },
+        {
+          "displayname": "Flurry Multiplier",
+          "id": 123,
+          "name": "flurrymultiplier"
+        },
+        {
+          "displayname": "Flurry Multiplier Mitigation",
+          "id": 124,
+          "name": "flurrymultipliermitigation"
+        }
+      ],
+      "equipmentslot_list": [
+        {
+          "displayname": "Primary",
+          "perm_id": 0,
+          "name": "primary",
+          "id": 0
+        },
+        {
+          "displayname": "Secondary",
+          "perm_id": 1,
+          "name": "secondary",
+          "id": 1
+        },
+        {
+          "displayname": "Head",
+          "perm_id": 2,
+          "name": "head",
+          "id": 2
+        },
+        {
+          "displayname": "Chest",
+          "perm_id": 3,
+          "name": "chest",
+          "id": 3
+        },
+        {
+          "displayname": "Shoulders",
+          "perm_id": 4,
+          "name": "shoulders",
+          "id": 4
+        },
+        {
+          "displayname": "Forearms",
+          "perm_id": 5,
+          "name": "forearms",
+          "id": 5
+        },
+        {
+          "displayname": "Hands",
+          "perm_id": 6,
+          "name": "hands",
+          "id": 6
+        },
+        {
+          "displayname": "Legs",
+          "perm_id": 7,
+          "name": "legs",
+          "id": 7
+        },
+        {
+          "displayname": "Feet",
+          "perm_id": 8,
+          "name": "feet",
+          "id": 8
+        },
+        {
+          "displayname": "Finger",
+          "perm_id": 9,
+          "name": "left_ring",
+          "id": 9
+        },
+        {
+          "displayname": "Finger",
+          "perm_id": 10,
+          "name": "right_ring",
+          "id": 10
+        },
+        {
+          "displayname": "Ear",
+          "perm_id": 11,
+          "name": "ears",
+          "id": 11
+        },
+        {
+          "displayname": "Ear",
+          "perm_id": 22,
+          "name": "ears2",
+          "id": 12
+        },
+        {
+          "displayname": "Neck",
+          "perm_id": 12,
+          "name": "neck",
+          "id": 13
+        },
+        {
+          "displayname": "Wrist",
+          "perm_id": 13,
+          "name": "left_wrist",
+          "id": 14
+        },
+        {
+          "displayname": "Wrist",
+          "perm_id": 14,
+          "name": "right_wrist",
+          "id": 15
+        },
+        {
+          "displayname": "Ranged",
+          "perm_id": 15,
+          "name": "ranged",
+          "id": 16
+        },
+        {
+          "displayname": "Ammo",
+          "perm_id": 16,
+          "name": "ammo",
+          "id": 17
+        },
+        {
+          "displayname": "Waist",
+          "perm_id": 17,
+          "name": "waist",
+          "id": 18
+        },
+        {
+          "displayname": "Cloak",
+          "perm_id": 23,
+          "name": "cloak",
+          "id": 19
+        },
+        {
+          "displayname": "Charm",
+          "perm_id": 18,
+          "name": "activate1",
+          "id": 20
+        },
+        {
+          "displayname": "Charm",
+          "perm_id": 19,
+          "name": "activate2",
+          "id": 21
+        },
+        {
+          "displayname": "Food",
+          "perm_id": 20,
+          "name": "food",
+          "id": 22
+        },
+        {
+          "displayname": "Drink",
+          "perm_id": 21,
+          "name": "drink",
+          "id": 23
+        },
+        {
+          "displayname": "Mount Adornment",
+          "perm_id": 24,
+          "name": "mount_adornment",
+          "id": 24
+        },
+        {
+          "displayname": "Mount Armor",
+          "perm_id": 25,
+          "name": "mount_armor",
+          "id": 25
+        },
+        {
+          "displayname": "Event Slot",
+          "perm_id": 26,
+          "name": "event_slot",
+          "id": 67
+        },
+        {
+          "displayname": "Accolade",
+          "id": 34,
+          "name": "accolade1"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 35,
+          "name": "accolade2"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 36,
+          "name": "accolade3"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 37,
+          "name": "accolade4"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 38,
+          "name": "accolade5"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 39,
+          "name": "accolade6"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 40,
+          "name": "accolade7"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 41,
+          "name": "accolade8"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 42,
+          "name": "accolade9"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 43,
+          "name": "accolade10"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 44,
+          "name": "accolade11"
+        },
+        {
+          "displayname": "Accolade",
+          "id": 45,
+          "name": "accolade12"
+        }
+      ],
+      "attribute_list": [
+        {
+          "id": 0,
+          "name": "str"
+        },
+        {
+          "id": 1,
+          "name": "sta"
+        },
+        {
+          "id": 2,
+          "name": "agi"
+        },
+        {
+          "id": 3,
+          "name": "wis"
+        },
+        {
+          "id": 4,
+          "name": "int"
+        }
+      ],
+      "minguildlevel": 1,
+      "adventureclass_list": [
+        {
+          "issubclass": "false",
+          "id": 1,
+          "name": "fighter"
+        },
+        {
+          "issubclass": "false",
+          "id": 2,
+          "name": "warrior"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 12
+            },
+            {
+              "id": 13
+            },
+            {
+              "id": 43
+            },
+            {
+              "id": 72
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 102
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 147
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 3,
+          "name": "guardian"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 12
+            },
+            {
+              "id": 14
+            },
+            {
+              "id": 44
+            },
+            {
+              "id": 72
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 103
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 146
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 4,
+          "name": "berserker"
+        },
+        {
+          "issubclass": "false",
+          "id": 5,
+          "name": "brawler"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 2
+            },
+            {
+              "id": 17
+            },
+            {
+              "id": 47
+            },
+            {
+              "id": 62
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 106
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 149
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 6,
+          "name": "monk"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 2
+            },
+            {
+              "id": 18
+            },
+            {
+              "id": 48
+            },
+            {
+              "id": 62
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 107
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 148
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 7,
+          "name": "bruiser"
+        },
+        {
+          "issubclass": "false",
+          "id": 8,
+          "name": "crusader"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 4
+            },
+            {
+              "id": 16
+            },
+            {
+              "id": 46
+            },
+            {
+              "id": 64
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 105
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 150
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 9,
+          "name": "shadowknight"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 4
+            },
+            {
+              "id": 15
+            },
+            {
+              "id": 45
+            },
+            {
+              "id": 64
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 104
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 127
+            },
+            {
+              "id": 151
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 10,
+          "name": "paladin"
+        },
+        {
+          "issubclass": "false",
+          "id": 11,
+          "name": "priest"
+        },
+        {
+          "issubclass": "false",
+          "id": 12,
+          "name": "cleric"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 3
+            },
+            {
+              "id": 25
+            },
+            {
+              "id": 49
+            },
+            {
+              "id": 63
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 96
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 142
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 13,
+          "name": "templar"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 3
+            },
+            {
+              "id": 26
+            },
+            {
+              "id": 50
+            },
+            {
+              "id": 63
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 97
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 141
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 14,
+          "name": "inquisitor"
+        },
+        {
+          "issubclass": "false",
+          "id": 15,
+          "name": "druid"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 5
+            },
+            {
+              "id": 27
+            },
+            {
+              "id": 51
+            },
+            {
+              "id": 65
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 99
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 144
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 16,
+          "name": "warden"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 5
+            },
+            {
+              "id": 28
+            },
+            {
+              "id": 52
+            },
+            {
+              "id": 65
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 98
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 143
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 17,
+          "name": "fury"
+        },
+        {
+          "issubclass": "false",
+          "id": 18,
+          "name": "shaman"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 9
+            },
+            {
+              "id": 29
+            },
+            {
+              "id": 54
+            },
+            {
+              "id": 69
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 100
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 140
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 19,
+          "name": "mystic"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 9
+            },
+            {
+              "id": 30
+            },
+            {
+              "id": 53
+            },
+            {
+              "id": 69
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 101
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 139
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 20,
+          "name": "defiler"
+        },
+        {
+          "issubclass": "false",
+          "id": 21,
+          "name": "mage"
+        },
+        {
+          "issubclass": "false",
+          "id": 22,
+          "name": "sorcerer"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 10
+            },
+            {
+              "id": 31
+            },
+            {
+              "id": 55
+            },
+            {
+              "id": 70
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 108
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 157
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 23,
+          "name": "wizard"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 10
+            },
+            {
+              "id": 32
+            },
+            {
+              "id": 56
+            },
+            {
+              "id": 70
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 109
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 156
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 24,
+          "name": "warlock"
+        },
+        {
+          "issubclass": "false",
+          "id": 25,
+          "name": "enchanter"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 6
+            },
+            {
+              "id": 36
+            },
+            {
+              "id": 60
+            },
+            {
+              "id": 66
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 110
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 153
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 26,
+          "name": "illusionist"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 6
+            },
+            {
+              "id": 35
+            },
+            {
+              "id": 59
+            },
+            {
+              "id": 66
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 111
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 152
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 27,
+          "name": "coercer"
+        },
+        {
+          "issubclass": "false",
+          "id": 28,
+          "name": "summoner"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 11
+            },
+            {
+              "id": 33
+            },
+            {
+              "id": 57
+            },
+            {
+              "id": 71
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 112
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 155
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 29,
+          "name": "conjuror"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 11
+            },
+            {
+              "id": 34
+            },
+            {
+              "id": 58
+            },
+            {
+              "id": 71
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 113
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 129
+            },
+            {
+              "id": 154
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 30,
+          "name": "necromancer"
+        },
+        {
+          "issubclass": "false",
+          "id": 31,
+          "name": "scout"
+        },
+        {
+          "issubclass": "false",
+          "id": 32,
+          "name": "rogue"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 8
+            },
+            {
+              "id": 22
+            },
+            {
+              "id": 40
+            },
+            {
+              "id": 68
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 116
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 137
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 33,
+          "name": "swashbuckler"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 8
+            },
+            {
+              "id": 21
+            },
+            {
+              "id": 39
+            },
+            {
+              "id": 68
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 117
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 136
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 34,
+          "name": "brigand"
+        },
+        {
+          "issubclass": "false",
+          "id": 35,
+          "name": "bard"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 1
+            },
+            {
+              "id": 24
+            },
+            {
+              "id": 42
+            },
+            {
+              "id": 61
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 118
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 133
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 36,
+          "name": "troubador"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 1
+            },
+            {
+              "id": 23
+            },
+            {
+              "id": 41
+            },
+            {
+              "id": 61
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 119
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 132
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 37,
+          "name": "dirge"
+        },
+        {
+          "issubclass": "false",
+          "id": 38,
+          "name": "predator"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 7
+            },
+            {
+              "id": 20
+            },
+            {
+              "id": 38
+            },
+            {
+              "id": 67
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 114
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 135
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 39,
+          "name": "ranger"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 7
+            },
+            {
+              "id": 19
+            },
+            {
+              "id": 37
+            },
+            {
+              "id": 67
+            },
+            {
+              "id": 73
+            },
+            {
+              "id": 115
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 134
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 40,
+          "name": "assassin"
+        },
+        {
+          "issubclass": "false",
+          "id": 41,
+          "name": "animalist"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 73
+            },
+            {
+              "id": 74
+            },
+            {
+              "id": 75
+            },
+            {
+              "id": 76
+            },
+            {
+              "id": 77
+            },
+            {
+              "id": 78
+            },
+            {
+              "id": 79
+            },
+            {
+              "id": 80
+            },
+            {
+              "id": 81
+            },
+            {
+              "id": 82
+            },
+            {
+              "id": 83
+            },
+            {
+              "id": 84
+            },
+            {
+              "id": 85
+            },
+            {
+              "id": 86
+            },
+            {
+              "id": 87
+            },
+            {
+              "id": 88
+            },
+            {
+              "id": 89
+            },
+            {
+              "id": 90
+            },
+            {
+              "id": 91
+            },
+            {
+              "id": 92
+            },
+            {
+              "id": 93
+            },
+            {
+              "id": 94
+            },
+            {
+              "id": 95
+            },
+            {
+              "id": 120
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 130
+            },
+            {
+              "id": 138
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 42,
+          "name": "beastlord"
+        },
+        {
+          "issubclass": "false",
+          "id": 43,
+          "name": "shaper"
+        },
+        {
+          "alternateadvancementtree_list": [
+            {
+              "id": 73
+            },
+            {
+              "id": 121
+            },
+            {
+              "id": 122
+            },
+            {
+              "id": 123
+            },
+            {
+              "id": 124
+            },
+            {
+              "id": 125
+            },
+            {
+              "id": 126
+            },
+            {
+              "id": 128
+            },
+            {
+              "id": 145
+            },
+            {
+              "id": 158
+            }
+          ],
+          "issubclass": "true",
+          "id": 44,
+          "name": "channeler"
+        }
+      ],
+      "tradeskillproperty_list": [
+        {
+          "displayname": "Durability Mod",
+          "id": 0,
+          "name": "durabilitymod"
+        },
+        {
+          "displayname": "Durability Add",
+          "id": 1,
+          "name": "durabilityadd"
+        },
+        {
+          "displayname": "Progress Mod",
+          "id": 2,
+          "name": "progressmod"
+        },
+        {
+          "displayname": "Progress Add",
+          "id": 3,
+          "name": "progressadd"
+        },
+        {
+          "displayname": "Success Mod",
+          "id": 4,
+          "name": "successmod"
+        },
+        {
+          "displayname": "Critical Success Mod",
+          "id": 5,
+          "name": "critsuccessmod"
+        },
+        {
+          "displayname": "Critical Failure Mod",
+          "id": 6,
+          "name": "critfailuremod"
+        },
+        {
+          "displayname": "Rare Harvest Chance",
+          "id": 7,
+          "name": "rareharvestchance"
+        },
+        {
+          "displayname": "Max Crafting Quantity",
+          "id": 8,
+          "name": "craftquantitymult"
+        },
+        {
+          "displayname": "Build Components Returned",
+          "id": 9,
+          "name": "materialreturnperc"
+        },
+        {
+          "displayname": "Experimentation Attempts",
+          "id": 10,
+          "name": "experimentationattempts"
+        },
+        {
+          "displayname": "Maximum Refine Size",
+          "id": 11,
+          "name": "refinequantitymod"
+        },
+        {
+          "displayname": "Exp Durability Mod",
+          "id": 12,
+          "name": "exdurabilitymod"
+        },
+        {
+          "displayname": "Exp Durability Add",
+          "id": 13,
+          "name": "exdurabilityadd"
+        },
+        {
+          "displayname": "Exp Critical Success Mod",
+          "id": 14,
+          "name": "excritsuccessmod"
+        },
+        {
+          "displayname": "Exp Critical Failure Mod",
+          "id": 15,
+          "name": "excritfailuremod"
+        },
+        {
+          "displayname": "Exp Progress Mod",
+          "id": 16,
+          "name": "exprogressmod"
+        },
+        {
+          "displayname": "Exp Progress Add",
+          "id": 17,
+          "name": "exprogressadd"
+        },
+        {
+          "displayname": "Exp Success Mod",
+          "id": 18,
+          "name": "exsuccessmod"
+        }
+      ],
+      "skill_list": [
+        {
+          "id": 90523872,
+          "name": "determinedfaith"
+        },
+        {
+          "id": 193411854,
+          "name": "noctivagance"
+        },
+        {
+          "id": 241174330,
+          "name": "heavyarmor"
+        },
+        {
+          "id": 270703085,
+          "name": "shadowprospecting"
+        },
+        {
+          "id": 287643040,
+          "name": "enchantments"
+        },
+        {
+          "id": 296246391,
+          "name": "ballads"
+        },
+        {
+          "id": 340921594,
+          "name": "dirges"
+        },
+        {
+          "id": 366253016,
+          "name": "ministration"
+        },
+        {
+          "id": 418532101,
+          "name": "slashing"
+        },
+        {
+          "id": 540022425,
+          "name": "parry"
+        },
+        {
+          "id": 545043066,
+          "name": "symbols"
+        },
+        {
+          "id": 554333641,
+          "name": "hammer"
+        },
+        {
+          "id": 570458645,
+          "name": "towershield"
+        },
+        {
+          "id": 574366497,
+          "name": "apothecary"
+        },
+        {
+          "id": 609880714,
+          "name": "defense"
+        },
+        {
+          "id": 613995491,
+          "name": "disruption"
+        },
+        {
+          "id": 641561514,
+          "name": "rapier"
+        },
+        {
+          "id": 688591146,
+          "name": "foresting"
+        },
+        {
+          "id": 723762198,
+          "name": "aggression"
+        },
+        {
+          "id": 770311065,
+          "name": "mace"
+        },
+        {
+          "id": 773137566,
+          "name": "scribing"
+        },
+        {
+          "id": 811670522,
+          "name": "experimentation"
+        },
+        {
+          "id": 882983852,
+          "name": "subjugation"
+        },
+        {
+          "id": 887279616,
+          "name": "dagger"
+        },
+        {
+          "id": 931275816,
+          "name": "adorning"
+        },
+        {
+          "id": 935416212,
+          "name": "culinary"
+        },
+        {
+          "id": 983110729,
+          "name": "ascension_etherealist"
+        },
+        {
+          "id": 1038997614,
+          "name": "tinkering"
+        },
+        {
+          "id": 1039865549,
+          "name": "sculpting"
+        },
+        {
+          "id": 1040683335,
+          "name": "naturesrefuge"
+        },
+        {
+          "id": 1048513601,
+          "name": "gathering"
+        },
+        {
+          "id": 1124719197,
+          "name": "tactics"
+        },
+        {
+          "id": 1151456682,
+          "name": "heavyarmoring"
+        },
+        {
+          "id": 1209716810,
+          "name": "protection"
+        },
+        {
+          "id": 1223501307,
+          "name": "beasttaming"
+        },
+        {
+          "id": 1311635100,
+          "name": "melodies"
+        },
+        {
+          "id": 1386343008,
+          "name": "geocraft"
+        },
+        {
+          "id": 1400160844,
+          "name": "archery"
+        },
+        {
+          "id": 1408356869,
+          "name": "martial"
+        },
+        {
+          "id": 1433335062,
+          "name": "berserk"
+        },
+        {
+          "id": 1468243427,
+          "name": "tracking"
+        },
+        {
+          "id": 1478114179,
+          "name": "woodcraft"
+        },
+        {
+          "id": 1514256692,
+          "name": "skullduggery"
+        },
+        {
+          "id": 1519965519,
+          "name": "banditry"
+        },
+        {
+          "id": 1553857724,
+          "name": "investigating"
+        },
+        {
+          "id": 1616998748,
+          "name": "spear"
+        },
+        {
+          "id": 1624274802,
+          "name": "naturesreckoning"
+        },
+        {
+          "id": 1653482350,
+          "name": "greathammer"
+        },
+        {
+          "id": 1662057652,
+          "name": "ascension_thaumaturge"
+        },
+        {
+          "id": 1677747280,
+          "name": "woodworking"
+        },
+        {
+          "id": 1696217328,
+          "name": "sword"
+        },
+        {
+          "id": 1703539708,
+          "name": "timbercraft"
+        },
+        {
+          "id": 1743366740,
+          "name": "bow"
+        },
+        {
+          "id": 1756482397,
+          "name": "ranged"
+        },
+        {
+          "id": 1829443087,
+          "name": "interrogations"
+        },
+        {
+          "id": 1852383242,
+          "name": "dualwield"
+        },
+        {
+          "id": 1921433074,
+          "name": "reconnaissance"
+        },
+        {
+          "id": 1970131346,
+          "name": "transmuting"
+        },
+        {
+          "id": 2011726342,
+          "name": "tranquility"
+        },
+        {
+          "id": 2037831821,
+          "name": "swimming"
+        },
+        {
+          "id": 2042842194,
+          "name": "conjurations"
+        },
+        {
+          "id": 2072844078,
+          "name": "magicaffinity"
+        },
+        {
+          "id": 2074345482,
+          "name": "channeling"
+        },
+        {
+          "id": 2082133324,
+          "name": "tailoring"
+        },
+        {
+          "id": 2120065377,
+          "name": "legerdemain"
+        },
+        {
+          "id": 2200201799,
+          "name": "disarmtrap"
+        },
+        {
+          "id": 2204694405,
+          "name": "ascension_geomancer"
+        },
+        {
+          "id": 2246237129,
+          "name": "mediumarmor"
+        },
+        {
+          "id": 2292577688,
+          "name": "greatsword"
+        },
+        {
+          "id": 2319450178,
+          "name": "fishing"
+        },
+        {
+          "id": 2380184628,
+          "name": "greatspear"
+        },
+        {
+          "id": 2383540775,
+          "name": "spellavoidance"
+        },
+        {
+          "id": 2398950520,
+          "name": "sortilege"
+        },
+        {
+          "id": 2459659856,
+          "name": "sanction"
+        },
+        {
+          "id": 2463145248,
+          "name": "inspirations"
+        },
+        {
+          "id": 2463992638,
+          "name": "runecraft"
+        },
+        {
+          "id": 2476073427,
+          "name": "axe"
+        },
+        {
+          "id": 2530063117,
+          "name": "weaving"
+        },
+        {
+          "id": 2533124061,
+          "name": "sorcery"
+        },
+        {
+          "id": 2557647574,
+          "name": "chemistry"
+        },
+        {
+          "id": 2572463168,
+          "name": "mounted_flight"
+        },
+        {
+          "id": 2581053277,
+          "name": "regimens"
+        },
+        {
+          "id": 2591116872,
+          "name": "thaumaturgy"
+        },
+        {
+          "id": 2608320658,
+          "name": "kiteshield"
+        },
+        {
+          "id": 2638198038,
+          "name": "focus"
+        },
+        {
+          "id": 2639209773,
+          "name": "craftsmanship"
+        },
+        {
+          "id": 2650425026,
+          "name": "thrownweapon"
+        },
+        {
+          "id": 2662430630,
+          "name": "elementalmastery"
+        },
+        {
+          "id": 2663054519,
+          "name": "swashbuckling"
+        },
+        {
+          "id": 2710531826,
+          "name": "lightarmoring"
+        },
+        {
+          "id": 2711101135,
+          "name": "assassination"
+        },
+        {
+          "id": 2741805322,
+          "name": "determinedzeal"
+        },
+        {
+          "id": 2812765109,
+          "name": "geomancy"
+        },
+        {
+          "id": 2817699641,
+          "name": "alchemy"
+        },
+        {
+          "id": 2894715199,
+          "name": "sepultures"
+        },
+        {
+          "id": 2896808154,
+          "name": "binding"
+        },
+        {
+          "id": 2897193374,
+          "name": "lightarmor"
+        },
+        {
+          "id": 2898101972,
+          "name": "hallucinations"
+        },
+        {
+          "id": 2949308177,
+          "name": "arcana"
+        },
+        {
+          "id": 2950599749,
+          "name": "protean"
+        },
+        {
+          "id": 2954459351,
+          "name": "greataxe"
+        },
+        {
+          "id": 3030229537,
+          "name": "ascension_elementalist"
+        },
+        {
+          "id": 3048574950,
+          "name": "piercing"
+        },
+        {
+          "id": 3067436248,
+          "name": "physicality"
+        },
+        {
+          "id": 3076004370,
+          "name": "fletching"
+        },
+        {
+          "id": 3108933728,
+          "name": "metalshaping"
+        },
+        {
+          "id": 3145299162,
+          "name": "animistal"
+        },
+        {
+          "id": 3167106577,
+          "name": "stalking"
+        },
+        {
+          "id": 3173504370,
+          "name": "roundshield"
+        },
+        {
+          "id": 3177806075,
+          "name": "fists"
+        },
+        {
+          "id": 3180399725,
+          "name": "staff"
+        },
+        {
+          "id": 3191839982,
+          "name": "vehemence"
+        },
+        {
+          "id": 3232294366,
+          "name": "safefall"
+        },
+        {
+          "id": 3282420779,
+          "name": "archegenesis"
+        },
+        {
+          "id": 3330500131,
+          "name": "artificing"
+        },
+        {
+          "id": 3341842907,
+          "name": "theurgy"
+        },
+        {
+          "id": 3343700951,
+          "name": "talismans"
+        },
+        {
+          "id": 3395302654,
+          "name": "weaponry"
+        },
+        {
+          "id": 3421494576,
+          "name": "crushing"
+        },
+        {
+          "id": 3429135390,
+          "name": "destroying"
+        },
+        {
+          "id": 3466021617,
+          "name": "aim"
+        },
+        {
+          "id": 3467160477,
+          "name": "fetichisms"
+        },
+        {
+          "id": 3539032716,
+          "name": "verylightarmor"
+        },
+        {
+          "id": 3548414643,
+          "name": "DONOTUSE"
+        },
+        {
+          "id": 3587918036,
+          "name": "ordination"
+        },
+        {
+          "id": 3659699625,
+          "name": "mining"
+        },
+        {
+          "id": 3694382619,
+          "name": "poisoning"
+        },
+        {
+          "id": 3729226181,
+          "name": "warcries"
+        },
+        {
+          "id": 3809066846,
+          "name": "faith"
+        },
+        {
+          "id": 3820670534,
+          "name": "evocations"
+        },
+        {
+          "id": 3850377186,
+          "name": "deflection"
+        },
+        {
+          "id": 3856706740,
+          "name": "brawling"
+        },
+        {
+          "id": 3881305672,
+          "name": "artistry"
+        },
+        {
+          "id": 4008363914,
+          "name": "picklock"
+        },
+        {
+          "id": 4032608519,
+          "name": "metalworking"
+        },
+        {
+          "id": 4037812502,
+          "name": "buckler"
+        },
+        {
+          "id": 4158365743,
+          "name": "trapping"
+        },
+        {
+          "id": 4218936092,
+          "name": "shaping"
+        },
+        {
+          "id": 4250045746,
+          "name": "alcoholtolerance"
+        },
+        {
+          "id": 4253456353,
+          "name": "skin"
+        }
+      ],
+      "secondarytradeskillclass_list": [
+        {
+          "id": 0,
+          "name": "none"
+        },
+        {
+          "id": 1,
+          "name": "tinkering"
+        },
+        {
+          "id": 2,
+          "name": "adorning"
+        }
+      ],
+      "maxguildlevel": 135,
+      "last_update": 1.779204204250407E9,
+      "version": 2,
+      "petkey_list": [
+        {
+          "displayname": "Amphibian",
+          "aatreeid": 90,
+          "name": "amphibian"
+        },
+        {
+          "displayname": "Aquatic",
+          "aatreeid": 78,
+          "name": "aquatic"
+        },
+        {
+          "displayname": "Avian",
+          "aatreeid": 81,
+          "name": "avian"
+        },
+        {
+          "displayname": "Bat",
+          "aatreeid": 82,
+          "name": "bat"
+        },
+        {
+          "displayname": "Bear",
+          "aatreeid": 84,
+          "name": "bear"
+        },
+        {
+          "displayname": "Boar",
+          "aatreeid": 85,
+          "name": "boar"
+        },
+        {
+          "displayname": "Bovid",
+          "aatreeid": 86,
+          "name": "bovid"
+        },
+        {
+          "displayname": "Canine",
+          "aatreeid": 79,
+          "name": "canine"
+        },
+        {
+          "displayname": "Default Pet Key",
+          "aatreeid": 0,
+          "name": "default"
+        },
+        {
+          "displayname": "Dire",
+          "aatreeid": 91,
+          "name": "dire"
+        },
+        {
+          "displayname": "Drake",
+          "aatreeid": 92,
+          "name": "drake"
+        },
+        {
+          "displayname": "Enchanted",
+          "aatreeid": 93,
+          "name": "enchanted"
+        },
+        {
+          "displayname": "Feline",
+          "aatreeid": 80,
+          "name": "feline"
+        },
+        {
+          "displayname": "Fighter",
+          "aatreeid": 0,
+          "name": "fighter"
+        },
+        {
+          "displayname": "Insect",
+          "aatreeid": 95,
+          "name": "insect"
+        },
+        {
+          "displayname": "Mage",
+          "aatreeid": 0,
+          "name": "mage"
+        },
+        {
+          "displayname": "Mystical",
+          "aatreeid": 88,
+          "name": "mystical"
+        },
+        {
+          "displayname": "Reptile",
+          "aatreeid": 83,
+          "name": "reptile"
+        },
+        {
+          "displayname": "Rodent",
+          "aatreeid": 94,
+          "name": "rodent"
+        },
+        {
+          "displayname": "Scout",
+          "aatreeid": 0,
+          "name": "scout"
+        },
+        {
+          "displayname": "Simian",
+          "aatreeid": 89,
+          "name": "simian"
+        },
+        {
+          "displayname": "War Boar",
+          "aatreeid": 87,
+          "name": "warboar"
+        }
+      ],
+      "maxtradeskilllevel": 135,
+      "ts": 1.779204204250407E9,
+      "alignment_list": [
+        {
+          "id": -1,
+          "name": "unknown"
+        },
+        {
+          "id": 0,
+          "name": "good"
+        },
+        {
+          "id": 1,
+          "name": "neutral"
+        },
+        {
+          "id": 2,
+          "name": "evil"
+        }
+      ],
+      "maxadventurelevel": 135,
+      "spelltier_list": [],
+      "reforging_constants_list": [
+        {
+          "display_name": "",
+          "name": "All",
+          "destination": 1,
+          "source": 0,
+          "cost": 0.01,
+          "type": 7,
+          "id": 7
+        },
+        {
+          "display_name": "",
+          "name": "basemodifier",
+          "destination": 1,
+          "source": 0,
+          "cost": 1.0,
+          "type": 6,
+          "id": 54
+        },
+        {
+          "display_name": "",
+          "name": "critbonus",
+          "destination": 1,
+          "source": 0,
+          "cost": 6.0,
+          "type": 6,
+          "id": 53
+        },
+        {
+          "display_name": "",
+          "name": "abilitydoubleattackchance",
+          "destination": 0,
+          "source": 1,
+          "cost": 10.7,
+          "type": 6,
+          "id": 43
+        },
+        {
+          "display_name": "",
+          "name": "accuracy",
+          "destination": 0,
+          "source": 1,
+          "cost": 4.0,
+          "type": 6,
+          "id": 76
+        },
+        {
+          "display_name": "",
+          "name": "aeautoattackchance",
+          "destination": 0,
+          "source": 1,
+          "cost": 7.0,
+          "type": 6,
+          "id": 40
+        },
+        {
+          "display_name": "",
+          "name": "armormitigationincrease",
+          "destination": 0,
+          "source": 1,
+          "cost": 11.0,
+          "type": 6,
+          "id": 72
+        },
+        {
+          "display_name": "",
+          "name": "attackspeed",
+          "destination": 0,
+          "source": 1,
+          "cost": 8.2,
+          "type": 6,
+          "id": 19
+        },
+        {
+          "display_name": "",
+          "name": "blockchance",
+          "destination": 0,
+          "source": 1,
+          "cost": 12.0,
+          "type": 6,
+          "id": 47
+        },
+        {
+          "display_name": "",
+          "name": "doubleattackchance",
+          "destination": 0,
+          "source": 1,
+          "cost": 8.2,
+          "type": 6,
+          "id": 41
+        },
+        {
+          "display_name": "",
+          "name": "dps",
+          "destination": 0,
+          "source": 1,
+          "cost": 1.2,
+          "type": 6,
+          "id": 31
+        },
+        {
+          "display_name": "",
+          "name": "flurry",
+          "destination": 0,
+          "source": 1,
+          "cost": 10.7,
+          "type": 6,
+          "id": 44
+        },
+        {
+          "display_name": "",
+          "name": "hategainmod",
+          "destination": 0,
+          "source": 1,
+          "cost": 4.0,
+          "type": 6,
+          "id": 25
+        },
+        {
+          "display_name": "",
+          "name": "maxhpperc",
+          "destination": 0,
+          "source": 1,
+          "cost": 3.6,
+          "type": 6,
+          "id": 7
+        },
+        {
+          "display_name": "",
+          "name": "parrychance",
+          "destination": 0,
+          "source": 1,
+          "cost": 4.0,
+          "type": 6,
+          "id": 38
+        },
+        {
+          "display_name": "",
+          "name": "ripostechance",
+          "destination": 0,
+          "source": 1,
+          "cost": 4.0,
+          "type": 6,
+          "id": 37
+        },
+        {
+          "display_name": "",
+          "name": "ripostedamage",
+          "destination": 0,
+          "source": 1,
+          "cost": 4.0,
+          "type": 6,
+          "id": 63
+        },
+        {
+          "display_name": "",
+          "name": "spelltimecastpct",
+          "destination": 0,
+          "source": 1,
+          "cost": 8.2,
+          "type": 6,
+          "id": 58
+        },
+        {
+          "display_name": "",
+          "name": "spelltimerecoverypct",
+          "destination": 0,
+          "source": 1,
+          "cost": 4.0,
+          "type": 6,
+          "id": 57
+        },
+        {
+          "display_name": "",
+          "name": "spelltimereusepct",
+          "destination": 0,
+          "source": 1,
+          "cost": 8.7,
+          "type": 6,
+          "id": 56
+        },
+        {
+          "display_name": "",
+          "name": "strikethrough",
+          "destination": 0,
+          "source": 1,
+          "cost": 4.0,
+          "type": 6,
+          "id": 74
+        },
+        {
+          "display_name": "",
+          "name": "weapondamagebonus",
+          "destination": 0,
+          "source": 1,
+          "cost": 3.8,
+          "type": 6,
+          "id": 79
+        }
+      ],
+      "tradeskillclass_list": [
+        {
+          "id": 0,
+          "name": "unskilled"
+        },
+        {
+          "id": 1,
+          "name": "artisan"
+        },
+        {
+          "id": 2,
+          "name": "craftsman"
+        },
+        {
+          "id": 3,
+          "name": "provisioner"
+        },
+        {
+          "id": 4,
+          "name": "woodworker"
+        },
+        {
+          "id": 5,
+          "name": "carpenter"
+        },
+        {
+          "id": 6,
+          "name": "outfitter"
+        },
+        {
+          "id": 7,
+          "name": "armorer"
+        },
+        {
+          "id": 8,
+          "name": "weaponsmith"
+        },
+        {
+          "id": 9,
+          "name": "tailor"
+        },
+        {
+          "id": 10,
+          "name": "scholar"
+        },
+        {
+          "id": 11,
+          "name": "jeweler"
+        },
+        {
+          "id": 12,
+          "name": "sage"
+        },
+        {
+          "id": 13,
+          "name": "alchemist"
+        }
+      ],
+      "language_list": [
+        {
+          "id": 0,
+          "name": "Common"
+        },
+        {
+          "id": 1,
+          "name": "Halasian"
+        },
+        {
+          "id": 2,
+          "name": "Thexian"
+        },
+        {
+          "id": 3,
+          "name": "Dwarven"
+        },
+        {
+          "id": 4,
+          "name": "Erudian"
+        },
+        {
+          "id": 5,
+          "name": "Guktan"
+        },
+        {
+          "id": 6,
+          "name": "Gnomish"
+        },
+        {
+          "id": 7,
+          "name": "Ayr'Dal"
+        },
+        {
+          "id": 8,
+          "name": "Stout"
+        },
+        {
+          "id": 9,
+          "name": "Koada'Dal"
+        },
+        {
+          "id": 10,
+          "name": "Lucanic"
+        },
+        {
+          "id": 11,
+          "name": "Antonican"
+        },
+        {
+          "id": 12,
+          "name": "Sebilisian"
+        },
+        {
+          "id": 13,
+          "name": "Kerran"
+        },
+        {
+          "id": 14,
+          "name": "Oggish"
+        },
+        {
+          "id": 15,
+          "name": "Ykeshan"
+        },
+        {
+          "id": 16,
+          "name": "Feir'Dal"
+        },
+        {
+          "id": 17,
+          "name": "Orcish"
+        },
+        {
+          "id": 18,
+          "name": "Gnollish"
+        },
+        {
+          "id": 19,
+          "name": "Draconic"
+        },
+        {
+          "id": 20,
+          "name": "Goblish"
+        },
+        {
+          "id": 21,
+          "name": "Thulian"
+        },
+        {
+          "id": 22,
+          "name": "Words of Shade"
+        },
+        {
+          "id": 23,
+          "name": "Fayefolk"
+        },
+        {
+          "id": 24,
+          "name": "Chaos Tongue"
+        },
+        {
+          "id": 25,
+          "name": "Krombral"
+        },
+        {
+          "id": 26,
+          "name": "Ratongan"
+        },
+        {
+          "id": 27,
+          "name": "Druzaic"
+        },
+        {
+          "id": 28,
+          "name": "Uruvanian"
+        },
+        {
+          "id": 29,
+          "name": "Death's Whisper"
+        },
+        {
+          "id": 30,
+          "name": "Screechsong"
+        },
+        {
+          "id": 31,
+          "name": "Volant"
+        },
+        {
+          "id": 32,
+          "name": "Argot"
+        },
+        {
+          "id": 33,
+          "name": "Serilian"
+        },
+        {
+          "id": 34,
+          "name": "Tik-Tok"
+        },
+        {
+          "id": 35,
+          "name": "Faerlie"
+        },
+        {
+          "id": 36,
+          "name": "Gorwish"
+        },
+        {
+          "id": 37,
+          "name": "Sathirian"
+        },
+        {
+          "id": 38,
+          "name": "Di'Zokian"
+        },
+        {
+          "id": 39,
+          "name": "Froak"
+        },
+        {
+          "id": 40,
+          "name": "Shisik"
+        },
+        {
+          "id": 41,
+          "name": "Sul'Dal"
+        },
+        {
+          "id": 42,
+          "name": "Ancient Draconic"
+        },
+        {
+          "id": 43,
+          "name": "Fleshless Tongue"
+        },
+        {
+          "id": 44,
+          "name": "Gymy"
+        },
+        {
+          "id": 45,
+          "name": "Cae'Dal"
+        }
+      ],
+      "mintradeskilllevel": 1,
+      "id": 1
+    }
+  ],
+  "returned": 1,
+  "limit": 1,
+  "min_ts": 1.779204204250407E9,
+  "max_ts": 1.779204204250407E9
+}

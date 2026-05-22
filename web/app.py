@@ -18,6 +18,7 @@ from web.routes.item import router as item_router
 from web.routes.claim import router as claim_router
 from web.routes.admin import router as admin_router
 from web.routes.guild import router as guild_router
+from web.routes.characters import router as characters_router
 from web import db as users_db
 
 _FRONTEND_DIST  = Path(__file__).resolve().parent.parent / "frontend" / "dist"
@@ -54,6 +55,7 @@ def create_app(session_secret: str | None = None) -> FastAPI:
     app.include_router(claim_router, prefix="/api")
     app.include_router(admin_router, prefix="/api")
     app.include_router(guild_router, prefix="/api")
+    app.include_router(characters_router, prefix="/api")
 
     # Item icons — served from local data directory
     if _ICONS_DIR.exists():

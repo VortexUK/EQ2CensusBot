@@ -5,8 +5,8 @@ import CharacterPage from './pages/CharacterPage'
 import ClaimPage from './pages/ClaimPage'
 import AdminPage from './pages/AdminPage'
 import GuildPage from './pages/GuildPage'
+import CharacterSearchPage from './pages/CharacterSearchPage'
 import {
-  CharacterSearchPage,
   GuildSearchPage,
   ItemSearchPage,
   SpellSearchPage,
