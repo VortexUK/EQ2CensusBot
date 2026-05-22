@@ -110,7 +110,7 @@ interface ItemSearchResult {
   class_label:      string | null
   icon_id:          number | null
   stats:            string[]
-  sort_stat_value:  number | null
+  stat_values:      Record<string, number>
 }
 
 interface ItemSearchResponse {
@@ -538,6 +538,14 @@ export default function ItemSearchPage() {
             sortBy={sortBy}
             sortDir={sortDir}
             statFilters={statFilters}
+            onSortByStat={(stat) => {
+              if (sortBy === stat) {
+                setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+              } else {
+                setSortBy(stat)
+                setSortDir('desc')
+              }
+            }}
           />}
 
           {totalPages > 1 && (
@@ -628,14 +636,17 @@ function StatPills({ stats, highlight }: { stats: string[]; highlight: string[] 
 }
 
 function ItemTable({
-  items, sortBy, sortDir, statFilters,
+  items, sortBy, sortDir, statFilters, onSortByStat,
 }: {
   items: ItemSearchResult[]
   sortBy: string
   sortDir: 'asc' | 'desc'
   statFilters: StatFilter[]
+  onSortByStat: (stat: string) => void
 }) {
-  const sortingByStat = !['name', 'level', 'tier'].includes(sortBy)
+  // Show one column per active stat filter, capped at 3
+  const statCols = statFilters.filter(f => f.stat).slice(0, 3)
+
   return (
     <div style={{ overflowX: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -645,11 +656,26 @@ function ItemTable({
             <th style={TH}>Quality</th>
             <th style={TH}>Slot</th>
             <th style={{ ...TH, textAlign: 'right' }}>Level</th>
-            {sortingByStat && (
-              <th style={{ ...TH, textAlign: 'right', color: 'var(--accent)' }}>
-                {sortBy} {sortDir === 'desc' ? '↓' : '↑'}
-              </th>
-            )}
+            {statCols.map(f => {
+              const active = sortBy === f.stat
+              return (
+                <th
+                  key={f.id}
+                  style={{
+                    ...TH,
+                    textAlign: 'right',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    color: active ? 'var(--accent)' : 'var(--text-muted)',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onClick={() => onSortByStat(f.stat)}
+                  title={`Sort by ${f.stat}`}
+                >
+                  {f.stat}&thinsp;{active ? (sortDir === 'desc' ? '↓' : '↑') : '↕'}
+                </th>
+              )
+            })}
             <th style={TH}>Classes</th>
             <th style={TH}>Stats</th>
           </tr>
@@ -679,13 +705,25 @@ function ItemTable({
               <td style={{ ...TD, textAlign: 'right' }}>
                 {item.level ?? '—'}
               </td>
-              {sortingByStat && (
-                <td style={{ ...TD, textAlign: 'right', fontWeight: 600, color: 'var(--accent)' }}>
-                  {item.sort_stat_value != null && item.sort_stat_value !== 0
-                    ? item.sort_stat_value
-                    : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>—</span>}
-                </td>
-              )}
+              {statCols.map(f => {
+                const val = item.stat_values[f.stat]
+                const active = sortBy === f.stat
+                return (
+                  <td
+                    key={f.id}
+                    style={{
+                      ...TD,
+                      textAlign: 'right',
+                      fontWeight: active ? 600 : undefined,
+                      color: active ? 'var(--accent)' : undefined,
+                    }}
+                  >
+                    {val != null
+                      ? val
+                      : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>—</span>}
+                  </td>
+                )
+              })}
               <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.8rem', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {item.class_label ?? '—'}
               </td>

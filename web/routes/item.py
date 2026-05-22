@@ -99,7 +99,7 @@ class ItemSearchResult(BaseModel):
     class_label: str | None = None
     icon_id: int | None = None
     stats: list[str] = []          # canonical stat names present on this item
-    sort_stat_value: float | None = None  # value of the sort stat (when sorting by stat)
+    stat_values: dict[str, float] = {}   # stat_name → value for each has_stat filter
 
 
 class ItemSearchResponse(BaseModel):
@@ -267,12 +267,16 @@ async def search_items(
         async with db.execute(count_sql, params) as cur:
             total = (await cur.fetchone())[0]
 
-        # Paged results — include sort stat value so frontend can display it
-        sort_val_select = f", COALESCE({sort_stat_col}, 0) AS _sort_val" if sort_stat_col else ""
+        # SELECT the value for each has_stat filter — INNER JOINs guarantee
+        # non-NULL values, so no COALESCE needed here.
+        stat_val_selects = "".join(
+            f", {stat_alias[stat]}.value AS _sv_{stat_alias[stat]}"
+            for stat in has_stat
+        )
         select_sql = (
             f"SELECT i.id, i.displayname, i.tier_display, i.slot, "
             f"i.typeinfo_name, i.level_to_use, i.class_label, i.icon_id"
-            f"{sort_val_select} "
+            f"{stat_val_selects} "
             f"FROM items i{stat_joins} "
             f"WHERE {where} "
             f"GROUP BY i.id "
@@ -282,7 +286,7 @@ async def search_items(
         async with db.execute(select_sql, params) as cur:
             rows = await cur.fetchall()
 
-        # For each result, fetch its stat names
+        # For each result, fetch its stat names and build the stat_values map
         results: list[ItemSearchResult] = []
         for row in rows:
             item_id = row["id"]
@@ -292,19 +296,23 @@ async def search_items(
             ) as scur:
                 stat_names = [r[0] for r in await scur.fetchall()]
 
-            sort_val = float(row["_sort_val"]) if sort_stat_col and row["_sort_val"] else None
+            stat_vals: dict[str, float] = {
+                stat: float(row[f"_sv_{stat_alias[stat]}"])
+                for stat in has_stat
+                if row[f"_sv_{stat_alias[stat]}"] is not None
+            }
 
             results.append(ItemSearchResult(
-                id              = item_id,
-                name            = row["displayname"],
-                tier            = row["tier_display"],
-                slot            = row["slot"],
-                item_type       = row["typeinfo_name"],
-                level           = row["level_to_use"],
-                class_label     = row["class_label"],
-                icon_id         = row["icon_id"],
-                sort_stat_value = sort_val,
-                stats      = stat_names,
+                id          = item_id,
+                name        = row["displayname"],
+                tier        = row["tier_display"],
+                slot        = row["slot"],
+                item_type   = row["typeinfo_name"],
+                level       = row["level_to_use"],
+                class_label = row["class_label"],
+                icon_id     = row["icon_id"],
+                stat_values = stat_vals,
+                stats       = stat_names,
             ))
 
     return ItemSearchResponse(
