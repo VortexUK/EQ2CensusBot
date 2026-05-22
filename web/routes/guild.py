@@ -12,6 +12,8 @@ from census.models import CharacterOverview, SpellEntry
 from census.spells_db import (
     DB_PATH as _SPELLS_DB,
     find_by_ids as _spell_find_by_ids,
+    load_blocklist as _load_spell_blocklist,
+    strip_roman as _strip_roman,
     unique_highest_entries as _unique_highest,
 )
 from web.cache import character_cache, guild_cache
@@ -243,6 +245,7 @@ def _build_spell_check_from_overviews(
 
     # One DB query for the whole guild
     spell_db: dict[int, dict] = _spell_find_by_ids(list(set(all_ids)))
+    blocklist = _load_spell_blocklist()
 
     out_members: list[MemberSpellTiers] = []
     tiers_with_data: set[str] = set()
@@ -253,7 +256,15 @@ def _build_spell_check_from_overviews(
             row = spell_db.get(sid)
             if row is None:
                 continue
-            if not row.get("passes_spellcheck"):
+            # Match the same filter as the character spell endpoint:
+            # only spellscroll-granted spells are upgradable, and the blocklist applies.
+            if (row.get("level") or 0) <= 0:
+                continue
+            if row.get("type") not in ("spells", "arts"):
+                continue
+            if row.get("given_by") != "spellscroll":
+                continue
+            if _strip_roman(row.get("name") or "").lower() in blocklist:
                 continue
             entries.append(SpellEntry(
                 name       = row["name"],
