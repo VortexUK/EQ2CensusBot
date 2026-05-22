@@ -38,6 +38,54 @@ const STAT_OPTIONS_SECONDARY = [
   'Attack Speed',
 ]
 
+// ── Static filter options ─────────────────────────────────────────────────────
+// These are stable EQ2 values — no DB scan needed. The /api/items/filters
+// endpoint only provides server_max_level (an env var); everything else
+// renders immediately from these constants.
+
+const TIER_OPTIONS = [
+  'Celestial', 'Ethereal', 'Mythical', 'Fabled',
+  'Legendary', 'Treasured', 'Uncommon',
+  'Mastercrafted', 'Handcrafted', 'Common',
+]
+
+const SLOT_OPTIONS = [
+  'Accolade',
+  'Ammo',
+  'Charm',
+  'Chest',
+  'Cloak',
+  'Drink',
+  'Ear',
+  'Feet',
+  'Finger',
+  'Food',
+  'Forearms',
+  'Hands',
+  'Head',
+  'Legs',
+  'Neck',
+  'Primary',
+  'Ranged',
+  'Secondary',
+  'Shoulders',
+  'Waist',
+  'Wrist',
+]
+
+const ITEM_TYPE_OPTIONS = [
+  'Adornment',
+  'Ammo',
+  'Armor',
+  'Container',
+  'Expendable',
+  'Food',
+  'House Item',
+  'Pattern',
+  'Shield',
+  'Weapon',
+]
+
 // ── Quality colour map ─────────────────────────────────────────────────────────
 // Keys match the raw DB tier_display values (ALL-CAPS).
 
@@ -142,9 +190,6 @@ interface ItemSearchResponse {
 }
 
 interface FilterOptions {
-  tiers:             string[]
-  slots:             string[]
-  item_types:        string[]
   server_max_level?: number | null
 }
 
@@ -220,15 +265,12 @@ export default function ItemSearchPage() {
     setTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : null)
   }, [])
 
-  // Filter options from server
-  const [filterOpts, setFilterOpts] = useState<FilterOptions>({ tiers: [], slots: [], item_types: [] })
-
-  // On mount: load filter opts and apply level defaults from SERVER_MAX_LEVEL.
+  // On mount: fetch only server_max_level to set level-range defaults.
+  // Tiers, slots, and item types are static constants — no DB scan needed.
   useEffect(() => {
     fetch('/api/items/filters', { credentials: 'include' })
       .then(r => r.json())
       .then((opts: FilterOptions) => {
-        setFilterOpts(opts)
         if (opts.server_max_level) {
           setMaxLevel(String(opts.server_max_level))
           setMinLevel(String(opts.server_max_level - 9))
@@ -385,7 +427,7 @@ export default function ItemSearchPage() {
             <Field label="Quality">
               <select value={tier} onChange={e => setTier(e.target.value)} style={{ ...CTRL, minWidth: 130 }}>
                 <option value="">Any</option>
-                {filterOpts.tiers.map(t => (
+                {TIER_OPTIONS.map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
@@ -394,7 +436,7 @@ export default function ItemSearchPage() {
             <Field label="Item Type">
               <select value={itemType} onChange={e => setItemType(e.target.value)} style={{ ...CTRL, minWidth: 140 }}>
                 <option value="">Any</option>
-                {filterOpts.item_types.map(t => (
+                {ITEM_TYPE_OPTIONS.map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
@@ -403,7 +445,7 @@ export default function ItemSearchPage() {
             <Field label="Slot">
               <select value={slot} onChange={e => setSlot(e.target.value)} style={{ ...CTRL, minWidth: 130 }}>
                 <option value="">Any</option>
-                {filterOpts.slots.map(s => (
+                {SLOT_OPTIONS.map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>

@@ -212,63 +212,16 @@ def _get_server_max_level() -> int | None:
 
 @router.get("/items/filters", response_model=ItemFilterOptions)
 async def get_item_filters() -> ItemFilterOptions:
-    """Return distinct tier / slot / type values for filter dropdowns."""
-    server_max_level = _get_server_max_level()
-    if not DB_PATH.exists():
-        return ItemFilterOptions(tiers=[], slots=[], item_types=[], server_max_level=server_max_level)
+    """Return server_max_level for the level-range defaults.
 
-    async with aiosqlite.connect(DB_PATH) as db:
-        # ── Tiers ──────────────────────────────────────────────────────────
-        # Map raw ALL-CAPS DB values to canonical display names; skip
-        # compound tiers like "MASTERCRAFTED FABLED"; sort by quality order.
-        async with db.execute(
-            "SELECT DISTINCT tier_display FROM items "
-            "WHERE visible=1 AND tier_display IS NOT NULL"
-        ) as cur:
-            raw_tiers = [r[0] for r in await cur.fetchall()]
-
-        seen_tiers: set[str] = set()
-        tiers: list[str] = []
-        for raw in raw_tiers:
-            display = _TIER_DB_MAP.get(raw)   # only single canonical tiers match
-            if display and display not in seen_tiers:
-                seen_tiers.add(display)
-                tiers.append(display)
-        tiers.sort(key=lambda t: _TIER_ORDER_IDX.get(t, 99))
-
-        # ── Slots ──────────────────────────────────────────────────────────
-        async with db.execute(
-            "SELECT DISTINCT slot FROM items "
-            "WHERE visible=1 AND slot IS NOT NULL "
-            "ORDER BY slot"
-        ) as cur:
-            slots = [r[0] for r in await cur.fetchall() if r[0] not in _SLOT_SKIP]
-
-        # ── Item types ─────────────────────────────────────────────────────
-        # Rename / skip / capitalise raw typeinfo_name values; deduplicate.
-        async with db.execute(
-            "SELECT DISTINCT typeinfo_name FROM items "
-            "WHERE visible=1 AND typeinfo_name IS NOT NULL"
-        ) as cur:
-            raw_types = [r[0] for r in await cur.fetchall()]
-
-        seen_types: set[str] = set()
-        for raw in raw_types:
-            if raw in _ITEM_TYPE_SKIP:
-                continue
-            display = _ITEM_TYPE_RENAME.get(raw)
-            if display is None:
-                # Capitalise first letter, leave rest as-is
-                display = raw[0].upper() + raw[1:] if raw else raw
-            if display not in seen_types:
-                seen_types.add(display)
-        item_types = sorted(seen_types)
-
+    Tiers, slots, and item types are static and defined in the frontend;
+    no DB scan needed here.
+    """
     return ItemFilterOptions(
-        tiers=tiers,
-        slots=slots,
-        item_types=item_types,
-        server_max_level=server_max_level,
+        tiers=[],
+        slots=[],
+        item_types=[],
+        server_max_level=_get_server_max_level(),
     )
 
 
