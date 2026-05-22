@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -8,10 +9,16 @@ from pydantic import BaseModel
 from web.db import (
     get_claim_by_id,
     list_claims,
+    list_pending_users,
     review_claim,
+    set_user_access,
 )
 from web.routes.claim import _refresh_claim_cache
 from web.routes.guild import _officer_chars, _roster_rank_map
+
+_ADMIN_IDS: frozenset[str] = frozenset(
+    filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(","))
+)
 
 router = APIRouter(tags=["guild"])
 
@@ -135,4 +142,53 @@ async def officer_reject_claim(
     if not result:
         raise HTTPException(status_code=404, detail="Claim not found")
     asyncio.create_task(_refresh_claim_cache(result["discord_id"]))
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Admin — user access approval
+# ---------------------------------------------------------------------------
+
+def _require_admin(request: Request) -> dict:
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if user["id"] not in _ADMIN_IDS:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+class PendingUserItem(BaseModel):
+    discord_id:       str
+    discord_name:     str
+    discord_username: str | None = None
+    avatar:           str | None = None
+    first_seen:       int
+
+
+@router.get("/admin/pending-users", response_model=list[PendingUserItem])
+async def get_pending_users(request: Request) -> list[PendingUserItem]:
+    """List all users awaiting access approval. Admin only."""
+    _require_admin(request)
+    rows = await list_pending_users()
+    return [PendingUserItem(**r) for r in rows]
+
+
+@router.post("/admin/users/{discord_id}/approve", status_code=200)
+async def approve_user(discord_id: str, request: Request) -> dict:
+    """Grant access to a pending user. Admin only."""
+    _require_admin(request)
+    if not await set_user_access(discord_id, "approved"):
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+
+@router.post("/admin/users/{discord_id}/deny", status_code=200)
+async def deny_user(discord_id: str, request: Request) -> dict:
+    """Deny access to a pending (or previously approved) user. Admin only."""
+    admin = _require_admin(request)
+    if discord_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="You cannot deny your own access")
+    if not await set_user_access(discord_id, "denied"):
+        raise HTTPException(status_code=404, detail="User not found")
     return {"ok": True}

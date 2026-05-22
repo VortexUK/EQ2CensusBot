@@ -6,6 +6,7 @@ export interface User {
   global_name: string | null
   avatar: string | null
   is_admin: boolean
+  access_status: string   // 'approved' | 'pending' | 'denied'
 }
 
 export type AuthState =

@@ -86,12 +86,57 @@ function NavLinks() {
   )
 }
 
+function AccessPendingGate() {
+  return (
+    <main style={{
+      minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: '1rem', padding: '2rem', textAlign: 'center',
+    }}>
+      <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '1.8rem', color: '#c8a96e' }}>
+        Access Pending
+      </h2>
+      <p style={{ color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.6 }}>
+        Your account is awaiting approval. An officer will review your request shortly.
+      </p>
+      <a href="/api/auth/logout" style={{ color: '#9a7d4a', fontSize: '0.85rem' }}
+        onClick={async e => { e.preventDefault(); await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); location.href = '/' }}>
+        Sign out
+      </a>
+    </main>
+  )
+}
+
+function AccessDeniedGate() {
+  return (
+    <main style={{
+      minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: '1rem', padding: '2rem', textAlign: 'center',
+    }}>
+      <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '1.8rem', color: '#f87171' }}>
+        Access Denied
+      </h2>
+      <p style={{ color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.6 }}>
+        Your access request was not approved. Contact an officer if you think this is a mistake.
+      </p>
+      <a href="#" style={{ color: '#9a7d4a', fontSize: '0.85rem' }}
+        onClick={async e => { e.preventDefault(); await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); location.href = '/' }}>
+        Sign out
+      </a>
+    </main>
+  )
+}
+
 function Layout() {
   const auth = useAuth()
 
   if (auth.status === 'loading') return null
 
   if (auth.status === 'unauthenticated') return <LoginGate />
+
+  if (auth.user.access_status === 'pending')  return <AccessPendingGate />
+  if (auth.user.access_status === 'denied')   return <AccessDeniedGate />
 
   return (
     <>

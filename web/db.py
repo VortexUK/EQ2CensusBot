@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS users (
     discord_username TEXT,
     avatar           TEXT,
     first_seen       INTEGER NOT NULL DEFAULT (strftime('%s','now')),
-    last_seen        INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    last_seen        INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    access_status    TEXT    NOT NULL DEFAULT 'pending'
 );
 
 CREATE TABLE IF NOT EXISTS character_claims (
@@ -94,6 +95,11 @@ def init_db(path: Path = DB_PATH) -> None:
         users_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
         if "discord_username" not in users_cols:
             conn.execute("ALTER TABLE users ADD COLUMN discord_username TEXT")
+        if "access_status" not in users_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN access_status TEXT NOT NULL DEFAULT 'pending'")
+            # Existing users were already using the app — approve them all.
+            # Only brand-new users (after this migration) start as 'pending'.
+            conn.execute("UPDATE users SET access_status = 'approved'")
         claims_cols = {row[1] for row in conn.execute("PRAGMA table_info(character_claims)")}
         if "is_primary" not in claims_cols:
             conn.execute("ALTER TABLE character_claims ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0")
@@ -109,23 +115,78 @@ async def upsert_user(
     discord_name: str,
     discord_username: str,
     avatar: str | None,
+    admin_ids: frozenset[str] = frozenset(),
     path: Path = DB_PATH,
-) -> None:
-    """Insert a new user row or update name/username/avatar and bump last_seen."""
+) -> str:
+    """Insert a new user row or update name/username/avatar and bump last_seen.
+
+    Returns the user's access_status after the upsert.
+
+    Admin IDs (from ADMIN_DISCORD_IDS env var) are always forced to 'approved'
+    regardless of what is stored — this prevents admins from being locked out
+    even after a complete database wipe.
+    """
+    is_admin = discord_id in admin_ids
     async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
         await db.execute(
             """
-            INSERT INTO users (discord_id, discord_name, discord_username, avatar)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO users (discord_id, discord_name, discord_username, avatar, access_status)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(discord_id) DO UPDATE SET
                 discord_name     = excluded.discord_name,
                 discord_username = excluded.discord_username,
                 avatar           = excluded.avatar,
-                last_seen        = strftime('%s','now')
+                last_seen        = strftime('%s','now'),
+                access_status    = CASE
+                    WHEN ? = 1 THEN 'approved'
+                    ELSE access_status
+                END
             """,
-            (discord_id, discord_name, discord_username, avatar),
+            (discord_id, discord_name, discord_username, avatar,
+             'approved' if is_admin else 'pending',
+             1 if is_admin else 0),
         )
         await db.commit()
+        async with db.execute(
+            "SELECT access_status FROM users WHERE discord_id = ?", (discord_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    return row["access_status"] if row else "pending"
+
+
+async def get_user_access_status(discord_id: str, path: Path = DB_PATH) -> str:
+    """Return the access_status for a user, or 'pending' if not found."""
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT access_status FROM users WHERE discord_id = ?", (discord_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    return row["access_status"] if row else "pending"
+
+
+async def list_pending_users(path: Path = DB_PATH) -> list[dict]:
+    """Return all users with access_status = 'pending', newest first."""
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT discord_id, discord_name, discord_username, avatar, first_seen "
+            "FROM users WHERE access_status = 'pending' ORDER BY first_seen DESC"
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def set_user_access(discord_id: str, status: str, path: Path = DB_PATH) -> bool:
+    """Set access_status for a user. Returns True if a row was updated."""
+    async with aiosqlite.connect(path) as db:
+        cur = await db.execute(
+            "UPDATE users SET access_status = ? WHERE discord_id = ?",
+            (status, discord_id),
+        )
+        await db.commit()
+    return cur.rowcount > 0
 
 
 # ---------------------------------------------------------------------------

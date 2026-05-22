@@ -4,6 +4,14 @@ import { useAuth } from '../hooks/useAuth'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface PendingUser {
+  discord_id:       string
+  discord_name:     string
+  discord_username: string | null
+  avatar:           string | null
+  first_seen:       number
+}
+
 interface ClaimDetail {
   id: number
   discord_id: string
@@ -354,15 +362,88 @@ function UserSection({
   )
 }
 
+// ── Pending access requests ───────────────────────────────────────────────────
+
+function PendingUserRow({ user, onAction }: { user: PendingUser; onAction: () => void }) {
+  const [busy, setBusy] = useState(false)
+
+  async function doAccess(action: 'approve' | 'deny') {
+    setBusy(true)
+    try {
+      await fetch(`/api/admin/users/${user.discord_id}/${action}`, {
+        method: 'POST', credentials: 'include',
+      })
+      onAction()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
+      padding: '0.55rem 0.75rem',
+      background: 'var(--surface-raised)',
+      border: '1px solid var(--border)',
+      borderRadius: 6,
+    }}>
+      <img
+        src={discordAvatar(user.discord_id, user.avatar)}
+        alt=""
+        width={32} height={32}
+        style={{ borderRadius: '50%', flexShrink: 0 }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+          {discordDisplayName(user.discord_name, user.discord_username)}
+        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+          Joined {relativeTime(user.first_seen)}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <button
+          onClick={() => doAccess('approve')}
+          disabled={busy}
+          style={{
+            padding: '0.3rem 0.9rem', borderRadius: 5, cursor: busy ? 'not-allowed' : 'pointer',
+            border: '1px solid rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.12)',
+            color: '#4ade80', fontWeight: 600, fontSize: '0.8rem',
+          }}
+        >
+          Approve
+        </button>
+        <button
+          onClick={() => doAccess('deny')}
+          disabled={busy}
+          style={{
+            padding: '0.3rem 0.9rem', borderRadius: 5, cursor: busy ? 'not-allowed' : 'pointer',
+            border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.1)',
+            color: '#f87171', fontWeight: 600, fontSize: '0.8rem',
+          }}
+        >
+          Deny
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
   const auth = useAuth()
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([])
   const [pending, setPending] = useState<ClaimDetail[]>([])
   const [all, setAll] = useState<ClaimDetail[]>([])
   const [showAll, setShowAll] = useState(false)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
+
+  async function fetchPendingUsers() {
+    const res = await fetch('/api/admin/pending-users', { credentials: 'include' })
+    if (res.ok) setPendingUsers(await res.json())
+  }
 
   async function fetchPending() {
     setLoading(true)
@@ -389,6 +470,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (auth.status === 'authenticated' && auth.user.is_admin) {
+      fetchPendingUsers()
       fetchPending()
     }
   }, [auth.status])
@@ -423,7 +505,28 @@ export default function AdminPage() {
         Manage character claim requests.
       </p>
 
-      {/* Pending queue */}
+      {/* Pending access requests */}
+      {pendingUsers.length > 0 && (
+        <div style={{ marginBottom: '2rem' }}>
+          <h2 style={{
+            fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.06em',
+            color: '#fbbf24', marginBottom: '0.6rem',
+          }}>
+            Pending access requests ({pendingUsers.length})
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {pendingUsers.map(u => (
+              <PendingUserRow
+                key={u.discord_id}
+                user={u}
+                onAction={() => { fetchPendingUsers(); fetchPending() }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pending claims queue */}
       <h2 style={{
         fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.06em',
         color: 'var(--text-muted)', marginBottom: '0.6rem',

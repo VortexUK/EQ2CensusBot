@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
-from web.db import upsert_user
+from web.db import get_user_access_status, upsert_user
 
 router = APIRouter(tags=["auth"])
 
@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     global_name: str | None = None
     avatar: str | None = None
     is_admin: bool = False
+    access_status: str = "approved"
 
 
 @router.get("/auth/login")
@@ -81,15 +82,21 @@ async def callback(code: str, request: Request) -> RedirectResponse:
         "avatar": user.get("avatar"),
     }
 
-    # Persist / update user record in our DB
-    await upsert_user(
+    # Persist / update user record in our DB.
+    # Admin IDs are always force-approved — protects against DB wipe lockout.
+    access_status = await upsert_user(
         discord_id=user["id"],
         discord_name=user.get("global_name") or user["username"],
         discord_username=user["username"],
         avatar=user.get("avatar"),
+        admin_ids=_ADMIN_IDS,
     )
 
-    return RedirectResponse("/")
+    # Approved users go straight to the app; others land on an access page
+    # so the frontend can show the appropriate message.
+    if access_status == "approved":
+        return RedirectResponse("/")
+    return RedirectResponse(f"/?access={access_status}")
 
 
 @router.get("/auth/me", response_model=UserResponse)
@@ -98,7 +105,12 @@ async def me(request: Request) -> UserResponse:
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return UserResponse(**user, is_admin=user["id"] in _ADMIN_IDS)
+    # Admin IDs are always approved regardless of DB state
+    if user["id"] in _ADMIN_IDS:
+        access_status = "approved"
+    else:
+        access_status = await get_user_access_status(user["id"])
+    return UserResponse(**user, is_admin=user["id"] in _ADMIN_IDS, access_status=access_status)
 
 
 @router.post("/auth/logout")
