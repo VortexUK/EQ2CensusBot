@@ -1,39 +1,19 @@
 import io
 import os
-import re
-from collections import Counter
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from census.client import CensusClient
+from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.models import CharacterSpells, SpellEntry
-from census.spells_db import load_blocklist as _load_spell_blocklist
-
-_TIER_ORDER = ["Apprentice", "Journeyman", "Adept", "Expert", "Master", "Grandmaster"]
-_COL_SEP = "  "
-
-# Matches trailing Roman numeral suffix, e.g. " VII" or " IV"
-_ROMAN_SUFFIX = re.compile(
-    r'\s+(?:XX|XIX|XVIII|XVII|XVI|XV|XIV|XIII|XII|XI|X'
-    r'|IX|VIII|VII|VI|V|IV|III|II|I)$',
-    re.IGNORECASE,
+from census.spells_db import (
+    load_blocklist as _load_spell_blocklist,
+    unique_highest_entries as _unique_highest,
 )
 
-
-def _base_name(name: str) -> str:
-    return _ROMAN_SUFFIX.sub("", name.strip())
-
-
-def _unique_highest(entries: list[SpellEntry]) -> list[SpellEntry]:
-    """For each unique base spell name, keep only the highest-level entry."""
-    best: dict[str, SpellEntry] = {}
-    for e in entries:
-        key = (_base_name(e.name), e.spell_type)
-        if key not in best or e.level > best[key].level:
-            best[key] = e
-    return list(best.values())
+_COL_SEP = "  "
 
 
 def _apply_blocklist(entries: list[SpellEntry]) -> list[SpellEntry]:

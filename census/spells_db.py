@@ -18,6 +18,7 @@ import json
 import os
 import re
 import sqlite3
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -347,6 +348,7 @@ def find_by_ids(spell_ids: list[int], path: Path = DB_PATH) -> dict[int, dict]:
     return {row["id"]: _row_to_dict(row) for row in rows}
 
 
+@lru_cache(maxsize=4096)
 def find_by_crc(crc: int, tier: Optional[int] = None, path: Path = DB_PATH) -> Optional[dict]:
     """Return the spell row for the given CRC and AA rank tier.
 
@@ -378,6 +380,33 @@ def find_by_crc(crc: int, tier: Optional[int] = None, path: Path = DB_PATH) -> O
 # ---------------------------------------------------------------------------
 
 _BLOCKLIST_PATH: Path = Path(__file__).resolve().parent.parent / "data" / "spells" / "blocklist.json"
+
+
+def unique_highest_entries(entries: list) -> list:
+    """For each base spell name + spell_type, keep only the highest-level entry.
+
+    Works on any objects (or dicts) that expose .name/.spell_type/.level
+    (SpellEntry) or ["name"]/["type"]/["level"] (raw DB rows).
+    """
+    best: dict[tuple, object] = {}
+    for e in entries:
+        if isinstance(e, dict):
+            name       = e.get("name") or ""
+            spell_type = e.get("type") or ""
+            level      = e.get("level") or 0
+        else:
+            name       = getattr(e, "name", "")
+            spell_type = getattr(e, "spell_type", "")
+            level      = getattr(e, "level", 0) or 0
+        key = (strip_roman(name), spell_type)
+        if key not in best:
+            best[key] = e
+        else:
+            existing = best[key]
+            elevel = (existing.get("level") or 0) if isinstance(existing, dict) else (getattr(existing, "level", 0) or 0)
+            if level > elevel:
+                best[key] = e
+    return list(best.values())
 
 
 def load_blocklist(path: Path = _BLOCKLIST_PATH) -> frozenset[str]:

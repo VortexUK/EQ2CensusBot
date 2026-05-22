@@ -125,6 +125,9 @@ ITEM_DISPLAY: list[tuple[str, str, str]] = [
     ("maxcharges", "Charges", "charges"),
 ]
 
+# Spell tier order, lowest → highest
+SPELL_TIER_ORDER: list[str] = ["Apprentice", "Journeyman", "Adept", "Expert", "Master", "Grandmaster"]
+
 # Flag field names → display labels (order matters for output)
 FLAG_FIELDS: list[tuple[str, str]] = [
     ("is_heirloom", "HEIRLOOM"),

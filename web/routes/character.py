@@ -1,21 +1,24 @@
 from __future__ import annotations
 
 import asyncio
-import os
-import re
 from collections import Counter
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from census.client import CensusClient
+from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.models import AdornSlot as _AdornSlot
-from census.spells_db import DB_PATH as _SPELLS_DB, find_by_ids as _spell_find_by_ids, load_blocklist as _load_spell_blocklist
+from census.spells_db import (
+    DB_PATH as _SPELLS_DB,
+    find_by_ids as _spell_find_by_ids,
+    load_blocklist as _load_spell_blocklist,
+    strip_roman as _strip_roman,
+    unique_highest_entries as _unique_highest_rows,
+)
 from web.cache import character_cache
+from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
 
 router = APIRouter(tags=["character"])
-
-_WORLD = os.getenv("EQ2_WORLD", "Varsoon")
-_SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
 
 
 class AdornSlotResponse(BaseModel):
@@ -272,28 +275,6 @@ async def get_character(name: str) -> CharacterResponse:
 # Character spell list
 # ---------------------------------------------------------------------------
 
-_TIER_ORDER = ["Apprentice", "Journeyman", "Adept", "Expert", "Master", "Grandmaster"]
-
-_ROMAN_SUFFIX = re.compile(
-    r'\s+(?:XX|XIX|XVIII|XVII|XVI|XV|XIV|XIII|XII|XI|X'
-    r'|IX|VIII|VII|VI|V|IV|III|II|I)$',
-    re.IGNORECASE,
-)
-
-
-def _base_name(name: str) -> str:
-    return _ROMAN_SUFFIX.sub("", name.strip())
-
-
-def _unique_highest_rows(rows: list[dict]) -> list[dict]:
-    """For each base spell name+type, keep only the highest-level DB row."""
-    best: dict[tuple, dict] = {}
-    for r in rows:
-        key = (_base_name(r["name"]), r.get("type") or "")
-        if key not in best or (r.get("level") or 0) > (best[key].get("level") or 0):
-            best[key] = r
-    return list(best.values())
-
 
 class SpellEntryResponse(BaseModel):
     name:           str
@@ -359,7 +340,7 @@ async def get_character_spells(name: str) -> CharacterSpellsResponse:
         if (r.get("level") or 0) > 0
         and r.get("type") in ("spells", "arts")
         and r.get("given_by") != "alternateadvancement"
-        and _base_name(r.get("name") or "").lower() not in blocklist
+        and _strip_roman(r.get("name") or "").lower() not in blocklist
     ]
 
     # Deduplicate: per base name+type keep the highest-level entry (highest rank)

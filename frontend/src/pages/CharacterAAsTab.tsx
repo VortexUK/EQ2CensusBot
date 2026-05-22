@@ -1,0 +1,369 @@
+import { useEffect, useState } from 'react'
+import { AATree, AATreeData } from '../components/AATree'
+import { StatGroup, StatRow } from './CharacterPage'
+
+// ── AA types ─────────────────────────────────────────────────────────────────
+
+export interface CharAATree {
+  tree_id:     number
+  tree_type:   string
+  tree_name:   string
+  spent:       Record<string, number>   // node_id str → tier
+  total_spent: number
+}
+
+export interface CharAAProfile {
+  name:  string
+  trees: CharAATree[]
+}
+
+export interface CharAAsResponse {
+  character_name: string
+  total_spent:    number
+  trees:          CharAATree[]
+  profiles:       CharAAProfile[]
+}
+
+interface AAConfig {
+  xpac:               string
+  aa_cap:             number
+  unlocked_tree_types: string[]
+}
+
+// ── AA data cache ─────────────────────────────────────────────────────────────
+// Module-level: survives re-renders and Vite HMR remounts.
+// Keyed by lower-cased character name.
+
+interface AACacheEntry {
+  charAAs:  CharAAsResponse
+  config:   AAConfig
+  treeData: Map<number, AATreeData>
+}
+export const _aaCache = new Map<string, AACacheEntry>()
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const _TREE_TYPE_LABEL: Record<string, string> = {
+  class:              'Class',
+  subclass:           'Subclass',
+  shadows:            'Shadows',
+  heroic:             'Heroic',
+  tradeskill:         'Tradeskill',
+  tradeskill_general: 'Tradeskill (General)',
+  warder:             'Warder',
+  prestige:           'Prestige',
+  dragon:             'Dragon',
+  reign_of_shadows:   'Reign of Shadows',
+  far_seas:           'Far Seas',
+}
+
+// ── AA progress bar ───────────────────────────────────────────────────────────
+
+function AAProgressBar({ label, value, max, pct }: {
+  label: string
+  value: number
+  max:   number | null
+  pct:   number | null
+}) {
+  const filled  = pct !== null && pct >= 100
+  const barColor = filled ? '#22cc22' : 'var(--accent)'
+  return (
+    <div style={{ padding: '4px 0 6px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {label}
+        </span>
+        <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+          {value.toLocaleString()}{max !== null ? ` / ${max.toLocaleString()}` : ''}
+        </span>
+      </div>
+      {pct !== null && (
+        <>
+          <div style={{ height: 5, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${pct}%`, borderRadius: 3,
+              background: barColor, transition: 'width 0.3s ease',
+            }} />
+          </div>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'right', marginTop: 2 }}>
+            {pct}%
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── AA Tab ────────────────────────────────────────────────────────────────────
+
+type AATabState =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ok'; charAAs: CharAAsResponse; config: AAConfig; treeData: Map<number, AATreeData> }
+
+// 'current' = live AAs; number = index into charAAs.profiles
+type ActiveProfile = 'current' | number
+
+export function AAsTab({ charName, aaCount }: { charName: string; aaCount: number }) {
+  const cacheKey = charName.toLowerCase()
+  const cached   = _aaCache.get(cacheKey)
+
+  const [state, setState] = useState<AATabState>(
+    cached ? { status: 'ok', ...cached } : { status: 'loading' }
+  )
+  const [selectedTreeId, setSelectedTreeId]     = useState<number | null>(
+    cached ? (cached.charAAs.trees[0]?.tree_id ?? null) : null
+  )
+  const [activeProfile, setActiveProfile] = useState<ActiveProfile>('current')
+
+  useEffect(() => {
+    // Already cached — nothing to fetch
+    if (_aaCache.has(cacheKey)) return
+
+    let cancelled = false
+
+    async function load() {
+      try {
+        const [aasRes, configRes] = await Promise.all([
+          fetch(`/api/character/${encodeURIComponent(charName)}/aas`),
+          fetch('/api/aa/config'),
+        ])
+        if (!aasRes.ok)    throw new Error(`AAs: HTTP ${aasRes.status}`)
+        if (!configRes.ok) throw new Error(`Config: HTTP ${configRes.status}`)
+
+        const charAAs: CharAAsResponse = await aasRes.json()
+        const config:  AAConfig        = await configRes.json()
+
+        // Filter trees to only those unlocked in the current xpac
+        const unlocked = new Set(config.unlocked_tree_types)
+        const visibleTrees = charAAs.trees.filter(t =>
+          unlocked.size === 0 || unlocked.has(t.tree_type)
+        )
+
+        // Fetch full node data for each visible tree in parallel
+        const treeResponses = await Promise.all(
+          visibleTrees.map(t =>
+            fetch(`/api/aa/tree/${t.tree_id}`)
+              .then(r => r.ok ? r.json() as Promise<AATreeData> : null)
+              .catch(() => null)
+          )
+        )
+
+        if (cancelled) return
+
+        const treeData = new Map<number, AATreeData>()
+        for (const td of treeResponses) {
+          if (td) treeData.set(td.tree_id, td)
+        }
+
+        const entry: AACacheEntry = { charAAs: { ...charAAs, trees: visibleTrees }, config, treeData }
+        _aaCache.set(cacheKey, entry)
+        setState({ status: 'ok', ...entry })
+        setSelectedTreeId(prev => prev ?? (visibleTrees[0]?.tree_id ?? null))
+      } catch (err) {
+        if (!cancelled) setState({ status: 'error', message: String(err) })
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [charName, cacheKey])
+
+  if (state.status === 'loading') {
+    return <p style={{ marginTop: '1.5rem', color: 'var(--text-muted)' }}>Loading AA data…</p>
+  }
+  if (state.status === 'error') {
+    return <p style={{ marginTop: '1.5rem', color: '#f87171' }}>Error: {state.message}</p>
+  }
+
+  const { charAAs, config, treeData } = state
+
+  // Determine which set of trees (current or a profile) to display.
+  // Profile trees are filtered to the same unlocked types as the current view.
+  const unlocked = new Set(config.unlocked_tree_types)
+  const profileTrees: CharAATree[] | null =
+    activeProfile === 'current' ? null :
+    (charAAs.profiles[activeProfile as number]?.trees ?? null)
+
+  // Active tree list: profile trees (filtered) or current trees (already filtered during load).
+  const visibleTrees: CharAATree[] = profileTrees
+    ? profileTrees.filter(t => unlocked.size === 0 || unlocked.has(t.tree_type))
+    : charAAs.trees
+
+  const activeCt = visibleTrees.find(t => t.tree_id === selectedTreeId) ?? visibleTrees[0]
+  const activeTd = activeCt ? treeData.get(activeCt.tree_id) : undefined
+
+  // Sum only the shown trees.
+  const spentInView = visibleTrees.reduce((sum, t) => sum + t.total_spent, 0)
+
+  const earnedPct = config.aa_cap > 0
+    ? Math.min(100, Math.round((aaCount / config.aa_cap) * 100))
+    : null
+  const spentPct = aaCount > 0
+    ? Math.min(100, Math.round((spentInView / aaCount) * 100))
+    : null
+
+  return (
+    <div style={{ marginTop: '1rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+
+      {/* ── Left sidebar ── */}
+      <div style={{ width: 240, flexShrink: 0 }}>
+
+        {/* Profile selector */}
+        {charAAs.profiles.length > 0 && (
+          <div style={{ marginBottom: '0.75rem' }}>
+            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent)', fontWeight: 600, marginBottom: 4 }}>
+              Profile
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {(['current', ...charAAs.profiles.map((_, i) => i)] as ActiveProfile[]).map(pid => {
+                const isActive = activeProfile === pid
+                const label    = pid === 'current' ? 'Current' : charAAs.profiles[pid as number].name
+                return (
+                  <button
+                    key={String(pid)}
+                    onClick={() => setActiveProfile(pid)}
+                    style={{
+                      textAlign: 'left',
+                      background: isActive ? 'var(--accent)' : 'var(--surface)',
+                      border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+                      borderRadius: 4,
+                      color: isActive ? '#000' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '0.78rem',
+                      fontWeight: isActive ? 600 : 400,
+                      padding: '4px 8px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      transition: 'background 0.12s, border-color 0.12s',
+                    }}
+                    title={label}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Expansion */}
+        {config.xpac && (
+          <StatGroup title="Expansion">
+            <div style={{ padding: '3px 0', fontSize: '0.83rem', color: 'var(--text)' }}>
+              {config.xpac}
+            </div>
+            {config.aa_cap > 0 && (
+              <div style={{ padding: '1px 0 3px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {config.aa_cap.toLocaleString()} AA cap
+              </div>
+            )}
+          </StatGroup>
+        )}
+
+        {/* Progress */}
+        <StatGroup title="Alternate Advancements">
+          <AAProgressBar
+            label="Earned"
+            value={aaCount}
+            max={config.aa_cap > 0 ? config.aa_cap : null}
+            pct={earnedPct}
+          />
+          <AAProgressBar
+            label="Spent"
+            value={spentInView}
+            max={aaCount}
+            pct={spentPct}
+          />
+        </StatGroup>
+
+        {/* Per-tree breakdown */}
+        {visibleTrees.length > 0 && (
+          <StatGroup title="By Tree">
+            {visibleTrees.map(ct => (
+              <StatRow
+                key={ct.tree_id}
+                label={ct.tree_name}
+                value={ct.total_spent.toLocaleString()}
+              />
+            ))}
+          </StatGroup>
+        )}
+
+      </div>
+
+      {/* ── Right: sub-tabs + tree ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+
+        {visibleTrees.length === 0 && (
+          <p style={{ color: 'var(--text-muted)' }}>No AA data available.</p>
+        )}
+
+        {visibleTrees.length > 0 && (
+          <>
+            {/* Tree sub-tabs */}
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: '2px',
+              borderBottom: '1px solid var(--border)',
+              marginBottom: '0.75rem',
+            }}>
+              {visibleTrees.map(ct => {
+                const active    = ct.tree_id === (activeCt?.tree_id)
+                const typeLabel = _TREE_TYPE_LABEL[ct.tree_type] ?? ct.tree_type
+                return (
+                  <button
+                    key={ct.tree_id}
+                    onClick={() => setSelectedTreeId(ct.tree_id)}
+                    style={{
+                      background: active ? 'var(--surface)' : 'transparent',
+                      border: 'none',
+                      borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+                      color: active ? 'var(--text)' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '5px 12px',
+                      marginBottom: '-1px',
+                      fontSize: '0.8rem',
+                      fontWeight: active ? 600 : 400,
+                      transition: 'color 0.12s, border-color 0.12s',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={`${typeLabel} · ${ct.total_spent} pts`}
+                  >
+                    {ct.tree_name}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Active tree */}
+            {activeCt && (
+              <div>
+                {/* Type label */}
+                <div style={{ marginBottom: '0.4rem', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)' }}>
+                  {_TREE_TYPE_LABEL[activeCt.tree_type] ?? activeCt.tree_type}
+                </div>
+
+                {/* Tree at 60% of the right column */}
+                <div style={{ width: '60%' }}>
+                  {activeTd ? (
+                    <AATree tree={activeTd} spent={activeCt.spent} />
+                  ) : (
+                    <div style={{
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 4, padding: '1rem',
+                      color: 'var(--text-muted)', fontSize: '0.82rem',
+                    }}>
+                      Tree data unavailable (tree #{activeCt.tree_id})
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+      </div>
+    </div>
+  )
+}

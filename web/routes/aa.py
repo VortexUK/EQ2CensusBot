@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import asyncio
 import json
-import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from census.client import CensusClient
 from census.spells_db import find_by_crc
 from image.aa_tree import detect_tree_type
+from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
 
 router = APIRouter(tags=["aa"])
 
@@ -27,8 +28,7 @@ _TYPE_ORDER = {
 # Tree index (loaded once at startup)
 # ---------------------------------------------------------------------------
 
-_tree_index: dict[int, dict] = {}          # tree_id → {"name": str, "type": str}
-_spell_cache: dict[tuple[int, int], list[dict]] = {}  # (spellcrc, tier) → [{description, indentation}]
+_tree_index: dict[int, dict] = {}   # tree_id → {"name": str, "type": str}
 
 
 def _load_tree_index() -> None:
@@ -108,6 +108,7 @@ class CharAAsResponse(BaseModel):
 @router.get("/aa/config", response_model=AAConfigResponse)
 async def get_aa_config() -> AAConfigResponse:
     """Return the current xpac's AA cap and which tree types are unlocked."""
+    import os
     xpac = os.getenv("SERVER_CURRENT_XPAC", "")
     if not _LIMITS.exists():
         return AAConfigResponse(xpac=xpac, aa_cap=0, unlocked_tree_types=[])
@@ -158,63 +159,44 @@ async def get_aa_tree(tree_id: int) -> AATreeResponse:
     )
 
 
-@router.get("/character/{name}/aas", response_model=CharAAsResponse)
-async def get_character_aas(name: str) -> CharAAsResponse:
-    """Return a character's spent AAs grouped by tree, sorted by tree type."""
-    client = CensusClient(service_id=os.getenv("CENSUS_SERVICE_ID", "example"))
-    world  = os.getenv("EQ2_WORLD", "Varsoon")
-    try:
-        char_aas = await client.get_character_aas(name, world)
-    finally:
-        await client.close()
-    if char_aas is None:
-        raise HTTPException(status_code=404, detail=f"Character '{name}' not found")
-
-    # Group node tiers by tree_id
+def _build_trees(aa_list) -> list[CharAATree]:
+    """Convert a list of NodeAA objects into CharAATree list, sorted by tree type."""
     by_tree: dict[int, dict[int, int]] = {}
-    for aa in char_aas.aa_list:
+    for aa in aa_list:
         by_tree.setdefault(aa.tree_id, {})[aa.node_id] = aa.tier
-
-    trees: list[CharAATree] = []
+    result = []
     for tid, spent in by_tree.items():
         info = _tree_index.get(tid, {})
-        trees.append(CharAATree(
+        result.append(CharAATree(
             tree_id     = tid,
             tree_type   = info.get("type", "unknown"),
             tree_name   = info.get("name", str(tid)),
             spent       = {str(k): v for k, v in spent.items()},
             total_spent = sum(spent.values()),
         ))
+    result.sort(key=lambda t: _TYPE_ORDER.get(t.tree_type, 99))
+    return result
 
-    trees.sort(key=lambda t: _TYPE_ORDER.get(t.tree_type, 99))
 
-    def _build_trees(aa_list) -> list[CharAATree]:
-        by_tree: dict[int, dict[int, int]] = {}
-        for aa in aa_list:
-            by_tree.setdefault(aa.tree_id, {})[aa.node_id] = aa.tier
-        result = []
-        for tid, spent in by_tree.items():
-            info = _tree_index.get(tid, {})
-            result.append(CharAATree(
-                tree_id     = tid,
-                tree_type   = info.get("type", "unknown"),
-                tree_name   = info.get("name", str(tid)),
-                spent       = {str(k): v for k, v in spent.items()},
-                total_spent = sum(spent.values()),
-            ))
-        result.sort(key=lambda t: _TYPE_ORDER.get(t.tree_type, 99))
-        return result
-
-    profiles_out: list[CharAAProfile] = [
-        CharAAProfile(name=prof.name, trees=_build_trees(prof.aa_list))
-        for prof in char_aas.profiles
-    ]
+@router.get("/character/{name}/aas", response_model=CharAAsResponse)
+async def get_character_aas(name: str) -> CharAAsResponse:
+    """Return a character's spent AAs grouped by tree, sorted by tree type."""
+    client = CensusClient(service_id=_SERVICE_ID)
+    try:
+        char_aas = await client.get_character_aas(name, _WORLD)
+    finally:
+        await client.close()
+    if char_aas is None:
+        raise HTTPException(status_code=404, detail=f"Character '{name}' not found")
 
     return CharAAsResponse(
         character_name = char_aas.character_name,
         total_spent    = sum(aa.tier for aa in char_aas.aa_list),
-        trees          = trees,
-        profiles       = profiles_out,
+        trees          = _build_trees(char_aas.aa_list),
+        profiles       = [
+            CharAAProfile(name=prof.name, trees=_build_trees(prof.aa_list))
+            for prof in char_aas.profiles
+        ],
     )
 
 
@@ -235,17 +217,8 @@ async def get_spell_effects(spellcrc: int, tier: int = 0) -> SpellEffectsRespons
 
     Pass ?tier=N to get effects for the character's actual spent rank.
     tier=0 (default) falls back to the highest available tier.
+    find_by_crc is lru_cache'd so repeated lookups are free.
     """
-    cache_key = (spellcrc, tier)
-    if cache_key in _spell_cache:
-        cached = _spell_cache[cache_key]
-        return SpellEffectsResponse(
-            effects=[SpellEffect(**e) for e in cached["effects"]],
-            matched_tier=cached["matched_tier"],
-            requested_tier=tier or None,
-        )
-
-    import asyncio, json as _json
     row = await asyncio.to_thread(find_by_crc, spellcrc, tier or None)
 
     effects: list[dict] = []
@@ -254,11 +227,10 @@ async def get_spell_effects(spellcrc: int, tier: int = 0) -> SpellEffectsRespons
         matched_tier = row.get("tier")
         if row.get("effects"):
             try:
-                effects = _json.loads(row["effects"])
+                effects = json.loads(row["effects"])
             except Exception:
                 effects = []
 
-    _spell_cache[cache_key] = {"effects": effects, "matched_tier": matched_tier}
     return SpellEffectsResponse(
         effects=[SpellEffect(**e) for e in effects],
         matched_tier=matched_tier,
