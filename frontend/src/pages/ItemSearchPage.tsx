@@ -117,7 +117,8 @@ const CLASS_OPTIONS: { label: string; value: string }[] = [
 interface StatFilter {
   id:       number
   stat:     string
-  minValue: string
+  op:       'gte' | 'lte'
+  value:    string
 }
 
 interface ItemSearchResult {
@@ -239,7 +240,7 @@ export default function ItemSearchPage() {
   // ── Stat filter management ──────────────────────────────────────────────────
 
   function addStatFilter() {
-    const newFilter = { id: nextId(), stat: STAT_OPTIONS_SECONDARY[0], minValue: '' }
+    const newFilter = { id: nextId(), stat: STAT_OPTIONS_SECONDARY[0], op: 'gte' as const, value: '' }
     // First stat filter added → start sorting by it descending
     if (statFilters.length === 0) {
       setSortBy(newFilter.stat)
@@ -268,12 +269,12 @@ export default function ItemSearchPage() {
     setStatFilters(prev => prev.filter(f => f.id !== id))
   }
 
-  function updateStatFilter(id: number, field: 'stat' | 'minValue', value: string) {
+  function updateStatFilter(id: number, field: 'stat' | 'op' | 'value', val: string) {
     // If renaming the stat we're currently sorting by, keep sort in sync
     if (field === 'stat' && sortBy === statFilters.find(f => f.id === id)?.stat) {
-      setSortBy(value)
+      setSortBy(val)
     }
-    setStatFilters(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f))
+    setStatFilters(prev => prev.map(f => f.id === id ? { ...f, [field]: val } : f))
   }
 
   // ── Search ──────────────────────────────────────────────────────────────────
@@ -301,9 +302,11 @@ export default function ItemSearchPage() {
       params.set('class_name', classVal.split(',')[0].trim())
     }
 
-    // Stat filters
+    // Stat filters — encode as "StatName", "StatName:gte:50", or "StatName:lte:50"
     for (const f of statFilters) {
-      if (f.stat) params.append('has_stat', f.stat)
+      if (!f.stat) continue
+      const v = f.value.trim()
+      params.append('stat_filter', v ? `${f.stat}:${f.op}:${v}` : f.stat)
     }
 
     setLoading(true)
@@ -482,6 +485,7 @@ export default function ItemSearchPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 {statFilters.map(f => (
                   <div key={f.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {/* Stat name */}
                     <select
                       value={f.stat}
                       onChange={e => updateStatFilter(f.id, 'stat', e.target.value)}
@@ -498,17 +502,26 @@ export default function ItemSearchPage() {
                         ))}
                       </optgroup>
                     </select>
+                    {/* Operator */}
+                    <select
+                      value={f.op}
+                      onChange={e => updateStatFilter(f.id, 'op', e.target.value)}
+                      style={{ ...CTRL, width: 60, paddingLeft: '0.4rem', paddingRight: '0.2rem' }}
+                      title="Comparison operator"
+                    >
+                      <option value="gte">≥</option>
+                      <option value="lte">≤</option>
+                    </select>
+                    {/* Value */}
                     <input
                       type="number"
                       min={0}
-                      placeholder="any value"
-                      value={f.minValue}
-                      onChange={e => updateStatFilter(f.id, 'minValue', e.target.value)}
-                      style={{ ...CTRL, width: 100 }}
+                      placeholder="any"
+                      value={f.value}
+                      onChange={e => updateStatFilter(f.id, 'value', e.target.value)}
+                      style={{ ...CTRL, width: 90 }}
                     />
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                      {f.minValue ? `≥ ${f.minValue}` : '(present)'}
-                    </span>
+                    {/* Remove */}
                     <button
                       type="button"
                       onClick={() => removeStatFilter(f.id)}

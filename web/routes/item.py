@@ -285,7 +285,7 @@ async def search_items(
     class_name: str | None            = None,   # lowercase class key in classes_json
     min_level:  int | None            = None,
     max_level:  int | None            = None,
-    has_stat:   list[str]             = Query(default=[]),  # canonical stat names
+    stat_filter: list[str]            = Query(default=[]),  # "StatName" or "StatName:gte:50" or "StatName:lte:50"
     sort_by:    str                   = "name",  # name | level | tier
     sort_dir:   str                   = "asc",
     page:       int                   = 1,
@@ -293,12 +293,35 @@ async def search_items(
     """
     Search the local items DB with optional filters.
     At least one filter must be provided.
+
+    stat_filter entries are encoded as:
+      "StatName"           – item must have the stat (any value)
+      "StatName:gte:50"    – stat value >= 50
+      "StatName:lte:50"    – stat value <= 50
     """
     per_page = 50
 
+    # Parse stat_filter entries into (stat_name, op, threshold_or_None) tuples
+    parsed_stats: list[tuple[str, str, float | None]] = []
+    for sf in stat_filter:
+        parts = sf.split(":", 2)
+        if len(parts) == 3:
+            sname, op, val_str = parts
+            op = op.lower()
+            if op not in ("gte", "lte"):
+                op = "gte"
+            try:
+                parsed_stats.append((sname, op, float(val_str)))
+            except ValueError:
+                parsed_stats.append((sname, "gte", None))
+        else:
+            parsed_stats.append((sf, "gte", None))
+
+    has_stat = [s for s, _, __ in parsed_stats]  # plain name list for compat
+
     # Require at least one meaningful filter
     if not any([name, tier, slot, item_type, class_name,
-                min_level is not None, max_level is not None, has_stat]):
+                min_level is not None, max_level is not None, parsed_stats]):
         return ItemSearchResponse(results=[], total=0, page=1, per_page=per_page)
 
     if not DB_PATH.exists():
@@ -365,11 +388,19 @@ async def search_items(
     stat_joins = ""
     join_params: list = []  # bound to ON conditions inside each JOIN
 
-    for i, stat in enumerate(has_stat):
+    for i, (stat, op, threshold) in enumerate(parsed_stats):
         alias = f"s{i}"
         stat_alias[stat] = alias
-        stat_joins += f" JOIN item_stats {alias} ON i.id = {alias}.item_id AND {alias}.stat = ?"
-        join_params.append(stat)
+        if threshold is not None:
+            op_sql = ">=" if op == "gte" else "<="
+            stat_joins += (
+                f" JOIN item_stats {alias} ON i.id = {alias}.item_id"
+                f" AND {alias}.stat = ? AND {alias}.value {op_sql} ?"
+            )
+            join_params.extend([stat, threshold])
+        else:
+            stat_joins += f" JOIN item_stats {alias} ON i.id = {alias}.item_id AND {alias}.stat = ?"
+            join_params.append(stat)
 
     # ── Sort ──────────────────────────────────────────────────────────────────
     direction = "DESC" if sort_dir == "desc" else "ASC"
