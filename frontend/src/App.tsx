@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import type { CSSProperties } from 'react'
 import { Routes, Route, Outlet, NavLink } from 'react-router-dom'
 import HomePage from './pages/HomePage'
@@ -6,10 +5,16 @@ import CharacterPage from './pages/CharacterPage'
 import ClaimPage from './pages/ClaimPage'
 import AdminPage from './pages/AdminPage'
 import GuildPage from './pages/GuildPage'
+import {
+  CharacterSearchPage,
+  GuildSearchPage,
+  ItemSearchPage,
+  SpellSearchPage,
+  AASearchPage,
+} from './pages/SearchPage'
 import UserWidget from './components/UserWidget'
 import { useAuth } from './hooks/useAuth'
 import { Link } from 'react-router-dom'
-import { useClaim } from './hooks/useClaim'
 import logo from './L&L.png'
 
 function LoginGate() {
@@ -63,76 +68,25 @@ function LoginGate() {
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
   fontFamily: "'Cinzel', serif",
-  fontSize: '0.85rem',
+  fontSize: '0.82rem',
   fontWeight: 600,
-  letterSpacing: '0.08em',
+  letterSpacing: '0.07em',
   textDecoration: 'none',
   color: isActive ? '#e8d5a3' : '#9a7d4a',
   borderBottom: isActive ? '1px solid #c8a96e' : '1px solid transparent',
   paddingBottom: '2px',
   transition: 'color 0.15s, border-color 0.15s',
+  whiteSpace: 'nowrap',
 })
 
-// ---------------------------------------------------------------------------
-// Nav link data: cached in localStorage for 24 h, refreshed on primary change
-// ---------------------------------------------------------------------------
-
-const _NAV_KEY = 'eq2_nav'
-const _NAV_TTL = 86_400_000  // 24 hours in ms
-
-interface NavCache { primary: string; guild: string | null; ts: number }
-
-function _readNavCache(): NavCache | null {
-  try {
-    const raw = localStorage.getItem(_NAV_KEY)
-    if (!raw) return null
-    const c: NavCache = JSON.parse(raw)
-    if (Date.now() - c.ts > _NAV_TTL) return null   // stale — treat as miss
-    return c
-  } catch { return null }
-}
-
-function _writeNavCache(primary: string, guild: string | null) {
-  try {
-    localStorage.setItem(_NAV_KEY, JSON.stringify({ primary, guild, ts: Date.now() }))
-  } catch { /* storage full or disabled — silently ignore */ }
-}
-
 function NavLinks() {
-  // Initialise synchronously from localStorage so links render instantly with no flash
-  const [navData, setNavData] = useState<{ primary: string; guild: string | null } | null>(
-    () => {
-      const c = _readNavCache()
-      return c ? { primary: c.primary, guild: c.guild } : null
-    }
-  )
-
-  // useClaim() keeps the cache fresh: updates on primary-character change or after 24 h
-  const claims = useClaim()
-  useEffect(() => {
-    if (claims.status !== 'ready') return
-    const primary = claims.data.approved.find(c => c.is_primary === 1)
-    if (!primary) return
-    const cached = _readNavCache()
-    // Write through if: no cache, different primary, or guild name changed
-    if (!cached || cached.primary !== primary.character_name || cached.guild !== primary.guild_name) {
-      _writeNavCache(primary.character_name, primary.guild_name)
-      setNavData({ primary: primary.character_name, guild: primary.guild_name })
-    }
-  }, [claims])
-
-  if (!navData) return null
-
   return (
-    <nav style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-      <NavLink to={`/character/${navData.primary}`} style={navLinkStyle} className="nav-ribbon-link">
-        Character
-      </NavLink>
-      {navData.guild && (
-        <NavLink to={`/guild/${encodeURIComponent(navData.guild)}`} style={navLinkStyle} className="nav-ribbon-link">
-          Guild
-        </NavLink>
-      )}
+    <nav style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+      <NavLink to="/characters" style={navLinkStyle}>Character</NavLink>
+      <NavLink to="/guilds"     style={navLinkStyle}>Guild</NavLink>
+      <NavLink to="/items"      style={navLinkStyle}>Item</NavLink>
+      <NavLink to="/spells"     style={navLinkStyle}>Spell</NavLink>
+      <NavLink to="/aa"         style={navLinkStyle}>AA</NavLink>
     </nav>
   )
 }
@@ -174,6 +128,11 @@ function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/characters" element={<CharacterSearchPage />} />
+        <Route path="/guilds"     element={<GuildSearchPage />} />
+        <Route path="/items"      element={<ItemSearchPage />} />
+        <Route path="/spells"     element={<SpellSearchPage />} />
+        <Route path="/aa"         element={<AASearchPage />} />
         <Route path="/character/:name" element={<CharacterPage />} />
         <Route path="/guild/:guildName" element={<GuildPage />} />
         <Route path="/claim" element={<ClaimPage />} />
