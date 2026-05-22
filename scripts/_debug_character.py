@@ -19,8 +19,7 @@ async def main():
     params = {
         "name.first": name,
         "locationdata.world": world,
-        "c:resolve": "equipment(displayname,id,iconid,slot,tier)",
-        "c:show": "name,type,equipmentslot_list,alternateadvancements",
+        "c:show": "name,type,stats",
         "c:limit": "1",
     }
 
