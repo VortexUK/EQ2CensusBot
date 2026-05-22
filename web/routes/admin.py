@@ -36,7 +36,7 @@ def _require_admin(request: Request) -> dict:
 class ClaimDetail(BaseModel):
     id: int
     discord_id: str
-    discord_name: str
+    discord_name: str | None = None   # NULL when user row missing (LEFT JOIN)
     discord_username: str | None = None
     avatar: str | None = None
     character_name: str

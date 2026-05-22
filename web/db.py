@@ -288,9 +288,9 @@ async def get_claim_by_id(
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """
-            SELECT c.*, u.discord_name, u.avatar
+            SELECT c.*, u.discord_name, u.discord_username, u.avatar
             FROM character_claims c
-            JOIN users u ON u.discord_id = c.discord_id
+            LEFT JOIN users u ON u.discord_id = c.discord_id
             WHERE c.id = ?
             """,
             (claim_id,),
@@ -314,9 +314,9 @@ async def list_claims(
             order = "ASC" if status == "pending" else "DESC"
             async with db.execute(
                 f"""
-                SELECT c.*, u.discord_name, u.avatar
+                SELECT c.*, u.discord_name, u.discord_username, u.avatar
                 FROM character_claims c
-                JOIN users u ON u.discord_id = c.discord_id
+                LEFT JOIN users u ON u.discord_id = c.discord_id
                 WHERE c.status = ?
                 ORDER BY c.requested_at {order}
                 """,
@@ -326,9 +326,9 @@ async def list_claims(
         else:
             async with db.execute(
                 """
-                SELECT c.*, u.discord_name, u.avatar
+                SELECT c.*, u.discord_name, u.discord_username, u.avatar
                 FROM character_claims c
-                JOIN users u ON u.discord_id = c.discord_id
+                LEFT JOIN users u ON u.discord_id = c.discord_id
                 ORDER BY c.requested_at DESC
                 """
             ) as cur:

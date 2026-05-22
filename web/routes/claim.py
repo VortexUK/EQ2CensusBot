@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from census.client import CensusClient
 from web.cache import claim_cache
-from web.db import get_active_claims, set_primary, submit_claim, withdraw_claim
+from web.db import get_active_claims, set_primary, submit_claim, upsert_user, withdraw_claim
 
 router = APIRouter(tags=["claim"])
 
@@ -145,6 +145,15 @@ async def create_claim(body: SubmitClaimRequest, request: Request) -> ClaimRespo
     name = body.character_name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Character name is required")
+
+    # Ensure the user row exists — it may be missing if the DB was reset while
+    # the session cookie was still valid (i.e. user never re-authed after reset).
+    await upsert_user(
+        discord_id=user["id"],
+        discord_name=user.get("global_name") or user.get("username", user["id"]),
+        discord_username=user.get("username", ""),
+        avatar=user.get("avatar"),
+    )
 
     client = CensusClient(service_id=_SERVICE_ID)
     try:

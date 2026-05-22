@@ -7,7 +7,7 @@ import { useAuth } from '../hooks/useAuth'
 interface ClaimDetail {
   id: number
   discord_id: string
-  discord_name: string
+  discord_name: string | null
   discord_username: string | null
   avatar: string | null
   character_name: string
@@ -20,9 +20,10 @@ interface ClaimDetail {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function discordDisplayName(name: string, username: string | null): string {
-  if (!username || username === name) return name
-  return `${name} (${username})`
+function discordDisplayName(name: string | null, username: string | null): string {
+  const display = name ?? username ?? 'Unknown user'
+  if (!username || username === name) return display
+  return `${display} (${username})`
 }
 
 function discordAvatar(id: string, avatar: string | null): string {
@@ -361,12 +362,21 @@ export default function AdminPage() {
   const [all, setAll] = useState<ClaimDetail[]>([])
   const [showAll, setShowAll] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   async function fetchPending() {
     setLoading(true)
+    setFetchError(null)
     try {
       const res = await fetch('/api/admin/claims?status=pending', { credentials: 'include' })
-      if (res.ok) setPending(await res.json())
+      if (res.ok) {
+        setPending(await res.json())
+      } else {
+        const detail = await res.json().catch(() => ({}))
+        setFetchError(`Error ${res.status}: ${detail.detail ?? 'Failed to load claims'}`)
+      }
+    } catch {
+      setFetchError('Network error — could not load claims.')
     } finally {
       setLoading(false)
     }
@@ -423,7 +433,11 @@ export default function AdminPage() {
 
       {loading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
 
-      {!loading && pendingGroups.length === 0 && (
+      {!loading && fetchError && (
+        <p style={{ color: '#f87171' }}>{fetchError}</p>
+      )}
+
+      {!loading && !fetchError && pendingGroups.length === 0 && (
         <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No pending claims.</p>
       )}
 
