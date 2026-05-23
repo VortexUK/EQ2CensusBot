@@ -40,6 +40,8 @@ interface SearchConfig {
   linkPrefix:  string
   /** Colour for result links */
   linkColor:   string
+  /** Small note rendered below the search input */
+  sourceNote:  string
   /** Optional: format a subtitle line from a result row */
   renderSub?:  (r: SearchResult) => string | null
 }
