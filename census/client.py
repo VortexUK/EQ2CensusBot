@@ -571,6 +571,138 @@ class CensusClient:
             return None  # character genuinely has no guild
         return guild.get("name") or None
 
+    async def get_character_brief(self, name: str, world: str) -> dict | None:
+        """
+        Lightweight single-character lookup — returns name, class, level, guild only.
+        Uses the same ``name.first`` exact-match parameter as ``get_character``
+        so it works reliably even when prefix-search misses a character.
+        """
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
+        params = {
+            "name.first": name,
+            "locationdata.world": world,
+            "c:show": "displayname,type,guild",
+            "c:limit": "1",
+        }
+        print(f"[Census] GET {url} params={params}")
+        try:
+            async with self._session_().get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=15)
+            ) as resp:
+                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                if resp.status != 200:
+                    return None
+                data = await resp.json(content_type=None)
+        except Exception as exc:
+            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            return None
+
+        char_list = data.get("character_list", [])
+        if not char_list:
+            return None
+        char = char_list[0]
+        t     = char.get("type") or {}
+        guild = char.get("guild") or {}
+        char_name = char.get("displayname") or (char.get("name") or {}).get("first", name)
+        return {
+            "name":       char_name,
+            "cls":        t.get("class"),
+            "class_id":   _int(t.get("classid")),
+            "level":      _int(t.get("level")),
+            "aa_level":   _int(t.get("aa_level")),
+            "race":       t.get("race"),
+            "guild_name": guild.get("name") if isinstance(guild, dict) else None,
+        }
+
+    async def search_characters_by_name(
+        self,
+        name: str,
+        world: str,
+        limit: int = 20,
+    ) -> list[dict]:
+        """
+        Search characters whose first name starts with *name* on the given world.
+        Uses Census ``name.first_lower`` prefix filter (``^`` = starts-with).
+        Returns a list of dicts with keys: name, cls, class_id, level, aa_level,
+        race, guild_name.
+        """
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
+        params = {
+            "name.first_lower": f"^{name.lower()}",
+            "locationdata.world": world,
+            "c:show": "displayname,type,guild",
+            "c:limit": str(limit),
+        }
+        print(f"[Census] GET {url} params={params}")
+        try:
+            async with self._session_().get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=15)
+            ) as resp:
+                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                if resp.status != 200:
+                    return []
+                data = await resp.json(content_type=None)
+        except Exception as exc:
+            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            return []
+
+        results: list[dict] = []
+        for char in data.get("character_list") or []:
+            t = char.get("type") or {}
+            guild = char.get("guild") or {}
+            char_name = char.get("displayname") or (char.get("name") or {}).get("first", "")
+            if not char_name:
+                continue
+            results.append({
+                "name":       char_name,
+                "cls":        t.get("class"),
+                "class_id":   _int(t.get("classid")),
+                "level":      _int(t.get("level")),
+                "aa_level":   _int(t.get("aa_level")),
+                "race":       t.get("race"),
+                "guild_name": guild.get("name") if isinstance(guild, dict) else None,
+            })
+        results.sort(key=lambda r: (r.get("name") or "").lower())
+        return results
+
+    async def search_guilds_by_name(
+        self,
+        name: str,
+        world: str,
+        limit: int = 15,
+    ) -> list[dict]:
+        """
+        Search guilds whose name starts with *name* on the given world.
+        Returns a list of dicts with keys: name.
+        """
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
+        params = {
+            "name_lower": f"^{name.lower()}",
+            "world": world,
+            "c:show": "name,world",
+            "c:limit": str(limit),
+        }
+        print(f"[Census] GET {url} params={params}")
+        try:
+            async with self._session_().get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=15)
+            ) as resp:
+                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                if resp.status != 200:
+                    return []
+                data = await resp.json(content_type=None)
+        except Exception as exc:
+            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            return []
+
+        results: list[dict] = []
+        for guild in data.get("guild_list") or []:
+            guild_name = guild.get("name")
+            if guild_name:
+                results.append({"name": guild_name})
+        results.sort(key=lambda r: (r.get("name") or "").lower())
+        return results
+
     async def search_characters(
         self,
         world: str,

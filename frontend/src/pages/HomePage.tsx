@@ -177,6 +177,91 @@ function CharacterCard({ claim, detail, isPrimary }: {
   )
 }
 
+// ── Guilds sidebar ────────────────────────────────────────────────────────────
+
+function GuildsSidebar({ approved }: { approved: Claim[] }) {
+  // Collect unique guilds with a count of how many of the user's chars are in each
+  const guildMap = new Map<string, number>()
+  for (const c of approved) {
+    if (c.guild_name) {
+      guildMap.set(c.guild_name, (guildMap.get(c.guild_name) ?? 0) + 1)
+    }
+  }
+  const guilds = [...guildMap.entries()].sort(([a], [b]) => a.localeCompare(b))
+
+  if (guilds.length === 0) return null
+
+  return (
+    <aside style={{
+      width: 210,
+      flexShrink: 0,
+    }}>
+      <h2 style={{
+        fontFamily: "'Cinzel', serif",
+        fontSize: '0.88rem',
+        fontWeight: 600,
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        color: 'rgba(200,169,110,0.7)',
+        margin: '0 0 0.85rem',
+      }}>
+        My Guilds
+      </h2>
+
+      <div style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 8,
+        overflow: 'hidden',
+      }}>
+        {guilds.map(([name, count], i) => (
+          <Link
+            key={name}
+            to={`/guild/${encodeURIComponent(name)}`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.6rem 0.85rem',
+              borderBottom: i < guilds.length - 1 ? '1px solid var(--border)' : 'none',
+              textDecoration: 'none',
+              transition: 'background 0.1s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-raised)')}
+            onMouseLeave={e => (e.currentTarget.style.background = '')}
+          >
+            <span style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: '0.82rem',
+              color: '#c8a96e',
+              fontWeight: 500,
+              letterSpacing: '0.02em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flex: 1,
+              marginRight: '0.5rem',
+            }}>
+              {name}
+            </span>
+            <span style={{
+              fontSize: '0.72rem',
+              color: 'var(--text-muted)',
+              background: 'var(--surface-raised)',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              padding: '0.05rem 0.45rem',
+              flexShrink: 0,
+            }}>
+              {count}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </aside>
+  )
+}
+
 // ── My Characters grid ────────────────────────────────────────────────────────
 
 function MyCharacters() {
@@ -250,53 +335,62 @@ function MyCharacters() {
   }
 
   return (
-    <div>
-      {/* Section header */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '1.1rem' }}>
-        <h2 style={{
-          fontFamily: "'Cinzel', serif",
-          fontSize: '0.88rem',
-          fontWeight: 600,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          color: 'rgba(200,169,110,0.7)',
-          margin: 0,
-        }}>
-          My Characters
-        </h2>
-        <Link to="/claim" style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textDecoration: 'none' }}>
-          manage
-        </Link>
-      </div>
+    <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
 
-      {/* Cards grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-        gap: '0.85rem',
-      }}>
-        {approved.map(c => (
-          <CharacterCard
-            key={c.id}
-            claim={c}
-            detail={details[c.character_name] ?? null}
-            isPrimary={c === primary}
-          />
-        ))}
-      </div>
+      {/* Left: character cards */}
+      <div style={{ flex: 1, minWidth: 0 }}>
 
-      {/* Pending claim notice */}
-      {pending && (
-        <div style={{
-          marginTop: '1rem',
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          fontSize: '0.83rem', color: 'var(--text-muted)',
-        }}>
-          <span>⏳</span>
-          <span style={{ fontStyle: 'italic' }}>{pending.character_name}</span>
-          <Link to="/claim" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>· pending approval</Link>
+        {/* Section header */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '1.1rem' }}>
+          <h2 style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: '0.88rem',
+            fontWeight: 600,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: 'rgba(200,169,110,0.7)',
+            margin: 0,
+          }}>
+            My Characters
+          </h2>
+          <Link to="/claim" style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textDecoration: 'none' }}>
+            manage
+          </Link>
         </div>
-      )}
+
+        {/* Cards grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+          gap: '0.85rem',
+        }}>
+          {approved.map(c => (
+            <CharacterCard
+              key={c.id}
+              claim={c}
+              detail={details[c.character_name] ?? null}
+              isPrimary={c === primary}
+            />
+          ))}
+        </div>
+
+        {/* Pending claim notice */}
+        {pending && (
+          <div style={{
+            marginTop: '1rem',
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+            fontSize: '0.83rem', color: 'var(--text-muted)',
+          }}>
+            <span>⏳</span>
+            <span style={{ fontStyle: 'italic' }}>{pending.character_name}</span>
+            <Link to="/claim" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>· pending approval</Link>
+          </div>
+        )}
+      </div>
+
+      {/* Right: guilds sidebar */}
+      <GuildsSidebar approved={approved} />
+
     </div>
   )
 }
@@ -307,7 +401,7 @@ export default function HomePage() {
   const auth = useAuth()
 
   return (
-    <main style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
+    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
 
       {/* Title */}
       <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>

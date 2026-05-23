@@ -4,80 +4,286 @@ import { useAuth } from '../hooks/useAuth'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface PendingUser {
+interface UserItem {
   discord_id:       string
-  discord_name:     string
+  discord_name:     string | null
   discord_username: string | null
   avatar:           string | null
   first_seen:       number
+  last_seen:        number
+  access_status:    string
+  claim_count:      number
 }
 
 interface ClaimDetail {
-  id: number
-  discord_id: string
-  discord_name: string | null
+  id:               number
+  discord_id:       string
+  discord_name:     string | null
   discord_username: string | null
-  avatar: string | null
-  character_name: string
-  status: string
-  requested_at: number
-  reviewed_at: number | null
-  reviewed_by: string | null
-  note: string | null
+  avatar:           string | null
+  character_name:   string
+  status:           string
+  requested_at:     number
+  reviewed_at:      number | null
+  reviewed_by:      string | null
+  note:             string | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function discordDisplayName(name: string | null, username: string | null): string {
-  const display = name ?? username ?? 'Unknown user'
-  if (!username || username === name) return display
-  return `${display} (${username})`
-}
-
 function discordAvatar(id: string, avatar: string | null): string {
-  if (avatar) return `https://cdn.discordapp.com/avatars/${id}/${avatar}.png?size=64`
+  if (avatar) return `https://cdn.discordapp.com/avatars/${id}/${avatar}.png?size=32`
   const index = Number(BigInt(id) >> 22n) % 6
   return `https://cdn.discordapp.com/embed/avatars/${index}.png`
 }
 
+function fmt(unix: number): string {
+  return new Date(unix * 1000).toLocaleDateString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+  })
+}
+
 function relativeTime(unix: number): string {
   const diff = Math.floor(Date.now() / 1000) - unix
-  if (diff < 60)   return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 60)    return 'just now'
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   return `${Math.floor(diff / 86400)}d ago`
 }
 
-function groupByUser(claims: ClaimDetail[]): { discordId: string; claims: ClaimDetail[] }[] {
-  const map = new Map<string, ClaimDetail[]>()
-  for (const c of claims) {
-    const bucket = map.get(c.discord_id) ?? []
-    bucket.push(c)
-    map.set(c.discord_id, bucket)
-  }
-  return Array.from(map.entries()).map(([discordId, claims]) => ({ discordId, claims }))
+const ACCESS_BADGE: Record<string, React.CSSProperties> = {
+  pending:  { background: 'rgba(234,179,8,0.18)',   color: '#fbbf24', border: '1px solid rgba(234,179,8,0.4)'  },
+  approved: { background: 'rgba(34,197,94,0.13)',   color: '#4ade80', border: '1px solid rgba(34,197,94,0.35)' },
+  denied:   { background: 'rgba(239,68,68,0.13)',   color: '#f87171', border: '1px solid rgba(239,68,68,0.35)' },
 }
 
-const STATUS_BADGE: Record<string, React.CSSProperties> = {
-  pending:    { background: 'rgba(234,179,8,0.2)',    color: '#fbbf24', border: '1px solid rgba(234,179,8,0.4)'    },
-  approved:   { background: 'rgba(34,197,94,0.15)',   color: '#4ade80', border: '1px solid rgba(34,197,94,0.4)'    },
-  rejected:   { background: 'rgba(239,68,68,0.15)',   color: '#f87171', border: '1px solid rgba(239,68,68,0.4)'    },
-  withdrawn:  { background: 'rgba(100,116,139,0.15)', color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)'  },
-  superseded: { background: 'rgba(100,116,139,0.15)', color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)'  },
+const CLAIM_BADGE: Record<string, React.CSSProperties> = {
+  pending:    { background: 'rgba(234,179,8,0.18)',    color: '#fbbf24', border: '1px solid rgba(234,179,8,0.4)'    },
+  approved:   { background: 'rgba(34,197,94,0.13)',    color: '#4ade80', border: '1px solid rgba(34,197,94,0.35)'   },
+  rejected:   { background: 'rgba(239,68,68,0.13)',    color: '#f87171', border: '1px solid rgba(239,68,68,0.35)'   },
+  withdrawn:  { background: 'rgba(100,116,139,0.13)',  color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)'  },
+  superseded: { background: 'rgba(100,116,139,0.13)',  color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)'  },
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const style = STATUS_BADGE[status] ?? STATUS_BADGE.withdrawn
+function Badge({ label, style }: { label: string; style?: React.CSSProperties }) {
   return (
-    <span style={{ ...style, borderRadius: 4, padding: '1px 7px', fontSize: '0.75rem', fontWeight: 600 }}>
-      {status}
+    <span style={{
+      borderRadius: 4, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 600,
+      whiteSpace: 'nowrap',
+      ...style,
+    }}>
+      {label}
     </span>
   )
 }
 
-// ── Pending claim row (inside a user section) ─────────────────────────────────
+// ── Shared table styles ───────────────────────────────────────────────────────
 
-function PendingClaimRow({ claim, onAction }: { claim: ClaimDetail; onAction: () => void }) {
+const TABLE: React.CSSProperties = {
+  width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem',
+}
+const TH: React.CSSProperties = {
+  textAlign: 'left', padding: '0.45rem 0.75rem',
+  color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600,
+  textTransform: 'uppercase', letterSpacing: '0.05em',
+  borderBottom: '1px solid var(--border)',
+  whiteSpace: 'nowrap',
+}
+const TD: React.CSSProperties = {
+  padding: '0.5rem 0.75rem',
+  borderBottom: '1px solid rgba(255,255,255,0.05)',
+  verticalAlign: 'middle',
+}
+const BTN_BASE: React.CSSProperties = {
+  padding: '0.22rem 0.65rem', borderRadius: 4, cursor: 'pointer',
+  fontSize: '0.78rem', fontWeight: 600, border: 'none', whiteSpace: 'nowrap',
+}
+const BTN_GREEN: React.CSSProperties = {
+  ...BTN_BASE,
+  background: 'rgba(34,197,94,0.15)', color: '#4ade80',
+  border: '1px solid rgba(34,197,94,0.4)',
+}
+const BTN_RED: React.CSSProperties = {
+  ...BTN_BASE,
+  background: 'rgba(239,68,68,0.12)', color: '#f87171',
+  border: '1px solid rgba(239,68,68,0.35)',
+}
+const BTN_GHOST: React.CSSProperties = {
+  ...BTN_BASE,
+  background: 'transparent', color: 'var(--text-muted)',
+  border: '1px solid var(--border)',
+}
+const BTN_AMBER: React.CSSProperties = {
+  ...BTN_BASE,
+  background: 'rgba(234,179,8,0.12)', color: '#fbbf24',
+  border: '1px solid rgba(234,179,8,0.35)',
+}
+
+// ── Users table ───────────────────────────────────────────────────────────────
+
+function UserRow({ user, onAction }: { user: UserItem; onAction: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [kickConfirm, setKickConfirm] = useState(false)
+
+  async function doAccess(action: 'approve' | 'deny' | 'kick') {
+    setBusy(true)
+    try {
+      const url = action === 'kick'
+        ? `/api/admin/users/${user.discord_id}/kick`
+        : `/api/admin/users/${user.discord_id}/${action}`
+      await fetch(url, { method: 'POST', credentials: 'include' })
+      onAction()
+    } finally {
+      setBusy(false)
+      setKickConfirm(false)
+    }
+  }
+
+  const displayName = user.discord_name ?? user.discord_username ?? 'Unknown'
+  const badgeStyle  = ACCESS_BADGE[user.access_status] ?? ACCESS_BADGE.denied
+
+  return (
+    <tr>
+      {/* User */}
+      <td style={TD}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <img
+            src={discordAvatar(user.discord_id, user.avatar)}
+            alt=""
+            width={28} height={28}
+            style={{ borderRadius: '50%', flexShrink: 0 }}
+          />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: '0.88rem', lineHeight: 1.2 }}>
+              {displayName}
+            </div>
+            {user.discord_username && user.discord_username !== user.discord_name && (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                {user.discord_username}
+              </div>
+            )}
+          </div>
+        </div>
+      </td>
+
+      {/* Joined */}
+      <td style={{ ...TD, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+        <span title={fmt(user.first_seen)}>{relativeTime(user.first_seen)}</span>
+      </td>
+
+      {/* Status */}
+      <td style={TD}>
+        <Badge label={user.access_status} style={badgeStyle} />
+      </td>
+
+      {/* Claims */}
+      <td style={{ ...TD, textAlign: 'center', color: user.claim_count ? 'var(--text)' : 'var(--text-muted)' }}>
+        {user.claim_count}
+      </td>
+
+      {/* Actions */}
+      <td style={{ ...TD, whiteSpace: 'nowrap' }}>
+        {kickConfirm ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.75rem', color: '#f87171' }}>Kick + delete all claims?</span>
+            <button onClick={() => doAccess('kick')} disabled={busy} style={BTN_RED}>
+              {busy ? '…' : 'Confirm'}
+            </button>
+            <button onClick={() => setKickConfirm(false)} style={BTN_GHOST}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+            {user.access_status !== 'approved' && (
+              <button onClick={() => doAccess('approve')} disabled={busy} style={BTN_GREEN}>
+                Approve
+              </button>
+            )}
+            {user.access_status !== 'denied' && (
+              <button onClick={() => doAccess('deny')} disabled={busy} style={BTN_RED}>
+                Deny
+              </button>
+            )}
+            <button
+              onClick={() => setKickConfirm(true)}
+              disabled={busy}
+              style={BTN_AMBER}
+              title="Revoke access and delete all claims"
+            >
+              Kick
+            </button>
+          </div>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function UsersTable({ users, onAction }: { users: UserItem[]; onAction: () => void }) {
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'denied'>('all')
+
+  const visible = filter === 'all' ? users : users.filter(u => u.access_status === filter)
+
+  const counts = {
+    all:      users.length,
+    pending:  users.filter(u => u.access_status === 'pending').length,
+    approved: users.filter(u => u.access_status === 'approved').length,
+    denied:   users.filter(u => u.access_status === 'denied').length,
+  }
+
+  return (
+    <div>
+      {/* Filter pills */}
+      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+        {(['all', 'pending', 'approved', 'denied'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            style={{
+              ...BTN_BASE,
+              background: filter === f ? 'rgba(200,169,110,0.15)' : 'transparent',
+              color: filter === f ? '#c8a96e' : 'var(--text-muted)',
+              border: filter === f ? '1px solid rgba(200,169,110,0.4)' : '1px solid var(--border)',
+            }}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)}{' '}
+            <span style={{ opacity: 0.7, fontSize: '0.7rem' }}>({counts[f]})</span>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+        <table style={TABLE}>
+          <thead>
+            <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <th style={TH}>User</th>
+              <th style={TH}>Joined</th>
+              <th style={TH}>Status</th>
+              <th style={{ ...TH, textAlign: 'center' }}>Claims</th>
+              <th style={TH}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.length === 0 ? (
+              <tr>
+                <td colSpan={5} style={{ ...TD, color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem' }}>
+                  No users.
+                </td>
+              </tr>
+            ) : (
+              visible.map(u => (
+                <UserRow key={u.discord_id} user={u} onAction={onAction} />
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── Claims table ──────────────────────────────────────────────────────────────
+
+function ClaimRow({ claim, onDelete }: { claim: ClaimDetail; onDelete: () => void }) {
   const [rejectOpen, setRejectOpen] = useState(false)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -91,339 +297,182 @@ function PendingClaimRow({ claim, onAction }: { claim: ClaimDetail; onAction: ()
         headers: body ? { 'Content-Type': 'application/json' } : undefined,
         body: body ? JSON.stringify(body) : undefined,
       })
-      onAction()
+      onDelete()
     } finally {
       setBusy(false)
+      setRejectOpen(false)
     }
   }
 
-  return (
-    <div style={{
-      padding: '0.55rem 0.75rem',
-      borderBottom: '1px solid var(--border)',
-      background: 'var(--surface-raised)',
-      borderRadius: 4,
-      marginBottom: '0.35rem',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-        <span style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '0.92rem' }}>
-          {claim.character_name}
-        </span>
-        <StatusBadge status={claim.status} />
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: 'auto' }}>
-          {relativeTime(claim.requested_at)}
-        </span>
-      </div>
+  const displayName = claim.discord_name ?? claim.discord_username ?? claim.discord_id
+  const badgeStyle  = CLAIM_BADGE[claim.status] ?? CLAIM_BADGE.withdrawn
 
-      {!rejectOpen ? (
-        <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.45rem', alignItems: 'center' }}>
-          <button
-            onClick={() => doAction(`/api/admin/claims/${claim.id}/approve`)}
-            disabled={busy}
-            style={{
-              padding: '0.25rem 0.75rem', borderRadius: 5, cursor: 'pointer', fontSize: '0.82rem',
-              background: 'rgba(34,197,94,0.15)', color: '#4ade80',
-              border: '1px solid rgba(34,197,94,0.4)',
-            }}
-          >
-            Approve
-          </button>
-          <button
-            onClick={() => setRejectOpen(true)}
-            disabled={busy}
-            style={{
-              padding: '0.25rem 0.75rem', borderRadius: 5, cursor: 'pointer', fontSize: '0.82rem',
-              background: 'rgba(239,68,68,0.1)', color: '#f87171',
-              border: '1px solid rgba(239,68,68,0.3)',
-            }}
-          >
-            Reject
-          </button>
+  return (
+    <tr>
+      {/* Character */}
+      <td style={{ ...TD, color: 'var(--accent)', fontWeight: 600 }}>
+        {claim.character_name}
+      </td>
+
+      {/* User */}
+      <td style={TD}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <img
+            src={discordAvatar(claim.discord_id, claim.avatar)}
+            alt=""
+            width={22} height={22}
+            style={{ borderRadius: '50%', flexShrink: 0 }}
+          />
+          <span style={{ fontSize: '0.85rem' }}>{displayName}</span>
+        </div>
+      </td>
+
+      {/* Status */}
+      <td style={TD}>
+        <Badge label={claim.status} style={badgeStyle} />
+      </td>
+
+      {/* Submitted */}
+      <td style={{ ...TD, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+        <span title={fmt(claim.requested_at)}>{relativeTime(claim.requested_at)}</span>
+      </td>
+
+      {/* Reviewed */}
+      <td style={{ ...TD, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+        {claim.reviewed_at ? (
+          <span title={fmt(claim.reviewed_at)}>{relativeTime(claim.reviewed_at)}</span>
+        ) : (
+          <span style={{ opacity: 0.4 }}>—</span>
+        )}
+      </td>
+
+      {/* Note */}
+      <td style={{ ...TD, color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem', maxWidth: 180 }}>
+        {claim.note
+          ? <span title={claim.note} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{claim.note}"</span>
+          : <span style={{ opacity: 0.4 }}>—</span>
+        }
+      </td>
+
+      {/* Actions */}
+      <td style={{ ...TD, whiteSpace: 'nowrap' }}>
+        {claim.status === 'pending' ? (
+          rejectOpen ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 200 }}>
+              <textarea
+                placeholder="Optional rejection reason…"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                rows={2}
+                style={{ fontSize: '0.78rem', resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                <button
+                  onClick={() => doAction(`/api/admin/claims/${claim.id}/reject`, { note: note || null })}
+                  disabled={busy}
+                  style={BTN_RED}
+                >
+                  {busy ? '…' : 'Confirm'}
+                </button>
+                <button onClick={() => { setRejectOpen(false); setNote('') }} style={BTN_GHOST}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.35rem' }}>
+              <button
+                onClick={() => doAction(`/api/admin/claims/${claim.id}/approve`)}
+                disabled={busy}
+                style={BTN_GREEN}
+              >
+                Approve
+              </button>
+              <button onClick={() => setRejectOpen(true)} disabled={busy} style={BTN_RED}>
+                Reject
+              </button>
+              <button
+                onClick={() => doAction(`/api/admin/claims/${claim.id}`, null, 'DELETE')}
+                disabled={busy}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', padding: '0 0.1rem' }}
+                title="Delete permanently"
+              >
+                🗑
+              </button>
+            </div>
+          )
+        ) : (
           <button
             onClick={() => doAction(`/api/admin/claims/${claim.id}`, null, 'DELETE')}
             disabled={busy}
-            style={{
-              marginLeft: 'auto', background: 'transparent', border: 'none',
-              cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0 0.2rem',
-            }}
-            title="Delete this claim permanently"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', padding: '0 0.1rem' }}
+            title="Delete permanently"
           >
             🗑
           </button>
-        </div>
-      ) : (
-        <div style={{ marginTop: '0.45rem' }}>
-          <textarea
-            placeholder="Optional reason for rejection…"
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            rows={2}
-            style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.82rem', resize: 'vertical' }}
-          />
-          <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.35rem' }}>
-            <button
-              onClick={() => doAction(`/api/admin/claims/${claim.id}/reject`, { note: note || null })}
-              disabled={busy}
-              style={{
-                padding: '0.25rem 0.75rem', borderRadius: 5, cursor: 'pointer', fontSize: '0.82rem',
-                background: 'rgba(239,68,68,0.15)', color: '#f87171',
-                border: '1px solid rgba(239,68,68,0.4)',
-              }}
-            >
-              {busy ? 'Rejecting…' : 'Confirm reject'}
-            </button>
-            <button
-              onClick={() => { setRejectOpen(false); setNote('') }}
-              style={{
-                padding: '0.25rem 0.75rem', borderRadius: 5, cursor: 'pointer', fontSize: '0.82rem',
-                background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </td>
+    </tr>
   )
 }
 
-// ── History claim row (inside a user section) ─────────────────────────────────
+function ClaimsTable({ claims, onAction }: { claims: ClaimDetail[]; onAction: () => void }) {
+  const [filter, setFilter] = useState<'pending' | 'all'>('pending')
 
-function HistoryClaimRow({ claim, onDelete }: { claim: ClaimDetail; onDelete: () => void }) {
-  async function handleDelete() {
-    await fetch(`/api/admin/claims/${claim.id}`, { method: 'DELETE', credentials: 'include' })
-    onDelete()
-  }
+  const visible = filter === 'pending' ? claims.filter(c => c.status === 'pending') : claims
+  const pendingCount = claims.filter(c => c.status === 'pending').length
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '0.6rem',
-      padding: '0.45rem 0.75rem', borderBottom: '1px solid var(--border)', flexWrap: 'wrap',
-    }}>
-      <span style={{ color: 'var(--accent)', fontWeight: 500, fontSize: '0.9rem' }}>
-        {claim.character_name}
-      </span>
-      <StatusBadge status={claim.status} />
-      {claim.note && (
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
-          "{claim.note}"
-        </span>
-      )}
-      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: 'auto' }}>
-        {relativeTime(claim.requested_at)}
-      </span>
-      <button
-        onClick={handleDelete}
-        style={{
-          background: 'transparent', border: 'none', cursor: 'pointer',
-          color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0 0.2rem',
-        }}
-        title="Delete this claim permanently"
-      >
-        🗑
-      </button>
-    </div>
-  )
-}
-
-// ── User section (collapsible) ────────────────────────────────────────────────
-
-function UserSection({
-  discordId,
-  claims,
-  mode,
-  defaultOpen,
-  onAction,
-}: {
-  discordId: string
-  claims: ClaimDetail[]
-  mode: 'pending' | 'history'
-  defaultOpen: boolean
-  onAction: () => void
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  const [confirmAll, setConfirmAll] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-
-  // Representative claim for user meta (they all share the same user)
-  const rep = claims[0]
-  const displayName = discordDisplayName(rep.discord_name, rep.discord_username)
-
-  async function handleDeleteAll() {
-    setDeleting(true)
-    try {
-      await fetch(`/api/admin/users/${discordId}/claims`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      onAction()
-    } finally {
-      setDeleting(false)
-      setConfirmAll(false)
-    }
-  }
-
-  return (
-    <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 8,
-      overflow: 'hidden',
-    }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '0.65rem',
-        padding: '0.65rem 0.9rem',
-        background: open ? 'var(--surface-raised)' : 'var(--surface)',
-        borderBottom: open ? '1px solid var(--border)' : 'none',
-        flexWrap: 'wrap',
-      }}>
-        {/* Expand toggle + avatar + name */}
-        <button
-          onClick={() => { setOpen(v => !v); setConfirmAll(false) }}
-          style={{
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0 0.1rem', flexShrink: 0,
-          }}
-          aria-label={open ? 'Collapse' : 'Expand'}
-        >
-          {open ? '▾' : '▸'}
-        </button>
-        <img
-          src={discordAvatar(discordId, rep.avatar)}
-          alt=""
-          style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0 }}
-        />
-        <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>{displayName}</span>
-        <span style={{
-          fontSize: '0.72rem', padding: '1px 7px', borderRadius: 10,
-          background: 'var(--surface-raised)', border: '1px solid var(--border)',
-          color: 'var(--text-muted)', flexShrink: 0,
-        }}>
-          {claims.length} {claims.length === 1 ? 'claim' : 'claims'}
-        </span>
-
-        {/* Delete all — normal button or inline confirm */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {!confirmAll ? (
+    <div>
+      {/* Filter pills */}
+      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem' }}>
+        {(['pending', 'all'] as const).map(f => {
+          const count = f === 'pending' ? pendingCount : claims.length
+          return (
             <button
-              onClick={() => setConfirmAll(true)}
+              key={f}
+              onClick={() => setFilter(f)}
               style={{
-                fontSize: '0.78rem', padding: '0.2rem 0.6rem', borderRadius: 5, cursor: 'pointer',
-                background: 'rgba(239,68,68,0.08)', color: '#f87171',
-                border: '1px solid rgba(239,68,68,0.3)',
+                ...BTN_BASE,
+                background: filter === f ? 'rgba(200,169,110,0.15)' : 'transparent',
+                color: filter === f ? '#c8a96e' : 'var(--text-muted)',
+                border: filter === f ? '1px solid rgba(200,169,110,0.4)' : '1px solid var(--border)',
               }}
-              title="Delete all claims for this user"
             >
-              Delete all
+              {f === 'pending' ? 'Pending' : 'All'}{' '}
+              <span style={{ opacity: 0.7, fontSize: '0.7rem' }}>({count})</span>
             </button>
-          ) : (
-            <>
-              <span style={{ fontSize: '0.78rem', color: '#f87171' }}>
-                Delete all {claims.length} claims? This is permanent.
-              </span>
-              <button
-                onClick={handleDeleteAll}
-                disabled={deleting}
-                style={{
-                  fontSize: '0.78rem', padding: '0.2rem 0.65rem', borderRadius: 5, cursor: 'pointer',
-                  background: 'rgba(239,68,68,0.2)', color: '#f87171',
-                  border: '1px solid rgba(239,68,68,0.5)', fontWeight: 600,
-                }}
-              >
-                {deleting ? '…' : 'Confirm'}
-              </button>
-              <button
-                onClick={() => setConfirmAll(false)}
-                style={{
-                  fontSize: '0.78rem', padding: '0.2rem 0.55rem', borderRadius: 5, cursor: 'pointer',
-                  background: 'transparent', color: 'var(--text-muted)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                Cancel
-              </button>
-            </>
-          )}
-        </div>
+          )
+        })}
       </div>
 
-      {/* Body */}
-      {open && (
-        <div style={{ padding: mode === 'pending' ? '0.5rem 0.75rem' : '0' }}>
-          {mode === 'pending'
-            ? claims.map(c => <PendingClaimRow key={c.id} claim={c} onAction={onAction} />)
-            : claims.map(c => <HistoryClaimRow key={c.id} claim={c} onDelete={onAction} />)
-          }
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Pending access requests ───────────────────────────────────────────────────
-
-function PendingUserRow({ user, onAction }: { user: PendingUser; onAction: () => void }) {
-  const [busy, setBusy] = useState(false)
-
-  async function doAccess(action: 'approve' | 'deny') {
-    setBusy(true)
-    try {
-      await fetch(`/api/admin/users/${user.discord_id}/${action}`, {
-        method: 'POST', credentials: 'include',
-      })
-      onAction()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
-      padding: '0.55rem 0.75rem',
-      background: 'var(--surface-raised)',
-      border: '1px solid var(--border)',
-      borderRadius: 6,
-    }}>
-      <img
-        src={discordAvatar(user.discord_id, user.avatar)}
-        alt=""
-        width={32} height={32}
-        style={{ borderRadius: '50%', flexShrink: 0 }}
-      />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-          {discordDisplayName(user.discord_name, user.discord_username)}
-        </div>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-          Joined {relativeTime(user.first_seen)}
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: '0.4rem' }}>
-        <button
-          onClick={() => doAccess('approve')}
-          disabled={busy}
-          style={{
-            padding: '0.3rem 0.9rem', borderRadius: 5, cursor: busy ? 'not-allowed' : 'pointer',
-            border: '1px solid rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.12)',
-            color: '#4ade80', fontWeight: 600, fontSize: '0.8rem',
-          }}
-        >
-          Approve
-        </button>
-        <button
-          onClick={() => doAccess('deny')}
-          disabled={busy}
-          style={{
-            padding: '0.3rem 0.9rem', borderRadius: 5, cursor: busy ? 'not-allowed' : 'pointer',
-            border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.1)',
-            color: '#f87171', fontWeight: 600, fontSize: '0.8rem',
-          }}
-        >
-          Deny
-        </button>
+      <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+        <table style={TABLE}>
+          <thead>
+            <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <th style={TH}>Character</th>
+              <th style={TH}>Discord user</th>
+              <th style={TH}>Status</th>
+              <th style={TH}>Submitted</th>
+              <th style={TH}>Reviewed</th>
+              <th style={TH}>Note</th>
+              <th style={TH}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ ...TD, color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem' }}>
+                  {filter === 'pending' ? 'No pending claims.' : 'No claims yet.'}
+                </td>
+              </tr>
+            ) : (
+              visible.map(c => (
+                <ClaimRow key={c.id} claim={c} onDelete={onAction} />
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -433,160 +482,93 @@ function PendingUserRow({ user, onAction }: { user: PendingUser; onAction: () =>
 
 export default function AdminPage() {
   const auth = useAuth()
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([])
-  const [pending, setPending] = useState<ClaimDetail[]>([])
-  const [all, setAll] = useState<ClaimDetail[]>([])
-  const [showAll, setShowAll] = useState(false)
+  const [users,  setUsers]  = useState<UserItem[]>([])
+  const [claims, setClaims] = useState<ClaimDetail[]>([])
   const [loading, setLoading] = useState(true)
-  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [error,   setError]   = useState<string | null>(null)
 
-  async function fetchPendingUsers() {
-    const res = await fetch('/api/admin/pending-users', { credentials: 'include' })
-    if (res.ok) setPendingUsers(await res.json())
-  }
-
-  async function fetchPending() {
+  async function fetchAll() {
     setLoading(true)
-    setFetchError(null)
+    setError(null)
     try {
-      const res = await fetch('/api/admin/claims?status=pending', { credentials: 'include' })
-      if (res.ok) {
-        setPending(await res.json())
-      } else {
-        const detail = await res.json().catch(() => ({}))
-        setFetchError(`Error ${res.status}: ${detail.detail ?? 'Failed to load claims'}`)
+      const [uRes, cRes] = await Promise.all([
+        fetch('/api/admin/users',  { credentials: 'include' }),
+        fetch('/api/admin/claims', { credentials: 'include' }),
+      ])
+      if (!uRes.ok || !cRes.ok) {
+        const body = await (uRes.ok ? cRes : uRes).json().catch(() => ({}))
+        setError(`Error: ${body.detail ?? 'Failed to load admin data'}`)
+        return
       }
+      const [u, c] = await Promise.all([uRes.json(), cRes.json()])
+      setUsers(u)
+      setClaims(c)
     } catch {
-      setFetchError('Network error — could not load claims.')
+      setError('Network error — could not load admin data.')
     } finally {
       setLoading(false)
     }
   }
 
-  async function fetchAll() {
-    const res = await fetch('/api/admin/claims', { credentials: 'include' })
-    if (res.ok) setAll(await res.json())
-  }
-
   useEffect(() => {
     if (auth.status === 'authenticated' && auth.user.is_admin) {
-      fetchPendingUsers()
-      fetchPending()
+      fetchAll()
     }
   }, [auth.status])
 
-  useEffect(() => {
-    if (showAll && auth.status === 'authenticated' && auth.user.is_admin) {
-      fetchAll()
-    }
-  }, [showAll, auth.status])
-
   if (auth.status === 'loading') {
-    return <main style={{ maxWidth: 720, margin: '3rem auto', padding: '0 1rem' }}><p>Loading…</p></main>
+    return (
+      <main style={{ maxWidth: 960, margin: '3rem auto', padding: '0 1rem' }}>
+        <p style={{ color: 'var(--text-muted)' }}>Loading…</p>
+      </main>
+    )
   }
 
   if (auth.status === 'unauthenticated' || !auth.user.is_admin) {
     return (
-      <main style={{ maxWidth: 720, margin: '3rem auto', padding: '0 1rem' }}>
+      <main style={{ maxWidth: 960, margin: '3rem auto', padding: '0 1rem' }}>
         <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
         <p style={{ marginTop: '2rem', color: '#f87171' }}>Access denied.</p>
       </main>
     )
   }
 
-  const pendingGroups = groupByUser(pending)
-  const allGroups = groupByUser(all)
+  const section: React.CSSProperties = { marginBottom: '2.5rem' }
+  const sectionTitle: React.CSSProperties = {
+    fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.07em',
+    color: 'var(--text-muted)', marginBottom: '0.75rem', fontWeight: 600,
+  }
 
   return (
-    <main style={{ maxWidth: 720, margin: '3rem auto', padding: '0 1rem' }}>
+    <main style={{ maxWidth: 1100, margin: '2rem auto', padding: '0 1rem' }}>
       <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
-      <h1 style={{ margin: '0.75rem 0 0.25rem' }}>Admin Panel</h1>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-        Manage character claim requests.
+      <h1 style={{ margin: '0.6rem 0 0.2rem', fontFamily: "'Cinzel', serif" }}>Admin Panel</h1>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.75rem' }}>
+        Manage users and character claims.
       </p>
 
-      {/* Pending access requests */}
-      {pendingUsers.length > 0 && (
-        <div style={{ marginBottom: '2rem' }}>
-          <h2 style={{
-            fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.06em',
-            color: '#fbbf24', marginBottom: '0.6rem',
-          }}>
-            Pending access requests ({pendingUsers.length})
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {pendingUsers.map(u => (
-              <PendingUserRow
-                key={u.discord_id}
-                user={u}
-                onAction={() => { fetchPendingUsers(); fetchPending() }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Pending claims queue */}
-      <h2 style={{
-        fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.06em',
-        color: 'var(--text-muted)', marginBottom: '0.6rem',
-      }}>
-        Pending claims {!loading && `(${pending.length})`}
-      </h2>
-
       {loading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
+      {error   && <p style={{ color: '#f87171' }}>{error}</p>}
 
-      {!loading && fetchError && (
-        <p style={{ color: '#f87171' }}>{fetchError}</p>
-      )}
-
-      {!loading && !fetchError && pendingGroups.length === 0 && (
-        <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No pending claims.</p>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {pendingGroups.map(g => (
-          <UserSection
-            key={g.discordId}
-            discordId={g.discordId}
-            claims={g.claims}
-            mode="pending"
-            defaultOpen={true}
-            onAction={fetchPending}
-          />
-        ))}
-      </div>
-
-      {/* All claims history */}
-      <div style={{ marginTop: '2rem' }}>
-        <button
-          onClick={() => setShowAll(v => !v)}
-          style={{
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            color: 'var(--text-muted)', fontSize: '0.85rem', padding: 0,
-          }}
-        >
-          {showAll ? '▾ Hide history' : '▸ View all claims'}
-        </button>
-
-        {showAll && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.6rem' }}>
-            {allGroups.length === 0
-              ? <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No claims yet.</p>
-              : allGroups.map(g => (
-                  <UserSection
-                    key={g.discordId}
-                    discordId={g.discordId}
-                    claims={g.claims}
-                    mode="history"
-                    defaultOpen={false}
-                    onAction={fetchAll}
-                  />
-                ))
-            }
+      {!loading && !error && (
+        <>
+          {/* Users */}
+          <div style={section}>
+            <p style={sectionTitle}>
+              Users ({users.length})
+            </p>
+            <UsersTable users={users} onAction={fetchAll} />
           </div>
-        )}
-      </div>
+
+          {/* Claims */}
+          <div style={section}>
+            <p style={sectionTitle}>
+              Character claims ({claims.length})
+            </p>
+            <ClaimsTable claims={claims} onAction={fetchAll} />
+          </div>
+        </>
+      )}
     </main>
   )
 }

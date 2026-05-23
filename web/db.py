@@ -178,6 +178,25 @@ async def list_pending_users(path: Path = DB_PATH) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def list_all_users(path: Path = DB_PATH) -> list[dict]:
+    """Return all users with access_status and total claim count, newest first."""
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """
+            SELECT u.discord_id, u.discord_name, u.discord_username, u.avatar,
+                   u.first_seen, u.last_seen, u.access_status,
+                   COUNT(c.id) AS claim_count
+            FROM users u
+            LEFT JOIN character_claims c ON c.discord_id = u.discord_id
+            GROUP BY u.discord_id
+            ORDER BY u.first_seen DESC
+            """
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def set_user_access(discord_id: str, status: str, path: Path = DB_PATH) -> bool:
     """Set access_status for a user. Returns True if a row was updated."""
     async with aiosqlite.connect(path) as db:

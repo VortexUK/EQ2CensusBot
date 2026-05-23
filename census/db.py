@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Optional
@@ -450,6 +451,55 @@ def extract_item_stats(raw: dict) -> dict[str, float]:
     return result
 
 
+# ---------------------------------------------------------------------------
+# Effect-based stat extraction
+# ---------------------------------------------------------------------------
+# Some stats in EQ2 are not in the `modifiers` dict but are expressed as
+# human-readable effect lines, e.g.:
+#   "Increases Attack Speed of caster by 25.0"
+#
+# Each entry is (compiled_regex, canonical_stat_name).  The regex must have
+# exactly one capture group that captures the numeric value.
+#
+# The stat name must match a key in STAT_MAP / an entry in item_stats so the
+# existing search machinery works unchanged.
+
+_EFFECT_STAT_PATTERNS: list[tuple[re.Pattern, str]] = [
+    # "Increases Attack Speed of caster by 25.0"
+    # "Increases Attack Speed of the caster by 25.0"
+    (re.compile(r'Attack Speed of .+? by ([\d.]+)'), "Haste"),
+]
+
+# Bump this string whenever _EFFECT_STAT_PATTERNS changes.
+# init_db() stores it in _meta; backfill only runs when stored value differs.
+_EFFECT_STATS_VERSION = "1"
+
+
+def extract_effect_stats(raw: dict) -> dict[str, float]:
+    """Return a mapping of canonical stat name → value parsed from effect_list.
+
+    Complements extract_item_stats (which only reads the ``modifiers`` dict).
+    Only extracts stats listed in _EFFECT_STAT_PATTERNS.  When both a modifier
+    and an effect line exist for the same stat the modifier value takes
+    precedence (callers use INSERT OR IGNORE for these rows).
+    """
+    result: dict[str, float] = {}
+    for eff in raw.get("effect_list") or []:
+        if not isinstance(eff, dict):
+            continue
+        desc = str(eff.get("description") or "")
+        for pattern, stat_name in _EFFECT_STAT_PATTERNS:
+            if stat_name in result:
+                continue  # already captured; keep first occurrence
+            m = pattern.search(desc)
+            if m:
+                try:
+                    result[stat_name] = float(m.group(1))
+                except (ValueError, IndexError):
+                    pass
+    return result
+
+
 _PVP_STAT_PREFIXES = ("pvp",)
 
 
@@ -598,6 +648,9 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     # Uses LOWER(raw_json) LIKE '%pvp%' — catches both pvp stats and effect text.
     # Safe to run every startup; is a no-op once all rows are set.
     _backfill_pvp_flag(conn)
+    # Backfill effect-derived stats (Haste etc.) for items that predate this
+    # feature.  Version-gated — only runs once per _EFFECT_STATS_VERSION.
+    _backfill_effect_stats(conn)
     return conn
 
 
@@ -617,6 +670,52 @@ def _backfill_pvp_flag(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _backfill_effect_stats(conn: sqlite3.Connection) -> None:
+    """Parse effect_list from raw_json and populate effect-based stats in item_stats.
+
+    Uses a version key in _meta so the full table scan only happens once per
+    _EFFECT_STATS_VERSION.  Bump _EFFECT_STATS_VERSION when new patterns are
+    added to _EFFECT_STAT_PATTERNS to trigger a re-run.
+
+    Effect stats are inserted with OR IGNORE so existing modifier-derived
+    values are never overwritten.
+    """
+    stored_version = get_meta(conn, "effect_stats_version")
+    if stored_version == _EFFECT_STATS_VERSION:
+        return  # already up to date
+
+    # Narrow the scan using a keyword hint from the patterns so we don't have
+    # to JSON-decode every row.  Build one LIKE filter per pattern.
+    # For now "Attack Speed" covers all patterns in _EFFECT_STAT_PATTERNS.
+    keyword_hints = ["attack speed"]  # lowercase; extend when patterns grow
+
+    conditions = " OR ".join(
+        f"LOWER(raw_json) LIKE ?" for _ in keyword_hints
+    )
+    rows = conn.execute(
+        f"SELECT id, raw_json FROM items WHERE raw_json IS NOT NULL AND ({conditions})",
+        [f"%{kw}%" for kw in keyword_hints],
+    ).fetchall()
+
+    stat_rows: list[tuple] = []
+    for item_id, raw_json_str in rows:
+        try:
+            raw = json.loads(raw_json_str)
+        except Exception:
+            continue
+        for stat_name, value in extract_effect_stats(raw).items():
+            stat_rows.append((item_id, stat_name, value))
+
+    if stat_rows:
+        conn.executemany(
+            "INSERT OR IGNORE INTO item_stats (item_id, stat, value) VALUES (?, ?, ?)",
+            stat_rows,
+        )
+
+    set_meta(conn, "effect_stats_version", _EFFECT_STATS_VERSION)
+    conn.commit()
+
+
 def get_meta(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
     row = conn.execute("SELECT value FROM _meta WHERE key = ?", (key,)).fetchone()
     return row[0] if row else default
@@ -631,18 +730,29 @@ def upsert_items(items: list[dict], conn: sqlite3.Connection) -> int:
     """Upsert a batch of raw Census item dicts. Returns number inserted/replaced."""
     rows = [item_to_row(item) for item in items]
     conn.executemany(_UPSERT_SQL, rows)
-    # Maintain item_stats side-table
-    stat_rows: list[tuple] = []
+    # Maintain item_stats side-table.
+    # Modifier stats (from `modifiers` dict) are inserted first with OR REPLACE.
+    # Effect stats (parsed from effect_list text) are inserted second with OR IGNORE
+    # so that modifier values always win when both are present.
+    mod_stat_rows:    list[tuple] = []
+    effect_stat_rows: list[tuple] = []
     for item in items:
         item_id = item.get("id")
         if item_id is None:
             continue
         for stat_name, value in extract_item_stats(item).items():
-            stat_rows.append((item_id, stat_name, value))
-    if stat_rows:
+            mod_stat_rows.append((item_id, stat_name, value))
+        for stat_name, value in extract_effect_stats(item).items():
+            effect_stat_rows.append((item_id, stat_name, value))
+    if mod_stat_rows:
         conn.executemany(
             "INSERT OR REPLACE INTO item_stats (item_id, stat, value) VALUES (?, ?, ?)",
-            stat_rows,
+            mod_stat_rows,
+        )
+    if effect_stat_rows:
+        conn.executemany(
+            "INSERT OR IGNORE INTO item_stats (item_id, stat, value) VALUES (?, ?, ?)",
+            effect_stat_rows,
         )
     conn.commit()
     return len(rows)

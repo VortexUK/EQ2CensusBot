@@ -2,36 +2,56 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, Query
+import aiosqlite
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from census.client import CensusClient
+from web.db import DB_PATH
 
 router = APIRouter(tags=["characters"])
 
 _SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
-_WORLD       = os.getenv("EQ2_WORLD", "Varsoon")
+_WORLD      = os.getenv("EQ2_WORLD", "Varsoon")
 
 
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
 
-class CharSearchResult(BaseModel):
-    name: str
-    cls: str | None = None
-    class_id: int | None = None
-    level: int | None = None
-    aa_level: int | None = None
-    race: str | None = None
+class CharNameResult(BaseModel):
+    name:       str
+    cls:        str | None = None
+    level:      int | None = None
     guild_name: str | None = None
 
 
 class CharSearchResponse(BaseModel):
-    results: list[CharSearchResult]
-    total: int
-    page: int
-    per_page: int
+    results: list[CharNameResult]
+    total:   int
+    source:  str = "census"   # "census" | "local"
+
+
+# ---------------------------------------------------------------------------
+# Local fallback — claimed characters whose name starts with the query
+# ---------------------------------------------------------------------------
+
+async def _local_search(q: str) -> list[CharNameResult]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """
+            SELECT DISTINCT character_name
+            FROM character_claims
+            WHERE LOWER(character_name) LIKE ?
+              AND status IN ('approved', 'pending')
+            ORDER BY character_name
+            LIMIT 50
+            """,
+            (f"{q.lower()}%",),
+        ) as cur:
+            rows = await cur.fetchall()
+    return [CharNameResult(name=r["character_name"]) for r in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -39,43 +59,40 @@ class CharSearchResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.get("/characters/search", response_model=CharSearchResponse)
-async def search_characters(
-    class_id: list[int] = Query(default=[]),
-    min_level: int | None = None,
-    max_level: int | None = None,
-    sort_by: str = "level",   # level | aa | name
-    sort_dir: str = "desc",   # desc | asc
-    page: int = 1,
-) -> CharSearchResponse:
+async def search_characters(name: str = "") -> CharSearchResponse:
     """
-    Search server characters with optional class and level filters.
-    At least one of class_id or min_level must be provided.
-    Archetype selections should be pre-expanded to leaf class IDs by the caller.
+    Search characters by name prefix.
+    Queries the Census API for all characters on the configured world whose
+    name starts with *name*.  Falls back to locally-registered claimed
+    characters if Census is unavailable.
+    Requires at least 2 characters.
     """
-    per_page = 100
-
-    # Require at least one filter to avoid fetching the entire server population
-    if not class_id and min_level is None and max_level is None:
-        return CharSearchResponse(results=[], total=0, page=1, per_page=per_page)
+    q = name.strip()
+    if len(q) < 2:
+        return CharSearchResponse(results=[], total=0)
 
     client = CensusClient(service_id=_SERVICE_ID)
     try:
-        data = await client.search_characters(
-            world=_WORLD,
-            class_ids=class_id,
-            min_level=min_level,
-            max_level=max_level,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-            page=page,
-            per_page=per_page,
-        )
+        raw = await client.search_characters_by_name(q, _WORLD)
+
+        if not raw:
+            # Prefix search missed — try exact-name lookup (handles cases like "Exobroker"
+            # where the prefix index doesn't return results for a complete name)
+            try:
+                brief = await client.get_character_brief(q, _WORLD)
+                if brief:
+                    raw = [brief]
+            except Exception:
+                pass
+    except Exception:
+        raw = []
     finally:
         await client.close()
 
-    return CharSearchResponse(
-        results=[CharSearchResult(**r) for r in data["results"]],
-        total=data["total"],
-        page=data["page"],
-        per_page=per_page,
-    )
+    if raw:
+        results = [CharNameResult(**r) for r in raw]
+        return CharSearchResponse(results=results, total=len(results), source="census")
+
+    # Census returned nothing or failed — fall back to local claims
+    results = await _local_search(q)
+    return CharSearchResponse(results=results, total=len(results), source="local")

@@ -7,7 +7,15 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from web.cache import claim_cache
-from web.db import delete_claim, delete_claims_for_user, get_claim_by_id, list_claims, review_claim
+from web.db import (
+    delete_claim,
+    delete_claims_for_user,
+    get_claim_by_id,
+    list_all_users,
+    list_claims,
+    review_claim,
+    set_user_access,
+)
 from web.routes.claim import _refresh_claim_cache
 
 router = APIRouter(tags=["admin"])
@@ -50,6 +58,17 @@ class ClaimDetail(BaseModel):
 
 class RejectRequest(BaseModel):
     note: str | None = None
+
+
+class UserItem(BaseModel):
+    discord_id:       str
+    discord_name:     str | None = None
+    discord_username: str | None = None
+    avatar:           str | None = None
+    first_seen:       int
+    last_seen:        int
+    access_status:    str
+    claim_count:      int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -119,3 +138,29 @@ async def remove_all_user_claims(discord_id: str, request: Request) -> dict:
     claim_cache.delete(f"claims:{discord_id}")
     asyncio.create_task(_refresh_claim_cache(discord_id))
     return {"ok": True, "deleted": count}
+
+
+@router.get("/admin/users", response_model=list[UserItem])
+async def list_users(request: Request) -> list[UserItem]:
+    """List all users with access status and claim counts. Admin only."""
+    _require_admin(request)
+    rows = await list_all_users()
+    return [UserItem(**r) for r in rows]
+
+
+@router.post("/admin/users/{discord_id}/kick", status_code=200)
+async def kick_user(discord_id: str, request: Request) -> dict:
+    """
+    Deny a user's access and permanently delete all their claims.
+    Use this to fully remove a user's presence from the system.
+    Admin cannot kick themselves.
+    """
+    admin = _require_admin(request)
+    if discord_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="You cannot kick yourself")
+    if not await set_user_access(discord_id, "denied"):
+        raise HTTPException(status_code=404, detail="User not found")
+    count = await delete_claims_for_user(discord_id)
+    claim_cache.delete(f"claims:{discord_id}")
+    asyncio.create_task(_refresh_claim_cache(discord_id))
+    return {"ok": True, "claims_deleted": count}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections import Counter
 
+import aiosqlite
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -18,7 +19,7 @@ from census.spells_db import (
 )
 from web.cache import character_cache, guild_cache
 from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
-from web.db import get_active_claims
+from web.db import DB_PATH as _USERS_DB_PATH, get_active_claims
 
 router = APIRouter(tags=["guild"])
 
@@ -572,3 +573,59 @@ async def guild_adorn_check(guild_name: str) -> GuildAdornCheckResponse:
         raise HTTPException(status_code=404, detail=f"No adorn data found for '{guild_name}'.")
     return result
 
+
+
+# ---------------------------------------------------------------------------
+# Guild name search (local DB)
+# ---------------------------------------------------------------------------
+
+class GuildNameResult(BaseModel):
+    name: str
+
+
+class GuildSearchResponse(BaseModel):
+    results: list[GuildNameResult]
+    total: int
+
+
+@router.get("/guilds/search", response_model=GuildSearchResponse)
+async def search_guilds(name: str = "") -> GuildSearchResponse:
+    """
+    Search guilds by name prefix on the configured world.
+    Queries Census first; falls back to locally-tracked guilds (item-watch)
+    if Census is unavailable.
+    Requires at least 2 characters.
+    """
+    q = name.strip()
+    if len(q) < 2:
+        return GuildSearchResponse(results=[], total=0)
+
+    client = CensusClient(service_id=_SERVICE_ID)
+    try:
+        raw = await client.search_guilds_by_name(q, _WORLD)
+    except Exception:
+        raw = []
+    finally:
+        await client.close()
+
+    if raw:
+        results = [GuildNameResult(name=r["name"]) for r in raw]
+        return GuildSearchResponse(results=results, total=len(results))
+
+    # Census failed — fall back to locally-tracked guilds in item_watch
+    async with aiosqlite.connect(_USERS_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """
+            SELECT DISTINCT guild_name
+            FROM item_watch
+            WHERE LOWER(guild_name) LIKE ?
+            ORDER BY guild_name
+            LIMIT 25
+            """,
+            (f"{q.lower()}%",),
+        ) as cur:
+            rows = await cur.fetchall()
+
+    results = [GuildNameResult(name=r["guild_name"]) for r in rows]
+    return GuildSearchResponse(results=results, total=len(results))
