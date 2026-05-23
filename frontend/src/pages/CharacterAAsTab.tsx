@@ -57,6 +57,68 @@ const _TREE_TYPE_LABEL: Record<string, string> = {
   far_seas:           'Far Seas',
 }
 
+// ── AA Raid Ready card ────────────────────────────────────────────────────────
+
+function AARaidReady({ spent, cap }: { spent: number; cap: number }) {
+  if (cap <= 0) return null
+  const pct       = Math.min(100, Math.round(spent / cap * 100))
+  const raidReady = pct >= 90
+  const color     = raidReady ? '#4ade80' : pct >= 70 ? '#fbbf24' : '#f87171'
+
+  return (
+    <div style={{ marginBottom: '0.75rem' }}>
+      <div style={{
+        fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em',
+        color: 'var(--accent)', fontWeight: 600, marginBottom: 3,
+      }}>
+        Raid Ready
+      </div>
+      <div style={{
+        background: 'var(--surface)',
+        border: `1px solid ${raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
+        borderRadius: 5,
+        padding: '8px 10px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          {/* Percentage */}
+          <div style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: '2rem',
+            fontWeight: 700,
+            lineHeight: 1,
+            color,
+            textShadow: `0 0 20px ${color}55`,
+            flexShrink: 0,
+            minWidth: '3ch',
+            textAlign: 'center',
+          }}>
+            {pct}%
+          </div>
+          {/* Status + detail */}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : '#f87171', marginBottom: '0.2rem' }}>
+              {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
+            </div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {spent.toLocaleString()} / {cap.toLocaleString()} spent
+            </div>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+              (90% required)
+            </div>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div style={{ marginTop: 7, height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', width: `${pct}%`, borderRadius: 2,
+            background: color, transition: 'width 0.3s ease',
+          }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── AA progress bar ───────────────────────────────────────────────────────────
 
 function AAProgressBar({ label, value, max, pct }: {
@@ -277,6 +339,9 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
             pct={spentPct}
           />
         </StatGroup>
+
+        {/* Raid Ready */}
+        <AARaidReady spent={charAAs.total_spent} cap={config.aa_cap} />
 
         {/* Per-tree breakdown */}
         {visibleTrees.length > 0 && (
