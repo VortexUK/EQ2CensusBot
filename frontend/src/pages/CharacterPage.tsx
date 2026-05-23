@@ -87,6 +87,163 @@ interface Character {
   equipment: EquipmentSlot[]
 }
 
+// ── Gear rating ──────────────────────────────────────────────────────────────
+//
+// Update EXPANSION_MAX_LEVEL when the TLE server unlocks a new expansion.
+//   Original EQ2  → 50   Desert of Flames → 60   Kingdom of Sky / EoF → 70
+//   Rise of Kunark → 80   Sentinel's Fate  → 90   Age of Discovery     → 90
+const EXPANSION_MAX_LEVEL = 50
+
+// Numeric scores for the six letter grades (used to average across all items)
+const GRADE_SCORE: Record<string, number> = { A: 10, B: 8, C: 6, D: 4, E: 2, F: 0 }
+
+/**
+ * Classify an item tier string into one of three groups used by the matrix.
+ * Handles compound strings like "Mastercrafted Fabled" (uses the highest tier found).
+ */
+function ratingTierGroup(tier: string | null): 'fabled' | 'legendary' | 'treasured' | null {
+  const t = (tier ?? '').toLowerCase()
+  if (t.includes('mythical') || t.includes('fabled')) return 'fabled'
+  if (t.includes('legendary') || t.includes('mastercrafted')) return 'legendary'
+  if (t.includes('treasured') || t.includes('uncommon') || t.includes('handcrafted') || t.includes('common')) return 'treasured'
+  return null
+}
+
+/**
+ * Score a single equipped item (0–10).
+ * Returns null if the item has no tier/level data yet (still loading).
+ */
+function scoreItem(item: EquipmentSlot): number | null {
+  if (!item.item_id) return null
+  const detail = getCachedItem(item.item_id)
+  const itemLevel = detail?.item_level ?? null
+  const group = ratingTierGroup(item.tier)
+  if (group === null || itemLevel === null) return null
+
+  const max = EXPANSION_MAX_LEVEL
+  const band: 'A' | 'B' | 'C' =
+    itemLevel >= max - 4  ? 'A' :
+    itemLevel >= max - 10 ? 'B' : 'C'
+
+  // Grade matrix: rows = tier group, cols = level band
+  //               A-band  B-band  C-band
+  // Fabled+         A       B       E
+  // Legendary/MC    B       C       F
+  // Treasured-      D       E       F
+  const MATRIX: Record<typeof group, Record<typeof band, string>> = {
+    fabled:     { A: 'A', B: 'B', C: 'E' },
+    legendary:  { A: 'B', B: 'C', C: 'F' },
+    treasured:  { A: 'D', B: 'E', C: 'F' },
+  }
+  return GRADE_SCORE[MATRIX[group][band]]
+}
+
+/** Convert a numeric average (0–10) into a display grade with optional +/− modifier. */
+function gradeLabel(avg: number): { grade: string; color: string; raidReady: boolean } {
+  let grade: string
+  if      (avg >= 9.5) grade = 'A'
+  else if (avg >= 8.5) grade = 'A−'
+  else if (avg >= 7.5) grade = 'B+'
+  else if (avg >= 7.0) grade = 'B'
+  else if (avg >= 6.5) grade = 'B−'
+  else if (avg >= 5.5) grade = 'C+'
+  else if (avg >= 5.0) grade = 'C'
+  else if (avg >= 4.5) grade = 'C−'
+  else if (avg >= 3.0) grade = 'D'
+  else if (avg >= 1.0) grade = 'E'
+  else                 grade = 'F'
+
+  const raidReady = avg >= 5.5   // C+ and above
+
+  // Colour echoes the EQ2 quality palette: gold → fabled → legendary → blue → muted → red
+  const color =
+    avg >= 9.0 ? '#e8d5a3' :   // A  – gold
+    avg >= 7.5 ? '#ff939d' :   // B+ – fabled pink
+    avg >= 7.0 ? '#ffc993' :   // B  – legendary orange
+    avg >= 5.5 ? '#92d7fd' :   // B−/C+ – mastercrafted blue
+    avg >= 4.5 ? '#a8d4a8' :   // C  – uncommon green
+                 '#f87171'     // C− and below – red
+
+  return { grade, color, raidReady }
+}
+
+const SKIP_GEAR_SLOTS = new Set(['food', 'drink'])
+
+function GearRating({ equipment, ready }: { equipment: EquipmentSlot[]; ready: boolean }) {
+  const bySlot = buildSlotMap(equipment)
+
+  const scored: number[] = []
+  let pending = 0
+  for (const [key, item] of bySlot) {
+    if (SKIP_GEAR_SLOTS.has(key) || !item.item_id) continue
+    const s = scoreItem(item)
+    if (s !== null) scored.push(s)
+    else if (!ready) pending++   // still loading
+  }
+
+  if (scored.length === 0) {
+    return (
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={ratingHeading}>Raid Ready</div>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 5, padding: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
+          {ready ? 'No gear data' : 'Loading item data…'}
+        </div>
+      </div>
+    )
+  }
+
+  const avg = scored.reduce((a, b) => a + b, 0) / scored.length
+  const { grade, color, raidReady } = gradeLabel(avg)
+
+  return (
+    <div style={{ marginBottom: '1rem' }}>
+      <div style={ratingHeading}>Raid Ready</div>
+      <div style={{
+        background: 'var(--surface)',
+        border: `1px solid ${raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
+        borderRadius: 5,
+        padding: '8px 10px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          {/* Grade letter */}
+          <div style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: '2.6rem',
+            fontWeight: 700,
+            lineHeight: 1,
+            color,
+            textShadow: `0 0 20px ${color}55`,
+            flexShrink: 0,
+            minWidth: '2ch',
+            textAlign: 'center',
+          }}>
+            {grade}
+          </div>
+
+          {/* Status + detail */}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : '#f87171', marginBottom: '0.2rem' }}>
+              {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
+            </div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {scored.length} item{scored.length !== 1 ? 's' : ''} rated
+              {pending > 0 && <span style={{ opacity: 0.6 }}> · {pending} loading</span>}
+            </div>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+              (C+ or above = raid ready)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ratingHeading: React.CSSProperties = {
+  fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em',
+  color: 'var(--accent)', fontWeight: 600, marginBottom: '3px',
+}
+
 // ── Paperdoll slot config ────────────────────────────────────────────────────
 
 const LEFT_SLOTS: [string, string][] = [
@@ -325,8 +482,8 @@ function CharacterView({ char }: { char: Character }) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [hoveredStat, setHoveredStat] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<ActiveTab>('equipment')
-  // Tracks when background prefetch completes so highlights re-evaluate.
-  const [, setItemsReady] = useState(false)
+  // Tracks when background prefetch completes so highlights + gear rating re-evaluate.
+  const [itemsReady, setItemsReady] = useState(false)
 
   // Eagerly fetch stats for every equipped item + adorn so highlights work
   // without the user having to hover each item first.
@@ -416,8 +573,9 @@ function CharacterView({ char }: { char: Character }) {
       {/* Equipment & Stats tab */}
       {activeTab === 'equipment' && (
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', marginTop: '1rem' }}>
-          {/* Left: detailed stats */}
+          {/* Left: gear rating + detailed stats */}
           <div style={{ width: 260, flexShrink: 0 }}>
+            <GearRating equipment={char.equipment} ready={itemsReady} />
             <StatsPanel char={char}
               onStatHover={setHoveredStat}
               onStatLeave={() => setHoveredStat(null)} />
