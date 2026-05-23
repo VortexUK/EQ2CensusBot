@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import BackLink from '../components/BackLink'
+import Breadcrumb from '../components/Breadcrumb'
 import { useClaim } from '../hooks/useClaim'
 import { useAuth } from '../hooks/useAuth'
 
@@ -1233,7 +1233,7 @@ export default function GuildPage() {
 
   return (
     <main style={{ maxWidth: 1000, margin: '3rem auto', padding: '0 1rem' }}>
-      <BackLink />
+      <Breadcrumb items={[{ label: 'Guilds', to: '/guilds' }, { label: guildName ?? '…' }]} />
 
       {/* Header */}
       <div style={{ margin: '1rem 0 1.5rem' }}>

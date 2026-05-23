@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import BackLink from '../components/BackLink'
 import { useAuth } from '../hooks/useAuth'
 import { Claim, useClaim } from '../hooks/useClaim'
 
@@ -190,7 +189,6 @@ export default function ClaimPage() {
 
   return (
     <main style={{ maxWidth: 560, margin: '3rem auto', padding: '0 1rem' }}>
-      <BackLink />
       <h1 style={{ margin: '0.75rem 0 0.5rem' }}>My Characters</h1>
       <div style={{
         background: 'var(--surface)',

@@ -6,7 +6,6 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import BackLink from '../components/BackLink'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
@@ -106,8 +105,6 @@ function NameSearchPage({ config }: { config: SearchConfig }) {
 
   return (
     <main style={{ maxWidth: 640, margin: '4rem auto', padding: '0 1.5rem' }}>
-      <BackLink />
-
       {/* Header */}
       <div style={{ margin: '1.25rem 0 1.75rem' }}>
         <h1 style={{

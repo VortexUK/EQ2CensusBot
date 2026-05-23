@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import BackLink from '../components/BackLink'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -392,7 +391,6 @@ export default function RecipesPage() {
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' }}>
-      <BackLink />
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '1.2rem' }}>
         <h1 style={{ fontFamily: "'Cinzel', serif", fontSize: '1.7rem', color: '#c8a96e', margin: 0 }}>
           Recipes

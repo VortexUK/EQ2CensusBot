@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import BackLink from '../components/BackLink'
 import { ItemTooltip, TooltipState } from '../components/ItemTooltip'
 
 // ── Stat options (canonical display names from STAT_MAP) ──────────────────────
@@ -443,8 +442,6 @@ export default function ItemSearchPage() {
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
-      <BackLink />
-
       <h1 style={{
         fontFamily: "'Cinzel', serif",
         fontSize: '1.9rem', fontWeight: 700, letterSpacing: '0.06em',
