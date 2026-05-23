@@ -14,7 +14,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from web.routes.health import router as health_router
 from web.routes.auth import router as auth_router
-from web.routes.character import router as character_router
+from web.routes.character import router as character_router, prewarm_character_cache
 from web.routes.item import router as item_router
 from web.routes.claim import router as claim_router
 from web.routes.admin import router as admin_router
@@ -88,8 +88,14 @@ def create_app(session_secret: str | None = None) -> FastAPI:
         t = threading.Thread(target=_ensure_item_stats, daemon=True, name="item-stats-backfill")
         t.start()
 
+    async def _prewarm() -> None:
+        # Fire-and-forget: pre-warm the character cache in the background so the
+        # home page loads instantly even immediately after a redeploy.
+        import asyncio as _asyncio
+        _asyncio.create_task(prewarm_character_cache())
+
     app = FastAPI(
-        on_startup=[_startup],
+        on_startup=[_startup, _prewarm],
         title="EQ2 TLE Companion",
         version="0.1.0",
         docs_url="/api/docs",

@@ -237,6 +237,52 @@ def _build_char_response(char) -> CharacterResponse:
     )
 
 
+async def prewarm_character_cache() -> None:
+    """
+    Fetch all approved claimed characters into cache at startup.
+    Runs as a background task so it never blocks the server coming up.
+    Uses a semaphore to avoid hammering Census with too many parallel requests.
+    """
+    import aiosqlite
+    from web.db import DB_PATH
+
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT DISTINCT character_name FROM character_claims WHERE status = 'approved'"
+            ) as cur:
+                names = [row["character_name"] for row in await cur.fetchall()]
+
+        if not names:
+            return
+
+        print(f"[startup] Pre-warming character cache for {len(names)} character(s)…", flush=True)
+
+        sem = asyncio.Semaphore(3)  # max 3 concurrent Census fetches
+
+        async def _fetch_one(name: str) -> None:
+            cache_key = f"{name.lower()}:{_WORLD.lower()}"
+            if character_cache.get_stale(cache_key)[0] is not None:
+                return  # already warm
+            async with sem:
+                client = CensusClient(service_id=_SERVICE_ID)
+                try:
+                    char = await client.get_character(name, _WORLD)
+                    if char is not None:
+                        character_cache.set(cache_key, _build_char_response(char))
+                except Exception as exc:
+                    print(f"[startup] Pre-warm failed for {name}: {exc}", flush=True)
+                finally:
+                    await client.close()
+
+        await asyncio.gather(*[_fetch_one(n) for n in names])
+        print("[startup] Character cache pre-warm complete.", flush=True)
+
+    except Exception as exc:
+        print(f"[startup] Character cache pre-warm error: {exc}", flush=True)
+
+
 async def _bg_refresh_character(name: str, cache_key: str) -> None:
     """Background task: silently re-fetch a character and update the cache."""
     try:
