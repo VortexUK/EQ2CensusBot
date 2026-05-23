@@ -271,6 +271,9 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
       {/* ── Left sidebar ── */}
       <div style={{ width: 240, flexShrink: 0 }}>
 
+        {/* Raid Ready */}
+        <AARaidReady spent={charAAs.total_spent} cap={config.aa_cap} />
+
         {/* Profile selector */}
         {charAAs.profiles.length > 0 && (
           <div style={{ marginBottom: '0.75rem' }}>
@@ -339,9 +342,6 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
             pct={spentPct}
           />
         </StatGroup>
-
-        {/* Raid Ready */}
-        <AARaidReady spent={charAAs.total_spent} cap={config.aa_cap} />
 
         {/* Per-tree breakdown */}
         {visibleTrees.length > 0 && (
