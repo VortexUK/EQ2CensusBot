@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from census.client import CensusClient
 from census.constants import ARCHETYPES, CLASS_GROUPS
 from census.db import DB_PATH
+from census.recipes_db import DB_PATH as RECIPES_DB_PATH, find_by_spell
 
 router = APIRouter(tags=["item"])
 _SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
@@ -444,6 +445,85 @@ async def search_items(
         page=page,
         per_page=per_page,
     )
+
+
+# ---------------------------------------------------------------------------
+# Spell-scroll lookup
+# ---------------------------------------------------------------------------
+
+CRAFTABLE_TIERS = frozenset(["Journeyman", "Expert"])
+
+
+class SpellScrollIngredient(BaseModel):
+    description: str
+    quantity: int
+
+
+class SpellScrollRecipe(BaseModel):
+    primary_comp: str | None = None
+    primary_qty: int | None = None
+    secondary_comps: list[SpellScrollIngredient] = []
+    fuel_comp: str | None = None
+    fuel_qty: int | None = None
+
+
+class SpellScrollResult(BaseModel):
+    item_id: int | None = None
+    craftable: bool = False
+    recipe: SpellScrollRecipe | None = None
+
+
+@router.get("/spell-scroll", response_model=SpellScrollResult)
+async def get_spell_scroll(name: str, tier: str) -> SpellScrollResult:
+    """Return the item ID and optional recipe for a spell scroll.
+
+    name: spell base name, e.g. "Sanctuary III"
+    tier: tier suffix, e.g. "Expert", "Journeyman", "Apprentice"
+
+    Looks up the item by displayname_lower = '<name> (<tier>)' in the items DB.
+    If tier is Journeyman or Expert (craftable), also returns recipe ingredients.
+    """
+    craftable = tier in CRAFTABLE_TIERS
+    item_id: int | None = None
+    recipe: SpellScrollRecipe | None = None
+
+    # Look up the item in the local items DB
+    if DB_PATH.exists():
+        scroll_name = f"{name} ({tier})".lower()
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                "SELECT id FROM items"
+                " WHERE displayname_lower = ?"
+                "   AND typeinfo_name = 'spellscroll'"
+                " LIMIT 1",
+                (scroll_name,),
+            ) as cur:
+                row = await cur.fetchone()
+                if row:
+                    item_id = row[0]
+
+    # Look up the recipe if craftable
+    if craftable and RECIPES_DB_PATH.exists():
+        recipes = find_by_spell(name, tier)
+        if recipes:
+            r = recipes[0]
+            sec = [
+                SpellScrollIngredient(
+                    description=c.get("description", ""),
+                    quantity=c.get("quantity") or 1,
+                )
+                for c in (r.get("secondary_comps") or [])
+                if c.get("description")
+            ]
+            recipe = SpellScrollRecipe(
+                primary_comp=r.get("primary_comp"),
+                primary_qty=r.get("primary_qty"),
+                secondary_comps=sec,
+                fuel_comp=r.get("fuel_comp"),
+                fuel_qty=r.get("fuel_qty"),
+            )
+
+    return SpellScrollResult(item_id=item_id, craftable=craftable, recipe=recipe)
 
 
 @router.get("/item/{item_id}", response_model=ItemResponse)

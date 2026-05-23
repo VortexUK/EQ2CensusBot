@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { StatGroup } from './CharacterPage'
+import { SpellTierPip } from '../components/SpellScrollTooltip'
 import {
   type SpellEntry,
   type CharacterSpellsData,
@@ -488,12 +489,11 @@ export function SpellsTab({ charName }: { charName: string }) {
                             const base = SPELL_TIER_ICON[t]
                             const filename = t === s.tier ? `${base}-lit.png` : `${base}.png`
                             return (
-                              <img
+                              <SpellTierPip
                                 key={t}
                                 src={`/spell-icons/${filename}`}
-                                alt={t}
-                                title={t}
-                                style={{ width: 14, height: 14 }}
+                                tier={t}
+                                spellName={s.name}
                               />
                             )
                           })}

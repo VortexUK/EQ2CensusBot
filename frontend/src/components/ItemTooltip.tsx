@@ -2,7 +2,7 @@
  * HTML tooltip mirroring image/tooltip.py.
  * Colours, layout order, and section logic kept in sync with that file.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ interface SetBonus {
   lines: string[]
 }
 
-interface ItemDetail {
+export interface ItemDetail {
   id: string
   name: string
   quality: string
@@ -60,8 +60,8 @@ export interface TooltipState {
 
 // ── Colours (from tooltip.py) ─────────────────────────────────────────────────
 
-const BORDER_OUTER = '#c49e2c'
-const BORDER_INNER = '#364c5c'
+export const BORDER_OUTER = '#c49e2c'
+export const BORDER_INNER = '#364c5c'
 const C_BODY       = '#c7cfc7'
 const C_NAME       = '#e8e8e8'
 const C_PRIMARY    = '#22ff22'
@@ -74,7 +74,7 @@ function glow(color: string) {
   return `${_outline}, 0 0 4px ${color}, 0 0 4px ${color}`
 }
 
-interface QualityStyle { color: string; glowColor?: string }
+export interface QualityStyle { color: string; glowColor?: string }
 const QUALITY: Record<string, QualityStyle> = {
   fabled:        { color: '#ff939d', glowColor: '#df535f' },
   legendary:     { color: '#ffc993', glowColor: '#D56900' },
@@ -84,7 +84,7 @@ const QUALITY: Record<string, QualityStyle> = {
   handcrafted:   { color: '#beff93' },
   common:        { color: '#beff93' },
 }
-function qualityStyle(q: string): QualityStyle {
+export function qualityStyle(q: string): QualityStyle {
   const key = q.toLowerCase()
   if (QUALITY[key]) return QUALITY[key]
   // Compound quality like "mastercrafted fabled" — use the last recognised word
@@ -185,7 +185,7 @@ export function ItemTooltip({ state }: { state: TooltipState }) {
 
 // ── Content ───────────────────────────────────────────────────────────────────
 
-function TooltipContent({ item, qs }: { item: ItemDetail; qs: QualityStyle }) {
+export function TooltipContent({ item, qs }: { item: ItemDetail; qs: QualityStyle }) {
   const primary   = item.stats.filter(s => s.stat_group === 'primary'   && s.value !== 0)
   const secondary = item.stats.filter(s => s.stat_group === 'secondary' && s.value !== 0)
   const isAdorn   = item.armor_type.toLowerCase().includes('adornment')
@@ -338,7 +338,7 @@ function TooltipContent({ item, qs }: { item: ItemDetail; qs: QualityStyle }) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function Section({ children }: { children: React.ReactNode }) {
+export function Section({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ borderTop: `1px solid ${BORDER_INNER}`, marginTop: 6, paddingTop: 5 }}>
       {children}
