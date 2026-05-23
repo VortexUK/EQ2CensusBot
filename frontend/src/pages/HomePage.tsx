@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useClaim } from '../hooks/useClaim'
 import type { Claim } from '../hooks/useClaim'
+import ServerLaunchTimer from '../components/ServerLaunchTimer'
 
 // ── Class colours (adventure archetype) ──────────────────────────────────────
 
@@ -424,6 +425,7 @@ export default function HomePage() {
           Guild companion for <em>Wuoshi</em> — track characters, spells,
           gear and guild rosters across the realm of Norrath.
         </p>
+        <ServerLaunchTimer />
       </div>
 
       {/* Characters */}

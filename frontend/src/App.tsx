@@ -12,6 +12,7 @@ import UserWidget from './components/UserWidget'
 import { useAuth } from './hooks/useAuth'
 import { Link } from 'react-router-dom'
 import logo from './L&L.png'
+import ServerLaunchTimer from './components/ServerLaunchTimer'
 
 function LoginGate() {
   return (
@@ -41,6 +42,7 @@ function LoginGate() {
       <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: 340 }}>
         Sign in with Discord to access the guild companion.
       </p>
+      <ServerLaunchTimer />
       <a
         href="/api/auth/login"
         style={{
