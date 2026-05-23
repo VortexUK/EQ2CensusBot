@@ -439,45 +439,6 @@ class CensusClient:
         }
         return rank_map, guild.get("member_list") or []
 
-    async def get_guild_info(self, name: str, world: str) -> Optional[dict]:
-        """Return lightweight guild metadata (no member resolve)."""
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
-        params = {
-            "name": name,
-            "world": world,
-            "c:show": "name,world,dateformed,description,alignment,type,level,members,accounts,achievement_list",
-            "c:limit": "1",
-        }
-        _log.info("[Census] GET %s params=%s", url, params)
-        try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=15)
-            ) as resp:
-                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
-                if resp.status != 200:
-                    return None
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
-            return None
-
-        guild_list = data.get("guild_list", [])
-        if not guild_list:
-            return None
-        g = guild_list[0]
-        return {
-            "name":              g.get("name", name),
-            "world":             g.get("world", world),
-            "dateformed":        g.get("dateformed"),
-            "description":       g.get("description") or None,
-            "alignment":         g.get("alignment") or None,
-            "type":              g.get("type") or None,
-            "level":             _int(g.get("level")),
-            "members":           _int(g.get("members")),
-            "accounts":          _int(g.get("accounts")),
-            "achievement_count": len(g.get("achievement_list") or []),
-        }
-
     async def get_guild_full(
         self, name: str, world: str
     ) -> Optional[tuple[GuildData, list[CharacterOverview], dict]]:
