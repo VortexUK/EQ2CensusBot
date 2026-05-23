@@ -1,0 +1,19 @@
+{
+  "_comment": "Gear rating rules. Edit and restart the server to apply changes.",
+
+  "bands": [
+    { "label": "A", "min_below_max": 4  },
+    { "label": "B", "min_below_max": 10 }
+  ],
+  "fallback_band": "C",
+
+  "matrix": {
+    "fabled":    { "A": "A", "B": "B", "C": "E" },
+    "legendary": { "A": "B", "B": "C", "C": "F" },
+    "treasured": { "A": "D", "B": "E", "C": "F" }
+  },
+
+  "grade_scores": { "A": 10, "B": 8, "C": 6, "D": 4, "E": 2, "F": 0 },
+
+  "raid_ready_min_avg": 5.5
+}

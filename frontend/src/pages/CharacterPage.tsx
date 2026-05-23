@@ -89,8 +89,26 @@ interface Character {
 
 // ── Gear rating ──────────────────────────────────────────────────────────────
 
-// Numeric scores for the six letter grades (used to average across all items)
-const GRADE_SCORE: Record<string, number> = { A: 10, B: 8, C: 6, D: 4, E: 2, F: 0 }
+interface RatingBand   { label: string; min_below_max: number }
+interface RatingConfig {
+  bands:              RatingBand[]
+  fallback_band:      string
+  matrix:             Record<string, Record<string, string>>
+  grade_scores:       Record<string, number>
+  raid_ready_min_avg: number
+}
+
+const DEFAULT_RATING_CONFIG: RatingConfig = {
+  bands:              [{ label: 'A', min_below_max: 4 }, { label: 'B', min_below_max: 10 }],
+  fallback_band:      'C',
+  matrix: {
+    fabled:    { A: 'A', B: 'B', C: 'E' },
+    legendary: { A: 'B', B: 'C', C: 'F' },
+    treasured: { A: 'D', B: 'E', C: 'F' },
+  },
+  grade_scores:       { A: 10, B: 8, C: 6, D: 4, E: 2, F: 0 },
+  raid_ready_min_avg: 5.5,
+}
 
 /**
  * Classify an item tier string into one of three groups used by the matrix.
@@ -108,33 +126,29 @@ function ratingTierGroup(tier: string | null): 'fabled' | 'legendary' | 'treasur
  * Score a single equipped item (0–10).
  * Returns null if the item has no tier/level data yet (still loading).
  */
-function scoreItem(item: EquipmentSlot, maxLevel: number): number | null {
+function scoreItem(item: EquipmentSlot, maxLevel: number, cfg: RatingConfig): number | null {
   if (!item.item_id) return null
   const detail = getCachedItem(item.item_id)
   const itemLevel = detail?.item_level ?? null
   const group = ratingTierGroup(item.tier)
   if (group === null || itemLevel === null) return null
 
-  const max = maxLevel
-  const band: 'A' | 'B' | 'C' =
-    itemLevel >= max - 4  ? 'A' :
-    itemLevel >= max - 10 ? 'B' : 'C'
-
-  // Grade matrix: rows = tier group, cols = level band
-  //               A-band  B-band  C-band
-  // Fabled+         A       B       E
-  // Legendary/MC    B       C       F
-  // Treasured-      D       E       F
-  const MATRIX: Record<typeof group, Record<typeof band, string>> = {
-    fabled:     { A: 'A', B: 'B', C: 'E' },
-    legendary:  { A: 'B', B: 'C', C: 'F' },
-    treasured:  { A: 'D', B: 'E', C: 'F' },
+  // Determine level band by walking cfg.bands from best to worst
+  let band = cfg.fallback_band
+  for (const b of cfg.bands) {
+    if (itemLevel >= maxLevel - b.min_below_max) { band = b.label; break }
   }
-  return GRADE_SCORE[MATRIX[group][band]]
+
+  const gradeLetter = cfg.matrix[group]?.[band]
+  if (!gradeLetter) return null
+  return cfg.grade_scores[gradeLetter] ?? 0
 }
 
-/** Convert a numeric average (0–10) into a display grade with optional +/− modifier. */
-function gradeLabel(avg: number): { grade: string; color: string; raidReady: boolean } {
+/** Convert a numeric average into a display grade with optional +/− modifier. */
+function gradeLabel(avg: number, cfg: RatingConfig): { grade: string; color: string; raidReady: boolean } {
+  const raidReady = avg >= cfg.raid_ready_min_avg
+
+  // Half-step display grades derived from the 0–10 score scale
   let grade: string
   if      (avg >= 9.5) grade = 'A'
   else if (avg >= 8.5) grade = 'A−'
@@ -148,30 +162,33 @@ function gradeLabel(avg: number): { grade: string; color: string; raidReady: boo
   else if (avg >= 1.0) grade = 'E'
   else                 grade = 'F'
 
-  const raidReady = avg >= 5.5   // C+ and above
-
-  // Colour echoes the EQ2 quality palette: gold → fabled → legendary → blue → muted → red
+  // Colour echoes the EQ2 quality palette
   const color =
-    avg >= 9.0 ? '#e8d5a3' :   // A  – gold
-    avg >= 7.5 ? '#ff939d' :   // B+ – fabled pink
-    avg >= 7.0 ? '#ffc993' :   // B  – legendary orange
-    avg >= 5.5 ? '#92d7fd' :   // B−/C+ – mastercrafted blue
-    avg >= 4.5 ? '#a8d4a8' :   // C  – uncommon green
-                 '#f87171'     // C− and below – red
+    avg >= 9.0 ? '#e8d5a3' :
+    avg >= 7.5 ? '#ff939d' :
+    avg >= 7.0 ? '#ffc993' :
+    avg >= 5.5 ? '#92d7fd' :
+    avg >= 4.5 ? '#a8d4a8' :
+                 '#f87171'
 
   return { grade, color, raidReady }
 }
 
 const SKIP_GEAR_SLOTS = new Set(['food', 'drink'])
 
-function GearRating({ equipment, ready, maxLevel }: { equipment: EquipmentSlot[]; ready: boolean; maxLevel: number }) {
+function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
+  equipment: EquipmentSlot[]
+  ready: boolean
+  maxLevel: number
+  ratingConfig: RatingConfig
+}) {
   const bySlot = buildSlotMap(equipment)
 
   const scored: number[] = []
   let pending = 0
   for (const [key, item] of bySlot) {
     if (SKIP_GEAR_SLOTS.has(key) || !item.item_id) continue
-    const s = scoreItem(item, maxLevel)
+    const s = scoreItem(item, maxLevel, ratingConfig)
     if (s !== null) scored.push(s)
     else if (!ready) pending++   // still loading
   }
@@ -188,7 +205,7 @@ function GearRating({ equipment, ready, maxLevel }: { equipment: EquipmentSlot[]
   }
 
   const avg = scored.reduce((a, b) => a + b, 0) / scored.length
-  const { grade, color, raidReady } = gradeLabel(avg)
+  const { grade, color, raidReady } = gradeLabel(avg, ratingConfig)
 
   return (
     <div style={{ marginBottom: '1rem' }}>
@@ -431,17 +448,18 @@ type State =
   | { status: 'error'; message: string }
 
 // Module-level config cache — fetched once, shared across navigations.
-let _serverMaxLevel = 50
-let _configFetched  = false
+let _serverMaxLevel   = 50
+let _ratingConfig     = DEFAULT_RATING_CONFIG
+let _configFetched    = false
 
 export default function CharacterPage() {
   const { name } = useParams<{ name: string }>()
   const [state, setState] = useState<State>(() => {
-    // Initialise from cache so there's never a loading flash on back-navigation.
     const cached = name ? _charCache.get(name.toLowerCase()) : undefined
     return cached ? { status: 'ok', char: cached } : { status: 'loading' }
   })
-  const [maxLevel, setMaxLevel] = useState(_serverMaxLevel)
+  const [maxLevel,     setMaxLevel]     = useState(_serverMaxLevel)
+  const [ratingConfig, setRatingConfig] = useState<RatingConfig>(_ratingConfig)
 
   // Fetch public server config once (cached in module scope after first load).
   useEffect(() => {
@@ -450,10 +468,9 @@ export default function CharacterPage() {
     fetch('/api/config', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d?.server_max_level) {
-          _serverMaxLevel = d.server_max_level
-          setMaxLevel(d.server_max_level)
-        }
+        if (!d) return
+        if (d.server_max_level) { _serverMaxLevel = d.server_max_level; setMaxLevel(d.server_max_level) }
+        if (d.gear_rating)      { _ratingConfig   = d.gear_rating;      setRatingConfig(d.gear_rating) }
       })
       .catch(() => {})
   }, [])
@@ -483,7 +500,7 @@ export default function CharacterPage() {
       {state.status === 'loading' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Loading…</p>}
       {state.status === 'not_found' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Character <strong>{state.name}</strong> not found.</p>}
       {state.status === 'error' && <p style={{ marginTop: '2rem', color: '#f87171' }}>Error: {state.message}</p>}
-      {state.status === 'ok' && <CharacterView char={state.char} maxLevel={maxLevel} />}
+      {state.status === 'ok' && <CharacterView char={state.char} maxLevel={maxLevel} ratingConfig={ratingConfig} />}
     </main>
   )
 }
@@ -492,7 +509,7 @@ export default function CharacterPage() {
 
 type ActiveTab = 'equipment' | 'aas' | 'spells'
 
-function CharacterView({ char, maxLevel }: { char: Character; maxLevel: number }) {
+function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxLevel: number; ratingConfig: RatingConfig }) {
   const bySlot = buildSlotMap(char.equipment)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [hoveredStat, setHoveredStat] = useState<string | null>(null)
@@ -590,7 +607,7 @@ function CharacterView({ char, maxLevel }: { char: Character; maxLevel: number }
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', marginTop: '1rem' }}>
           {/* Left: gear rating + detailed stats */}
           <div style={{ width: 260, flexShrink: 0 }}>
-            <GearRating equipment={char.equipment} ready={itemsReady} maxLevel={maxLevel} />
+            <GearRating equipment={char.equipment} ready={itemsReady} maxLevel={maxLevel} ratingConfig={ratingConfig} />
             <StatsPanel char={char}
               onStatHover={setHoveredStat}
               onStatLeave={() => setHoveredStat(null)} />
