@@ -88,11 +88,6 @@ interface Character {
 }
 
 // ── Gear rating ──────────────────────────────────────────────────────────────
-//
-// Update EXPANSION_MAX_LEVEL when the TLE server unlocks a new expansion.
-//   Original EQ2  → 50   Desert of Flames → 60   Kingdom of Sky / EoF → 70
-//   Rise of Kunark → 80   Sentinel's Fate  → 90   Age of Discovery     → 90
-const EXPANSION_MAX_LEVEL = 50
 
 // Numeric scores for the six letter grades (used to average across all items)
 const GRADE_SCORE: Record<string, number> = { A: 10, B: 8, C: 6, D: 4, E: 2, F: 0 }
@@ -113,14 +108,14 @@ function ratingTierGroup(tier: string | null): 'fabled' | 'legendary' | 'treasur
  * Score a single equipped item (0–10).
  * Returns null if the item has no tier/level data yet (still loading).
  */
-function scoreItem(item: EquipmentSlot): number | null {
+function scoreItem(item: EquipmentSlot, maxLevel: number): number | null {
   if (!item.item_id) return null
   const detail = getCachedItem(item.item_id)
   const itemLevel = detail?.item_level ?? null
   const group = ratingTierGroup(item.tier)
   if (group === null || itemLevel === null) return null
 
-  const max = EXPANSION_MAX_LEVEL
+  const max = maxLevel
   const band: 'A' | 'B' | 'C' =
     itemLevel >= max - 4  ? 'A' :
     itemLevel >= max - 10 ? 'B' : 'C'
@@ -169,14 +164,14 @@ function gradeLabel(avg: number): { grade: string; color: string; raidReady: boo
 
 const SKIP_GEAR_SLOTS = new Set(['food', 'drink'])
 
-function GearRating({ equipment, ready }: { equipment: EquipmentSlot[]; ready: boolean }) {
+function GearRating({ equipment, ready, maxLevel }: { equipment: EquipmentSlot[]; ready: boolean; maxLevel: number }) {
   const bySlot = buildSlotMap(equipment)
 
   const scored: number[] = []
   let pending = 0
   for (const [key, item] of bySlot) {
     if (SKIP_GEAR_SLOTS.has(key) || !item.item_id) continue
-    const s = scoreItem(item)
+    const s = scoreItem(item, maxLevel)
     if (s !== null) scored.push(s)
     else if (!ready) pending++   // still loading
   }
@@ -435,6 +430,10 @@ type State =
   | { status: 'not_found'; name: string }
   | { status: 'error'; message: string }
 
+// Module-level config cache — fetched once, shared across navigations.
+let _serverMaxLevel = 50
+let _configFetched  = false
+
 export default function CharacterPage() {
   const { name } = useParams<{ name: string }>()
   const [state, setState] = useState<State>(() => {
@@ -442,6 +441,22 @@ export default function CharacterPage() {
     const cached = name ? _charCache.get(name.toLowerCase()) : undefined
     return cached ? { status: 'ok', char: cached } : { status: 'loading' }
   })
+  const [maxLevel, setMaxLevel] = useState(_serverMaxLevel)
+
+  // Fetch public server config once (cached in module scope after first load).
+  useEffect(() => {
+    if (_configFetched) return
+    _configFetched = true
+    fetch('/api/config', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.server_max_level) {
+          _serverMaxLevel = d.server_max_level
+          setMaxLevel(d.server_max_level)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!name) return
@@ -468,7 +483,7 @@ export default function CharacterPage() {
       {state.status === 'loading' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Loading…</p>}
       {state.status === 'not_found' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Character <strong>{state.name}</strong> not found.</p>}
       {state.status === 'error' && <p style={{ marginTop: '2rem', color: '#f87171' }}>Error: {state.message}</p>}
-      {state.status === 'ok' && <CharacterView char={state.char} />}
+      {state.status === 'ok' && <CharacterView char={state.char} maxLevel={maxLevel} />}
     </main>
   )
 }
@@ -477,7 +492,7 @@ export default function CharacterPage() {
 
 type ActiveTab = 'equipment' | 'aas' | 'spells'
 
-function CharacterView({ char }: { char: Character }) {
+function CharacterView({ char, maxLevel }: { char: Character; maxLevel: number }) {
   const bySlot = buildSlotMap(char.equipment)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [hoveredStat, setHoveredStat] = useState<string | null>(null)
@@ -575,7 +590,7 @@ function CharacterView({ char }: { char: Character }) {
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', marginTop: '1rem' }}>
           {/* Left: gear rating + detailed stats */}
           <div style={{ width: 260, flexShrink: 0 }}>
-            <GearRating equipment={char.equipment} ready={itemsReady} />
+            <GearRating equipment={char.equipment} ready={itemsReady} maxLevel={maxLevel} />
             <StatsPanel char={char}
               onStatHover={setHoveredStat}
               onStatLeave={() => setHoveredStat(null)} />
