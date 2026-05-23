@@ -1,9 +1,20 @@
 import asyncio
+import logging
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+# Configure once before anything else imports logging.  force=True re-applies
+# even if uvicorn or another library already touched the root logger.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s.%(msecs)03d  %(levelname)-8s  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,
+)
 
 
 async def run_bot() -> None:

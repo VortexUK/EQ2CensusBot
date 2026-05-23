@@ -373,7 +373,7 @@ function StatCols({ stats, color }: { stats: ItemStat[]; color: string }) {
 function EffectBlock({ eff, qs, showName }: { eff: ItemEffect; qs: QualityStyle; showName: boolean }) {
   return (
     <div style={{ marginBottom: 5 }}>
-      {showName && (
+      {showName && eff.name && (
         <div style={{
           color: qs.color, fontWeight: 'bold',
           textShadow: qs.glowColor ? glow(qs.glowColor) : undefined,

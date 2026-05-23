@@ -193,7 +193,7 @@ def parse_effects(effect_list: list, adornment_list: list) -> list[ItemEffect]:
 
     effects: list[ItemEffect] = []
     for i, group in enumerate(groups):
-        name = adornment_names[i] if i < len(adornment_names) else "Unknown Effect"
+        name = adornment_names[i] if i < len(adornment_names) else ""
         effects.append(ItemEffect(name=name, trigger=group["trigger"], lines=group["lines"]))
     return effects
 

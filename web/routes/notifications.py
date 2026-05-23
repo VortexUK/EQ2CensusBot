@@ -21,7 +21,7 @@ from starlette.requests import Request
 from web.cache import character_cache
 from web.config import WORLD as _WORLD
 from web.db import get_active_claims, list_claims, list_pending_users
-from web.routes.guild import _officer_chars, _roster_rank_map
+from web.routes.guild import _OFFICER_RANKS, _roster_rank_map
 
 _ADMIN_IDS: frozenset[str] = frozenset(
     filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(","))
@@ -68,6 +68,7 @@ async def get_notifications(request: Request) -> NotificationsResponse:
     if approved_chars:
         # Resolve guild names from the in-memory character cache (no Census call)
         guilds_seen: set[str] = set()
+        approved_lower = {c.lower() for c in approved_chars}
         for char_name in approved_chars:
             cache_key = f"{char_name.lower()}:{_WORLD.lower()}"
             cached, _ = character_cache.get_stale(cache_key)
@@ -79,10 +80,14 @@ async def get_notifications(request: Request) -> NotificationsResponse:
             counted_ids: set[int] = set()
 
             for guild_name in guilds_seen:
-                # _officer_chars uses the cached roster — fast after first load
-                if not await _officer_chars(disc_id, guild_name):
-                    continue
+                # One _roster_rank_map call per guild — cached after first fetch,
+                # shared across concurrent polls via in-flight deduplication.
                 rank_map = await _roster_rank_map(guild_name)
+
+                # Check officer status inline (avoids a redundant second call)
+                if not any(rank_map.get(n) in _OFFICER_RANKS for n in approved_lower):
+                    continue
+
                 new_ids = {
                     c["id"] for c in all_pending
                     if c["id"] not in counted_ids

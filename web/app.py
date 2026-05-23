@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
+
+_log = logging.getLogger(__name__)
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response
 
@@ -69,10 +72,9 @@ def _ensure_item_stats() -> None:
         conn.close()
 
         if stat_count == 0 and item_count > 0:
-            print(
-                f"[startup] item_stats is empty ({item_count:,} items) — "
-                "running background backfill…",
-                flush=True,
+            _log.info(
+                "[startup] item_stats is empty (%d items) — running background backfill…",
+                item_count,
             )
             # Ensure repo root is on sys.path so the scripts package is importable
             import sys
@@ -81,10 +83,10 @@ def _ensure_item_stats() -> None:
                 sys.path.insert(0, repo_root)
             from scripts.backfill_item_stats import run as _backfill  # type: ignore[import]
             _backfill(rebuild=False)
-            print("[startup] item_stats backfill complete.", flush=True)
+            _log.info("[startup] item_stats backfill complete.")
 
     except Exception as exc:
-        print(f"[startup] item_stats init/backfill error: {exc}", flush=True)
+        _log.error("[startup] item_stats init/backfill error: %s", exc)
 
 # ---------------------------------------------------------------------------
 # HTTP metrics middleware

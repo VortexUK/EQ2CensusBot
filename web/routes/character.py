@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import sqlite3
 from collections import Counter, defaultdict
+
+_log = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -257,7 +260,7 @@ async def prewarm_character_cache() -> None:
         if not names:
             return
 
-        print(f"[startup] Pre-warming character cache for {len(names)} character(s)…", flush=True)
+        _log.info("[startup] Pre-warming character cache for %d character(s)…", len(names))
 
         sem = asyncio.Semaphore(3)  # max 3 concurrent Census fetches
 
@@ -272,15 +275,15 @@ async def prewarm_character_cache() -> None:
                     if char is not None:
                         character_cache.set(cache_key, _build_char_response(char))
                 except Exception as exc:
-                    print(f"[startup] Pre-warm failed for {name}: {exc}", flush=True)
+                    _log.warning("[startup] Pre-warm failed for %s: %s", name, exc)
                 finally:
                     await client.close()
 
         await asyncio.gather(*[_fetch_one(n) for n in names])
-        print("[startup] Character cache pre-warm complete.", flush=True)
+        _log.info("[startup] Character cache pre-warm complete.")
 
     except Exception as exc:
-        print(f"[startup] Character cache pre-warm error: {exc}", flush=True)
+        _log.error("[startup] Character cache pre-warm error: %s", exc)
 
 
 async def _bg_refresh_character(name: str, cache_key: str) -> None:
@@ -294,7 +297,7 @@ async def _bg_refresh_character(name: str, cache_key: str) -> None:
         if char is not None:
             character_cache.set(cache_key, _build_char_response(char))
     except Exception as exc:
-        print(f"[Cache] Background character refresh failed for {name}: {exc}")
+        _log.error("[Cache] Background character refresh failed for %s: %s", name, exc)
 
 
 @router.get("/character/{name}", response_model=CharacterResponse)

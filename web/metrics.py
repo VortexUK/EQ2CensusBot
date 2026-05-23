@@ -10,9 +10,12 @@ is open (fine for a private Railway service).
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 import sqlite3
+
+_log = logging.getLogger(__name__)
 
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -107,7 +110,7 @@ class _DBCollector(Collector):
 
             conn.close()
         except Exception as exc:
-            print(f"[metrics] DB collector error: {exc}")
+            _log.error("[metrics] DB collector error: %s", exc)
 
         yield g_users
         yield g_claims

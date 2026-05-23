@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import Counter
+
+_log = logging.getLogger(__name__)
 
 import aiosqlite
 from fastapi import APIRouter, HTTPException
@@ -124,23 +127,67 @@ def _int(v) -> int | None:
         return None
 
 
+# In-flight deduplication: prevents thundering-herd when multiple requests
+# concurrently miss the roster cache for the same guild.
+_roster_fetch_tasks: dict[str, "asyncio.Task[dict[str, int | None]]"] = {}
+
+
 async def _roster_rank_map(guild_name: str) -> dict[str, int | None]:
     """
     Return {member_name_lower: rank_id} for a guild.
     Uses the cached roster when available; falls back to a Census call.
+    The Census result is stored in guild_cache so subsequent calls skip Census.
+    Concurrent cache-misses share a single in-flight fetch task (thundering-herd guard).
     """
     cache_key = f"roster:{guild_name.lower()}:{_WORLD.lower()}"
     roster, _ = guild_cache.get_stale(cache_key)
     if roster is not None:
         return {m.name.lower(): m.rank_id for m in roster.members}
-    client = CensusClient(service_id=_SERVICE_ID)
+
+    # Reuse any already-running fetch for this guild instead of firing a new one
+    existing = _roster_fetch_tasks.get(cache_key)
+    if existing is not None and not existing.done():
+        return await existing
+
+    async def _fetch() -> dict[str, int | None]:
+        client = CensusClient(service_id=_SERVICE_ID)
+        try:
+            guild = await client.get_guild(guild_name, _WORLD)
+        finally:
+            await client.close()
+        if not guild:
+            return {}
+        # Cache the result so the next call is served from memory
+        guild_cache.set(cache_key, GuildResponse(
+            name    = guild.name,
+            world   = guild.world,
+            members = [
+                GuildMemberResponse(
+                    name         = m.name,
+                    level        = m.level,
+                    cls          = m.cls,
+                    ts_class     = m.ts_class,
+                    ts_level     = m.ts_level,
+                    aa_level     = m.aa_level,
+                    deity        = m.deity,
+                    rank         = m.rank,
+                    rank_id      = m.rank_id,
+                    guild_status = m.guild_status,
+                    played_time  = m.played_time,
+                )
+                for m in guild.members
+            ],
+        ))
+        return {m.name.lower(): m.rank_id for m in guild.members}
+
+    task: asyncio.Task[dict[str, int | None]] = asyncio.create_task(_fetch())
+    _roster_fetch_tasks[cache_key] = task
     try:
-        guild = await client.get_guild(guild_name, _WORLD)
+        return await task
     finally:
-        await client.close()
-    if not guild:
-        return {}
-    return {m.name.lower(): m.rank_id for m in guild.members}
+        # Clean up only our own task; a later task may have replaced it already
+        if _roster_fetch_tasks.get(cache_key) is task:
+            _roster_fetch_tasks.pop(cache_key, None)
 
 
 async def _officer_chars(discord_id: str, guild_name: str) -> set[str]:
@@ -379,7 +426,7 @@ async def _bg_refresh_guild(guild_name: str) -> None:
             ],
         ))
     except Exception as exc:
-        print(f"[Cache] Background guild refresh failed for {guild_name}: {exc}")
+        _log.error("[Cache] Background guild refresh failed for %s: %s", guild_name, exc)
 
 
 def _overview_to_char_response(ov: CharacterOverview):  # → CharacterResponse
@@ -416,7 +463,7 @@ async def get_guild_info(guild_name: str) -> GuildInfoResponse:
                         if info:
                             guild_cache.set(ck, GuildInfoResponse(**info))
                     except Exception as exc:
-                        print(f"[Cache] Background guild info refresh failed for {gn}: {exc}")
+                        _log.error("[Cache] Background guild info refresh failed for %s: %s", gn, exc)
                 asyncio.create_task(_bg_refresh_info(guild_name, cache_key))
             return cached
         info = await client.get_guild_info(guild_name, _WORLD)
@@ -462,7 +509,7 @@ async def get_guild(guild_name: str) -> GuildResponse:
         try:
             character_cache.set(f"{ov.name.lower()}:{world_lower}", _overview_to_char_response(ov))
         except Exception as exc:
-            print(f"[Cache] Failed to pre-warm character {ov.name}: {exc}")
+            _log.warning("[Cache] Failed to pre-warm character %s: %s", ov.name, exc)
     _prewarm_adorn_cache(f"adorns:{guild_name.lower()}:{world_lower}", guild_name, overviews, member_rank)
     _prewarm_spell_cache(f"spells:{guild_name.lower()}:{world_lower}", guild_name, overviews, member_rank)
 

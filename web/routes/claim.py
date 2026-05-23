@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+
+_log = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -85,7 +88,7 @@ async def _build_claims_response(discord_id: str) -> tuple[ClaimsResponse, bool]
             c["character_name"] for c, gn in zip(approved_raw, guild_results)
             if isinstance(gn, BaseException)
         ]
-        print(f"[Claims] Guild fetch failed for: {failed_names} — result will not be cached")
+        _log.warning("[Claims] Guild fetch failed for: %s — result will not be cached", failed_names)
 
     approved = [
         ClaimResponse(**{**c, "guild_name": gn if isinstance(gn, str) else None})
@@ -105,9 +108,9 @@ async def _refresh_claim_cache(discord_id: str) -> None:
         if cacheable:
             claim_cache.set(f"claims:{discord_id}", result)
         else:
-            print(f"[Cache] Background claim refresh for {discord_id}: some fetches failed, skipping cache update")
+            _log.warning("[Cache] Background claim refresh for %s: some fetches failed, skipping cache update", discord_id)
     except Exception as exc:
-        print(f"[Cache] Background claim refresh failed for {discord_id}: {exc}")
+        _log.error("[Cache] Background claim refresh failed for %s: %s", discord_id, exc)
 
 
 @router.get("/claim/me", response_model=ClaimsResponse)

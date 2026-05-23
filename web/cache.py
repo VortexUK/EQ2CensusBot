@@ -4,8 +4,11 @@ Safe for single-process asyncio (no locking needed).
 """
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any, Optional
+
+_log = logging.getLogger(__name__)
 
 
 class TTLCache:
@@ -66,7 +69,7 @@ class TTLCache:
             self._update_size()
             self._inc_miss()
             return None
-        print(f"[Cache] HIT   {key}")
+        _log.debug("[Cache] HIT   %s", key)
         self._inc_hit()
         return value
 
@@ -89,11 +92,11 @@ class TTLCache:
         if self._max_age is not None and age > self._max_age:
             del self._store[key]
             self._update_size()
-            print(f"[Cache] EXPIRED {key} ({age / 60:.1f} min old)")
+            _log.info("[Cache] EXPIRED %s (%.1f min old)", key, age / 60)
             self._inc_miss()
             return None, False
         is_stale = age > self._ttl
-        print(f"[Cache] {'STALE' if is_stale else 'HIT  '} {key}")
+        _log.debug("[Cache] %s %s", "STALE" if is_stale else "HIT  ", key)
         if is_stale:
             self._inc_stale()
         else:
@@ -101,7 +104,7 @@ class TTLCache:
         return value, is_stale
 
     def set(self, key: str, value: Any) -> None:
-        print(f"[Cache] SET   {key}")
+        _log.debug("[Cache] SET   %s", key)
         self._store[key] = (time.monotonic(), value)
         try:
             from web.metrics import CACHE_SETS
@@ -112,7 +115,7 @@ class TTLCache:
 
     def delete(self, key: str) -> None:
         self._store.pop(key, None)
-        print(f"[Cache] DEL   {key}")
+        _log.info("[Cache] DEL   %s", key)
         self._update_size()
 
 

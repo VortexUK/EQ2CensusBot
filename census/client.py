@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import time as _time
 from collections import Counter
 from typing import Any, Optional
 
 import aiohttp
+
+_log = logging.getLogger(__name__)
 
 from census import db as item_db
 from census.item_parser import parse_item as _parse_item_fn
@@ -96,12 +99,12 @@ class CensusClient:
         # Try local DB first (fast, no rate limits)
         raw = await self._find_in_db(query)
         if raw:
-            print(f"[DB] Cache hit for {query!r}")
+            _log.debug("[DB] Cache hit for %r", query)
             return _parse_item_fn(raw)
         if db_exists:
-            print(f"[DB] Cache miss for {query!r} — falling back to Census API")
+            _log.debug("[DB] Cache miss for %r — falling back to Census API", query)
         else:
-            print(f"[DB] No database at {DB_PATH} — using Census API")
+            _log.debug("[DB] No database at %s — using Census API", DB_PATH)
         # Fall back to live Census API
         data = await self._fetch(self._build_params(query))
         if not data:
@@ -136,9 +139,9 @@ class CensusClient:
             conn = item_db.init_db()
             item_db.upsert_items([raw], conn)
             conn.close()
-            print(f"[DB] Cached item {raw.get('id')} ({raw.get('displayname')})")
+            _log.debug("[DB] Cached item %s (%s)", raw.get('id'), raw.get('displayname'))
         except Exception as exc:
-            print(f"[DB] Failed to cache item {raw.get('id')}: {exc}")
+            _log.warning("[DB] Failed to cache item %s: %s", raw.get('id'), exc)
 
     async def get_raw_item(self, query: str) -> Optional[dict]:
         """Return the raw parsed JSON — used by inspect_item.py."""
@@ -153,17 +156,17 @@ class CensusClient:
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=30)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return None
 
         guild_list = data.get("guild_list", [])
@@ -267,17 +270,17 @@ class CensusClient:
             "c:show": "name,type,stats,equipmentslot_list,spell_list,guild",
             "c:limit": "1",
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=30)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return None
 
         char_list = data.get("character_list", [])
@@ -344,17 +347,17 @@ class CensusClient:
             "c:show": "name,alternateadvancements,orderedalternateadvancement_list",
             "c:limit": "1",
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=30)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return None
 
         char_list = data.get("character_list", [])
@@ -411,17 +414,17 @@ class CensusClient:
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=60)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return {}, []
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return {}, []
 
         guild_list = data.get("guild_list", [])
@@ -445,17 +448,17 @@ class CensusClient:
             "c:show": "name,world,dateformed,description,alignment,type,level,members,accounts,achievement_list",
             "c:limit": "1",
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=15)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return None
 
         guild_list = data.get("guild_list", [])
@@ -493,17 +496,17 @@ class CensusClient:
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=60)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return None
 
         guild_list = data.get("guild_list", [])
@@ -608,17 +611,17 @@ class CensusClient:
             "c:show": "name,guild",
             "c:limit": "1",
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=30)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     raise RuntimeError(f"Census HTTP {resp.status} for guild lookup of {character_name!r}")
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error fetching guild for {character_name!r}: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error fetching guild for %r: %s: %r", character_name, type(exc).__name__, exc)
             raise  # re-raise so callers can detect the failure
 
         char_list = data.get("character_list", [])
@@ -642,17 +645,17 @@ class CensusClient:
             "c:show": "name,type,guild",
             "c:limit": "1",
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=15)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return None
 
         char_list = data.get("character_list", [])
@@ -691,17 +694,17 @@ class CensusClient:
             "c:show": "name,type,guild",
             "c:limit": str(limit),
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=15)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return []
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return []
 
         results: list[dict] = []
@@ -740,17 +743,17 @@ class CensusClient:
             "c:show": "name,world",
             "c:limit": str(limit),
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=15)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return []
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return []
 
         results: list[dict] = []
@@ -832,17 +835,17 @@ class CensusClient:
             # aiohttp percent-encodes ] as %5D which Census accepts fine
             params["type.level"] = f"]{min_level}"
 
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=30)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return []
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return []
 
         results: list[dict] = []
@@ -873,17 +876,17 @@ class CensusClient:
             "c:show": "name,spell_list",
             "c:limit": "1",
         }
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=30)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
                 data = await resp.json(content_type=None)
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return None
 
         char_list = data.get("character_list", [])
@@ -931,19 +934,19 @@ class CensusClient:
 
     async def _fetch(self, params: dict) -> Optional[dict]:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/item/"
-        print(f"[Census] GET {url} params={params}")
+        _log.info("[Census] GET %s params=%s", url, params)
         try:
             async with self._session_().get(
                 url, params=params, timeout=aiohttp.ClientTimeout(total=10)
             ) as resp:
-                print(f"[Census] HTTP {resp.status} url={resp.url}")
+                _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
                 data = await resp.json(content_type=None)
-                print(f"[Census] returned={data.get('returned')} items")
+                _log.info("[Census] returned=%s items", data.get('returned'))
                 return data
         except Exception as exc:
-            print(f"[Census] API error: {type(exc).__name__}: {exc!r}")
+            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return None
 
 
