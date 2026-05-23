@@ -35,6 +35,7 @@ from web.metrics import (
     CONTENT_TYPE_LATEST,
     HTTP_REQUEST_DURATION,
     HTTP_REQUESTS,
+    USER_PAGE_VIEWS,
     _register_db_collector,
     check_metrics_auth,
     generate_latest,
@@ -116,6 +117,16 @@ class _MetricsMiddleware(BaseHTTPMiddleware):
                 method=request.method,
                 path=label_path,
             ).observe(elapsed)
+
+            # Per-user page views: authenticated GET requests only.
+            # Session is already populated by SessionMiddleware (runs before us).
+            if request.method == "GET" and response.status_code < 400:
+                user = request.session.get("user")
+                if user:
+                    USER_PAGE_VIEWS.labels(
+                        username=user.get("username", "unknown"),
+                        path=label_path,
+                    ).inc()
 
         return response
 

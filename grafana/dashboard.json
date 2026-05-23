@@ -434,6 +434,83 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "id": 104,
+      "title": "User Activity",
+      "type": "row"
+    },
+
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Page Views per User (last window)",
+      "description": "Authenticated GET requests by Discord username. Use the time picker to zoom into any window.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "spanNulls": false }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum by(username) (increase(user_page_views_total{job=\"eq2companion\"}[$__rate_interval]))",
+          "legendFormat": "{{username}}",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 18,
+      "type": "table",
+      "title": "Top Pages by User — last 1 h",
+      "description": "Which routes each user has hit in the past hour. Sort any column by clicking its header.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Views", "desc": true }]
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "left" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Views" },
+            "properties": [
+              { "id": "custom.width", "value": 80 },
+              { "id": "custom.align", "value": "right" }
+            ]
+          }
+        ]
+      },
+      "transformations": [
+        { "id": "labelsToFields", "options": { "mode": "columns" } },
+        { "id": "organize", "options": { "renameByName": { "username": "User", "path": "Path", "Value": "Views" } } },
+        { "id": "sortBy", "options": { "fields": [{ "displayName": "Views", "desc": true }] } }
+      ],
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sort_desc(sum by(username, path) (increase(user_page_views_total{job=\"eq2companion\"}[1h])))",
+          "legendFormat": "",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
       "id": 103,
       "title": "Application Health",
       "type": "row"
@@ -443,7 +520,7 @@
       "id": 11,
       "type": "stat",
       "title": "Approved Users",
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 32 },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 41 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -475,7 +552,7 @@
       "id": 12,
       "type": "stat",
       "title": "Pending Users",
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 32 },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 41 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -514,7 +591,7 @@
       "id": 13,
       "type": "stat",
       "title": "Denied Users",
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 32 },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 41 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -546,7 +623,7 @@
       "id": 14,
       "type": "stat",
       "title": "Approved Claims",
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 32 },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 41 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -578,7 +655,7 @@
       "id": 15,
       "type": "stat",
       "title": "Pending Claims",
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 32 },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 41 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
@@ -617,7 +694,7 @@
       "id": 16,
       "type": "stat",
       "title": "Total Approved Claims (all time)",
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 32 },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 41 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
