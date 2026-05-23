@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { Routes, Route, Outlet, NavLink } from 'react-router-dom'
+import { Routes, Route, Outlet, NavLink, useLocation } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import CharacterPage from './pages/CharacterPage'
 import ClaimPage from './pages/ClaimPage'
@@ -77,14 +77,24 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
   whiteSpace: 'nowrap',
 })
 
+function NavItem({ to, label, also }: { to: string; label: string; also?: string }) {
+  const { pathname } = useLocation()
+  const isActive = pathname === to || (also ? pathname.startsWith(also) : false)
+  return (
+    <NavLink to={to} end style={() => navLinkStyle({ isActive })}>
+      {label}
+    </NavLink>
+  )
+}
+
 function NavLinks() {
   return (
     <nav style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-      <NavLink to="/" end      style={navLinkStyle}>Home</NavLink>
-      <NavLink to="/characters" style={navLinkStyle}>Character</NavLink>
-      <NavLink to="/guilds"     style={navLinkStyle}>Guild</NavLink>
-      <NavLink to="/items"      style={navLinkStyle}>Item</NavLink>
-      <NavLink to="/recipes"    style={navLinkStyle}>Recipes</NavLink>
+      <NavItem to="/"           label="Home" />
+      <NavItem to="/characters" label="Characters" also="/character/" />
+      <NavItem to="/guilds"     label="Guilds"      also="/guild/" />
+      <NavItem to="/items"      label="Items"       also="/item/" />
+      <NavItem to="/recipes"    label="Recipes" />
     </nav>
   )
 }

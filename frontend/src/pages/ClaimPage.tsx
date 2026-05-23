@@ -191,11 +191,37 @@ export default function ClaimPage() {
   return (
     <main style={{ maxWidth: 560, margin: '3rem auto', padding: '0 1rem' }}>
       <BackLink />
-      <h1 style={{ margin: '0.75rem 0 0.25rem' }}>My Characters</h1>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-        Link your Discord account to your EQ2 characters on {import.meta.env.VITE_EQ2_WORLD ?? 'Woushi'}.
-        Each claim is reviewed by a guild officer before being approved.
-      </p>
+      <h1 style={{ margin: '0.75rem 0 0.5rem' }}>My Characters</h1>
+      <div style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderLeft: '3px solid rgba(200,169,110,0.5)',
+        borderRadius: 8,
+        padding: '0.9rem 1.1rem',
+        marginBottom: '1.5rem',
+        fontSize: '0.88rem',
+        color: 'var(--text-muted)',
+        lineHeight: 1.65,
+      }}>
+        <p style={{ margin: '0 0 0.5rem', color: 'var(--text)', fontWeight: 600 }}>
+          What is character claiming?
+        </p>
+        <p style={{ margin: '0 0 0.5rem' }}>
+          Linking your Discord account to your in-game characters unlocks
+          personalised features — your character sheet, spell upgrade tracker,
+          and gear overview are all tied to your claim.
+        </p>
+        <p style={{ margin: '0 0 0.5rem' }}>
+          After submitting a claim, a <strong style={{ color: 'var(--text)' }}>guild officer or admin</strong> will
+          verify that the character belongs to you and approve the request.
+          You'll be notified once it's approved.
+        </p>
+        <p style={{ margin: 0 }}>
+          You can have multiple characters linked — mark one as your{' '}
+          <strong style={{ color: 'var(--text)' }}>primary</strong> to set it as
+          your default on the home page.
+        </p>
+      </div>
 
       {isUnauth && (
         <div style={card}>

@@ -78,6 +78,17 @@ export default function UserWidget() {
           boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
           overflow: 'hidden',
         }}>
+          <Link
+            to="/claim"
+            onClick={() => setOpen(false)}
+            style={{
+              display: 'block', padding: '0.6rem 1rem',
+              color: 'var(--text-muted)', fontSize: '0.88rem',
+              textDecoration: 'none', borderBottom: '1px solid var(--border)',
+            }}
+          >
+            ★ My Characters
+          </Link>
           {user.is_admin && (
             <Link
               to="/admin"
