@@ -41,8 +41,8 @@ class GuildInfoResponse(BaseModel):
     world: str
     dateformed: int | None = None
     description: str | None = None
-    alignment: str | None = None
-    type: str | None = None
+    alignment: int | str | None = None   # Census returns an int (0/1/2) or None
+    type: int | str | None = None        # Census may return an int here too
     level: int | None = None
     members: int | None = None
     accounts: int | None = None
