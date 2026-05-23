@@ -4,3 +4,4 @@ dockerfilePath = "Dockerfile"
 
 [deploy]
 restartPolicyType = "always"
+watchPaths = ["alloy/**"]
