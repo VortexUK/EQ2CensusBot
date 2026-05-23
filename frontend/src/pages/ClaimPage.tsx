@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import BackLink from '../components/BackLink'
 import { useAuth } from '../hooks/useAuth'
 import { Claim, useClaim } from '../hooks/useClaim'
 
@@ -189,7 +190,7 @@ export default function ClaimPage() {
 
   return (
     <main style={{ maxWidth: 560, margin: '3rem auto', padding: '0 1rem' }}>
-      <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
+      <BackLink />
       <h1 style={{ margin: '0.75rem 0 0.25rem' }}>My Characters</h1>
       <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
         Link your Discord account to your EQ2 characters on {import.meta.env.VITE_EQ2_WORLD ?? 'Woushi'}.

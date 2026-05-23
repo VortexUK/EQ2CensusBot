@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import BackLink from '../components/BackLink'
 import { useAuth } from '../hooks/useAuth'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -527,7 +528,7 @@ export default function AdminPage() {
   if (auth.status === 'unauthenticated' || !auth.user.is_admin) {
     return (
       <main style={{ maxWidth: 960, margin: '3rem auto', padding: '0 1rem' }}>
-        <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
+        <BackLink />
         <p style={{ marginTop: '2rem', color: '#f87171' }}>Access denied.</p>
       </main>
     )

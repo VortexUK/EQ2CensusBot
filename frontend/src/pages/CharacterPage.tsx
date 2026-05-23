@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import BackLink from '../components/BackLink'
 import { ItemTooltip, TooltipState, getCachedItem, prefetchItem } from '../components/ItemTooltip'
 import { AAsTab } from './CharacterAAsTab'
 import { SpellsTab } from './CharacterSpellsTab'
@@ -496,7 +497,7 @@ export default function CharacterPage() {
 
   return (
     <main style={{ maxWidth: 1280, margin: '2rem auto', padding: '0 1rem' }}>
-      <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
+      <BackLink />
       {state.status === 'loading' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Loading…</p>}
       {state.status === 'not_found' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Character <strong>{state.name}</strong> not found.</p>}
       {state.status === 'error' && <p style={{ marginTop: '2rem', color: '#f87171' }}>Error: {state.message}</p>}

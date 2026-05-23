@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import BackLink from '../components/BackLink'
 import { useClaim } from '../hooks/useClaim'
 import { useAuth } from '../hooks/useAuth'
 
@@ -1232,7 +1233,7 @@ export default function GuildPage() {
 
   return (
     <main style={{ maxWidth: 1000, margin: '3rem auto', padding: '0 1rem' }}>
-      <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
+      <BackLink />
 
       {/* Header */}
       <div style={{ margin: '1rem 0 1.5rem' }}>
