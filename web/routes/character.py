@@ -116,7 +116,7 @@ def _f(d: dict, *keys: str) -> float | None:
     if cur is None:
         return None
     try:
-        return float(cur)
+        return float(cur)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
 
@@ -127,12 +127,12 @@ def _i(d: dict, *keys: str) -> int | None:
 
 
 def _parse_stats(s: dict) -> CharacterStats:
-    health  = s.get("health") or {}
-    power   = s.get("power") or {}
+    health = s.get("health") or {}
+    power = s.get("power") or {}
     defense = s.get("defense") or {}
-    combat  = s.get("combat") or {}
+    combat = s.get("combat") or {}
     ability = s.get("ability") or {}
-    weapon  = s.get("weapon") or {}
+    weapon = s.get("weapon") or {}
 
     def attr(name: str) -> int | None:
         return _i(s.get(name) or {}, "effective")
@@ -145,52 +145,52 @@ def _parse_stats(s: dict) -> CharacterStats:
         sec_min = sec_max = sec_delay = None
 
     return CharacterStats(
-        health_max        = _i(health, "max"),
-        health_regen      = _i(health, "regen"),
-        power_max         = _i(power, "max"),
-        power_regen       = _i(power, "regen"),
-        run_speed         = _f(s, "runspeed"),
-        status_points     = _i(s, "personal_status_points"),
-        str_eff           = attr("str"),
-        sta_eff           = attr("sta"),
-        agi_eff           = attr("agi"),
-        wis_eff           = attr("wis"),
-        int_eff           = attr("int"),
-        armor             = _i(defense, "armor"),
-        avoidance         = _i(defense, "avoidance"),
-        block_chance      = _f(combat, "blockchance"),
-        parry             = _i(defense, "parry"),
-        mit_physical      = _f(combat, "mitigation_physical"),
-        mit_elemental     = _f(combat, "mitigation_elemental"),
-        mit_noxious       = _f(combat, "mitigation_noxious"),
-        mit_arcane        = _f(combat, "mitigation_arcane"),
-        potency           = _f(combat, "basemodifier"),
-        crit_chance       = _f(combat, "critchance"),
-        crit_bonus        = _f(combat, "critbonus"),
-        fervor            = _f(combat, "fervor"),
-        dps               = _f(combat, "dps"),
-        double_attack     = _f(combat, "doubleattackchance"),
-        ability_doublecast= _f(combat, "abilitydoubleattackchance"),
-        attack_speed      = _f(combat, "attackspeed"),
-        strikethrough     = _f(combat, "strikethrough"),
-        accuracy          = _f(combat, "accuracy"),
-        ability_mod       = _f(combat, "abilitymod"),
+        health_max=_i(health, "max"),
+        health_regen=_i(health, "regen"),
+        power_max=_i(power, "max"),
+        power_regen=_i(power, "regen"),
+        run_speed=_f(s, "runspeed"),
+        status_points=_i(s, "personal_status_points"),
+        str_eff=attr("str"),
+        sta_eff=attr("sta"),
+        agi_eff=attr("agi"),
+        wis_eff=attr("wis"),
+        int_eff=attr("int"),
+        armor=_i(defense, "armor"),
+        avoidance=_i(defense, "avoidance"),
+        block_chance=_f(combat, "blockchance"),
+        parry=_i(defense, "parry"),
+        mit_physical=_f(combat, "mitigation_physical"),
+        mit_elemental=_f(combat, "mitigation_elemental"),
+        mit_noxious=_f(combat, "mitigation_noxious"),
+        mit_arcane=_f(combat, "mitigation_arcane"),
+        potency=_f(combat, "basemodifier"),
+        crit_chance=_f(combat, "critchance"),
+        crit_bonus=_f(combat, "critbonus"),
+        fervor=_f(combat, "fervor"),
+        dps=_f(combat, "dps"),
+        double_attack=_f(combat, "doubleattackchance"),
+        ability_doublecast=_f(combat, "abilitydoubleattackchance"),
+        attack_speed=_f(combat, "attackspeed"),
+        strikethrough=_f(combat, "strikethrough"),
+        accuracy=_f(combat, "accuracy"),
+        ability_mod=_f(combat, "abilitymod"),
         weapon_damage_bonus=_f(combat, "weapondamagebonus"),
-        flurry            = _f(combat, "flurry"),
-        lethality         = _f(combat, "lethality"),
-        toughness         = _f(combat, "toughness"),
-        reuse_speed       = _f(ability, "spelltimereusepct"),
-        casting_speed     = _f(ability, "spelltimecastpct"),
-        recovery_speed    = _f(ability, "spelltimerecoverypct"),
-        primary_min       = _i(weapon, "primarymindamage"),
-        primary_max       = _i(weapon, "primarymaxdamage"),
-        primary_delay     = _f(weapon, "primarydelay"),
-        secondary_min     = sec_min,
-        secondary_max     = sec_max,
-        secondary_delay   = sec_delay,
-        ranged_min        = _i(weapon, "rangedmindamage"),
-        ranged_max        = _i(weapon, "rangedmaxdamage"),
-        ranged_delay      = _f(weapon, "rangeddelay"),
+        flurry=_f(combat, "flurry"),
+        lethality=_f(combat, "lethality"),
+        toughness=_f(combat, "toughness"),
+        reuse_speed=_f(ability, "spelltimereusepct"),
+        casting_speed=_f(ability, "spelltimecastpct"),
+        recovery_speed=_f(ability, "spelltimerecoverypct"),
+        primary_min=_i(weapon, "primarymindamage"),
+        primary_max=_i(weapon, "primarymaxdamage"),
+        primary_delay=_f(weapon, "primarydelay"),
+        secondary_min=sec_min,
+        secondary_max=sec_max,
+        secondary_delay=sec_delay,
+        ranged_min=_i(weapon, "rangedmindamage"),
+        ranged_max=_i(weapon, "rangedmaxdamage"),
+        ranged_delay=_f(weapon, "rangeddelay"),
     )
 
 
@@ -215,34 +215,34 @@ class CharacterResponse(BaseModel):
 def _build_char_response(char) -> CharacterResponse:
     """Convert a CharacterOverview into a CharacterResponse (shared by endpoint + guild pre-warming)."""
     return CharacterResponse(
-        id         = char.id,
-        name       = char.name,
-        level      = char.level,
-        cls        = char.cls,
-        race       = char.race,
-        gender     = char.gender,
-        deity      = char.deity,
-        aa_count   = char.aa_count,
-        world      = char.world,
-        ts_class   = char.ts_class,
-        ts_level   = char.ts_level,
-        guild_name = char.guild_name,
-        stats      = _parse_stats(char.stats),
-        equipment  = [
+        id=char.id,
+        name=char.name,
+        level=char.level,
+        cls=char.cls,
+        race=char.race,
+        gender=char.gender,
+        deity=char.deity,
+        aa_count=char.aa_count,
+        world=char.world,
+        ts_class=char.ts_class,
+        ts_level=char.ts_level,
+        guild_name=char.guild_name,
+        stats=_parse_stats(char.stats),
+        equipment=[
             EquipmentSlotResponse(
-                slot        = s.slot_name,
-                name        = s.item_name,
-                item_id     = s.item_id,
-                icon_id     = s.icon_id,
-                tier        = s.tier,
-                adorn_slots = [
+                slot=s.slot_name,
+                name=s.item_name,
+                item_id=s.item_id,
+                icon_id=s.icon_id,
+                tier=s.tier,
+                adorn_slots=[
                     AdornSlotResponse(color=a.color, adorn_name=a.adorn_name, adorn_id=a.adorn_id)
                     for a in s.adorn_slots
                 ],
             )
             for s in char.equipment
         ],
-        spell_ids = char.spell_ids,
+        spell_ids=char.spell_ids,
     )
 
 
@@ -342,19 +342,19 @@ async def get_character(name: str) -> CharacterResponse:
 
 
 class SpellEntryResponse(BaseModel):
-    name:           str
-    tier:           str
-    level:          int
-    spell_type:     str
-    icon_id:        int | None = None
-    icon_backdrop:  int | None = None
+    name: str
+    tier: str
+    level: int
+    spell_type: str
+    icon_id: int | None = None
+    icon_backdrop: int | None = None
 
 
 class CharacterSpellsResponse(BaseModel):
     character_name: str
-    spells:         list[SpellEntryResponse]
-    tier_counts:    dict[str, int]       # all _TIER_ORDER keys present
-    tiers_present:  list[str]            # ordered subset that have > 0 spells
+    spells: list[SpellEntryResponse]
+    tier_counts: dict[str, int]  # all _TIER_ORDER keys present
+    tiers_present: list[str]  # ordered subset that have > 0 spells
 
 
 @router.get("/character/{name}/spells", response_model=CharacterSpellsResponse)
@@ -403,7 +403,8 @@ async def get_character_spells(name: str) -> CharacterSpellsResponse:
     # Servant, base combat art ranks etc.) that are permanently fixed in tier.
     blocklist = _load_spell_blocklist()
     rows = [
-        r for r in spell_db.values()
+        r
+        for r in spell_db.values()
         if (r.get("level") or 0) > 0
         and r.get("type") in ("spells", "arts")
         and r.get("given_by") == "spellscroll"
@@ -417,20 +418,20 @@ async def get_character_spells(name: str) -> CharacterSpellsResponse:
     count = Counter(r.get("tier_name") or "Unknown" for r in rows)
 
     return CharacterSpellsResponse(
-        character_name = char_name,
-        spells         = [
+        character_name=char_name,
+        spells=[
             SpellEntryResponse(
-                name          = r["name"],
-                tier          = r.get("tier_name") or "Unknown",
-                level         = r.get("level") or 0,
-                spell_type    = r.get("type") or "",
-                icon_id       = r.get("icon_id"),
-                icon_backdrop = r.get("icon_backdrop"),
+                name=r["name"],
+                tier=r.get("tier_name") or "Unknown",
+                level=r.get("level") or 0,
+                spell_type=r.get("type") or "",
+                icon_id=r.get("icon_id"),
+                icon_backdrop=r.get("icon_backdrop"),
             )
             for r in rows
         ],
-        tier_counts    = {t: count.get(t, 0) for t in _TIER_ORDER},
-        tiers_present  = [t for t in _TIER_ORDER if count.get(t, 0) > 0],
+        tier_counts={t: count.get(t, 0) for t in _TIER_ORDER},
+        tiers_present=[t for t in _TIER_ORDER if count.get(t, 0) > 0],
     )
 
 
@@ -460,7 +461,7 @@ def _lookup_items_by_name(names: list[str]) -> dict[str, dict]:
     # Partition into "raw" originals and plain originals.
     # orig_to_lookup maps lowercased original → exact lookup key (Raw stripped).
     orig_to_lookup: dict[str, str] = {}
-    raw_originals: list[str] = []          # lowercased originals that started with "raw "
+    raw_originals: list[str] = []  # lowercased originals that started with "raw "
     for n in names:
         lo = n.lower()
         if lo.startswith("raw "):
@@ -473,26 +474,26 @@ def _lookup_items_by_name(names: list[str]) -> dict[str, dict]:
     def _row_to_info(row) -> dict:
         tier_raw = row[3] or ""
         return {
-            "item_id":      row[0],
-            "display_name": row[1],          # canonical cased name from DB
-            "icon_id":      row[2],
-            "tier":         tier_raw.title() if tier_raw else None,
-            "description":  row[4] or None,
-            "item_level":   row[5],
+            "item_id": row[0],
+            "display_name": row[1],  # canonical cased name from DB
+            "icon_id": row[2],
+            "tier": tier_raw.title() if tier_raw else None,
+            "description": row[4] or None,
+            "item_level": row[5],
         }
 
     by_lookup: dict[str, dict] = {}
     with sqlite3.connect(_ITEMS_DB) as conn:
         # ── Pass 1: exact match (displayname_lower IN (...)) ─────────────────
         unique_lookups = list(set(orig_to_lookup.values()))
-        placeholders   = ",".join("?" * len(unique_lookups))
+        placeholders = ",".join("?" * len(unique_lookups))
         rows = conn.execute(
             f"SELECT id, displayname, icon_id, tier_display, description, item_level "
             f"FROM items WHERE displayname_lower IN ({placeholders})",
             unique_lookups,
         ).fetchall()
         for row in rows:
-            key = row[1].lower()   # displayname → lowercase for keying
+            key = row[1].lower()  # displayname → lowercase for keying
             if key not in by_lookup:
                 by_lookup[key] = _row_to_info(row)
 
@@ -500,12 +501,9 @@ def _lookup_items_by_name(names: list[str]) -> dict[str, dict]:
         # For each "raw opaline" whose stripped form "opaline" wasn't found,
         # search for no-value items with max_stack_size=800 whose name contains
         # the keyword ("opaline").  Pick the first match (e.g. "Rough Opaline").
-        unmatched_raw = [
-            lo for lo in raw_originals
-            if orig_to_lookup[lo] not in by_lookup
-        ]
+        unmatched_raw = [lo for lo in raw_originals if orig_to_lookup[lo] not in by_lookup]
         for lo in unmatched_raw:
-            keyword = orig_to_lookup[lo]   # e.g. "opaline"
+            keyword = orig_to_lookup[lo]  # e.g. "opaline"
             row = conn.execute(
                 "SELECT id, displayname, icon_id, tier_display, description, item_level "
                 "FROM items "
@@ -520,28 +518,24 @@ def _lookup_items_by_name(names: list[str]) -> dict[str, dict]:
                 by_lookup[keyword] = _row_to_info(row)
 
     # Map results back to original ingredient names
-    return {
-        orig: by_lookup[lookup]
-        for orig, lookup in orig_to_lookup.items()
-        if lookup in by_lookup
-    }
+    return {orig: by_lookup[lookup] for orig, lookup in orig_to_lookup.items() if lookup in by_lookup}
 
 
 class IngredientResponse(BaseModel):
-    name:        str
-    quantity:    int
-    category:    str            # "primary" | "secondary" | "fuel"
-    item_id:     int | None = None
-    icon_id:     int | None = None
-    tier:        str | None = None
+    name: str
+    quantity: int
+    category: str  # "primary" | "secondary" | "fuel"
+    item_id: int | None = None
+    icon_id: int | None = None
+    tier: str | None = None
     description: str | None = None
-    item_level:  int | None = None
+    item_level: int | None = None
 
 
 class UpgradeMaterialsResponse(BaseModel):
-    spells_needing_upgrade: int   # sub-expert spells found in spell DB
-    spells_with_recipe:     int   # of those, how many had an Expert recipe
-    ingredients:            list[IngredientResponse]   # aggregated, sorted qty desc within category
+    spells_needing_upgrade: int  # sub-expert spells found in spell DB
+    spells_with_recipe: int  # of those, how many had an Expert recipe
+    ingredients: list[IngredientResponse]  # aggregated, sorted qty desc within category
 
 
 @router.get("/character/{name}/upgrade-materials", response_model=UpgradeMaterialsResponse)
@@ -579,7 +573,8 @@ async def get_upgrade_materials(name: str) -> UpgradeMaterialsResponse:
     spell_db: dict[int, dict] = _spell_find_by_ids(spell_ids)
     blocklist = _load_spell_blocklist()
     rows = [
-        r for r in spell_db.values()
+        r
+        for r in spell_db.values()
         if (r.get("level") or 0) > 0
         and r.get("type") in ("spells", "arts")
         and r.get("given_by") == "spellscroll"
@@ -597,8 +592,8 @@ async def get_upgrade_materials(name: str) -> UpgradeMaterialsResponse:
     recipes = _find_spell_recipes(spell_names, "Expert", path=_RECIPES_DB)
 
     # Aggregate ingredients across all matched recipes
-    totals: dict[str, int]   = defaultdict(int)
-    cats:   dict[str, str]   = {}
+    totals: dict[str, int] = defaultdict(int)
+    cats: dict[str, str] = {}
 
     for recipe in recipes.values():
         if recipe.get("primary_comp"):
@@ -623,14 +618,14 @@ async def get_upgrade_materials(name: str) -> UpgradeMaterialsResponse:
     ingredients = sorted(
         [
             IngredientResponse(
-                name        = (item_data.get(n.lower(), {}).get("display_name") or n),
-                quantity    = q,
-                category    = cats[n],
-                item_id     = item_data.get(n.lower(), {}).get("item_id"),
-                icon_id     = item_data.get(n.lower(), {}).get("icon_id"),
-                tier        = item_data.get(n.lower(), {}).get("tier"),
-                description = item_data.get(n.lower(), {}).get("description"),
-                item_level  = item_data.get(n.lower(), {}).get("item_level"),
+                name=(item_data.get(n.lower(), {}).get("display_name") or n),
+                quantity=q,
+                category=cats[n],
+                item_id=item_data.get(n.lower(), {}).get("item_id"),
+                icon_id=item_data.get(n.lower(), {}).get("icon_id"),
+                tier=item_data.get(n.lower(), {}).get("tier"),
+                description=item_data.get(n.lower(), {}).get("description"),
+                item_level=item_data.get(n.lower(), {}).get("item_level"),
             )
             for n, q in totals.items()
         ],
@@ -638,16 +633,16 @@ async def get_upgrade_materials(name: str) -> UpgradeMaterialsResponse:
     )
 
     return UpgradeMaterialsResponse(
-        spells_needing_upgrade = len(sub_expert),
-        spells_with_recipe     = len(recipes),
-        ingredients            = ingredients,
+        spells_needing_upgrade=len(sub_expert),
+        spells_with_recipe=len(recipes),
+        ingredients=ingredients,
     )
 
 
 class UpgradeRecipesResponse(BaseModel):
-    results:               list[_RecipeResult]
+    results: list[_RecipeResult]
     spells_needing_upgrade: int
-    spells_with_recipe:     int
+    spells_with_recipe: int
 
 
 @router.get("/character/{name}/upgrade-recipes", response_model=UpgradeRecipesResponse)
@@ -688,7 +683,8 @@ async def get_upgrade_recipes(name: str) -> UpgradeRecipesResponse:
     spell_db: dict[int, dict] = _spell_find_by_ids(spell_ids)
     blocklist = _load_spell_blocklist()
     rows = [
-        r for r in spell_db.values()
+        r
+        for r in spell_db.values()
         if (r.get("level") or 0) > 0
         and r.get("type") in ("spells", "arts")
         and r.get("given_by") == "spellscroll"
@@ -706,33 +702,33 @@ async def get_upgrade_recipes(name: str) -> UpgradeRecipesResponse:
 
     results = [
         _RecipeResult(
-            id               = recipe["id"],
-            name             = recipe["name"],
-            bench            = recipe.get("bench"),
-            bench_label      = _recipe_bench_label(recipe.get("bench")),
-            craft_tier       = _recipe_fuel_to_craft_tier(recipe.get("fuel_comp")),
-            crafted_tier     = recipe.get("crafted_tier"),
-            primary_comp     = recipe.get("primary_comp"),
-            primary_qty      = recipe.get("primary_qty"),
-            secondary_comps  = [
+            id=recipe["id"],
+            name=recipe["name"],
+            bench=recipe.get("bench"),
+            bench_label=_recipe_bench_label(recipe.get("bench")),
+            craft_tier=_recipe_fuel_to_craft_tier(recipe.get("fuel_comp")),
+            crafted_tier=recipe.get("crafted_tier"),
+            primary_comp=recipe.get("primary_comp"),
+            primary_qty=recipe.get("primary_qty"),
+            secondary_comps=[
                 _RecipeIngredientResponse(
-                    description = sc.get("description", ""),
-                    quantity    = sc.get("quantity", 1),
+                    description=sc.get("description", ""),
+                    quantity=sc.get("quantity", 1),
                 )
                 for sc in (recipe.get("secondary_comps") or [])
                 if sc.get("description")
             ],
-            fuel_comp        = recipe.get("fuel_comp"),
-            fuel_qty         = recipe.get("fuel_qty"),
-            out_formed_id    = recipe.get("out_formed_id"),
-            out_formed_count = recipe.get("out_formed_count"),
-            class_label      = None,
+            fuel_comp=recipe.get("fuel_comp"),
+            fuel_qty=recipe.get("fuel_qty"),
+            out_formed_id=recipe.get("out_formed_id"),
+            out_formed_count=recipe.get("out_formed_count"),
+            class_label=None,
         )
         for recipe in recipes.values()
     ]
 
     return UpgradeRecipesResponse(
-        results                = results,
-        spells_needing_upgrade = len(sub_expert),
-        spells_with_recipe     = len(recipes),
+        results=results,
+        spells_needing_upgrade=len(sub_expert),
+        spells_with_recipe=len(recipes),
     )

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Backfill the `effects` column for spells that have NULL effects.
 
@@ -9,6 +9,7 @@ Usage:
     python scripts/backfill_spell_effects.py
     python scripts/backfill_spell_effects.py --dry-run   # just show count
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,13 +24,14 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from census.config import SERVICE_ID, WORLD
+
 load_dotenv(override=True)
 
 from census.spells_db import DB_PATH, init_db, spell_to_row
 
-BASE_URL   = "https://census.daybreakgames.com"
-BATCH_SIZE = 50      # IDs per Census request (well within URL limits)
-RETRY_MAX  = 5
+BASE_URL = "https://census.daybreakgames.com"
+BATCH_SIZE = 50  # IDs per Census request (well within URL limits)
+RETRY_MAX = 5
 RETRY_SLEEP = 15.0
 
 
@@ -38,25 +40,32 @@ async def _fetch_one(
     service_id: str,
     spell_id: int,
 ) -> dict | None:
-    url   = f"{BASE_URL}/s:{service_id}/json/get/eq2/spell/{spell_id}"
+    url = f"{BASE_URL}/s:{service_id}/json/get/eq2/spell/{spell_id}"
     delay = RETRY_SLEEP
     for attempt in range(1, RETRY_MAX + 1):
         try:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 if resp.status == 429:
-                    await asyncio.sleep(delay); delay *= 2; continue
+                    await asyncio.sleep(delay)
+                    delay *= 2
+                    continue
                 if resp.status != 200:
                     if attempt < RETRY_MAX:
-                        await asyncio.sleep(delay); delay *= 2; continue
+                        await asyncio.sleep(delay)
+                        delay *= 2
+                        continue
                     return None
                 data = await resp.json(content_type=None)
                 if "error" in data or "errorCode" in data:
-                    await asyncio.sleep(delay); delay *= 2; continue
+                    await asyncio.sleep(delay)
+                    delay *= 2
+                    continue
                 spells = data.get("spell_list") or []
                 return spells[0] if spells else None
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             if attempt < RETRY_MAX:
-                await asyncio.sleep(delay); delay *= 2
+                await asyncio.sleep(delay)
+                delay *= 2
             else:
                 print(f"  [failed] id={spell_id}: {type(exc).__name__}")
                 return None
@@ -70,9 +79,7 @@ async def main(dry_run: bool) -> None:
 
     conn = init_db(DB_PATH)
 
-    null_rows = conn.execute(
-        "SELECT id FROM spells WHERE effects IS NULL ORDER BY id"
-    ).fetchall()
+    null_rows = conn.execute("SELECT id FROM spells WHERE effects IS NULL ORDER BY id").fetchall()
     ids = [r[0] for r in null_rows]
     print(f"Spells with NULL effects: {len(ids):,}")
 
@@ -86,7 +93,7 @@ async def main(dry_run: bool) -> None:
         conn.close()
         return
 
-    updated   = 0
+    updated = 0
     no_effects = 0
     headers = {
         "User-Agent": (

@@ -15,22 +15,24 @@ router = APIRouter(tags=["characters"])
 # Models
 # ---------------------------------------------------------------------------
 
+
 class CharNameResult(BaseModel):
-    name:       str
-    cls:        str | None = None
-    level:      int | None = None
+    name: str
+    cls: str | None = None
+    level: int | None = None
     guild_name: str | None = None
 
 
 class CharSearchResponse(BaseModel):
     results: list[CharNameResult]
-    total:   int
-    source:  str = "census"   # "census" | "local"
+    total: int
+    source: str = "census"  # "census" | "local"
 
 
 # ---------------------------------------------------------------------------
 # Local fallback — claimed characters whose name starts with the query
 # ---------------------------------------------------------------------------
+
 
 async def _local_search(q: str) -> list[CharNameResult]:
     async with aiosqlite.connect(DB_PATH) as db:
@@ -53,6 +55,7 @@ async def _local_search(q: str) -> list[CharNameResult]:
 # ---------------------------------------------------------------------------
 # Endpoint
 # ---------------------------------------------------------------------------
+
 
 @router.get("/characters/search", response_model=CharSearchResponse)
 async def search_characters(name: str = "") -> CharSearchResponse:

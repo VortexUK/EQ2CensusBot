@@ -19,6 +19,7 @@ Kept:
 Usage:
     python scripts/migrate_drop_redundant_json.py
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -46,7 +47,7 @@ def main() -> None:
     conn = sqlite3.connect(DB_PATH)
 
     existing = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
-    to_drop  = [c for c in DROP_COLS if c in existing]
+    to_drop = [c for c in DROP_COLS if c in existing]
 
     if not to_drop:
         print("Nothing to drop — all redundant columns already removed.")
@@ -54,7 +55,7 @@ def main() -> None:
         return
 
     page_before = conn.execute("PRAGMA page_count").fetchone()[0]
-    page_size   = conn.execute("PRAGMA page_size").fetchone()[0]
+    page_size = conn.execute("PRAGMA page_size").fetchone()[0]
     print(f"DB size before : {page_before * page_size / 1024**2:.1f} MB")
     print(f"Dropping {len(to_drop)} column(s): {to_drop}")
 

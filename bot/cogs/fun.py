@@ -16,7 +16,7 @@ from census.config import LAUNCH_DT_ISO
 # Data paths
 # ---------------------------------------------------------------------------
 _DATA = Path(__file__).resolve().parent.parent.parent / "data"
-_INSULTS_PATH     = _DATA / "insult_creator.json"
+_INSULTS_PATH = _DATA / "insult_creator.json"
 _TIME_METRICS_PATH = _DATA / "time_metrics.json"
 
 # ---------------------------------------------------------------------------
@@ -71,19 +71,22 @@ def _random_insult(data: dict) -> tuple[str, str]:
 
 def _random_time_metric(minutes_remaining: float, metrics: list[dict]) -> str:
     metric = random.choice(metrics)
-    count  = minutes_remaining / metric["duration_minutes"]
+    count = minutes_remaining / metric["duration_minutes"]
     return metric["template"].format(count=_format_count(count))
 
 
 def _normal_countdown(delta_seconds: float) -> str:
     total = int(delta_seconds)
-    days, rem   = divmod(total, 86400)
-    hours, rem  = divmod(rem,   3600)
-    minutes, _  = divmod(rem,   60)
+    days, rem = divmod(total, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, _ = divmod(rem, 60)
     parts = []
-    if days:    parts.append(f"**{days}** day{'s' if days != 1 else ''}")
-    if hours:   parts.append(f"**{hours}** hour{'s' if hours != 1 else ''}")
-    if minutes: parts.append(f"**{minutes}** minute{'s' if minutes != 1 else ''}")
+    if days:
+        parts.append(f"**{days}** day{'s' if days != 1 else ''}")
+    if hours:
+        parts.append(f"**{hours}** hour{'s' if hours != 1 else ''}")
+    if minutes:
+        parts.append(f"**{minutes}** minute{'s' if minutes != 1 else ''}")
     return ", ".join(parts) or "**any moment now**"
 
 
@@ -91,44 +94,35 @@ class FunCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @app_commands.command(
-        name="when",
-        description="How long until the EQ2 server launch?"
-    )
+    @app_commands.command(name="when", description="How long until the EQ2 server launch?")
     async def when(self, interaction: discord.Interaction) -> None:
         if LAUNCH_DT is None:
             await interaction.response.send_message("No launch date configured.", ephemeral=True)
             return
 
-        now    = datetime.now(timezone.utc)
-        delta  = (LAUNCH_DT - now).total_seconds()
+        now = datetime.now(timezone.utc)
+        delta = (LAUNCH_DT - now).total_seconds()
         dt_str = LAUNCH_DT.strftime("%-d %B %Y, %H:%M UTC") if hasattr(LAUNCH_DT, "strftime") else LAUNCH_DT_ISO
 
         if delta <= 0:
-            await interaction.response.send_message(
-                "🎉 **The server is live!** Get in there!", ephemeral=False
-            )
+            await interaction.response.send_message("🎉 **The server is live!** Get in there!", ephemeral=False)
             return
 
         if _is_owner(interaction.user):
             countdown = _normal_countdown(delta)
-            await interaction.response.send_message(
-                f"⏳ Server launches in: {countdown}\n"
-                f"*({dt_str})*"
-            )
+            await interaction.response.send_message(f"⏳ Server launches in: {countdown}\n*({dt_str})*")
             return
 
         # --- Everyone else gets the obtuse treatment ---
-        insults  = _load_json(_INSULTS_PATH)
-        metrics  = _load_json(_TIME_METRICS_PATH)["metrics"]
-        minutes  = delta / 60
+        insults = _load_json(_INSULTS_PATH)
+        metrics = _load_json(_TIME_METRICS_PATH)["metrics"]
+        minutes = delta / 60
 
         metric_str = _random_time_metric(minutes, metrics)
-        insult     = _random_insult(insults)
+        insult = _random_insult(insults)
 
         username = interaction.user.display_name
         article, insult = insult
         await interaction.response.send_message(
-            f"The server launches in approximately **{metric_str}**.\n\n"
-            f"You're {article} {insult}, {username}."
+            f"The server launches in approximately **{metric_str}**.\n\nYou're {article} {insult}, {username}."
         )

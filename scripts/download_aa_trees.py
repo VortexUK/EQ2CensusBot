@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Download AA tree JSON files from the Census API for all adventurer subclasses.
 
@@ -11,6 +11,7 @@ Also writes data/AAs/index.json mapping class name -> list of tree IDs.
 Usage:
     python scripts/download_aa_trees.py
 """
+
 import asyncio
 import json
 import os
@@ -22,11 +23,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from census.config import SERVICE_ID, WORLD
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 import aiohttp
 
 from census.client import BASE_URL
+
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "AAs"
 TREES_DIR = DATA_DIR / "trees"
 ADVENTURER_FILE = DATA_DIR / "adventurer.json"

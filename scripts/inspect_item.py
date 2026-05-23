@@ -1,10 +1,11 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Dump the raw Census API JSON for an item — useful for checking field names.
 
 Usage:
     python scripts/inspect_item.py "Faded Black Hood"
 """
+
 import asyncio
 import json
 import os
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from census.config import SERVICE_ID, WORLD
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from census.client import CensusClient

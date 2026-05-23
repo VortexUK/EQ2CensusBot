@@ -13,7 +13,19 @@ _log = logging.getLogger(__name__)
 
 from census import db as item_db
 from census.item_parser import parse_item as _parse_item_fn
-from census.models import AAProfile, AdornSlot, CharacterAAs, CharacterOverview, CharacterSpells, EquipmentSlot, GuildData, GuildMember, ItemData, NodeAA, SpellEntry
+from census.models import (
+    AAProfile,
+    AdornSlot,
+    CharacterAAs,
+    CharacterOverview,
+    CharacterSpells,
+    EquipmentSlot,
+    GuildData,
+    GuildMember,
+    ItemData,
+    NodeAA,
+    SpellEntry,
+)
 
 BASE_URL = "https://census.daybreakgames.com"
 
@@ -24,6 +36,7 @@ BASE_URL = "https://census.daybreakgames.com"
 # Uses a lazy import of web.metrics so the Discord bot (which also imports
 # this module) works fine even if prometheus-client is absent or the web
 # package isn't on sys.path.
+
 
 def _build_trace_config() -> aiohttp.TraceConfig:
     """Return an aiohttp TraceConfig that records Census API metrics."""
@@ -45,8 +58,9 @@ def _build_trace_config() -> aiohttp.TraceConfig:
         elapsed = _time.perf_counter() - getattr(ctx, "start_time", _time.perf_counter())
         try:
             from web.metrics import CENSUS_DURATION, CENSUS_REQUESTS, census_endpoint_label
+
             endpoint = census_endpoint_label(str(params.url))
-            http_ok  = 200 <= params.response.status < 300
+            http_ok = 200 <= params.response.status < 300
             CENSUS_REQUESTS.labels(
                 endpoint=endpoint,
                 status="success" if http_ok else "http_error",
@@ -62,14 +76,15 @@ def _build_trace_config() -> aiohttp.TraceConfig:
     ) -> None:
         try:
             from web.metrics import CENSUS_REQUESTS, census_endpoint_label
+
             endpoint = census_endpoint_label(str(params.url))
             CENSUS_REQUESTS.labels(endpoint=endpoint, status="error").inc()
         except Exception:
             pass
 
-    tc.on_request_start.append(_on_start)
-    tc.on_request_end.append(_on_end)
-    tc.on_request_exception.append(_on_exception)
+    tc.on_request_start.append(_on_start)  # type: ignore[arg-type]
+    tc.on_request_end.append(_on_end)  # type: ignore[arg-type]
+    tc.on_request_exception.append(_on_exception)  # type: ignore[arg-type]
     return tc
 
 
@@ -95,6 +110,7 @@ class CensusClient:
 
     async def get_item(self, query: str) -> Optional[ItemData]:
         from census.db import DB_PATH
+
         db_exists = DB_PATH.exists()
         # Try local DB first (fast, no rate limits)
         raw = await self._find_in_db(query)
@@ -121,14 +137,14 @@ class CensusClient:
         """Look up an item in the local SQLite DB. Returns raw Census dict or None."""
         query = query.strip()
         # Game link
-        m = re.match(r'\\*aITEM\s+(-?\d+)', query)
+        m = re.match(r"\\*aITEM\s+(-?\d+)", query)
         if m:
             item_id = int(m.group(1))
             if item_id < 0:
-                item_id += 2 ** 32
+                item_id += 2**32
             return await item_db.find_by_id(item_id)
         # Bare numeric ID
-        if re.fullmatch(r'-?\d+', query):
+        if re.fullmatch(r"-?\d+", query):
             return await item_db.find_by_id(int(query))
         # Display name
         return await item_db.find_by_name(query)
@@ -139,9 +155,9 @@ class CensusClient:
             conn = item_db.init_db()
             item_db.upsert_items([raw], conn)
             conn.close()
-            _log.debug("[DB] Cached item %s (%s)", raw.get('id'), raw.get('displayname'))
+            _log.debug("[DB] Cached item %s (%s)", raw.get("id"), raw.get("displayname"))
         except Exception as exc:
-            _log.warning("[DB] Failed to cache item %s: %s", raw.get('id'), exc)
+            _log.warning("[DB] Failed to cache item %s: %s", raw.get("id"), exc)
 
     async def get_raw_item(self, query: str) -> Optional[dict]:
         """Return the raw parsed JSON — used by inspect_item.py."""
@@ -158,9 +174,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
@@ -186,27 +200,29 @@ class CensusClient:
             t = m.get("type")
             if not isinstance(t, dict):
                 continue
-            guild_sec    = m.get("guild") or {}
-            raw_rank     = _int(guild_sec.get("rank"))
+            guild_sec = m.get("guild") or {}
+            raw_rank = _int(guild_sec.get("rank"))
             guild_status = _int(guild_sec.get("status"))
-            deity_val    = t.get("deity")
-            members.append(GuildMember(
-                name         = m.get("name") or m.get("displayname", "Unknown"),
-                level        = _int(t.get("level")),
-                cls          = t.get("class"),
-                ts_class     = t.get("ts_class"),
-                ts_level     = _int(t.get("ts_level")),
-                aa_level     = _int(t.get("aa_level")),
-                deity        = deity_val if deity_val and str(deity_val).lower() != "none" else None,
-                rank         = rank_map.get(raw_rank) if raw_rank is not None else None,
-                rank_id      = raw_rank,
-                guild_status = guild_status,
-                played_time  = _int(m.get("playedtime")),
-            ))
+            deity_val = t.get("deity")
+            members.append(
+                GuildMember(
+                    name=m.get("name") or m.get("displayname", "Unknown"),
+                    level=_int(t.get("level")),
+                    cls=t.get("class"),
+                    ts_class=t.get("ts_class"),
+                    ts_level=_int(t.get("ts_level")),
+                    aa_level=_int(t.get("aa_level")),
+                    deity=deity_val if deity_val and str(deity_val).lower() != "none" else None,
+                    rank=rank_map.get(raw_rank) if raw_rank is not None else None,
+                    rank_id=raw_rank,
+                    guild_status=guild_status,
+                    played_time=_int(m.get("playedtime")),
+                )
+            )
         return GuildData(
-            name    = guild.get("name", name),
-            world   = guild.get("world", world),
-            members = members,
+            name=guild.get("name", name),
+            world=guild.get("world", world),
+            members=members,
         )
 
     # Slots to exclude from the equipment display
@@ -231,35 +247,39 @@ class CensusClient:
             if db_row:
                 item_name = db_row.get("displayname") or f"Item #{item_id}"
                 item_tier = str(db_row.get("tier") or "")
-                icon_id   = str(db_row["iconid"]) if db_row.get("iconid") else None
+                icon_id = str(db_row["iconid"]) if db_row.get("iconid") else None
             else:
                 item_name = f"Item #{item_id}"
                 item_tier = ""
-                icon_id   = None
+                icon_id = None
             adorn_slots: list[AdornSlot] = []
-            for adorn in (item_data.get("adornment_list") or []):
+            for adorn in item_data.get("adornment_list") or []:
                 if not isinstance(adorn, dict):
                     continue
-                color    = adorn.get("color", "").capitalize()
+                color = adorn.get("color", "").capitalize()
                 adorn_id = _int(adorn.get("id"))
                 if adorn_id is not None:
-                    adorn_db   = await item_db.find_by_id(adorn_id)
+                    adorn_db = await item_db.find_by_id(adorn_id)
                     adorn_name = adorn_db.get("displayname") if adorn_db else None
                 else:
                     adorn_name = None
-                adorn_slots.append(AdornSlot(
-                    color      = color,
-                    adorn_name = adorn_name,
-                    adorn_id   = str(adorn_id) if adorn_id is not None else None,
-                ))
-            equipment.append(EquipmentSlot(
-                slot_name   = slot_display,
-                item_name   = item_name,
-                item_id     = str(item_id),
-                icon_id     = icon_id,
-                tier        = item_tier or None,
-                adorn_slots = adorn_slots,
-            ))
+                adorn_slots.append(
+                    AdornSlot(
+                        color=color,
+                        adorn_name=adorn_name,
+                        adorn_id=str(adorn_id) if adorn_id is not None else None,
+                    )
+                )
+            equipment.append(
+                EquipmentSlot(
+                    slot_name=slot_display,
+                    item_name=item_name,
+                    item_id=str(item_id),
+                    icon_id=icon_id,
+                    tier=item_tier or None,
+                    adorn_slots=adorn_slots,
+                )
+            )
         return equipment
 
     async def get_character(self, name: str, world: str) -> Optional[CharacterOverview]:
@@ -272,9 +292,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
@@ -296,7 +314,7 @@ class CensusClient:
 
         equipment = await self._parse_equipment(char.get("equipmentslot_list") or [])
 
-        gender   = t.get("gender", "")
+        gender = t.get("gender", "")
         ts_class = t.get("ts_class", "")
         raw_stats = char.get("stats") or {}
         # In the direct character call, 'ability' and 'personal_status_points' are
@@ -318,25 +336,25 @@ class CensusClient:
             if sid is not None:
                 spell_ids.append(sid)
 
-        guild_raw  = char.get("guild")
+        guild_raw = char.get("guild")
         guild_name = guild_raw.get("name") if isinstance(guild_raw, dict) else None
 
         return CharacterOverview(
-            id         = str(char.get("id", "")),
-            name       = (char.get("name") or {}).get("first", name),
-            level      = _int(t.get("level")),
-            cls        = t.get("class"),
-            race       = t.get("race"),
-            gender     = gender.capitalize() if gender else None,
-            deity      = deity_val if deity_val and str(deity_val).lower() != "none" else None,
-            aa_count   = aa_count,
-            world      = world,
-            ts_class   = ts_class.capitalize() if ts_class else None,
-            ts_level   = _int(t.get("ts_level")),
-            guild_name = guild_name or None,
-            stats      = raw_stats,
-            equipment  = equipment,
-            spell_ids  = spell_ids,
+            id=str(char.get("id", "")),
+            name=(char.get("name") or {}).get("first", name),
+            level=_int(t.get("level")),
+            cls=t.get("class"),
+            race=t.get("race"),
+            gender=gender.capitalize() if gender else None,
+            deity=deity_val if deity_val and str(deity_val).lower() != "none" else None,
+            aa_count=aa_count,
+            world=world,
+            ts_class=ts_class.capitalize() if ts_class else None,
+            ts_level=_int(t.get("ts_level")),
+            guild_name=guild_name or None,
+            stats=raw_stats,
+            equipment=equipment,
+            spell_ids=spell_ids,
         )
 
     async def get_character_aas(self, name: str, world: str) -> Optional[CharacterAAs]:
@@ -349,9 +367,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
@@ -390,17 +406,12 @@ class CensusClient:
                 tree_id = _int(entry.get("treeID"))
                 if node_id is not None and tree_id is not None:
                     counts[(tree_id, node_id)] += 1
-            prof_nodes = [
-                NodeAA(node_id=nid, tree_id=tid, tier=count)
-                for (tid, nid), count in counts.items()
-            ]
+            prof_nodes = [NodeAA(node_id=nid, tree_id=tid, tier=count) for (tid, nid), count in counts.items()]
             profiles.append(AAProfile(name=prof_name, aa_list=prof_nodes))
 
         return CharacterAAs(character_name=char_name, aa_list=aa_entries, profiles=profiles)
 
-    async def get_guild_equipment_data(
-        self, guild_name: str, world: str
-    ) -> tuple[dict[int, str], list[dict]]:
+    async def get_guild_equipment_data(self, guild_name: str, world: str) -> tuple[dict[int, str], list[dict]]:
         """
         Fetch the guild's member list with equipment + adornment data.
         Returns (rank_id→name map, raw member list).
@@ -416,9 +427,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=60)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=60)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return {}, []
@@ -439,9 +448,7 @@ class CensusClient:
         }
         return rank_map, guild.get("member_list") or []
 
-    async def get_guild_full(
-        self, name: str, world: str
-    ) -> Optional[tuple[GuildData, list[CharacterOverview], dict]]:
+    async def get_guild_full(self, name: str, world: str) -> Optional[tuple[GuildData, list[CharacterOverview], dict]]:
         """
         Fetch guild with full member profiles (type + stats + equipment + spell IDs).
         Returns (GuildData, list[CharacterOverview], guild_info_dict) for cache
@@ -463,9 +470,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=60)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=60)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
@@ -494,28 +499,30 @@ class CensusClient:
             t = m.get("type")
             if not isinstance(t, dict):
                 continue
-            guild_sec    = m.get("guild") or {}
-            raw_rank     = _int(guild_sec.get("rank"))
+            guild_sec = m.get("guild") or {}
+            raw_rank = _int(guild_sec.get("rank"))
             guild_status = _int(guild_sec.get("status"))
-            deity_val    = t.get("deity")
+            deity_val = t.get("deity")
             # Guild member resolve puts the character name in 'name' or 'displayname'
             member_name = m.get("name") or m.get("displayname", "Unknown")
-            gender   = t.get("gender", "")
+            gender = t.get("gender", "")
             ts_class = t.get("ts_class", "")
 
-            members.append(GuildMember(
-                name         = member_name,
-                level        = _int(t.get("level")),
-                cls          = t.get("class"),
-                ts_class     = ts_class,
-                ts_level     = _int(t.get("ts_level")),
-                aa_level     = _int(t.get("aa_level")),
-                deity        = deity_val if deity_val and str(deity_val).lower() != "none" else None,
-                rank         = rank_map.get(raw_rank) if raw_rank is not None else None,
-                rank_id      = raw_rank,
-                guild_status = guild_status,
-                played_time  = _int(m.get("playedtime")),
-            ))
+            members.append(
+                GuildMember(
+                    name=member_name,
+                    level=_int(t.get("level")),
+                    cls=t.get("class"),
+                    ts_class=ts_class,
+                    ts_level=_int(t.get("ts_level")),
+                    aa_level=_int(t.get("aa_level")),
+                    deity=deity_val if deity_val and str(deity_val).lower() != "none" else None,
+                    rank=rank_map.get(raw_rank) if raw_rank is not None else None,
+                    rank_id=raw_rank,
+                    guild_status=guild_status,
+                    played_time=_int(m.get("playedtime")),
+                )
+            )
 
             # In guild resolves 'ability' and 'personal_status_points' live inside
             # the 'stats' dict already — no merge needed (unlike direct character calls).
@@ -536,41 +543,43 @@ class CensusClient:
                 if sid is not None:
                     spell_ids.append(sid)
 
-            overviews.append(CharacterOverview(
-                id         = str(m.get("id", "")),
-                name       = member_name,
-                level      = _int(t.get("level")),
-                cls        = t.get("class"),
-                race       = t.get("race"),
-                gender     = gender.capitalize() if gender else None,
-                deity      = deity_val if deity_val and str(deity_val).lower() != "none" else None,
-                aa_count   = _int(t.get("aa_level")) or 0,
-                world      = world,
-                ts_class   = ts_class.capitalize() if ts_class else None,
-                ts_level   = _int(t.get("ts_level")),
-                guild_name = guild_name_str or None,
-                stats      = raw_stats,
-                equipment  = equipment,
-                spell_ids  = spell_ids,
-            ))
+            overviews.append(
+                CharacterOverview(
+                    id=str(m.get("id", "")),
+                    name=member_name,
+                    level=_int(t.get("level")),
+                    cls=t.get("class"),
+                    race=t.get("race"),
+                    gender=gender.capitalize() if gender else None,
+                    deity=deity_val if deity_val and str(deity_val).lower() != "none" else None,
+                    aa_count=_int(t.get("aa_level")) or 0,
+                    world=world,
+                    ts_class=ts_class.capitalize() if ts_class else None,
+                    ts_level=_int(t.get("ts_level")),
+                    guild_name=guild_name_str or None,
+                    stats=raw_stats,
+                    equipment=equipment,
+                    spell_ids=spell_ids,
+                )
+            )
 
         guild_info = {
-            "name":              guild.get("name", name),
-            "world":             guild.get("world", world),
-            "dateformed":        guild.get("dateformed"),
-            "description":       guild.get("description") or None,
-            "alignment":         guild.get("alignment") or None,
-            "type":              guild.get("type") or None,
-            "level":             _int(guild.get("level")),
-            "members":           _int(guild.get("members")),
-            "accounts":          _int(guild.get("accounts")),
+            "name": guild.get("name", name),
+            "world": guild.get("world", world),
+            "dateformed": guild.get("dateformed"),
+            "description": guild.get("description") or None,
+            "alignment": guild.get("alignment") or None,
+            "type": guild.get("type") or None,
+            "level": _int(guild.get("level")),
+            "members": _int(guild.get("members")),
+            "accounts": _int(guild.get("accounts")),
             "achievement_count": len(guild.get("achievement_list") or []),
         }
         return (
             GuildData(
-                name    = guild.get("name", name),
-                world   = guild.get("world", world),
-                members = members,
+                name=guild.get("name", name),
+                world=guild.get("world", world),
+                members=members,
             ),
             overviews,
             guild_info,
@@ -591,9 +600,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     raise RuntimeError(f"Census HTTP {resp.status} for guild lookup of {character_name!r}")
@@ -625,9 +632,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=15)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
@@ -640,16 +645,16 @@ class CensusClient:
         if not char_list:
             return None
         char = char_list[0]
-        t     = char.get("type") or {}
+        t = char.get("type") or {}
         guild = char.get("guild") or {}
         char_name = (char.get("name") or {}).get("first", name)
         return {
-            "name":       char_name,
-            "cls":        t.get("class"),
-            "class_id":   _int(t.get("classid")),
-            "level":      _int(t.get("level")),
-            "aa_level":   _int(t.get("aa_level")),
-            "race":       t.get("race"),
+            "name": char_name,
+            "cls": t.get("class"),
+            "class_id": _int(t.get("classid")),
+            "level": _int(t.get("level")),
+            "aa_level": _int(t.get("aa_level")),
+            "race": t.get("race"),
             "guild_name": guild.get("name") if isinstance(guild, dict) else None,
         }
 
@@ -674,9 +679,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=15)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return []
@@ -692,15 +695,17 @@ class CensusClient:
             char_name = (char.get("name") or {}).get("first", "")
             if not char_name:
                 continue
-            results.append({
-                "name":       char_name,
-                "cls":        t.get("class"),
-                "class_id":   _int(t.get("classid")),
-                "level":      _int(t.get("level")),
-                "aa_level":   _int(t.get("aa_level")),
-                "race":       t.get("race"),
-                "guild_name": guild.get("name") if isinstance(guild, dict) else None,
-            })
+            results.append(
+                {
+                    "name": char_name,
+                    "cls": t.get("class"),
+                    "class_id": _int(t.get("classid")),
+                    "level": _int(t.get("level")),
+                    "aa_level": _int(t.get("aa_level")),
+                    "race": t.get("race"),
+                    "guild_name": guild.get("name") if isinstance(guild, dict) else None,
+                }
+            )
         results.sort(key=lambda r: (r.get("name") or "").lower())
         return results
 
@@ -723,9 +728,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=15)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return []
@@ -759,7 +762,7 @@ class CensusClient:
         and combines results server-side.
         Returns: {results, total, page, per_page}
         """
-        queries: list[int | None] = class_ids if class_ids else [None]
+        queries: list[int | None] = list(class_ids) if class_ids else [None]
         tasks = [self._search_chars_single(world, cid, min_level) for cid in queries]
         results_lists = await asyncio.gather(*tasks)
 
@@ -815,9 +818,7 @@ class CensusClient:
 
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return []
@@ -834,15 +835,17 @@ class CensusClient:
             name = char.get("displayname") or (char.get("name") or {}).get("first", "")
             if not name:
                 continue
-            results.append({
-                "name":       name,
-                "cls":        t.get("class"),
-                "class_id":   _int(t.get("classid")),
-                "level":      _int(t.get("level")),
-                "aa_level":   _int(t.get("aa_level")),
-                "race":       t.get("race"),
-                "guild_name": guild_name or None,
-            })
+            results.append(
+                {
+                    "name": name,
+                    "cls": t.get("class"),
+                    "class_id": _int(t.get("classid")),
+                    "level": _int(t.get("level")),
+                    "aa_level": _int(t.get("aa_level")),
+                    "race": t.get("race"),
+                    "guild_name": guild_name or None,
+                }
+            )
         return results
 
     async def get_character_spells(self, name: str, world: str) -> Optional[CharacterSpells]:
@@ -856,9 +859,7 @@ class CensusClient:
         }
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=30)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
@@ -881,12 +882,14 @@ class CensusClient:
                 continue
             if spell.get("given_by") in ("alternateadvancement", "class"):
                 continue
-            entries.append(SpellEntry(
-                name       = spell.get("name", ""),
-                tier       = spell.get("tier_name", "Unknown"),
-                spell_type = spell_type,
-                level      = level,
-            ))
+            entries.append(
+                SpellEntry(
+                    name=spell.get("name", ""),
+                    tier=spell.get("tier_name", "Unknown"),
+                    spell_type=spell_type,
+                    level=level,
+                )
+            )
         return CharacterSpells(character_name=char_name, entries=entries)
 
     # ------------------------------------------------------------------
@@ -898,14 +901,14 @@ class CensusClient:
         query = query.strip()
         # Game link: \aITEM <id> ...:<name>/a
         # The game uses signed 32-bit IDs; Census uses unsigned — convert if negative.
-        m = re.match(r'\\*aITEM\s+(-?\d+)', query)
+        m = re.match(r"\\*aITEM\s+(-?\d+)", query)
         if m:
             item_id = int(m.group(1))
             if item_id < 0:
-                item_id += 2 ** 32
+                item_id += 2**32
             return {"id": str(item_id), "c:limit": "1"}
         # Bare numeric ID (positive or negative)
-        if re.fullmatch(r'-?\d+', query):
+        if re.fullmatch(r"-?\d+", query):
             return {"id": query, "c:limit": "1"}
         # Display name
         return {"displayname": query, "c:limit": "1"}
@@ -914,24 +917,22 @@ class CensusClient:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/item/"
         _log.info("[Census] GET %s params=%s", url, params)
         try:
-            async with self._session_().get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=10)
-            ) as resp:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 _log.info("[Census] HTTP %s url=%s", resp.status, resp.url)
                 if resp.status != 200:
                     return None
                 data = await resp.json(content_type=None)
-                _log.info("[Census] returned=%s items", data.get('returned'))
+                _log.info("[Census] returned=%s items", data.get("returned"))
                 return data
         except Exception as exc:
             _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
             return None
 
 
-
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
 
 def _int(value: Any) -> Optional[int]:
     if value is None:

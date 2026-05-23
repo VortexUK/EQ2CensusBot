@@ -14,14 +14,14 @@ router = APIRouter(tags=["health"])
 _GEAR_RATING_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "gear_rating.json"
 
 _GEAR_RATING_DEFAULTS: dict[str, Any] = {
-    "bands":            [{"label": "A", "min_below_max": 4}, {"label": "B", "min_below_max": 10}],
-    "fallback_band":    "C",
+    "bands": [{"label": "A", "min_below_max": 4}, {"label": "B", "min_below_max": 10}],
+    "fallback_band": "C",
     "matrix": {
-        "fabled":    {"A": "A", "B": "B", "C": "E"},
+        "fabled": {"A": "A", "B": "B", "C": "E"},
         "legendary": {"A": "B", "B": "C", "C": "F"},
         "treasured": {"A": "D", "B": "E", "C": "F"},
     },
-    "grade_scores":     {"A": 10, "B": 8, "C": 6, "D": 4, "E": 2, "F": 0},
+    "grade_scores": {"A": 10, "B": 8, "C": 6, "D": 4, "E": 2, "F": 0},
     "raid_ready_min_avg": 5.5,
 }
 
@@ -44,7 +44,7 @@ class ConfigResponse(BaseModel):
     server_max_level: int
     world: str
     gear_rating: dict[str, Any]
-    launch_dt: str | None   # ISO-8601 UTC; null means no countdown to show
+    launch_dt: str | None  # ISO-8601 UTC; null means no countdown to show
 
 
 @router.get("/health", response_model=HealthResponse)

@@ -50,6 +50,7 @@ from web import db as users_db
 # Item-stats startup check
 # ---------------------------------------------------------------------------
 
+
 def _ensure_item_stats() -> None:
     """
     Called in a background thread at startup.
@@ -66,11 +67,11 @@ def _ensure_item_stats() -> None:
         return  # No items DB yet — nothing to initialise
 
     try:
-        items_init_db(items_db_path)   # creates tables/indexes if missing
+        items_init_db(items_db_path)  # creates tables/indexes if missing
 
         conn = sqlite3.connect(items_db_path)
-        stat_count  = conn.execute("SELECT COUNT(*) FROM item_stats").fetchone()[0]
-        item_count  = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        stat_count = conn.execute("SELECT COUNT(*) FROM item_stats").fetchone()[0]
+        item_count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
         conn.close()
 
         if stat_count == 0 and item_count > 0:
@@ -80,19 +81,23 @@ def _ensure_item_stats() -> None:
             )
             # Ensure repo root is on sys.path so the scripts package is importable
             import sys
+
             repo_root = str(Path(__file__).resolve().parent.parent)
             if repo_root not in sys.path:
                 sys.path.insert(0, repo_root)
             from scripts.backfill_item_stats import run as _backfill  # type: ignore[import]
+
             _backfill(rebuild=False)
             _log.info("[startup] item_stats backfill complete.")
 
     except Exception as exc:
         _log.error("[startup] item_stats init/backfill error: %s", exc)
 
+
 # ---------------------------------------------------------------------------
 # HTTP metrics middleware
 # ---------------------------------------------------------------------------
+
 
 class _MetricsMiddleware(BaseHTTPMiddleware):
     """Records per-route request count and latency using the matched route
@@ -122,8 +127,7 @@ class _MetricsMiddleware(BaseHTTPMiddleware):
             # Per-user page views: authenticated GET requests only.
             # Session is already populated by SessionMiddleware (runs before us).
             # Polling/background endpoints are excluded via should_track_user_view.
-            if request.method == "GET" and response.status_code < 400 \
-                    and should_track_user_view(label_path):
+            if request.method == "GET" and response.status_code < 400 and should_track_user_view(label_path):
                 user = request.session.get("user")
                 if user:
                     USER_PAGE_VIEWS.labels(
@@ -138,16 +142,16 @@ class _MetricsMiddleware(BaseHTTPMiddleware):
 # Paths / constants
 # ---------------------------------------------------------------------------
 
-_FRONTEND_DIST  = Path(__file__).resolve().parent.parent / "frontend" / "dist"
-_ICONS_DIR           = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
-_AA_ASSETS_DIR       = Path(__file__).resolve().parent.parent / "data" / "AAs"
-_SPELL_ICONS_DIR     = Path(__file__).resolve().parent.parent / "data" / "spells" / "icons"
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
+_AA_ASSETS_DIR = Path(__file__).resolve().parent.parent / "data" / "AAs"
+_SPELL_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "spells" / "icons"
 
 _SESSION_SECRET = os.getenv("SESSION_SECRET", "")
 if not _SESSION_SECRET:
     raise RuntimeError(
         "SESSION_SECRET environment variable is not set. "
-        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\" "
+        'Generate one with: python -c "import secrets; print(secrets.token_hex(32))" '
         "and add it to your .env file or Railway environment."
     )
 
@@ -172,6 +176,7 @@ def create_app(session_secret: str | None = None) -> FastAPI:
         # Fire-and-forget: pre-warm the character cache in the background so the
         # home page loads instantly even immediately after a redeploy.
         import asyncio as _asyncio
+
         _asyncio.create_task(prewarm_character_cache())
 
     def _init_metrics() -> None:
@@ -183,8 +188,8 @@ def create_app(session_secret: str | None = None) -> FastAPI:
         on_startup=[_startup, _prewarm, _init_metrics],
         title="EQ2 TLE Companion",
         version="0.1.0",
-        docs_url="/api/docs"         if _SHOW_DOCS else None,
-        redoc_url="/api/redoc"       if _SHOW_DOCS else None,
+        docs_url="/api/docs" if _SHOW_DOCS else None,
+        redoc_url="/api/redoc" if _SHOW_DOCS else None,
         openapi_url="/api/openapi.json" if _SHOW_DOCS else None,
     )
 

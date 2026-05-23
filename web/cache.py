@@ -2,6 +2,7 @@
 Simple in-memory TTL cache shared across all requests.
 Safe for single-process asyncio (no locking needed).
 """
+
 from __future__ import annotations
 
 import logging
@@ -30,6 +31,7 @@ class TTLCache:
     def _inc_hit(self) -> None:
         try:
             from web.metrics import CACHE_HITS
+
             CACHE_HITS.labels(cache=self._name).inc()
         except Exception:
             pass
@@ -37,6 +39,7 @@ class TTLCache:
     def _inc_miss(self) -> None:
         try:
             from web.metrics import CACHE_MISSES
+
             CACHE_MISSES.labels(cache=self._name).inc()
         except Exception:
             pass
@@ -44,6 +47,7 @@ class TTLCache:
     def _inc_stale(self) -> None:
         try:
             from web.metrics import CACHE_STALE
+
             CACHE_STALE.labels(cache=self._name).inc()
         except Exception:
             pass
@@ -51,6 +55,7 @@ class TTLCache:
     def _update_size(self) -> None:
         try:
             from web.metrics import CACHE_SIZE
+
             CACHE_SIZE.labels(cache=self._name).set(len(self._store))
         except Exception:
             pass
@@ -108,6 +113,7 @@ class TTLCache:
         self._store[key] = (time.monotonic(), value)
         try:
             from web.metrics import CACHE_SETS
+
             CACHE_SETS.labels(cache=self._name).inc()
         except Exception:
             pass
@@ -123,6 +129,6 @@ class TTLCache:
 # ttl=300  → stale after 5 min (background refresh fires, response still instant)
 # max_age=3600 → hard-expired after 1 hr (user waits for a fresh fetch)
 character_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="character")
-guild_cache:     TTLCache = TTLCache(ttl=300, max_age=3600, name="guild")
-claim_cache:     TTLCache = TTLCache(ttl=300, max_age=3600, name="claim")
-aa_cache:        TTLCache = TTLCache(ttl=300, max_age=3600, name="aa")
+guild_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="guild")
+claim_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="claim")
+aa_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="aa")

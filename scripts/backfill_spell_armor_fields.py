@@ -6,6 +6,7 @@ from existing raw_json — no re-download needed.
 Usage:
     python scripts/backfill_spell_armor_fields.py
 """
+
 from __future__ import annotations
 
 import json
@@ -41,7 +42,7 @@ def main() -> None:
     print(f"Backfilling {total:,} rows…")
 
     updated = 0
-    offset  = 0
+    offset = 0
 
     while True:
         rows = conn.execute(
@@ -53,18 +54,21 @@ def main() -> None:
 
         batch = []
         for item_id, raw in rows:
-            d  = json.loads(raw)
+            d = json.loads(raw)
             ti = d.get("typeinfo") or {}
-            batch.append({
-                "id":                 item_id,
-                "skill_type":         _str(ti.get("skilltype")),
-                "spell_target":       _str(ti.get("spelltarget")),
-                "spell_range":        _str(ti.get("spellrange")),
-                "spell_power_cost":   _int(ti.get("spellpowercost")),
-                "spell_resistability":_str(ti.get("resistability")),
-            })
+            batch.append(
+                {
+                    "id": item_id,
+                    "skill_type": _str(ti.get("skilltype")),
+                    "spell_target": _str(ti.get("spelltarget")),
+                    "spell_range": _str(ti.get("spellrange")),
+                    "spell_power_cost": _int(ti.get("spellpowercost")),
+                    "spell_resistability": _str(ti.get("resistability")),
+                }
+            )
 
-        conn.executemany("""
+        conn.executemany(
+            """
             UPDATE items SET
                 skill_type          = :skill_type,
                 spell_target        = :spell_target,
@@ -72,11 +76,13 @@ def main() -> None:
                 spell_power_cost    = :spell_power_cost,
                 spell_resistability = :spell_resistability
             WHERE id = :id
-        """, batch)
+        """,
+            batch,
+        )
         conn.commit()
 
         updated += len(rows)
-        offset  += BATCH
+        offset += BATCH
         print(f"  {updated:,} / {total:,}")
 
     conn.close()

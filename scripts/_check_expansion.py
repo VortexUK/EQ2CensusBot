@@ -1,5 +1,6 @@
 import sqlite3, json, sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from census.db import DB_PATH
 
@@ -7,9 +8,7 @@ conn = sqlite3.connect(DB_PATH)
 
 # Check classification_list — is it ever populated?
 print("=== classification_list samples (where not empty) ===")
-rows = conn.execute(
-    "SELECT raw_json FROM items WHERE raw_json IS NOT NULL LIMIT 5000"
-).fetchall()
+rows = conn.execute("SELECT raw_json FROM items WHERE raw_json IS NOT NULL LIMIT 5000").fetchall()
 shown = 0
 for (raw,) in rows:
     d = json.loads(raw)

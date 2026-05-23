@@ -20,6 +20,7 @@ router = APIRouter(tags=["claim"])
 # Auth helper
 # ---------------------------------------------------------------------------
 
+
 def _require_user(request: Request) -> dict:
     user = request.session.get("user")
     if not user:
@@ -30,6 +31,7 @@ def _require_user(request: Request) -> dict:
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
+
 
 class ClaimResponse(BaseModel):
     id: int
@@ -45,6 +47,7 @@ class ClaimResponse(BaseModel):
 
 class ClaimsResponse(BaseModel):
     """All active claims for the current user."""
+
     approved: list[ClaimResponse]
     pending: ClaimResponse | None = None
 
@@ -56,6 +59,7 @@ class SubmitClaimRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 async def _build_claims_response(discord_id: str) -> tuple[ClaimsResponse, bool]:
     """
@@ -111,9 +115,7 @@ async def _build_claims_response(discord_id: str) -> tuple[ClaimsResponse, bool]
             gn: str | None | BaseException = cached_guild[char_name]
         else:
             gn = census_guild.get(char_name)
-        approved.append(
-            ClaimResponse(**{**c, "guild_name": gn if isinstance(gn, str) else None})
-        )
+        approved.append(ClaimResponse(**{**c, "guild_name": gn if isinstance(gn, str) else None}))
 
     result = ClaimsResponse(
         approved=approved,
@@ -129,7 +131,9 @@ async def _refresh_claim_cache(discord_id: str) -> None:
         if cacheable:
             claim_cache.set(f"claims:{discord_id}", result)
         else:
-            _log.warning("[Cache] Background claim refresh for %s: some fetches failed, skipping cache update", discord_id)
+            _log.warning(
+                "[Cache] Background claim refresh for %s: some fetches failed, skipping cache update", discord_id
+            )
     except Exception as exc:
         _log.error("[Cache] Background claim refresh failed for %s: %s", discord_id, exc)
 
@@ -190,8 +194,7 @@ async def create_claim(body: SubmitClaimRequest, request: Request) -> ClaimRespo
     if char is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Character '{name}' not found on {_WORLD}. "
-                   f"Check the spelling — names are case-sensitive.",
+            detail=f"Character '{name}' not found on {_WORLD}. Check the spelling — names are case-sensitive.",
         )
 
     try:

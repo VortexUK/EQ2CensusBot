@@ -1,4 +1,5 @@
-﻿"""Dump raw Census character JSON so we can see the actual field structure."""
+"""Dump raw Census character JSON so we can see the actual field structure."""
+
 import asyncio
 import json
 import os
@@ -15,6 +16,7 @@ async def main():
     service_id = SERVICE_ID
 
     import aiohttp
+
     url = f"https://census.daybreakgames.com/s:{service_id}/json/get/eq2/character/"
     params = {
         "name.first": name,

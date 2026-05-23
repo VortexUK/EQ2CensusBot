@@ -14,6 +14,7 @@ class_name  adventure class name (lowercase) — matched against the
             Uses ATTACH + subquery so the items DB is never fully loaded.
 page        1-based page index (default 1)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -36,15 +37,15 @@ router = APIRouter(tags=["recipes"])
 # ---------------------------------------------------------------------------
 
 TIER_FUEL: dict[str, str] = {
-    "T1":  "Basic",
-    "T2":  "Glowing",
-    "T3":  "Smoldering",
-    "T4":  "Sparkling",
-    "T5":  "Scintillating",
-    "T6":  "Glimmering",
-    "T7":  "Lambent",
-    "T8":  "Luminous",
-    "T9":  "Ethereal",
+    "T1": "Basic",
+    "T2": "Glowing",
+    "T3": "Smoldering",
+    "T4": "Sparkling",
+    "T5": "Scintillating",
+    "T6": "Glimmering",
+    "T7": "Lambent",
+    "T8": "Luminous",
+    "T9": "Ethereal",
     "T10": "Celestial",
     "T11": "Coruscating",
     "T12": "Exultant",
@@ -52,25 +53,23 @@ TIER_FUEL: dict[str, str] = {
     "T14": "Formless",
 }
 
-CRAFT_TIERS: list[str] = list(TIER_FUEL.keys())   # T1 … T14
+CRAFT_TIERS: list[str] = list(TIER_FUEL.keys())  # T1 … T14
 
 # Reverse map: fuel prefix (lower) → tier label
-_FUEL_PREFIX_TO_TIER: dict[str, str] = {
-    prefix.lower(): tier for tier, prefix in TIER_FUEL.items()
-}
+_FUEL_PREFIX_TO_TIER: dict[str, str] = {prefix.lower(): tier for tier, prefix in TIER_FUEL.items()}
 
 # ---------------------------------------------------------------------------
 # Bench → display label mapping
 # ---------------------------------------------------------------------------
 
 BENCH_DISPLAY: dict[str, str] = {
-    "work_bench":        "Carpenter",
-    "work_desk":         "Sage",
-    "chemistry_table":   "Alchemist",
-    "forge":             "Armorer / Weaponsmith",
+    "work_bench": "Carpenter",
+    "work_desk": "Sage",
+    "chemistry_table": "Alchemist",
+    "forge": "Armorer / Weaponsmith",
     "woodworking_table": "Woodworker",
-    "sewing_table":      "Tailor",
-    "stove and keg":     "Provisioner",
+    "sewing_table": "Tailor",
+    "stove and keg": "Provisioner",
 }
 
 _LABEL_TO_BENCH: dict[str, str] = {v.lower(): k for k, v in BENCH_DISPLAY.items()}
@@ -80,17 +79,38 @@ _LABEL_TO_BENCH: dict[str, str] = {v.lower(): k for k, v in BENCH_DISPLAY.items(
 # ---------------------------------------------------------------------------
 
 _ADVENTURE_CLASSES = [
-    "Assassin", "Beastlord", "Berserker", "Brigand", "Bruiser",
-    "Channeler", "Coercer", "Conjuror", "Defiler", "Dirge",
-    "Fury", "Guardian", "Illusionist", "Inquisitor", "Monk",
-    "Mystic", "Necromancer", "Paladin", "Ranger", "Shadowknight",
-    "Swashbuckler", "Templar", "Troubador", "Warden", "Warlock",
+    "Assassin",
+    "Beastlord",
+    "Berserker",
+    "Brigand",
+    "Bruiser",
+    "Channeler",
+    "Coercer",
+    "Conjuror",
+    "Defiler",
+    "Dirge",
+    "Fury",
+    "Guardian",
+    "Illusionist",
+    "Inquisitor",
+    "Monk",
+    "Mystic",
+    "Necromancer",
+    "Paladin",
+    "Ranger",
+    "Shadowknight",
+    "Swashbuckler",
+    "Templar",
+    "Troubador",
+    "Warden",
+    "Warlock",
     "Wizard",
 ]
 
 # ---------------------------------------------------------------------------
 # Response models
 # ---------------------------------------------------------------------------
+
 
 class IngredientResponse(BaseModel):
     description: str
@@ -102,7 +122,7 @@ class RecipeResult(BaseModel):
     name: str
     bench: str | None = None
     bench_label: str | None = None
-    craft_tier: str | None = None    # T1 … T14 derived from fuel prefix
+    craft_tier: str | None = None  # T1 … T14 derived from fuel prefix
     crafted_tier: str | None = None  # spell-scroll quality tier (Expert, etc.)
     primary_comp: str | None = None
     primary_qty: int | None = None
@@ -130,6 +150,7 @@ class RecipeFiltersResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _fuel_to_craft_tier(fuel: str | None) -> str | None:
     if not fuel:
@@ -167,32 +188,34 @@ def _row_to_result(row: sqlite3.Row, class_label: str | None = None) -> RecipeRe
             pass
 
     return RecipeResult(
-        id               = row["id"],
-        name             = row["name"],
-        bench            = row["bench"],
-        bench_label      = _bench_label(row["bench"]),
-        craft_tier       = _fuel_to_craft_tier(row["fuel_comp"]),
-        crafted_tier     = row["crafted_tier"],
-        primary_comp     = row["primary_comp"],
-        primary_qty      = row["primary_qty"],
-        secondary_comps  = [
+        id=row["id"],
+        name=row["name"],
+        bench=row["bench"],
+        bench_label=_bench_label(row["bench"]),
+        craft_tier=_fuel_to_craft_tier(row["fuel_comp"]),
+        crafted_tier=row["crafted_tier"],
+        primary_comp=row["primary_comp"],
+        primary_qty=row["primary_qty"],
+        secondary_comps=[
             IngredientResponse(
                 description=c.get("description", ""),
                 quantity=c.get("quantity") or 1,
             )
-            for c in sec if c.get("description")
+            for c in sec
+            if c.get("description")
         ],
-        fuel_comp        = row["fuel_comp"],
-        fuel_qty         = row["fuel_qty"],
-        out_formed_id    = row["out_formed_id"],
-        out_formed_count = row["out_formed_count"],
-        class_label      = cl,
+        fuel_comp=row["fuel_comp"],
+        fuel_qty=row["fuel_qty"],
+        out_formed_id=row["out_formed_id"],
+        out_formed_count=row["out_formed_count"],
+        class_label=cl,
     )
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/recipes/filters", response_model=RecipeFiltersResponse)
 async def get_recipe_filters() -> RecipeFiltersResponse:
@@ -220,7 +243,7 @@ def _query_items_db(
         return None, {}
 
     conn = sqlite3.connect(str(ITEMS_DB_PATH))
-    conn.execute("PRAGMA query_only = ON")   # safety: never write
+    conn.execute("PRAGMA query_only = ON")  # safety: never write
     try:
         class_item_ids: list[int] | None = None
         if class_name:
@@ -246,11 +269,11 @@ def _query_items_db(
 
 @router.get("/recipes/search", response_model=RecipeSearchResponse)
 async def search_recipes(
-    q:          str | None = None,
-    tier:       str | None = None,    # T1 … T14
-    bench:      str | None = None,
+    q: str | None = None,
+    tier: str | None = None,  # T1 … T14
+    bench: str | None = None,
     class_name: str | None = None,
-    page:       int        = 1,
+    page: int = 1,
 ) -> RecipeSearchResponse:
     per_page = 25
 
@@ -274,9 +297,7 @@ async def search_recipes(
     class_item_ids: list[int] | None = None
     if class_name and items_db_available:
         loop = asyncio.get_event_loop()
-        class_item_ids, _ = await loop.run_in_executor(
-            None, _query_items_db, class_name, None
-        )
+        class_item_ids, _ = await loop.run_in_executor(None, _query_items_db, class_name, None)
         if not class_item_ids:
             return RecipeSearchResponse(results=[], total=0, page=1, per_page=per_page)
 
@@ -302,7 +323,7 @@ async def search_recipes(
         # out_formed_id is the rare "perfect craft" bonus and often points
         # to a different item (fuel component, etc.).
         # Split into chunks of 900 to stay well under SQLite's variable limit.
-        chunks = [class_item_ids[i:i+900] for i in range(0, len(class_item_ids), 900)]
+        chunks = [class_item_ids[i : i + 900] for i in range(0, len(class_item_ids), 900)]
         chunk_clauses = []
         for chunk in chunks:
             ph = ",".join("?" * len(chunk))
@@ -323,7 +344,8 @@ async def search_recipes(
 
         count_sql = f"SELECT COUNT(DISTINCT id) FROM recipes WHERE {where}"
         async with db.execute(count_sql, params) as cur:
-            total = (await cur.fetchone())[0]
+            count_row = await cur.fetchone()
+            total = count_row[0] if count_row else 0
 
         select_sql = (
             f"SELECT id, name, bench, crafted_tier, "
@@ -344,14 +366,9 @@ async def search_recipes(
     label_map: dict[int, str] = {}
     if elaborate_ids and items_db_available:
         loop = asyncio.get_event_loop()
-        _, label_map = await loop.run_in_executor(
-            None, _query_items_db, None, elaborate_ids
-        )
+        _, label_map = await loop.run_in_executor(None, _query_items_db, None, elaborate_ids)
 
-    results = [
-        _row_to_result(r, class_label=label_map.get(r["out_elaborate_id"]))
-        for r in rows
-    ]
+    results = [_row_to_result(r, class_label=label_map.get(r["out_elaborate_id"])) for r in rows]
 
     return RecipeSearchResponse(
         results=results,

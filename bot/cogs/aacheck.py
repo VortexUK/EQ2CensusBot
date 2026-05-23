@@ -12,7 +12,7 @@ from census.client import CensusClient
 from census.config import SERVICE_ID, WORLD
 from image.aa_tree import detect_tree_type, render_tree
 
-_DATA_DIR  = Path(__file__).resolve().parent.parent.parent / "data" / "AAs"
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "AAs"
 _TREES_DIR = _DATA_DIR / "trees"
 
 # Loaded once at import: tree_id → (name, detected_type)
@@ -37,19 +37,19 @@ _load_tree_index()
 
 # Static choice value → detect_tree_type key(s) that satisfy it
 _CHOICE_TO_TYPES: dict[str, set[str]] = {
-    "class":      {"class"},
-    "subclass":   {"subclass"},
-    "shadows":    {"shadows"},
-    "heroic":     {"heroic"},
+    "class": {"class"},
+    "subclass": {"subclass"},
+    "shadows": {"shadows"},
+    "heroic": {"heroic"},
     "tradeskill": {"tradeskill", "tradeskill_general"},
 }
 
 _TREE_CHOICES = [
-    app_commands.Choice(name="Class",    value="class"),
+    app_commands.Choice(name="Class", value="class"),
     app_commands.Choice(name="Subclass", value="subclass"),
-    app_commands.Choice(name="Shadows",  value="shadows"),
-    app_commands.Choice(name="Heroic",   value="heroic"),
-    app_commands.Choice(name="Trade",    value="tradeskill"),
+    app_commands.Choice(name="Shadows", value="shadows"),
+    app_commands.Choice(name="Heroic", value="heroic"),
+    app_commands.Choice(name="Trade", value="tradeskill"),
 ]
 
 

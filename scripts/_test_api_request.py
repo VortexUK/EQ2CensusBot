@@ -1,11 +1,14 @@
 """Start the app and hit the search endpoint to verify it works."""
+
 import asyncio
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from httpx import AsyncClient, ASGITransport
 from web.app import create_app
+
 
 async def test():
     app = create_app()
@@ -24,7 +27,9 @@ async def test():
         # Test 2: has_stat=Ability Mod
         r = await client.get("/api/items/search?has_stat=Ability+Mod")
         j = r.json()
-        print(f"has_stat=Ability+Mod -> {r.status_code}: {j['total']} results, first={j['results'][0]['name'] if j['results'] else 'none'}")
+        print(
+            f"has_stat=Ability+Mod -> {r.status_code}: {j['total']} results, first={j['results'][0]['name'] if j['results'] else 'none'}"
+        )
 
         # Test 3: has_stat=Ability Mod (percent-encoded)
         r = await client.get("/api/items/search?has_stat=Ability%20Mod")
@@ -35,5 +40,6 @@ async def test():
         r = await client.get("/api/items/search?name=templar")
         j = r.json()
         print(f"name=templar -> {r.status_code}: {j['total']} results")
+
 
 asyncio.run(test())

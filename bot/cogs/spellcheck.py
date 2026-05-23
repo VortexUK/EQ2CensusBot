@@ -1,4 +1,5 @@
 import io
+from collections import Counter
 
 import discord
 from discord import app_commands
@@ -10,6 +11,7 @@ from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.models import CharacterSpells, SpellEntry
 from census.spells_db import (
     load_blocklist as _load_spell_blocklist,
+    strip_roman as _base_name,
     unique_highest_entries as _unique_highest,
 )
 
@@ -59,7 +61,7 @@ def _build_table(data: CharacterSpells) -> str:
     count: Counter[str] = Counter(e.tier for e in entries)
     all_tiers = [t for t in _TIER_ORDER if count[t]]
 
-    tier_w  = max(len("Tier"),  max((len(t) for t in all_tiers), default=0))
+    tier_w = max(len("Tier"), max((len(t) for t in all_tiers), default=0))
     count_w = max(len("Count"), max((len(str(count[t])) for t in all_tiers), default=0))
 
     def _row(tier, n) -> str:

@@ -35,6 +35,24 @@ if ! python -m compileall -q census web bot image scripts 2>/dev/null; then
 fi
 echo "${GREEN}  ✓ Python OK${RESET}"
 
+# ── 3. Python formatting (ruff) ───────────────────────────────────────────────
+echo "${CYAN}→ Python formatting (ruff format --check)${RESET}"
+if ! python -m ruff format --check .; then
+  echo ""
+  echo "${RED}✗ Formatting issues found. Run: python -m ruff format .${RESET}"
+  exit 1
+fi
+echo "${GREEN}  ✓ ruff format OK${RESET}"
+
+# ── 4. Python type checking (pyright) ────────────────────────────────────────
+echo "${CYAN}→ Python types (pyright)${RESET}"
+if ! python -m pyright; then
+  echo ""
+  echo "${RED}✗ Pyright type errors found. Push aborted.${RESET}"
+  exit 1
+fi
+echo "${GREEN}  ✓ pyright OK${RESET}"
+
 echo ""
 echo "${GREEN}All checks passed.${RESET}"
 echo ""

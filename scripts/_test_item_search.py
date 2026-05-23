@@ -1,11 +1,14 @@
 """Quick test of the item search query logic, bypassing FastAPI."""
+
 import asyncio
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import aiosqlite
 from census.db import DB_PATH
+
 
 async def test():
     has_stat = ["Ability Mod"]
@@ -69,5 +72,6 @@ async def test():
         print(f"first {len(rows)} results:")
         for r in rows:
             print(f"  {dict(r)}")
+
 
 asyncio.run(test())

@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Optional
 
+
 def _resolve_db_path() -> Path:
     """
     DB path, in priority order:
@@ -13,10 +14,12 @@ def _resolve_db_path() -> Path:
     2. Default: <repo_root>/data/items/items.db
     """
     import os
+
     env = os.getenv("ITEMS_DB_PATH")
     if env:
         return Path(env)
     return Path(__file__).resolve().parent.parent / "data" / "items" / "items.db"
+
 
 DB_PATH = _resolve_db_path()
 
@@ -28,8 +31,10 @@ def _resolve_max_level() -> "int | None":
     Unset → no level filtering.
     """
     import os
+
     v = os.getenv("SERVER_MAX_LEVEL")
     return int(v) if v else None
+
 
 SERVER_MAX_LEVEL: "int | None" = _resolve_max_level()
 
@@ -38,52 +43,61 @@ SERVER_MAX_LEVEL: "int | None" = _resolve_max_level()
 # ---------------------------------------------------------------------------
 
 # ── Subclasses (pairs within each archetype) ────────────────────────────────
-_WARRIORS   = frozenset(["guardian",     "berserker"])
-_CRUSADERS  = frozenset(["paladin",      "shadowknight"])
-_BRAWLERS   = frozenset(["monk",         "bruiser"])
-_CLERICS    = frozenset(["templar",      "inquisitor"])
-_SHAMANS    = frozenset(["mystic",       "defiler"])
-_DRUIDS     = frozenset(["warden",       "fury"])
-_SORCERERS  = frozenset(["wizard",       "warlock"])
-_ENCHANTERS = frozenset(["illusionist",  "coercer"])
-_SUMMONERS  = frozenset(["necromancer",  "conjuror"])
-_ROGUES     = frozenset(["swashbuckler", "brigand"])
-_PREDATORS  = frozenset(["ranger",       "assassin"])
-_BARDS      = frozenset(["troubador",    "dirge"])
+_WARRIORS = frozenset(["guardian", "berserker"])
+_CRUSADERS = frozenset(["paladin", "shadowknight"])
+_BRAWLERS = frozenset(["monk", "bruiser"])
+_CLERICS = frozenset(["templar", "inquisitor"])
+_SHAMANS = frozenset(["mystic", "defiler"])
+_DRUIDS = frozenset(["warden", "fury"])
+_SORCERERS = frozenset(["wizard", "warlock"])
+_ENCHANTERS = frozenset(["illusionist", "coercer"])
+_SUMMONERS = frozenset(["necromancer", "conjuror"])
+_ROGUES = frozenset(["swashbuckler", "brigand"])
+_PREDATORS = frozenset(["ranger", "assassin"])
+_BARDS = frozenset(["troubador", "dirge"])
 
 # ── Full archetypes ──────────────────────────────────────────────────────────
 _FIGHTERS = _WARRIORS | _CRUSADERS | _BRAWLERS
-_PRIESTS  = _CLERICS  | _SHAMANS   | _DRUIDS | frozenset(["channeler"])
-_MAGES    = _SORCERERS | _ENCHANTERS | _SUMMONERS
-_SCOUTS   = _ROGUES   | _PREDATORS  | _BARDS  | frozenset(["beastlord"])
+_PRIESTS = _CLERICS | _SHAMANS | _DRUIDS | frozenset(["channeler"])
+_MAGES = _SORCERERS | _ENCHANTERS | _SUMMONERS
+_SCOUTS = _ROGUES | _PREDATORS | _BARDS | frozenset(["beastlord"])
 
-_CRAFTERS = frozenset([
-    "sage", "armorer", "weaponsmith", "woodworker",
-    "jeweler", "carpenter", "tailor", "alchemist", "provisioner",
-])
+_CRAFTERS = frozenset(
+    [
+        "sage",
+        "armorer",
+        "weaponsmith",
+        "woodworker",
+        "jeweler",
+        "carpenter",
+        "tailor",
+        "alchemist",
+        "provisioner",
+    ]
+)
 _ALL_ADVENTURERS = _FIGHTERS | _PRIESTS | _MAGES | _SCOUTS
 
 # Groups checked in priority order: full archetypes first, then subclasses.
 # The algorithm removes matched classes from `remaining` as it goes, so
 # full archetypes are consumed before subclasses are tested.
 _ARCHETYPES = [
-    ("All Fighters",  _FIGHTERS),
-    ("All Priests",   _PRIESTS),
-    ("All Mages",     _MAGES),
-    ("All Scouts",    _SCOUTS),
+    ("All Fighters", _FIGHTERS),
+    ("All Priests", _PRIESTS),
+    ("All Mages", _MAGES),
+    ("All Scouts", _SCOUTS),
     # subclasses
-    ("All Warriors",   _WARRIORS),
-    ("All Crusaders",  _CRUSADERS),
-    ("All Brawlers",   _BRAWLERS),
-    ("All Clerics",    _CLERICS),
-    ("All Shamans",    _SHAMANS),
-    ("All Druids",     _DRUIDS),
-    ("All Sorcerers",  _SORCERERS),
+    ("All Warriors", _WARRIORS),
+    ("All Crusaders", _CRUSADERS),
+    ("All Brawlers", _BRAWLERS),
+    ("All Clerics", _CLERICS),
+    ("All Shamans", _SHAMANS),
+    ("All Druids", _DRUIDS),
+    ("All Sorcerers", _SORCERERS),
     ("All Enchanters", _ENCHANTERS),
-    ("All Summoners",  _SUMMONERS),
-    ("All Rogues",     _ROGUES),
-    ("All Predators",  _PREDATORS),
-    ("All Bards",      _BARDS),
+    ("All Summoners", _SUMMONERS),
+    ("All Rogues", _ROGUES),
+    ("All Predators", _PREDATORS),
+    ("All Bards", _BARDS),
 ]
 
 
@@ -102,7 +116,7 @@ def compute_class_label(classes: "dict | None") -> "str | None":
         return None
 
     keys = frozenset(classes.keys())
-    adv  = keys & _ALL_ADVENTURERS
+    adv = keys & _ALL_ADVENTURERS
 
     # All 26 adventure classes present (crafters optional) → "All Classes"
     if adv >= _ALL_ADVENTURERS:
@@ -119,11 +133,7 @@ def compute_class_label(classes: "dict | None") -> "str | None":
     # Any leftover individual classes
     for key in sorted(remaining):
         entry = classes.get(key)
-        display = (
-            entry.get("displayname", key.title())
-            if isinstance(entry, dict)
-            else key.title()
-        )
+        display = entry.get("displayname", key.title()) if isinstance(entry, dict) else key.title()
         parts.append(display)
 
     # Crafter-only items (no adventure classes matched at all)
@@ -310,20 +320,20 @@ _CREATE_STAT_INDEXES = [
 
 # Columns added after initial schema — used by init_db() to migrate existing DBs
 _MIGRATIONS = [
-    ("visible",                    "INTEGER DEFAULT 1"),
-    ("typeinfo_name",              "TEXT"),
-    ("classes_json",               "TEXT"),
+    ("visible", "INTEGER DEFAULT 1"),
+    ("typeinfo_name", "TEXT"),
+    ("classes_json", "TEXT"),
     ("physical_damage_absorption", "INTEGER"),
-    ("class_label",                "TEXT"),
-    ("class_count",                "INTEGER"),
-    ("tier_display",               "TEXT"),
-    ("skill_type",                 "TEXT"),
-    ("spell_target",               "TEXT"),
-    ("spell_range",                "TEXT"),
-    ("spell_power_cost",           "INTEGER"),
-    ("spell_resistability",        "TEXT"),
-    ("flag_pvp",                   "INTEGER DEFAULT 0"),
-    ("classification_list",        "TEXT"),
+    ("class_label", "TEXT"),
+    ("class_count", "INTEGER"),
+    ("tier_display", "TEXT"),
+    ("skill_type", "TEXT"),
+    ("spell_target", "TEXT"),
+    ("spell_range", "TEXT"),
+    ("spell_power_cost", "INTEGER"),
+    ("spell_resistability", "TEXT"),
+    ("flag_pvp", "INTEGER DEFAULT 0"),
+    ("classification_list", "TEXT"),
 ]
 
 _UPSERT_SQL = """
@@ -383,6 +393,7 @@ INSERT OR REPLACE INTO items (
 # Row conversion
 # ---------------------------------------------------------------------------
 
+
 def _flag(flags: dict, key: str) -> int:
     val = flags.get(key)
     if isinstance(val, dict):
@@ -402,7 +413,7 @@ def _int_field(v: Any) -> Optional[int]:
     if v is None:
         return None
     try:
-        return int(v) or None   # treat 0 as NULL for quest IDs etc.
+        return int(v) or None  # treat 0 as NULL for quest IDs etc.
     except (ValueError, TypeError):
         return None
 
@@ -427,7 +438,7 @@ def extract_item_stats(raw: dict) -> dict[str, float]:
     non-zero value encountered.
     """
     # Import lazily to avoid circular import at module level
-    from census.constants import STAT_MAP   # noqa: PLC0415
+    from census.constants import STAT_MAP  # noqa: PLC0415
 
     modifiers = raw.get("modifiers") or {}
     result: dict[str, float] = {}
@@ -468,7 +479,7 @@ def extract_item_stats(raw: dict) -> dict[str, float]:
 _EFFECT_STAT_PATTERNS: list[tuple[re.Pattern, str]] = [
     # "Increases Attack Speed of caster by 25.0"
     # "Increases Attack Speed of the caster by 25.0"
-    (re.compile(r'Attack Speed of .+? by ([\d.]+)'), "Haste"),
+    (re.compile(r"Attack Speed of .+? by ([\d.]+)"), "Haste"),
 ]
 
 # Bump this string whenever _EFFECT_STAT_PATTERNS changes.
@@ -528,102 +539,105 @@ def _is_pvp_item(item: dict) -> int:
 
 def item_to_row(item: dict) -> dict:
     """Convert a raw Census API item dict to a flat DB row dict."""
-    typeinfo     = item.get("typeinfo") or {}
-    flags        = item.get("flags") or {}
-    slot_list    = item.get("slot_list") or []
-    extended     = item.get("_extended") or {}
-    reqskill     = item.get("requiredskill")
+    typeinfo = item.get("typeinfo") or {}
+    flags = item.get("flags") or {}
+    slot_list = item.get("slot_list") or []
+    extended = item.get("_extended") or {}
+    reqskill = item.get("requiredskill")
     if not isinstance(reqskill, dict):
         reqskill = {}
 
-    discovered   = (extended.get("discovered") or {}).get("timestamp")
-    aq           = _int_field(item.get("associatedquest"))
-    autoq        = _int_field(item.get("autoquest"))
+    discovered = (extended.get("discovered") or {}).get("timestamp")
+    aq = _int_field(item.get("associatedquest"))
+    autoq = _int_field(item.get("autoquest"))
 
     return {
-        "id":                   item.get("id"),
-        "displayname":          str(item.get("displayname") or ""),
-        "displayname_lower":    str(item.get("displayname") or "").lower(),
-        "gamelink":             _str_field(item, "gamelink"),
-        "description":          _str_field(item, "description"),
-        "last_update":          _int_field_zero(item.get("last_update")),
-        "tier":                 _str_field(item, "tier"),
-        "tierid":               _int_field_zero(item.get("tierid")),
-        "tier_display":         _str_field(item, "tier") or "COMMON",
-        "type":                 _str_field(item, "type"),
-        "typeid":               _int_field_zero(item.get("typeid")),
-        "item_level":           _int_field_zero(item.get("itemlevel")),
-        "level_to_use":         _int_field_zero(item.get("leveltouse")),
-        "planar_level":         _int_field_zero(item.get("planar_level")),
-        "icon_id":              _int_field_zero(item.get("iconid")),
-        "max_stack_size":       _int_field_zero(item.get("maxstacksize")),
-        "slot":                 slot_list[0].get("name") if slot_list else None,
-        "armor_class_min":      _int_field_zero(typeinfo.get("minarmorclass")),
-        "armor_class_max":      _int_field_zero(typeinfo.get("maxarmorclass")),
-        "damage_min":           _int_field_zero(typeinfo.get("mindamage")),
-        "damage_max":           _int_field_zero(typeinfo.get("maxdamage")),
-        "damage_base":          _int_field_zero(typeinfo.get("damage")),
-        "damage_type":          _str_field(typeinfo, "damagetype"),
-        "damage_type_id":       _int_field_zero(typeinfo.get("damagetypeid")),
-        "damage_rating":        typeinfo.get("damagerating"),
-        "delay":                typeinfo.get("delay"),
-        "wield_style":          _str_field(typeinfo, "wieldstyle"),
-        "spell_name":           _str_field(typeinfo, "spellname"),
-        "spell_tier_id":        _int_field_zero(typeinfo.get("tier")),
-        "spell_cast_time":      typeinfo.get("spellcasttime"),
-        "spell_recast_time":    typeinfo.get("spellrecasttime"),
-        "spell_duration":       typeinfo.get("spellduration"),
-        "weapon_range_min":     typeinfo.get("minrange"),
-        "weapon_range_max":     typeinfo.get("range"),
-        "food_duration":        _str_field(typeinfo, "duration"),
-        "food_satiation":       _str_field(typeinfo, "satiation"),
-        "food_level":           _int_field_zero(typeinfo.get("foodlevel")),
-        "adornment_color":      _str_field(typeinfo, "color"),
-        "container_slots":      _int_field_zero(typeinfo.get("slots")),
-        "status_reduction":     _int_field_zero(typeinfo.get("statusreduction")),
-        "max_charges":          _int_field_zero(item.get("maxcharges")),
-        "setbonus_name":             (item.get("setbonus_info") or {}).get("displayname"),
-        "unique_equip_group":        (item.get("unique_equipment_group") or {}).get("text"),
-        "unique_equip_wearable_count": _int_field_zero((item.get("unique_equipment_group") or {}).get("wearable_count")),
-        "unique_equip_prestige":     1 if (item.get("unique_equipment_group") or {}).get("prestige") == "true" else 0,
-        "required_skill_name":  reqskill.get("text"),
-        "required_skill_min":   _int_field_zero(reqskill.get("min_skill")),
-        "associated_quest":     aq,
-        "autoquest":            autoq,
-        "first_discovered":     _int_field_zero(discovered),
-        "visible":                      _int_field_zero(item.get("visible")),
-        "typeinfo_name":                _str_field(typeinfo, "name"),
-        "classes_json":                 json.dumps(typeinfo["classes"]) if typeinfo.get("classes") is not None else None,
-        "physical_damage_absorption":   _int_field_zero(typeinfo.get("physicaldamageabsorption")),
-        "class_label":                  compute_class_label(typeinfo.get("classes")),
-        "class_count":                  len(typeinfo["classes"]) if typeinfo.get("classes") else None,
-        "skill_type":                   _str_field(typeinfo, "skilltype"),
-        "spell_target":                 _str_field(typeinfo, "spelltarget"),
-        "spell_range":                  _str_field(typeinfo, "spellrange"),
-        "spell_power_cost":             _int_field_zero(typeinfo.get("spellpowercost")),
-        "spell_resistability":          _str_field(typeinfo, "resistability"),
-        "flag_heirloom":        _flag(flags, "heirloom"),
-        "flag_lore":            _flag(flags, "lore"),
-        "flag_lore_equip":      _flag(flags, "lore-equip"),
-        "flag_no_trade":        _flag(flags, "notrade"),
-        "flag_no_value":        _flag(flags, "novalue"),
-        "flag_no_zone":         _flag(flags, "nozone"),
-        "flag_prestige":        _flag(flags, "prestige"),
-        "flag_relic":           _flag(flags, "relic"),
-        "flag_attunable":       _flag(flags, "attunable"),
-        "flag_ornate":          _flag(flags, "ornate"),
-        "flag_refined":         _flag(flags, "refined"),
-        "flag_infusable":       _flag(flags, "infusable"),
-        "flag_indestructible":  _flag(flags, "indestructible"),
-        "flag_pvp":             _is_pvp_item(item),
-        "raw_json":             json.dumps(item),
-        "classification_list":  json.dumps(item.get("classification_list") or []),
+        "id": item.get("id"),
+        "displayname": str(item.get("displayname") or ""),
+        "displayname_lower": str(item.get("displayname") or "").lower(),
+        "gamelink": _str_field(item, "gamelink"),
+        "description": _str_field(item, "description"),
+        "last_update": _int_field_zero(item.get("last_update")),
+        "tier": _str_field(item, "tier"),
+        "tierid": _int_field_zero(item.get("tierid")),
+        "tier_display": _str_field(item, "tier") or "COMMON",
+        "type": _str_field(item, "type"),
+        "typeid": _int_field_zero(item.get("typeid")),
+        "item_level": _int_field_zero(item.get("itemlevel")),
+        "level_to_use": _int_field_zero(item.get("leveltouse")),
+        "planar_level": _int_field_zero(item.get("planar_level")),
+        "icon_id": _int_field_zero(item.get("iconid")),
+        "max_stack_size": _int_field_zero(item.get("maxstacksize")),
+        "slot": slot_list[0].get("name") if slot_list else None,
+        "armor_class_min": _int_field_zero(typeinfo.get("minarmorclass")),
+        "armor_class_max": _int_field_zero(typeinfo.get("maxarmorclass")),
+        "damage_min": _int_field_zero(typeinfo.get("mindamage")),
+        "damage_max": _int_field_zero(typeinfo.get("maxdamage")),
+        "damage_base": _int_field_zero(typeinfo.get("damage")),
+        "damage_type": _str_field(typeinfo, "damagetype"),
+        "damage_type_id": _int_field_zero(typeinfo.get("damagetypeid")),
+        "damage_rating": typeinfo.get("damagerating"),
+        "delay": typeinfo.get("delay"),
+        "wield_style": _str_field(typeinfo, "wieldstyle"),
+        "spell_name": _str_field(typeinfo, "spellname"),
+        "spell_tier_id": _int_field_zero(typeinfo.get("tier")),
+        "spell_cast_time": typeinfo.get("spellcasttime"),
+        "spell_recast_time": typeinfo.get("spellrecasttime"),
+        "spell_duration": typeinfo.get("spellduration"),
+        "weapon_range_min": typeinfo.get("minrange"),
+        "weapon_range_max": typeinfo.get("range"),
+        "food_duration": _str_field(typeinfo, "duration"),
+        "food_satiation": _str_field(typeinfo, "satiation"),
+        "food_level": _int_field_zero(typeinfo.get("foodlevel")),
+        "adornment_color": _str_field(typeinfo, "color"),
+        "container_slots": _int_field_zero(typeinfo.get("slots")),
+        "status_reduction": _int_field_zero(typeinfo.get("statusreduction")),
+        "max_charges": _int_field_zero(item.get("maxcharges")),
+        "setbonus_name": (item.get("setbonus_info") or {}).get("displayname"),
+        "unique_equip_group": (item.get("unique_equipment_group") or {}).get("text"),
+        "unique_equip_wearable_count": _int_field_zero(
+            (item.get("unique_equipment_group") or {}).get("wearable_count")
+        ),
+        "unique_equip_prestige": 1 if (item.get("unique_equipment_group") or {}).get("prestige") == "true" else 0,
+        "required_skill_name": reqskill.get("text"),
+        "required_skill_min": _int_field_zero(reqskill.get("min_skill")),
+        "associated_quest": aq,
+        "autoquest": autoq,
+        "first_discovered": _int_field_zero(discovered),
+        "visible": _int_field_zero(item.get("visible")),
+        "typeinfo_name": _str_field(typeinfo, "name"),
+        "classes_json": json.dumps(typeinfo["classes"]) if typeinfo.get("classes") is not None else None,
+        "physical_damage_absorption": _int_field_zero(typeinfo.get("physicaldamageabsorption")),
+        "class_label": compute_class_label(typeinfo.get("classes")),
+        "class_count": len(typeinfo["classes"]) if typeinfo.get("classes") else None,
+        "skill_type": _str_field(typeinfo, "skilltype"),
+        "spell_target": _str_field(typeinfo, "spelltarget"),
+        "spell_range": _str_field(typeinfo, "spellrange"),
+        "spell_power_cost": _int_field_zero(typeinfo.get("spellpowercost")),
+        "spell_resistability": _str_field(typeinfo, "resistability"),
+        "flag_heirloom": _flag(flags, "heirloom"),
+        "flag_lore": _flag(flags, "lore"),
+        "flag_lore_equip": _flag(flags, "lore-equip"),
+        "flag_no_trade": _flag(flags, "notrade"),
+        "flag_no_value": _flag(flags, "novalue"),
+        "flag_no_zone": _flag(flags, "nozone"),
+        "flag_prestige": _flag(flags, "prestige"),
+        "flag_relic": _flag(flags, "relic"),
+        "flag_attunable": _flag(flags, "attunable"),
+        "flag_ornate": _flag(flags, "ornate"),
+        "flag_refined": _flag(flags, "refined"),
+        "flag_infusable": _flag(flags, "infusable"),
+        "flag_indestructible": _flag(flags, "indestructible"),
+        "flag_pvp": _is_pvp_item(item),
+        "raw_json": json.dumps(item),
+        "classification_list": json.dumps(item.get("classification_list") or []),
     }
 
 
 # ---------------------------------------------------------------------------
 # Synchronous helpers (used by download script)
 # ---------------------------------------------------------------------------
+
 
 def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     """Create (or open) the DB, create tables/indexes if missing. Returns connection."""
@@ -710,9 +724,7 @@ def _backfill_effect_stats(conn: sqlite3.Connection) -> None:
     # For now "Attack Speed" covers all patterns in _EFFECT_STAT_PATTERNS.
     keyword_hints = ["attack speed"]  # lowercase; extend when patterns grow
 
-    conditions = " OR ".join(
-        f"LOWER(raw_json) LIKE ?" for _ in keyword_hints
-    )
+    conditions = " OR ".join(f"LOWER(raw_json) LIKE ?" for _ in keyword_hints)
     rows = conn.execute(
         f"SELECT id, raw_json FROM items WHERE raw_json IS NOT NULL AND ({conditions})",
         [f"%{kw}%" for kw in keyword_hints],
@@ -755,7 +767,7 @@ def upsert_items(items: list[dict], conn: sqlite3.Connection) -> int:
     # Modifier stats (from `modifiers` dict) are inserted first with OR REPLACE.
     # Effect stats (parsed from effect_list text) are inserted second with OR IGNORE
     # so that modifier values always win when both are present.
-    mod_stat_rows:    list[tuple] = []
+    mod_stat_rows: list[tuple] = []
     effect_stat_rows: list[tuple] = []
     for item in items:
         item_id = item.get("id")
@@ -786,6 +798,7 @@ def item_count(conn: sqlite3.Connection) -> int:
 # ---------------------------------------------------------------------------
 # Async helpers (used by bot)
 # ---------------------------------------------------------------------------
+
 
 async def find_by_name(name: str, path: Path = DB_PATH) -> Optional[dict]:
     """Return raw Census JSON dict for the closest name match, or None."""
@@ -831,8 +844,7 @@ async def find_by_name(name: str, path: Path = DB_PATH) -> Optional[dict]:
                     return await cur.fetchone()
             else:
                 async with db.execute(
-                    f"SELECT raw_json FROM items WHERE {where_clause}"
-                    "  ORDER BY tierid DESC, last_update DESC LIMIT 1",
+                    f"SELECT raw_json FROM items WHERE {where_clause}  ORDER BY tierid DESC, last_update DESC LIMIT 1",
                     params,
                 ) as cur:
                     return await cur.fetchone()
@@ -857,9 +869,7 @@ async def find_by_id(item_id: int, path: Path = DB_PATH) -> Optional[dict]:
         return None
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT raw_json FROM items WHERE id = ? LIMIT 1", (item_id,)
-        ) as cur:
+        async with db.execute("SELECT raw_json FROM items WHERE id = ? LIMIT 1", (item_id,)) as cur:
             row = await cur.fetchone()
         return json.loads(row["raw_json"]) if row else None
 
@@ -884,8 +894,7 @@ def _find_by_name_sync(name: str, path: Path) -> Optional[dict]:
                 params,
             ).fetchone()
         return conn.execute(
-            f"SELECT raw_json FROM items WHERE {where_clause}"
-            "  ORDER BY tierid DESC, last_update DESC LIMIT 1",
+            f"SELECT raw_json FROM items WHERE {where_clause}  ORDER BY tierid DESC, last_update DESC LIMIT 1",
             params,
         ).fetchone()
 
@@ -901,7 +910,5 @@ def _find_by_id_sync(item_id: int, path: Path) -> Optional[dict]:
     if not path.exists():
         return None
     with sqlite3.connect(path) as conn:
-        row = conn.execute(
-            "SELECT raw_json FROM items WHERE id = ? LIMIT 1", (item_id,)
-        ).fetchone()
+        row = conn.execute("SELECT raw_json FROM items WHERE id = ? LIMIT 1", (item_id,)).fetchone()
         return json.loads(row[0]) if row else None

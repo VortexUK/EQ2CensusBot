@@ -2,6 +2,7 @@
 
 Separate from the item catalogue DB (census/db.py).
 """
+
 from __future__ import annotations
 
 import os
@@ -14,6 +15,7 @@ import aiosqlite
 # ---------------------------------------------------------------------------
 # Path
 # ---------------------------------------------------------------------------
+
 
 def _db_path() -> Path:
     env = os.getenv("USERS_DB_PATH")
@@ -86,6 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_watch_guild ON item_watch(guild_name);
 # Init
 # ---------------------------------------------------------------------------
 
+
 def init_db(path: Path = DB_PATH) -> None:
     """Create tables if they don't exist, and migrate existing ones.  Called once at startup."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,6 +112,7 @@ def init_db(path: Path = DB_PATH) -> None:
 # ---------------------------------------------------------------------------
 # User helpers
 # ---------------------------------------------------------------------------
+
 
 async def upsert_user(
     discord_id: str,
@@ -143,14 +147,17 @@ async def upsert_user(
                     ELSE access_status
                 END
             """,
-            (discord_id, discord_name, discord_username, avatar,
-             'approved' if is_admin else 'pending',
-             1 if is_admin else 0),
+            (
+                discord_id,
+                discord_name,
+                discord_username,
+                avatar,
+                "approved" if is_admin else "pending",
+                1 if is_admin else 0,
+            ),
         )
         await db.commit()
-        async with db.execute(
-            "SELECT access_status FROM users WHERE discord_id = ?", (discord_id,)
-        ) as cur:
+        async with db.execute("SELECT access_status FROM users WHERE discord_id = ?", (discord_id,)) as cur:
             row = await cur.fetchone()
     return row["access_status"] if row else "pending"
 
@@ -159,9 +166,7 @@ async def get_user_access_status(discord_id: str, path: Path = DB_PATH) -> str:
     """Return the access_status for a user, or 'pending' if not found."""
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT access_status FROM users WHERE discord_id = ?", (discord_id,)
-        ) as cur:
+        async with db.execute("SELECT access_status FROM users WHERE discord_id = ?", (discord_id,)) as cur:
             row = await cur.fetchone()
     return row["access_status"] if row else "pending"
 
@@ -212,6 +217,7 @@ async def set_user_access(discord_id: str, status: str, path: Path = DB_PATH) ->
 # Claim helpers
 # ---------------------------------------------------------------------------
 
+
 async def get_active_claims(
     discord_id: str,
     path: Path = DB_PATH,
@@ -235,7 +241,7 @@ async def get_active_claims(
     claims = [dict(r) for r in rows]
     return {
         "approved": [c for c in claims if c["status"] == "approved"],
-        "pending":  next((c for c in claims if c["status"] == "pending"), None),
+        "pending": next((c for c in claims if c["status"] == "pending"), None),
     }
 
 
@@ -254,8 +260,7 @@ async def submit_claim(
         db.row_factory = aiosqlite.Row
         # Reject if this character is already claimed (approved or pending) by anyone
         async with db.execute(
-            "SELECT discord_id FROM character_claims "
-            "WHERE character_name = ? AND status IN ('approved', 'pending')",
+            "SELECT discord_id FROM character_claims WHERE character_name = ? AND status IN ('approved', 'pending')",
             (character_name,),
         ) as cur:
             existing = await cur.fetchone()
@@ -266,21 +271,18 @@ async def submit_claim(
                 raise ValueError(f"'{character_name}' has already been claimed by another player.")
         # Cancel any existing pending claim (one pending at a time)
         await db.execute(
-            "UPDATE character_claims SET status = 'withdrawn' "
-            "WHERE discord_id = ? AND status = 'pending'",
+            "UPDATE character_claims SET status = 'withdrawn' WHERE discord_id = ? AND status = 'pending'",
             (discord_id,),
         )
         cur = await db.execute(
-            "INSERT INTO character_claims (discord_id, character_name, status) "
-            "VALUES (?, ?, 'pending')",
+            "INSERT INTO character_claims (discord_id, character_name, status) VALUES (?, ?, 'pending')",
             (discord_id, character_name),
         )
         new_id = cur.lastrowid
         await db.commit()
-        async with db.execute(
-            "SELECT * FROM character_claims WHERE id = ?", (new_id,)
-        ) as cur2:
+        async with db.execute("SELECT * FROM character_claims WHERE id = ?", (new_id,)) as cur2:
             row = await cur2.fetchone()
+    assert row is not None, "INSERT succeeded but SELECT returned nothing"
     return dict(row)
 
 
@@ -434,9 +436,7 @@ async def review_claim(
     Returns the updated claim (with user info) or None if not found.
     """
     async with aiosqlite.connect(path) as db:
-        async with db.execute(
-            "SELECT discord_id FROM character_claims WHERE id = ?", (claim_id,)
-        ) as cur:
+        async with db.execute("SELECT discord_id FROM character_claims WHERE id = ?", (claim_id,)) as cur:
             row = await cur.fetchone()
         if not row:
             return None
@@ -477,9 +477,7 @@ async def delete_claim(
 ) -> bool:
     """Hard-delete a claim row. Returns True if a row was deleted."""
     async with aiosqlite.connect(path) as db:
-        cur = await db.execute(
-            "DELETE FROM character_claims WHERE id = ?", (claim_id,)
-        )
+        cur = await db.execute("DELETE FROM character_claims WHERE id = ?", (claim_id,))
         deleted = cur.rowcount > 0
         await db.commit()
     return deleted
@@ -491,9 +489,7 @@ async def delete_claims_for_user(
 ) -> int:
     """Hard-delete all claim rows for a user. Returns the number of rows deleted."""
     async with aiosqlite.connect(path) as db:
-        cur = await db.execute(
-            "DELETE FROM character_claims WHERE discord_id = ?", (discord_id,)
-        )
+        cur = await db.execute("DELETE FROM character_claims WHERE discord_id = ?", (discord_id,))
         count = cur.rowcount
         await db.commit()
     return count
@@ -502,6 +498,7 @@ async def delete_claims_for_user(
 # ---------------------------------------------------------------------------
 # Item watch helpers
 # ---------------------------------------------------------------------------
+
 
 async def add_item_watch(
     guild_name: str,
@@ -530,14 +527,13 @@ async def add_item_watch(
             )
         except Exception as exc:
             if "UNIQUE" in str(exc):
-                raise ValueError(
-                    f"'{item_name}' is already being watched for {character_name}."
-                ) from exc
+                raise ValueError(f"'{item_name}' is already being watched for {character_name}.") from exc
             raise
         new_id = cur.lastrowid
         await db.commit()
         async with db.execute("SELECT * FROM item_watch WHERE id = ?", (new_id,)) as cur2:
             row = await cur2.fetchone()
+    assert row is not None, "INSERT succeeded but SELECT returned nothing"
     return dict(row)
 
 

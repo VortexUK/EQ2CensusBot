@@ -7,6 +7,7 @@ Usage:
     python scripts/preview_aa_tree.py 3     # tree id 3 (Cleric class tree)
     python scripts/preview_aa_tree.py 25    # tree id 25 (Templar subclass tree)
 """
+
 import os
 import subprocess
 import sys

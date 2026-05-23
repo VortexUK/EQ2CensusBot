@@ -18,6 +18,7 @@ Spell-scroll recipes (e.g. "Lightning Palm III (Expert)") also populate:
   crafted_tier    – tier suffix ("Expert", "Grandmaster", "Ancient", …)
 Non-spell recipes leave both columns NULL.
 """
+
 from __future__ import annotations
 
 import json
@@ -48,6 +49,7 @@ _TIER_RE = re.compile(r"^(.+?)\s*\(([^)]+)\)\s*$")
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+
 
 def _db_path() -> Path:
     env = os.getenv("RECIPES_DB_PATH")
@@ -164,6 +166,7 @@ INSERT OR REPLACE INTO recipes (
 # Row conversion
 # ---------------------------------------------------------------------------
 
+
 def _int(v) -> Optional[int]:
     if v is None:
         return None
@@ -203,9 +206,9 @@ def recipe_to_row(r: dict) -> Optional[dict]:
     name = str(r.get("name") or "")
 
     # Primary component
-    pc     = r.get("primarycomponent") or {}
+    pc = r.get("primarycomponent") or {}
     p_comp = str(pc.get("description") or "").strip() or None
-    p_qty  = _int(pc.get("quantity"))
+    p_qty = _int(pc.get("quantity"))
 
     # Secondary components → compact JSON
     sc_raw = r.get("secondarycomponent_list") or []
@@ -216,9 +219,9 @@ def recipe_to_row(r: dict) -> Optional[dict]:
     ]
 
     # Fuel component
-    fc     = r.get("fuelcomponent") or {}
+    fc = r.get("fuelcomponent") or {}
     f_comp = str(fc.get("description") or "").strip() or None
-    f_qty  = _int(fc.get("quantity"))
+    f_qty = _int(fc.get("quantity"))
 
     # Output tiers
     out = r.get("output") or {}
@@ -227,30 +230,30 @@ def recipe_to_row(r: dict) -> Optional[dict]:
     base_name_lower, crafted_tier = _parse_spell_tier(name)
 
     return {
-        "id":                    rid,
-        "crc":                   _int(r.get("crc")),
-        "name":                  name,
-        "name_lower":            name.lower(),
-        "bench":                 str(r.get("bench") or "").strip() or None,
-        "version":               _int(r.get("version")),
-        "primary_comp":          p_comp,
-        "primary_qty":           p_qty,
-        "secondary_comps":       json.dumps(sc),
-        "fuel_comp":             f_comp,
-        "fuel_qty":              f_qty,
-        "out_unfinished_id":     _int(out.get("unfinished")),
-        "out_unfinished_count":  _int(out.get("unfinished_count")),
-        "out_simple_id":         _int(out.get("simple")),
-        "out_simple_count":      _int(out.get("simple_count")),
-        "out_worked_id":         _int(out.get("worked")),
-        "out_worked_count":      _int(out.get("worked_count")),
-        "out_elaborate_id":      _int(out.get("elaborate")),
-        "out_elaborate_count":   _int(out.get("elaborate_count")),
-        "out_formed_id":         _int(out.get("formed")),
-        "out_formed_count":      _int(out.get("formed_count")),
-        "base_name_lower":       base_name_lower,
-        "crafted_tier":          crafted_tier,
-        "last_update":           _int(r.get("last_update")),
+        "id": rid,
+        "crc": _int(r.get("crc")),
+        "name": name,
+        "name_lower": name.lower(),
+        "bench": str(r.get("bench") or "").strip() or None,
+        "version": _int(r.get("version")),
+        "primary_comp": p_comp,
+        "primary_qty": p_qty,
+        "secondary_comps": json.dumps(sc),
+        "fuel_comp": f_comp,
+        "fuel_qty": f_qty,
+        "out_unfinished_id": _int(out.get("unfinished")),
+        "out_unfinished_count": _int(out.get("unfinished_count")),
+        "out_simple_id": _int(out.get("simple")),
+        "out_simple_count": _int(out.get("simple_count")),
+        "out_worked_id": _int(out.get("worked")),
+        "out_worked_count": _int(out.get("worked_count")),
+        "out_elaborate_id": _int(out.get("elaborate")),
+        "out_elaborate_count": _int(out.get("elaborate_count")),
+        "out_formed_id": _int(out.get("formed")),
+        "out_formed_count": _int(out.get("formed_count")),
+        "base_name_lower": base_name_lower,
+        "crafted_tier": crafted_tier,
+        "last_update": _int(r.get("last_update")),
     }
 
 
@@ -271,9 +274,7 @@ def _backfill_spell_tiers(conn: sqlite3.Connection) -> int:
     startup — it's a no-op once all rows are filled.  Returns the number of rows
     updated.
     """
-    rows = conn.execute(
-        "SELECT id, name FROM recipes WHERE crafted_tier IS NULL"
-    ).fetchall()
+    rows = conn.execute("SELECT id, name FROM recipes WHERE crafted_tier IS NULL").fetchall()
     if not rows:
         return 0
     updates = []
@@ -372,9 +373,7 @@ def find_by_id(recipe_id: int, path: Path = DB_PATH) -> Optional[dict]:
         return None
     with sqlite3.connect(path) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            f"SELECT {_SELECT_COLS} FROM recipes WHERE id = ? LIMIT 1", (recipe_id,)
-        ).fetchone()
+        row = conn.execute(f"SELECT {_SELECT_COLS} FROM recipes WHERE id = ? LIMIT 1", (recipe_id,)).fetchone()
     return _row_to_dict(row) if row else None
 
 

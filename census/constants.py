@@ -25,14 +25,14 @@ STAT_MAP: dict[str, tuple[str, str]] = {
     "crit_bonus": ("Crit Bonus", "secondary"),
     "castingspeed": ("Casting Speed", "secondary"),
     "casting_speed": ("Casting Speed", "secondary"),
-    "spelltimecastpct": ("Casting Speed", "secondary"),   # XML tag name from API
+    "spelltimecastpct": ("Casting Speed", "secondary"),  # XML tag name from API
     "critchance": ("Crit Chance", "secondary"),
     "crit_chance": ("Crit Chance", "secondary"),
     "potency": ("Potency", "secondary"),
-    "basemodifier": ("Potency", "secondary"),             # XML tag name from API
+    "basemodifier": ("Potency", "secondary"),  # XML tag name from API
     "maxhealth": ("Max Health", "secondary"),
     "max_health": ("Max Health", "secondary"),
-    "maxhpperc": ("Max Health", "secondary"),             # XML tag name from API
+    "maxhpperc": ("Max Health", "secondary"),  # XML tag name from API
     "maxpower": ("Max Power", "secondary"),
     "max_power": ("Max Power", "secondary"),
     "abilitymod": ("Ability Mod", "secondary"),
@@ -63,25 +63,26 @@ STAT_MAP: dict[str, tuple[str, str]] = {
     "spell_dmg_bonus": ("Spell Dmg Bonus", "secondary"),
     "attackspeed": ("Attack Speed", "secondary"),
     "attack_speed": ("Attack Speed", "secondary"),
-    "arcane":       ("Resistances", "primary"),
-    "elemental":    ("Resistances", "primary"),
-    "noxious":      ("Resistances", "primary"),
+    "arcane": ("Resistances", "primary"),
+    "elemental": ("Resistances", "primary"),
+    "noxious": ("Resistances", "primary"),
 }
 
 # EQ2 class groups — used to collapse full class lists into group names
-FIGHTERS  = frozenset(["Guardian", "Berserker", "Monk", "Bruiser", "Shadowknight", "Paladin"])
-PRIESTS   = frozenset(["Templar", "Inquisitor", "Fury", "Warden", "Mystic", "Defiler", "Channeler"])
-SCOUTS    = frozenset(["Troubador", "Dirge", "Assassin", "Ranger", "Swashbuckler", "Brigand", "Beastlord"])
-MAGES     = frozenset(["Coercer", "Illusionist", "Conjuror", "Necromancer", "Wizard", "Warlock"])
-ARTISANS  = frozenset(["Sage", "Armorer", "Weaponsmith", "Woodworker", "Jeweler",
-                        "Carpenter", "Tailor", "Alchemist", "Provisioner"])
+FIGHTERS = frozenset(["Guardian", "Berserker", "Monk", "Bruiser", "Shadowknight", "Paladin"])
+PRIESTS = frozenset(["Templar", "Inquisitor", "Fury", "Warden", "Mystic", "Defiler", "Channeler"])
+SCOUTS = frozenset(["Troubador", "Dirge", "Assassin", "Ranger", "Swashbuckler", "Brigand", "Beastlord"])
+MAGES = frozenset(["Coercer", "Illusionist", "Conjuror", "Necromancer", "Wizard", "Warlock"])
+ARTISANS = frozenset(
+    ["Sage", "Armorer", "Weaponsmith", "Woodworker", "Jeweler", "Carpenter", "Tailor", "Alchemist", "Provisioner"]
+)
 
 # Ordered list used for archetype decomposition (most specific → least specific)
 ARCHETYPES: list[tuple[frozenset, str]] = [
     (FIGHTERS, "All Fighters"),
-    (PRIESTS,  "All Priests"),
-    (SCOUTS,   "All Scouts"),
-    (MAGES,    "All Mages"),
+    (PRIESTS, "All Priests"),
+    (SCOUTS, "All Scouts"),
+    (MAGES, "All Mages"),
     (ARTISANS, "All Artisans"),
 ]
 
@@ -116,16 +117,16 @@ CLASS_GROUPS: dict[frozenset, str] = {
 TYPEINFO_DISPLAY: list[tuple[str, str, str]] = [
     # (api_field_in_typeinfo, display_label, format)  — format: "duration" | "str"
     # Spell scroll / ability (Census API stores these with "spell" prefix in typeinfo)
-    ("spelltarget",     "Target",   "str"),
-    ("spellrange",      "Range",    "str"),
-    ("spellcasttime",   "Casting",  "duration"),
-    ("spellrecasttime", "Recast",   "duration"),
-    ("spellduration",   "Duration", "duration"),
+    ("spelltarget", "Target", "str"),
+    ("spellrange", "Range", "str"),
+    ("spellcasttime", "Casting", "duration"),
+    ("spellrecasttime", "Recast", "duration"),
+    ("spellduration", "Duration", "duration"),
     # Food / drink duration (pre-formatted string like "6 minutes")
-    ("duration",        "Duration", "duration"),
+    ("duration", "Duration", "duration"),
     # Other items (legacy field names — kept for backward compat; usually no-ops)
-    ("casttime",        "Casting",  "duration"),
-    ("recasttime",      "Recast",   "duration"),
+    ("casttime", "Casting", "duration"),
+    ("recasttime", "Recast", "duration"),
 ]
 
 # Top-level item fields to render as info rows.

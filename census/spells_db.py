@@ -12,6 +12,7 @@ Character spell-check looks up spell IDs in this table so the per-character
 Census call can return bare IDs instead of resolved spell objects, making it
 faster and removing the c:resolve overhead.
 """
+
 from __future__ import annotations
 
 import fnmatch
@@ -27,6 +28,7 @@ from typing import Optional
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+
 
 def _db_path() -> Path:
     env = os.getenv("SPELLS_DB_PATH")
@@ -152,6 +154,7 @@ INSERT OR REPLACE INTO spells (
 # Row conversion
 # ---------------------------------------------------------------------------
 
+
 def _str(v) -> Optional[str]:
     if v is None or isinstance(v, dict):
         return None
@@ -179,8 +182,8 @@ def _float(v) -> Optional[float]:
 
 def _passes_spellcheck(row: dict) -> int:
     """Return 1 if this spell row would survive the spellcheck filter, else 0."""
-    level    = row.get("level") or 0
-    typ      = row.get("type") or ""
+    level = row.get("level") or 0
+    typ = row.get("type") or ""
     given_by = row.get("given_by") or ""
     if level <= 0:
         return 0
@@ -208,52 +211,54 @@ def _parse_effects(spell: dict) -> str:
         desc = str(e.get("description") or "").strip()
         if not desc:
             continue
-        effects.append({
-            "description": desc,
-            "indentation": int(e.get("indentation") or 0),
-        })
+        effects.append(
+            {
+                "description": desc,
+                "indentation": int(e.get("indentation") or 0),
+            }
+        )
     return json.dumps(effects)
 
 
 def spell_to_row(spell: dict) -> dict:
     """Convert a raw Census /spell/ dict into a flat DB row dict."""
-    icon   = spell.get("icon") or {}
+    icon = spell.get("icon") or {}
     cast_h = _int(spell.get("cast_secs_hundredths"))
-    rec_t  = _int(spell.get("recovery_secs_tenths"))
-    desc   = spell.get("description")
+    rec_t = _int(spell.get("recovery_secs_tenths"))
+    desc = spell.get("description")
     if isinstance(desc, dict):
         desc = None  # Census sometimes returns {} for empty descriptions
 
-    name       = str(spell.get("name") or "")
+    name = str(spell.get("name") or "")
     name_lower = name.lower()
-    base       = strip_roman(name)
+    base = strip_roman(name)
     base_lower = base.lower()
 
     row = {
-        "id":               _int(spell.get("id")),
-        "name":             name,
-        "name_lower":       name_lower,
-        "base_name":        base,
-        "base_name_lower":  base_lower,
-        "tier":             _int(spell.get("tier")),
-        "tier_name":        _str(spell.get("tier_name")),
-        "type":             _str(spell.get("type")),
-        "typeid":           _int(spell.get("typeid")),
-        "level":            _int(spell.get("level")),
-        "given_by":         _str(spell.get("given_by")),
-        "crc":              _int(spell.get("crc")),
-        "beneficial":       1 if spell.get("beneficial") == 1 else 0,
-        "cast_secs":        cast_h / 100.0 if cast_h is not None else None,
-        "recast_secs":      _float(spell.get("recast_secs")),
-        "recovery_secs":    rec_t  / 10.0  if rec_t  is not None else None,
-        "target_type":      _str(spell.get("target_type")),
-        "aoe_radius":       _float(spell.get("aoe_radius_meters")),
-        "max_targets":      _int(spell.get("max_targets")),
-        "description":      _str(desc),
-        "icon_id":          _int(icon.get("id")),
-        "icon_backdrop":    _int(icon.get("backdrop")),
-        "effects":          _parse_effects(spell),
-        "last_update":      _int(spell.get("last_update")),
+        "id": _int(spell.get("id")),
+        "name": name,
+        "name_lower": name_lower,
+        "base_name": base,
+        "base_name_lower": base_lower,
+        "tier": _int(spell.get("tier")),
+        "tier_name": _str(spell.get("tier_name")),
+        "type": _str(spell.get("type")),
+        "typeid": _int(spell.get("typeid")),
+        "level": _int(spell.get("level")),
+        "given_by": _str(spell.get("given_by")),
+        "crc": _int(spell.get("crc")),
+        "beneficial": 1 if spell.get("beneficial") == 1 else 0,
+        "cast_secs": cast_h / 100.0 if cast_h is not None else None,
+        "recast_secs": _float(spell.get("recast_secs")),
+        "recovery_secs": rec_t / 10.0 if rec_t is not None else None,
+        "target_type": _str(spell.get("target_type")),
+        "aoe_radius": _float(spell.get("aoe_radius_meters")),
+        "max_targets": _int(spell.get("max_targets")),
+        "description": _str(desc),
+        "icon_id": _int(icon.get("id")),
+        "icon_backdrop": _int(icon.get("backdrop")),
+        "effects": _parse_effects(spell),
+        "last_update": _int(spell.get("last_update")),
     }
     row["passes_spellcheck"] = _passes_spellcheck(row)
     return row
@@ -262,6 +267,7 @@ def spell_to_row(spell: dict) -> dict:
 # ---------------------------------------------------------------------------
 # DB management (synchronous — used by download script and web startup)
 # ---------------------------------------------------------------------------
+
 
 def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     """Create tables/indexes if missing. Returns an open connection."""
@@ -329,9 +335,7 @@ def find_by_id(spell_id: int, path: Path = DB_PATH) -> Optional[dict]:
         return None
     with sqlite3.connect(path) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            f"SELECT {_SELECT_COLS} FROM spells WHERE id = ? LIMIT 1", (spell_id,)
-        ).fetchone()
+        row = conn.execute(f"SELECT {_SELECT_COLS} FROM spells WHERE id = ? LIMIT 1", (spell_id,)).fetchone()
     return _row_to_dict(row) if row else None
 
 
@@ -392,19 +396,21 @@ def unique_highest_entries(entries: list) -> list:
     best: dict[tuple, object] = {}
     for e in entries:
         if isinstance(e, dict):
-            name       = e.get("name") or ""
+            name = e.get("name") or ""
             spell_type = e.get("type") or ""
-            level      = e.get("level") or 0
+            level = e.get("level") or 0
         else:
-            name       = getattr(e, "name", "")
+            name = getattr(e, "name", "")
             spell_type = getattr(e, "spell_type", "")
-            level      = getattr(e, "level", 0) or 0
+            level = getattr(e, "level", 0) or 0
         key = (strip_roman(name), spell_type)
         if key not in best:
             best[key] = e
         else:
             existing = best[key]
-            elevel = (existing.get("level") or 0) if isinstance(existing, dict) else (getattr(existing, "level", 0) or 0)
+            elevel = (
+                (existing.get("level") or 0) if isinstance(existing, dict) else (getattr(existing, "level", 0) or 0)
+            )
             if level > elevel:
                 best[key] = e
     return list(best.values())
@@ -426,8 +432,8 @@ class Blocklist:
     __slots__ = ("_exact", "_patterns")
 
     def __init__(self, exact: frozenset[str], patterns: list[str]) -> None:
-        self._exact    = exact      # lowercased, Roman-stripped literals
-        self._patterns = patterns   # lowercased wildcard patterns
+        self._exact = exact  # lowercased, Roman-stripped literals
+        self._patterns = patterns  # lowercased wildcard patterns
 
     def __contains__(self, name: object) -> bool:
         if not isinstance(name, str):
@@ -443,9 +449,7 @@ class Blocklist:
         return bool(self._exact or self._patterns)
 
     def __repr__(self) -> str:
-        return (
-            f"Blocklist(exact={len(self._exact)}, patterns={len(self._patterns)})"
-        )
+        return f"Blocklist(exact={len(self._exact)}, patterns={len(self._patterns)})"
 
 
 def load_blocklist(path: Path = _BLOCKLIST_PATH) -> Blocklist:
@@ -460,10 +464,10 @@ def load_blocklist(path: Path = _BLOCKLIST_PATH) -> Blocklist:
     if not path.exists():
         return Blocklist(frozenset(), [])
     try:
-        data  = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
         names: list[str] = data.get("blocked", []) if isinstance(data, dict) else data
 
-        exact:    list[str] = []
+        exact: list[str] = []
         patterns: list[str] = []
         for n in names:
             if not isinstance(n, str):

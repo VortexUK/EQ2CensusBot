@@ -15,15 +15,11 @@ router = APIRouter(tags=["auth"])
 
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID", "")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET", "")
-DISCORD_REDIRECT_URI = os.getenv(
-    "DISCORD_REDIRECT_URI", "http://localhost:8000/api/auth/callback"
-)
+DISCORD_REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8000/api/auth/callback")
 _DISCORD_API = "https://discord.com/api/v10"
 _SCOPES = "identify"
 
-_ADMIN_IDS: frozenset[str] = frozenset(
-    filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(","))
-)
+_ADMIN_IDS: frozenset[str] = frozenset(filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(",")))
 
 
 class UserResponse(BaseModel):

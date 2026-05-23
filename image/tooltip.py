@@ -14,40 +14,40 @@ from census.models import ItemData, ItemEffect, ItemStat
 # Colours matching the in-game tooltip screenshot
 # ---------------------------------------------------------------------------
 BG = (10, 10, 14)
-BORDER_OUTER = (196, 158, 44)   # golden amber
-BORDER_INNER = (54, 76, 92)     # slate teal
+BORDER_OUTER = (196, 158, 44)  # golden amber
+BORDER_INNER = (54, 76, 92)  # slate teal
 
 C_NAME = (232, 232, 232)
 C_WHITE = (220, 220, 220)
-C_BODY  = (199, 207, 199)   # #c7cfc7 — base card text colour from CSS
+C_BODY = (199, 207, 199)  # #c7cfc7 — base card text colour from CSS
 
 # Glow params shared between quality badges and effect names: (colour, radius, passes)
 EFFECT_GLOW: tuple[tuple[int, int, int], int, int] = ((223, 83, 95), 4, 2)
 
 # Rarity / quality  — text colour
 QUALITY_COLORS: dict[str, tuple[int, int, int]] = {
-    "fabled":    (255, 147, 157),   # #ff939d
-    "legendary": (255, 201, 147),   # #ffc993
-    "treasured":     (147, 217, 255),   # #93d9ff
-    "mastercrafted": (147, 217, 255),   # same as treasured
-    "uncommon":     (190, 255, 147),   # #beff93
-    "handcrafted":  (190, 255, 147),   # same as uncommon
-    "common":       (190, 255, 147),   # same as uncommon
+    "fabled": (255, 147, 157),  # #ff939d
+    "legendary": (255, 201, 147),  # #ffc993
+    "treasured": (147, 217, 255),  # #93d9ff
+    "mastercrafted": (147, 217, 255),  # same as treasured
+    "uncommon": (190, 255, 147),  # #beff93
+    "handcrafted": (190, 255, 147),  # same as uncommon
+    "common": (190, 255, 147),  # same as uncommon
 }
 
 QUALITY_GLOWS: dict[str, tuple[tuple[int, int, int], int, int]] = {
-    "fabled":    EFFECT_GLOW,
-    "legendary": ((213, 105, 0), 4, 2),    # #D56900
-    "treasured":     ((213, 105, 0), 4, 2),   # #D56900
+    "fabled": EFFECT_GLOW,
+    "legendary": ((213, 105, 0), 4, 2),  # #D56900
+    "treasured": ((213, 105, 0), 4, 2),  # #D56900
     "mastercrafted": ((213, 105, 0), 4, 2),
 }
 
-C_STAT_PRIMARY   = (34, 255, 34)    # #22ff22
-C_STAT_SECONDARY = (60, 192, 192)   # cyan
-C_VALUE       = (60, 192, 192)
-C_CLASS       = (34, 255, 34)    # #22ff22
-C_GOLD        = (230, 233, 112)     # #e6e970 — "Effects:" / "Adornment Slots:" headers
-C_EFFECT_NAME = (255, 147, 157)     # #ff939d — same pink as FABLED rarity
+C_STAT_PRIMARY = (34, 255, 34)  # #22ff22
+C_STAT_SECONDARY = (60, 192, 192)  # cyan
+C_VALUE = (60, 192, 192)
+C_CLASS = (34, 255, 34)  # #22ff22
+C_GOLD = (230, 233, 112)  # #e6e970 — "Effects:" / "Adornment Slots:" headers
+C_EFFECT_NAME = (255, 147, 157)  # #ff939d — same pink as FABLED rarity
 
 # Adornment slot name → colour
 ADORN_COLORS: dict[str, tuple[int, int, int]] = {
@@ -66,22 +66,24 @@ ADORN_COLORS: dict[str, tuple[int, int, int]] = {
 # ---------------------------------------------------------------------------
 # ZOOM: output size multiplier — change this to resize everything proportionally.
 # SCALE: supersampling factor for anti-aliasing — keep at 2, do not change.
-ZOOM        = 1.3
-SCALE       = 2
+ZOOM = 1.3
+SCALE = 2
+
 
 def _z(n: float) -> int:
     """Convert a base pixel value to render pixels, applying both ZOOM and SCALE."""
     return round(n * ZOOM) * SCALE
 
-WIDTH_OUT   = round(368 * ZOOM)    # final output width in pixels
-WIDTH       = WIDTH_OUT * SCALE    # internal render width
-PADDING     = _z(18)
-BORDER_W    = _z(3)
-INSET       = _z(6)
-LINE_GAP    = _z(4)
+
+WIDTH_OUT = round(368 * ZOOM)  # final output width in pixels
+WIDTH = WIDTH_OUT * SCALE  # internal render width
+PADDING = _z(18)
+BORDER_W = _z(3)
+INSET = _z(6)
+LINE_GAP = _z(4)
 SECTION_GAP = _z(8)
-ICON_SIZE   = round(_z(64) * 0.9)  # render-space icon size (90% of base)
-COL2_FRAC   = 0.48                 # fraction — scale-independent
+ICON_SIZE = round(_z(64) * 0.9)  # render-space icon size (90% of base)
+COL2_FRAC = 0.48  # fraction — scale-independent
 
 _SLOT_BACKDROP_PATH = Path(__file__).resolve().parent.parent / "data" / "AAs" / "slot-empty-blue.png"
 _slot_backdrop: Image.Image | None = None
@@ -90,15 +92,14 @@ _slot_backdrop: Image.Image | None = None
 def _get_slot_backdrop(size: int) -> Image.Image:
     global _slot_backdrop
     if _slot_backdrop is None or _slot_backdrop.size != (size, size):
-        _slot_backdrop = (
-            Image.open(_SLOT_BACKDROP_PATH).convert("RGBA").resize((size, size), Image.LANCZOS)
-        )
+        _slot_backdrop = Image.open(_SLOT_BACKDROP_PATH).convert("RGBA").resize((size, size), Image.LANCZOS)
     return _slot_backdrop
 
 
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
+
 
 def render_tooltip(item: ItemData) -> Image.Image:
     return _TooltipRenderer().render(item)
@@ -107,6 +108,7 @@ def render_tooltip(item: ItemData) -> Image.Image:
 # ---------------------------------------------------------------------------
 # Renderer
 # ---------------------------------------------------------------------------
+
 
 class _TooltipRenderer:
     def render(self, item: ItemData) -> Image.Image:
@@ -190,16 +192,23 @@ class _TooltipRenderer:
 
         # Rarity — bottom of tier text aligns with bottom of icon
         if item.quality:
-            tier_h  = _lh(fonts["bold_lg"])
-            tier_y  = max(y + LINE_GAP, icon_y + ICON_SIZE - tier_h)
+            tier_h = _lh(fonts["bold_lg"])
+            tier_y = max(y + LINE_GAP, icon_y + ICON_SIZE - tier_h)
             q = item.quality.lower()
             color = QUALITY_COLORS.get(q, C_WHITE)
             glow_info = QUALITY_GLOWS.get(q)
             if glow_info:
                 glow_color, glow_radius, glow_passes = glow_info
                 _draw_with_glow(
-                    canvas, x, tier_y, item.quality.upper(), fonts["bold_lg"],
-                    color, glow_color, glow_radius, glow_passes,
+                    canvas,
+                    x,
+                    tier_y,
+                    item.quality.upper(),
+                    fonts["bold_lg"],
+                    color,
+                    glow_color,
+                    glow_radius,
+                    glow_passes,
                 )
             else:
                 draw.text((x, tier_y), item.quality.upper(), font=fonts["bold_lg"], fill=color)
@@ -255,12 +264,11 @@ class _TooltipRenderer:
         if item.effects:
             q = item.quality.lower() if item.quality else ""
             eff_color = QUALITY_COLORS.get(q, C_EFFECT_NAME)
-            eff_glow  = QUALITY_GLOWS.get(q)
+            eff_glow = QUALITY_GLOWS.get(q)
             draw.text((x, y), "Effects:", font=fonts["bold"], fill=C_GOLD)
             y += _lh(fonts["bold"]) + LINE_GAP
             for eff in item.effects:
-                y = _draw_effect(draw, eff, fonts, y, x, content_w, canvas,
-                                 name_color=eff_color, glow_info=eff_glow)
+                y = _draw_effect(draw, eff, fonts, y, x, content_w, canvas, name_color=eff_color, glow_info=eff_glow)
 
         # Set bonuses
         if item.set_bonuses:
@@ -301,6 +309,7 @@ class _TooltipRenderer:
 # ---------------------------------------------------------------------------
 # Drawing helpers
 # ---------------------------------------------------------------------------
+
 
 def _draw_with_glow(
     canvas: Image.Image,
@@ -424,8 +433,8 @@ def _draw_effect(
     indent_step = _z(12)
 
     for indent_level, line_text in eff.lines:
-        line_x  = x + indent_level * indent_step
-        wrap_w  = WIDTH - line_x - PADDING - BORDER_W - _z(1) - bullet_w
+        line_x = x + indent_level * indent_step
+        wrap_w = WIDTH - line_x - PADDING - BORDER_W - _z(1) - bullet_w
         wrapped = _wrap(line_text, fonts["regular"], wrap_w)
         for j, wline in enumerate(wrapped):
             if j == 0:
@@ -460,6 +469,7 @@ def _draw_adorn_slots(
 # Utility helpers
 # ---------------------------------------------------------------------------
 
+
 def _fmt_stat(s: ItemStat) -> str:
     v = s.value
     value_str = str(int(v)) if v == int(v) else f"{v:g}"
@@ -489,7 +499,6 @@ def _format_classes(classes: list[str]) -> str:
     return ", ".join(sorted(classes))
 
 
-
 def _wrap(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
     words = text.split()
     if not words:
@@ -516,6 +525,7 @@ def _lh(font: ImageFont.FreeTypeFont) -> int:
 # ---------------------------------------------------------------------------
 # Font loading
 # ---------------------------------------------------------------------------
+
 
 def _load_fonts() -> dict:
     project_fonts = Path("fonts")
@@ -567,9 +577,9 @@ def _load_fonts() -> dict:
     bold = _find(_SERIF_BOLD) or regular  # fall back to regular if no bold found
 
     return {
-        "name":    _load(bold,    _z(20)),
-        "bold_lg": _load(bold,    _z(16)),
-        "bold":    _load(bold,    _z(14)),
+        "name": _load(bold, _z(20)),
+        "bold_lg": _load(bold, _z(16)),
+        "bold": _load(bold, _z(14)),
         "regular": _load(regular, _z(13)),
-        "small":   _load(regular, _z(12)),
+        "small": _load(regular, _z(12)),
     }

@@ -18,29 +18,35 @@ from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
 
 router = APIRouter(tags=["aa"])
 
-_DATA_DIR  = Path(__file__).resolve().parent.parent.parent / "data" / "AAs"
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "AAs"
 _TREES_DIR = _DATA_DIR / "trees"
-_LIMITS    = _DATA_DIR / "aa_limits.json"
+_LIMITS = _DATA_DIR / "aa_limits.json"
 
 _TYPE_ORDER = {
-    "class": 0, "subclass": 1, "shadows": 2, "heroic": 3,
-    "tradeskill": 4, "tradeskill_general": 5, "warder": 6,
-    "prestige": 7, "dragon": 8,
+    "class": 0,
+    "subclass": 1,
+    "shadows": 2,
+    "heroic": 3,
+    "tradeskill": 4,
+    "tradeskill_general": 5,
+    "warder": 6,
+    "prestige": 7,
+    "dragon": 8,
 }
 
 # ---------------------------------------------------------------------------
 # Tree index (loaded once at startup)
 # ---------------------------------------------------------------------------
 
-_tree_index: dict[int, dict] = {}   # tree_id → {"name": str, "type": str}
+_tree_index: dict[int, dict] = {}  # tree_id → {"name": str, "type": str}
 
 
 def _load_tree_index() -> None:
     for path in _TREES_DIR.glob("*.json"):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            aa   = (data.get("alternateadvancement_list") or [{}])[0]
-            tid  = int(path.stem)
+            aa = (data.get("alternateadvancement_list") or [{}])[0]
+            tid = int(path.stem)
             _tree_index[tid] = {
                 "name": aa.get("name", path.stem),
                 "type": detect_tree_type(data),
@@ -56,6 +62,7 @@ _load_tree_index()
 # Response models
 # ---------------------------------------------------------------------------
 
+
 class AAConfigResponse(BaseModel):
     xpac: str
     aa_cap: int
@@ -63,61 +70,63 @@ class AAConfigResponse(BaseModel):
 
 
 class AANodeResponse(BaseModel):
-    node_id:          int
-    name:             str
-    description:      str
-    classification:   str
-    xcoord:           int
-    ycoord:           int
-    icon_id:          int
-    backdrop_id:      int
-    maxtier:          int
-    pointspertier:    int
+    node_id: int
+    name: str
+    description: str
+    classification: str
+    xcoord: int
+    ycoord: int
+    icon_id: int
+    backdrop_id: int
+    maxtier: int
+    pointspertier: int
     points_to_unlock: int
-    title:            str = ""
-    spellcrc:         int = 0
+    title: str = ""
+    spellcrc: int = 0
 
 
 class AATreeResponse(BaseModel):
-    tree_id:   int
+    tree_id: int
     tree_name: str
     tree_type: str
-    nodes:     list[AANodeResponse]
+    nodes: list[AANodeResponse]
 
 
 class CharAATree(BaseModel):
-    tree_id:     int
-    tree_type:   str
-    tree_name:   str
-    spent:       dict[str, int]   # node_id (str) → tier
+    tree_id: int
+    tree_type: str
+    tree_name: str
+    spent: dict[str, int]  # node_id (str) → tier
     total_spent: int
 
 
 class CharAAProfile(BaseModel):
-    name:  str
+    name: str
     trees: list[CharAATree]
 
 
 class CharAAsResponse(BaseModel):
     character_name: str
-    total_spent:    int
-    trees:          list[CharAATree]
-    profiles:       list[CharAAProfile] = []
+    total_spent: int
+    trees: list[CharAATree]
+    profiles: list[CharAAProfile] = []
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.get("/aa/config", response_model=AAConfigResponse)
 async def get_aa_config() -> AAConfigResponse:
     """Return the current xpac's AA cap and which tree types are unlocked."""
     import os
+
     xpac = os.getenv("SERVER_CURRENT_XPAC", "")
     if not _LIMITS.exists():
         return AAConfigResponse(xpac=xpac, aa_cap=0, unlocked_tree_types=[])
     limits = json.loads(_LIMITS.read_text(encoding="utf-8"))
-    entry  = limits.get(xpac, {})
+    entry = limits.get(xpac, {})
     return AAConfigResponse(
         xpac=xpac,
         aa_cap=entry.get("aa_cap", 0),
@@ -131,35 +140,37 @@ async def get_aa_tree(tree_id: int) -> AATreeResponse:
     path = _TREES_DIR / f"{tree_id}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"AA tree {tree_id} not found")
-    data    = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8"))
     aa_list = data.get("alternateadvancement_list") or []
     if not aa_list:
         raise HTTPException(status_code=404, detail=f"AA tree {tree_id} has no data")
-    tree      = aa_list[0]
+    tree = aa_list[0]
     tree_type = detect_tree_type(data)
     nodes: list[AANodeResponse] = []
     for n in tree.get("alternateadvancementnode_list") or []:
         icon = n.get("icon") or {}
-        nodes.append(AANodeResponse(
-            node_id          = int(n["nodeid"]),
-            name             = str(n.get("name", "")),
-            description      = str(n.get("description", "")),
-            classification   = str(n.get("classification", "")),
-            xcoord           = int(n["xcoord"]),
-            ycoord           = int(n["ycoord"]),
-            icon_id          = int(icon.get("id", 0)),
-            backdrop_id      = int(icon.get("backdrop", -1)),
-            maxtier          = int(n.get("maxtier", 1)),
-            pointspertier    = int(n.get("pointspertier", 1)),
-            points_to_unlock = int(n.get("pointsspentintreetounlock", 0)),
-            title            = str(n.get("title", "")),
-            spellcrc         = int(n.get("spellcrc", 0)),
-        ))
+        nodes.append(
+            AANodeResponse(
+                node_id=int(n["nodeid"]),
+                name=str(n.get("name", "")),
+                description=str(n.get("description", "")),
+                classification=str(n.get("classification", "")),
+                xcoord=int(n["xcoord"]),
+                ycoord=int(n["ycoord"]),
+                icon_id=int(icon.get("id", 0)),
+                backdrop_id=int(icon.get("backdrop", -1)),
+                maxtier=int(n.get("maxtier", 1)),
+                pointspertier=int(n.get("pointspertier", 1)),
+                points_to_unlock=int(n.get("pointsspentintreetounlock", 0)),
+                title=str(n.get("title", "")),
+                spellcrc=int(n.get("spellcrc", 0)),
+            )
+        )
     return AATreeResponse(
-        tree_id   = tree_id,
-        tree_name = tree.get("name", str(tree_id)),
-        tree_type = tree_type,
-        nodes     = nodes,
+        tree_id=tree_id,
+        tree_name=tree.get("name", str(tree_id)),
+        tree_type=tree_type,
+        nodes=nodes,
     )
 
 
@@ -171,13 +182,15 @@ def _build_trees(aa_list) -> list[CharAATree]:
     result = []
     for tid, spent in by_tree.items():
         info = _tree_index.get(tid, {})
-        result.append(CharAATree(
-            tree_id     = tid,
-            tree_type   = info.get("type", "unknown"),
-            tree_name   = info.get("name", str(tid)),
-            spent       = {str(k): v for k, v in spent.items()},
-            total_spent = sum(spent.values()),
-        ))
+        result.append(
+            CharAATree(
+                tree_id=tid,
+                tree_type=info.get("type", "unknown"),
+                tree_name=info.get("name", str(tid)),
+                spent={str(k): v for k, v in spent.items()},
+                total_spent=sum(spent.values()),
+            )
+        )
     result.sort(key=lambda t: _TYPE_ORDER.get(t.tree_type, 99))
     return result
 
@@ -191,15 +204,15 @@ async def _bg_refresh_aas(name: str, cache_key: str) -> None:
         finally:
             await client.close()
         if char_aas is not None:
-            aa_cache.set(cache_key, CharAAsResponse(
-                character_name = char_aas.character_name,
-                total_spent    = sum(aa.tier for aa in char_aas.aa_list),
-                trees          = _build_trees(char_aas.aa_list),
-                profiles       = [
-                    CharAAProfile(name=p.name, trees=_build_trees(p.aa_list))
-                    for p in char_aas.profiles
-                ],
-            ))
+            aa_cache.set(
+                cache_key,
+                CharAAsResponse(
+                    character_name=char_aas.character_name,
+                    total_spent=sum(aa.tier for aa in char_aas.aa_list),
+                    trees=_build_trees(char_aas.aa_list),
+                    profiles=[CharAAProfile(name=p.name, trees=_build_trees(p.aa_list)) for p in char_aas.profiles],
+                ),
+            )
     except Exception as exc:
         _log.error("[Cache] Background AA refresh failed for %s: %s", name, exc)
 
@@ -226,13 +239,10 @@ async def get_character_aas(name: str) -> CharAAsResponse:
         raise HTTPException(status_code=404, detail=f"Character '{name}' not found")
 
     result = CharAAsResponse(
-        character_name = char_aas.character_name,
-        total_spent    = sum(aa.tier for aa in char_aas.aa_list),
-        trees          = _build_trees(char_aas.aa_list),
-        profiles       = [
-            CharAAProfile(name=prof.name, trees=_build_trees(prof.aa_list))
-            for prof in char_aas.profiles
-        ],
+        character_name=char_aas.character_name,
+        total_spent=sum(aa.tier for aa in char_aas.aa_list),
+        trees=_build_trees(char_aas.aa_list),
+        profiles=[CharAAProfile(name=prof.name, trees=_build_trees(prof.aa_list)) for prof in char_aas.profiles],
     )
     aa_cache.set(cache_key, result)
     return result
@@ -244,8 +254,8 @@ class SpellEffect(BaseModel):
 
 
 class SpellEffectsResponse(BaseModel):
-    effects:       list[SpellEffect]
-    matched_tier:  int | None = None   # tier row actually found (may differ from requested)
+    effects: list[SpellEffect]
+    matched_tier: int | None = None  # tier row actually found (may differ from requested)
     requested_tier: int | None = None  # tier that was requested
 
 

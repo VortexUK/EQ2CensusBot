@@ -1,10 +1,11 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Print a guild member table to the console without needing Discord.
 
 Usage:
     python scripts/preview_guild.py "Exordium"
 """
+
 import asyncio
 import os
 import sys
@@ -15,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from census.config import SERVICE_ID, WORLD
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from census.client import CensusClient

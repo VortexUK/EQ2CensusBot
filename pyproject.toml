@@ -1,0 +1,26 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.format]
+# Black-compatible defaults; double quotes, 4-space indent
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint]
+# Only run the formatter via the pre-push hook, not the linter.
+# Linting rules can be added here later if desired.
+select = []
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+include = ["census", "web", "bot"]
+exclude = ["scripts", "data", "frontend", "image", "**/__pycache__"]
+# Third-party stubs (aiohttp, discord.py, etc.) are often missing — suppress
+# the noise so only real type errors block the push.
+reportMissingModuleSource = false
+reportMissingImports = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false

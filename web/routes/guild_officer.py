@@ -17,9 +17,7 @@ from web.db import (
 from web.routes.claim import _refresh_claim_cache
 from web.routes.guild import _officer_chars, _roster_rank_map
 
-_ADMIN_IDS: frozenset[str] = frozenset(
-    filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(","))
-)
+_ADMIN_IDS: frozenset[str] = frozenset(filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(",")))
 
 router = APIRouter(tags=["guild"])
 
@@ -28,13 +26,14 @@ router = APIRouter(tags=["guild"])
 # Models — officer claim review
 # ---------------------------------------------------------------------------
 
+
 class GuildClaimItem(BaseModel):
     id: int
     discord_name: str
     avatar: str | None = None
     character_name: str
     requested_at: int
-    is_own: bool = False   # True when this claim belongs to the requesting officer
+    is_own: bool = False  # True when this claim belongs to the requesting officer
 
 
 class RejectNoteRequest(BaseModel):
@@ -44,6 +43,7 @@ class RejectNoteRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Officer claim-review endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/guild/{guild_name}/officer-status")
 async def get_officer_status(guild_name: str, request: Request) -> dict:
@@ -71,16 +71,16 @@ async def get_guild_claims(guild_name: str, request: Request) -> list[GuildClaim
         raise HTTPException(status_code=403, detail="Officer access required")
 
     rank_map = await _roster_rank_map(guild_name)
-    pending  = await list_claims(status="pending")
+    pending = await list_claims(status="pending")
 
     return [
         GuildClaimItem(
-            id             = c["id"],
-            discord_name   = c["discord_name"],
-            avatar         = c.get("avatar"),
-            character_name = c["character_name"],
-            requested_at   = c["requested_at"],
-            is_own         = c["discord_id"] == user["id"],
+            id=c["id"],
+            discord_name=c["discord_name"],
+            avatar=c.get("avatar"),
+            character_name=c["character_name"],
+            requested_at=c["requested_at"],
+            is_own=c["discord_id"] == user["id"],
         )
         for c in pending
         if c["character_name"].lower() in rank_map
@@ -108,12 +108,12 @@ async def officer_approve_claim(guild_name: str, claim_id: int, request: Request
     claim_cache.delete(f"claims:{result['discord_id']}")
     asyncio.create_task(_refresh_claim_cache(result["discord_id"]))
     return GuildClaimItem(
-        id             = result["id"],
-        discord_name   = result["discord_name"],
-        avatar         = result.get("avatar"),
-        character_name = result["character_name"],
-        requested_at   = result["requested_at"],
-        is_own         = False,
+        id=result["id"],
+        discord_name=result["discord_name"],
+        avatar=result.get("avatar"),
+        character_name=result["character_name"],
+        requested_at=result["requested_at"],
+        is_own=False,
     )
 
 
@@ -149,6 +149,7 @@ async def officer_reject_claim(
 # Admin — user access approval
 # ---------------------------------------------------------------------------
 
+
 def _require_admin(request: Request) -> dict:
     user = request.session.get("user")
     if not user:
@@ -159,11 +160,11 @@ def _require_admin(request: Request) -> dict:
 
 
 class PendingUserItem(BaseModel):
-    discord_id:       str
-    discord_name:     str
+    discord_id: str
+    discord_name: str
     discord_username: str | None = None
-    avatar:           str | None = None
-    first_seen:       int
+    avatar: str | None = None
+    first_seen: int
 
 
 @router.get("/admin/pending-users", response_model=list[PendingUserItem])

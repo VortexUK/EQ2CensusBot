@@ -8,6 +8,7 @@ Exposed at  GET /metrics  (Prometheus text format).
 Optional token auth: set METRICS_TOKEN env var; if empty, the endpoint
 is open (fine for a private Railway service).
 """
+
 from __future__ import annotations
 
 import logging
@@ -57,11 +58,11 @@ USER_PAGE_VIEWS = Counter(
 # ── Cache metrics ─────────────────────────────────────────────────────────────
 # Labels: cache = character | guild | claim
 
-CACHE_HITS   = Counter("cache_hits_total",   "Fresh cache hits",                     ["cache"])
-CACHE_MISSES = Counter("cache_misses_total",  "Cache misses (not found or expired)",  ["cache"])
-CACHE_STALE  = Counter("cache_stale_total",   "Stale hits that fired bg refresh",     ["cache"])
-CACHE_SETS   = Counter("cache_sets_total",    "Values written into cache",            ["cache"])
-CACHE_SIZE   = Gauge("cache_size",            "Live entry count in cache",            ["cache"])
+CACHE_HITS = Counter("cache_hits_total", "Fresh cache hits", ["cache"])
+CACHE_MISSES = Counter("cache_misses_total", "Cache misses (not found or expired)", ["cache"])
+CACHE_STALE = Counter("cache_stale_total", "Stale hits that fired bg refresh", ["cache"])
+CACHE_SETS = Counter("cache_sets_total", "Values written into cache", ["cache"])
+CACHE_SIZE = Gauge("cache_size", "Live entry count in cache", ["cache"])
 
 # ── Census API metrics ────────────────────────────────────────────────────────
 # endpoint label: character | guild | item | (unknown)
@@ -97,25 +98,17 @@ class _DBCollector(Collector):
     def collect(self):  # type: ignore[override]
         from web.db import DB_PATH
 
-        g_users = GaugeMetricFamily(
-            "users_total", "Registered users by access status", labels=["status"]
-        )
-        g_claims = GaugeMetricFamily(
-            "character_claims_total", "Character claims by status", labels=["status"]
-        )
+        g_users = GaugeMetricFamily("users_total", "Registered users by access status", labels=["status"])
+        g_claims = GaugeMetricFamily("character_claims_total", "Character claims by status", labels=["status"])
 
         try:
             conn = sqlite3.connect(DB_PATH, timeout=1.0)
             for status in ("approved", "pending", "denied"):
-                row = conn.execute(
-                    "SELECT COUNT(*) FROM users WHERE access_status = ?", (status,)
-                ).fetchone()
+                row = conn.execute("SELECT COUNT(*) FROM users WHERE access_status = ?", (status,)).fetchone()
                 g_users.add_metric([status], row[0] if row else 0)
 
             for status in ("pending", "approved", "rejected", "withdrawn", "superseded"):
-                row = conn.execute(
-                    "SELECT COUNT(*) FROM character_claims WHERE status = ?", (status,)
-                ).fetchone()
+                row = conn.execute("SELECT COUNT(*) FROM character_claims WHERE status = ?", (status,)).fetchone()
                 g_claims.add_metric([status], row[0] if row else 0)
 
             conn.close()
@@ -129,6 +122,7 @@ class _DBCollector(Collector):
 # Register once — guarded so re-imports in tests don't raise DuplicateCollector
 _db_collector_registered = False
 
+
 def _register_db_collector() -> None:
     global _db_collector_registered
     if not _db_collector_registered:
@@ -139,6 +133,7 @@ def _register_db_collector() -> None:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 _CENSUS_ENDPOINT_RE = re.compile(r"/json/get/eq2/([^/?]+)")
+
 
 def census_endpoint_label(url: str) -> str:
     """Extract the Census collection name (character, guild, item …) from a URL."""
@@ -159,9 +154,11 @@ _SKIP_PREFIXES = (
 # Routes excluded from per-user page-view tracking (still counted in
 # HTTP_REQUESTS).  Add polling/background endpoints here so they don't
 # inflate individual user activity graphs.
-_USER_VIEW_SKIP = frozenset([
-    "/api/notifications",
-])
+_USER_VIEW_SKIP = frozenset(
+    [
+        "/api/notifications",
+    ]
+)
 
 
 def should_track_path(path: str) -> bool:
@@ -182,7 +179,7 @@ METRICS_TOKEN: str = os.getenv("METRICS_TOKEN", "")
 def check_metrics_auth(authorization: str | None) -> bool:
     """Return True if the request is authorised to view /metrics."""
     if not METRICS_TOKEN:
-        return True   # no token configured → open access
+        return True  # no token configured → open access
     if not authorization:
         return False
     scheme, _, token = authorization.partition(" ")

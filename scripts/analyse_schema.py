@@ -7,6 +7,7 @@ Usage:
     python scripts/analyse_schema.py           # sample 5000 random items
     python scripts/analyse_schema.py --all     # scan every row (slow on large DBs)
 """
+
 from __future__ import annotations
 import argparse
 import json
@@ -19,19 +20,61 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from census.db import DB_PATH
 
 KNOWN_FLAT = {
-    "id", "displayname", "gamelink", "description", "last_update",
-    "tier", "tierid", "type", "typeid", "itemlevel", "leveltouse", "planar_level",
-    "iconid", "maxstacksize", "maxcharges", "associatedquest", "autoquest",
-    "modifiers", "typeinfo", "effect_list", "adornmentslot_list", "adornment_list",
-    "classification_list", "slot_list", "setbonus_list", "flags",
-    "requiredskill", "setbonus_info", "unique_equipment_group", "_extended",
+    "id",
+    "displayname",
+    "gamelink",
+    "description",
+    "last_update",
+    "tier",
+    "tierid",
+    "type",
+    "typeid",
+    "itemlevel",
+    "leveltouse",
+    "planar_level",
+    "iconid",
+    "maxstacksize",
+    "maxcharges",
+    "associatedquest",
+    "autoquest",
+    "modifiers",
+    "typeinfo",
+    "effect_list",
+    "adornmentslot_list",
+    "adornment_list",
+    "classification_list",
+    "slot_list",
+    "setbonus_list",
+    "flags",
+    "requiredskill",
+    "setbonus_info",
+    "unique_equipment_group",
+    "_extended",
 }
 
 KNOWN_TI = {
-    "minarmorclass", "maxarmorclass", "mindamage", "maxdamage", "damage",
-    "damagetype", "damagetypeid", "damagerating", "delay", "wieldstyle",
-    "spellname", "tier", "spellcasttime", "spellrecasttime", "spellduration",
-    "minrange", "range", "duration", "satiation", "foodlevel", "color", "slots",
+    "minarmorclass",
+    "maxarmorclass",
+    "mindamage",
+    "maxdamage",
+    "damage",
+    "damagetype",
+    "damagetypeid",
+    "damagerating",
+    "delay",
+    "wieldstyle",
+    "spellname",
+    "tier",
+    "spellcasttime",
+    "spellrecasttime",
+    "spellduration",
+    "minrange",
+    "range",
+    "duration",
+    "satiation",
+    "foodlevel",
+    "color",
+    "slots",
     "statusreduction",
 }
 
@@ -50,9 +93,7 @@ def main(scan_all: bool) -> None:
         label = f"all {total:,}"
     else:
         limit = min(5000, total)
-        rows = conn.execute(
-            "SELECT raw_json FROM items ORDER BY RANDOM() LIMIT ?", (limit,)
-        ).fetchall()
+        rows = conn.execute("SELECT raw_json FROM items ORDER BY RANDOM() LIMIT ?", (limit,)).fetchall()
         label = f"random sample of {limit:,}"
 
     items = [json.loads(r[0]) for r in rows]

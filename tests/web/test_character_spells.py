@@ -1,4 +1,5 @@
 """Tests for the GET /api/character/{name}/spells endpoint."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -63,6 +64,7 @@ def _fake_spell_row(
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_spells_db_not_available(app):
@@ -132,8 +134,8 @@ async def test_spells_returns_data(app):
 
     char = _fake_char(spell_ids=[1001, 1002])
     spell_rows = {
-        1001: _fake_spell_row(1001, name="Wound I",      tier_name="Adept",  level=20),
-        1002: _fake_spell_row(1002, name="Lifetap I",    tier_name="Master", level=30),
+        1001: _fake_spell_row(1001, name="Wound I", tier_name="Adept", level=20),
+        1002: _fake_spell_row(1002, name="Lifetap I", tier_name="Master", level=30),
     }
 
     with (
@@ -169,7 +171,7 @@ async def test_spells_blocklist_applied(app):
     char = _fake_char(spell_ids=[2001, 2002])
     spell_rows = {
         2001: _fake_spell_row(2001, name="Fighting Chance I", tier_name="Adept", level=10),
-        2002: _fake_spell_row(2002, name="Lifetap I",         tier_name="Adept", level=20),
+        2002: _fake_spell_row(2002, name="Lifetap I", tier_name="Adept", level=20),
     }
 
     # "fighting chance" (stripped roman) is blocklisted
@@ -279,7 +281,7 @@ async def test_spells_excludes_zero_level(app):
     char = _fake_char(spell_ids=[5001, 5002])
     spell_rows = {
         5001: _fake_spell_row(5001, name="Zero Level Spell", tier_name="Adept", level=0),
-        5002: _fake_spell_row(5002, name="Normal Spell I",   tier_name="Adept", level=10),
+        5002: _fake_spell_row(5002, name="Normal Spell I", tier_name="Adept", level=10),
     }
 
     with (
@@ -308,9 +310,9 @@ async def test_spells_deduplication_keeps_highest_level(app):
 
     char = _fake_char(spell_ids=[6001, 6002, 6003])
     spell_rows = {
-        6001: _fake_spell_row(6001, name="Fireball I",   tier_name="Apprentice", level=10),
-        6002: _fake_spell_row(6002, name="Fireball II",  tier_name="Adept",      level=20),
-        6003: _fake_spell_row(6003, name="Fireball III", tier_name="Master",     level=30),
+        6001: _fake_spell_row(6001, name="Fireball I", tier_name="Apprentice", level=10),
+        6002: _fake_spell_row(6002, name="Fireball II", tier_name="Adept", level=20),
+        6003: _fake_spell_row(6003, name="Fireball III", tier_name="Master", level=30),
     }
 
     with (
@@ -339,6 +341,7 @@ async def test_spells_fetches_from_census_on_cache_miss(app):
     mock_db.exists.return_value = True
 
     from census.models import CharacterOverview
+
     mock_char_overview = CharacterOverview(
         id="999",
         name="Menludiir",
@@ -416,5 +419,6 @@ async def test_spells_response_structure(app):
 
     # tier_counts has all SPELL_TIER_ORDER keys
     from census.constants import SPELL_TIER_ORDER
+
     for tier in SPELL_TIER_ORDER:
         assert tier in data["tier_counts"]

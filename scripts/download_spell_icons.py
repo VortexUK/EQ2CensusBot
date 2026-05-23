@@ -8,6 +8,7 @@ Usage:
     python scripts/download_spell_icons.py
     python scripts/download_spell_icons.py --start 500   # resume from a specific ID
 """
+
 import argparse
 import asyncio
 import sys
@@ -15,9 +16,9 @@ from pathlib import Path
 
 import aiohttp
 
-ICONS_DIR  = Path(__file__).resolve().parent.parent / "data" / "spells" / "icons"
-ICON_BASE  = "https://u.eq2wire.com/images/spell/{id}.png"
-ICON_RANGE = range(0, 1178)   # 0 – 1177 inclusive
+ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "spells" / "icons"
+ICON_BASE = "https://u.eq2wire.com/images/spell/{id}.png"
+ICON_RANGE = range(0, 1178)  # 0 – 1177 inclusive
 
 # Limit concurrent downloads to avoid hammering the server
 _CONCURRENCY = 10

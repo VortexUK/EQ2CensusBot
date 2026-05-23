@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Print a character spell summary to the console without needing Discord.
 
@@ -7,6 +7,7 @@ Usage:
     python scripts/preview_spellcheck.py Sihtric --debug
     python scripts/preview_spellcheck.py Sihtric --details
 """
+
 import asyncio
 import os
 import sys
@@ -17,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from census.config import SERVICE_ID, WORLD
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from census.client import CensusClient
@@ -25,7 +27,7 @@ from bot.cogs.spellcheck import _TIER_ORDER, _build_details, _build_table, _uniq
 
 async def main() -> None:
     args = sys.argv[1:]
-    debug   = "--debug"   in args
+    debug = "--debug" in args
     details = "--details" in args
     name_parts = [a for a in args if not a.startswith("--")]
 

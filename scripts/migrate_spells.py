@@ -19,6 +19,7 @@ Usage:
     python scripts/migrate_spells.py
     python scripts/migrate_spells.py --db path/to/custom/spells.db
 """
+
 from __future__ import annotations
 
 import argparse
@@ -43,6 +44,7 @@ from census.spells_db import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _column_names(conn: sqlite3.Connection, table: str) -> set[str]:
     rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
     return {r[1] for r in rows}
@@ -58,7 +60,7 @@ def _already_migrated(conn: sqlite3.Connection) -> bool:
 # Migration
 # ---------------------------------------------------------------------------
 
-_BATCH = 10_000   # rows per INSERT batch
+_BATCH = 10_000  # rows per INSERT batch
 
 
 def migrate(db_path: Path) -> None:
@@ -69,7 +71,7 @@ def migrate(db_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous  = NORMAL;")
-    conn.execute("PRAGMA cache_size   = -65536;")   # 64 MB page cache
+    conn.execute("PRAGMA cache_size   = -65536;")  # 64 MB page cache
 
     if _already_migrated(conn):
         print("Schema is already up to date — nothing to do.")
@@ -77,7 +79,7 @@ def migrate(db_path: Path) -> None:
         return
 
     old_cols = _column_names(conn, "spells")
-    has_raw  = "raw_json" in old_cols
+    has_raw = "raw_json" in old_cols
 
     total = conn.execute("SELECT COUNT(*) FROM spells").fetchone()[0]
     print(f"DB path:      {db_path}")
@@ -96,13 +98,26 @@ def migrate(db_path: Path) -> None:
 
     # We need the old column set to build a safe SELECT
     old_select = [
-        "id", "name",
+        "id",
+        "name",
         "name_lower" if "name_lower" in old_cols else "lower(name) AS name_lower",
-        "tier", "tier_name", "type", "typeid", "level", "given_by", "crc",
+        "tier",
+        "tier_name",
+        "type",
+        "typeid",
+        "level",
+        "given_by",
+        "crc",
         "beneficial",
-        "cast_secs", "recast_secs", "recovery_secs",
-        "target_type", "aoe_radius", "max_targets",
-        "description", "icon_id", "icon_backdrop",
+        "cast_secs",
+        "recast_secs",
+        "recovery_secs",
+        "target_type",
+        "aoe_radius",
+        "max_targets",
+        "description",
+        "icon_id",
+        "icon_backdrop",
         "last_update",
     ]
     select_sql = "SELECT " + ", ".join(old_select) + " FROM spells ORDER BY id"
@@ -125,9 +140,9 @@ def migrate(db_path: Path) -> None:
         )
     """
 
-    t0      = time.monotonic()
+    t0 = time.monotonic()
     written = 0
-    batch   = []
+    batch = []
 
     cursor = conn.execute(select_sql)
     while True:
@@ -136,33 +151,71 @@ def migrate(db_path: Path) -> None:
             break
 
         for r in chunk:
-            (sid, name, name_lower,
-             tier, tier_name, typ, typeid, level, given_by, crc, beneficial,
-             cast_secs, recast_secs, recovery_secs,
-             target_type, aoe_radius, max_targets,
-             description, icon_id, icon_backdrop, last_update) = r
+            (
+                sid,
+                name,
+                name_lower,
+                tier,
+                tier_name,
+                typ,
+                typeid,
+                level,
+                given_by,
+                crc,
+                beneficial,
+                cast_secs,
+                recast_secs,
+                recovery_secs,
+                target_type,
+                aoe_radius,
+                max_targets,
+                description,
+                icon_id,
+                icon_backdrop,
+                last_update,
+            ) = r
 
-            name       = name or ""
+            name = name or ""
             name_lower = (name_lower or name).lower()
-            base       = strip_roman(name)
+            base = strip_roman(name)
             base_lower = base.lower()
 
             # Build a minimal dict for the eligibility check
             eligibility = {
-                "level":    level,
-                "type":     typ,
+                "level": level,
+                "type": typ,
                 "given_by": given_by,
             }
             psc = _passes_spellcheck(eligibility)
 
-            batch.append((
-                sid, name, name_lower, base, base_lower,
-                tier, tier_name, typ, typeid, level, given_by, crc, beneficial,
-                psc,
-                cast_secs, recast_secs, recovery_secs,
-                target_type, aoe_radius, max_targets,
-                description, icon_id, icon_backdrop, last_update,
-            ))
+            batch.append(
+                (
+                    sid,
+                    name,
+                    name_lower,
+                    base,
+                    base_lower,
+                    tier,
+                    tier_name,
+                    typ,
+                    typeid,
+                    level,
+                    given_by,
+                    crc,
+                    beneficial,
+                    psc,
+                    cast_secs,
+                    recast_secs,
+                    recovery_secs,
+                    target_type,
+                    aoe_radius,
+                    max_targets,
+                    description,
+                    icon_id,
+                    icon_backdrop,
+                    last_update,
+                )
+            )
 
         conn.executemany(insert_sql, batch)
         conn.commit()
@@ -209,9 +262,6 @@ def migrate(db_path: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Migrate spells.db to the new schema.")
-    parser.add_argument(
-        "--db", type=Path, default=DB_PATH,
-        help=f"Path to spells.db (default: {DB_PATH})"
-    )
+    parser.add_argument("--db", type=Path, default=DB_PATH, help=f"Path to spells.db (default: {DB_PATH})")
     args = parser.parse_args()
     migrate(args.db)

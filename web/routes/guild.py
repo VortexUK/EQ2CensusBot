@@ -26,7 +26,7 @@ from web.db import DB_PATH as _USERS_DB_PATH, get_active_claims
 
 router = APIRouter(tags=["guild"])
 
-_OFFICER_RANKS = frozenset({0, 1})   # rank_ids that count as "officer"
+_OFFICER_RANKS = frozenset({0, 1})  # rank_ids that count as "officer"
 
 # Slots whose adornments are excluded from the adorn check (same as character page)
 _SKIP_SLOTS = frozenset({"ammo", "event slot", "mount adornment", "mount armor"})
@@ -39,13 +39,14 @@ _COLOUR_ORDER = ["White", "Yellow", "Red", "Blue", "Turquoise", "Green", "Orange
 # Models — roster
 # ---------------------------------------------------------------------------
 
+
 class GuildInfoResponse(BaseModel):
     name: str
     world: str
     dateformed: int | None = None
     description: str | None = None
-    alignment: int | str | None = None   # Census returns an int (0/1/2) or None
-    type: int | str | None = None        # Census may return an int here too
+    alignment: int | str | None = None  # Census returns an int (0/1/2) or None
+    type: int | str | None = None  # Census may return an int here too
     level: int | None = None
     members: int | None = None
     accounts: int | None = None
@@ -62,8 +63,8 @@ class GuildMemberResponse(BaseModel):
     deity: str | None = None
     rank: str | None = None
     rank_id: int | None = None
-    guild_status: int | None = None   # status points contributed to the guild
-    played_time: int | None = None    # total /played seconds
+    guild_status: int | None = None  # status points contributed to the guild
+    played_time: int | None = None  # total /played seconds
 
 
 class GuildResponse(BaseModel):
@@ -76,11 +77,12 @@ class GuildResponse(BaseModel):
 # Models — spell check
 # ---------------------------------------------------------------------------
 
+
 class MemberSpellTiers(BaseModel):
     name: str
     rank: str | None = None
     rank_id: int | None = None
-    tiers: dict[str, int]              # tier_name → count  (all _TIER_ORDER keys present)
+    tiers: dict[str, int]  # tier_name → count  (all _TIER_ORDER keys present)
     total: int
     spell_names: dict[str, list[str]] = {}  # tier_name → spell names, sorted by level desc
 
@@ -88,13 +90,14 @@ class MemberSpellTiers(BaseModel):
 class GuildSpellCheckResponse(BaseModel):
     guild_name: str
     world: str
-    tiers: list[str]        # ordered list of tier columns that have any data
+    tiers: list[str]  # ordered list of tier columns that have any data
     members: list[MemberSpellTiers]
 
 
 # ---------------------------------------------------------------------------
 # Models — adorn check
 # ---------------------------------------------------------------------------
+
 
 class AdornColorStats(BaseModel):
     filled: int
@@ -112,13 +115,14 @@ class MemberAdornStats(BaseModel):
 class GuildAdornCheckResponse(BaseModel):
     guild_name: str
     world: str
-    colors: list[str]       # ordered colour columns that appear in the data
+    colors: list[str]  # ordered colour columns that appear in the data
     members: list[MemberAdornStats]
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _int(v) -> int | None:
     try:
@@ -170,11 +174,9 @@ async def _fetch_and_cache_guild(
             return None
 
         guild_data, overviews, guild_info = full
-        world_lower  = _WORLD.lower()
-        guild_lower  = guild_name.lower()
-        member_rank: dict[str, tuple] = {
-            m.name: (m.rank, m.rank_id) for m in guild_data.members
-        }
+        world_lower = _WORLD.lower()
+        guild_lower = guild_name.lower()
+        member_rank: dict[str, tuple] = {m.name: (m.rank, m.rank_id) for m in guild_data.members}
 
         # Info
         guild_cache.set(
@@ -195,11 +197,15 @@ async def _fetch_and_cache_guild(
         # Adorn + spell derived caches
         _prewarm_adorn_cache(
             f"adorns:{guild_lower}:{world_lower}",
-            guild_data.name, overviews, member_rank,
+            guild_data.name,
+            overviews,
+            member_rank,
         )
         _prewarm_spell_cache(
             f"spells:{guild_lower}:{world_lower}",
-            guild_data.name, overviews, member_rank,
+            guild_data.name,
+            overviews,
+            member_rank,
         )
 
         # Roster (sorted by rank then level desc)
@@ -207,20 +213,29 @@ async def _fetch_and_cache_guild(
             guild_data.members,
             key=lambda m: (m.rank_id if m.rank_id is not None else 9999, -(m.level or 0)),
         )
-        guild_cache.set(f"roster:{guild_lower}:{world_lower}", GuildResponse(
-            name    = guild_data.name,
-            world   = guild_data.world,
-            members = [
-                GuildMemberResponse(
-                    name=m.name, level=m.level, cls=m.cls,
-                    ts_class=m.ts_class, ts_level=m.ts_level,
-                    aa_level=m.aa_level, deity=m.deity,
-                    rank=m.rank, rank_id=m.rank_id,
-                    guild_status=m.guild_status, played_time=m.played_time,
-                )
-                for m in members_sorted
-            ],
-        ))
+        guild_cache.set(
+            f"roster:{guild_lower}:{world_lower}",
+            GuildResponse(
+                name=guild_data.name,
+                world=guild_data.world,
+                members=[
+                    GuildMemberResponse(
+                        name=m.name,
+                        level=m.level,
+                        cls=m.cls,
+                        ts_class=m.ts_class,
+                        ts_level=m.ts_level,
+                        aa_level=m.aa_level,
+                        deity=m.deity,
+                        rank=m.rank,
+                        rank_id=m.rank_id,
+                        guild_status=m.guild_status,
+                        played_time=m.played_time,
+                    )
+                    for m in members_sorted
+                ],
+            ),
+        )
         return full
 
     task: asyncio.Task = asyncio.create_task(_do_fetch())
@@ -263,15 +278,13 @@ async def _officer_chars(discord_id: str, guild_name: str) -> set[str]:
     if not approved:
         return set()
     rank_map = await _roster_rank_map(guild_name)
-    return {
-        name for name in approved
-        if rank_map.get(name) in _OFFICER_RANKS
-    }
+    return {name for name in approved if rank_map.get(name) in _OFFICER_RANKS}
 
 
 # ---------------------------------------------------------------------------
 # Cache pre-warming helpers
 # ---------------------------------------------------------------------------
+
 
 def _prewarm_adorn_cache(
     cache_key: str,
@@ -284,7 +297,7 @@ def _prewarm_adorn_cache(
     out_members: list[MemberAdornStats] = []
 
     for ov in overviews:
-        colour_stats: dict[str, list[int]] = {}   # colour → [filled, total]
+        colour_stats: dict[str, list[int]] = {}  # colour → [filled, total]
         missing_slots: dict[str, list[str]] = {}  # colour → slot names with empty adorn
         for eq_slot in ov.equipment:
             # Capitalise the slot name for display (e.g. "ring" → "Ring")
@@ -307,28 +320,34 @@ def _prewarm_adorn_cache(
             continue
 
         rank_label, rank_id = member_rank.get(ov.name, (None, None))
-        out_members.append(MemberAdornStats(
-            name    = ov.name,
-            rank    = rank_label,
-            rank_id = rank_id,
-            adorns  = {c: AdornColorStats(filled=v[0], total=v[1]) for c, v in colour_stats.items()},
-            missing = missing_slots,
-        ))
+        out_members.append(
+            MemberAdornStats(
+                name=ov.name,
+                rank=rank_label,
+                rank_id=rank_id,
+                adorns={c: AdornColorStats(filled=v[0], total=v[1]) for c, v in colour_stats.items()},
+                missing=missing_slots,
+            )
+        )
 
-    out_members.sort(key=lambda m: (
-        member_rank.get(m.name, (None, 9999))[1]
-        if member_rank.get(m.name, (None, None))[1] is not None else 9999,
-        m.name,
-    ))
+    out_members.sort(
+        key=lambda m: (
+            member_rank.get(m.name, (None, 9999))[1] if member_rank.get(m.name, (None, None))[1] is not None else 9999,
+            m.name,
+        )
+    )
     ordered_colours = [c for c in _COLOUR_ORDER if c in all_colours]
     ordered_colours += sorted(c for c in all_colours if c not in _COLOUR_ORDER)
 
-    guild_cache.set(cache_key, GuildAdornCheckResponse(
-        guild_name = guild_name,
-        world      = _WORLD,
-        colors     = ordered_colours,
-        members    = out_members,
-    ))
+    guild_cache.set(
+        cache_key,
+        GuildAdornCheckResponse(
+            guild_name=guild_name,
+            world=_WORLD,
+            colors=ordered_colours,
+            members=out_members,
+        ),
+    )
 
 
 def _build_spell_check_from_overviews(
@@ -376,12 +395,14 @@ def _build_spell_check_from_overviews(
                 continue
             if _strip_roman(row.get("name") or "").lower() in blocklist:
                 continue
-            entries.append(SpellEntry(
-                name       = row["name"],
-                tier       = row["tier_name"] or "Unknown",
-                spell_type = row["type"] or "",
-                level      = row["level"] or 0,
-            ))
+            entries.append(
+                SpellEntry(
+                    name=row["name"],
+                    tier=row["tier_name"] or "Unknown",
+                    spell_type=row["type"] or "",
+                    level=row["level"] or 0,
+                )
+            )
 
         entries = _unique_highest(entries)
         count = Counter(e.tier for e in entries)
@@ -392,31 +413,33 @@ def _build_spell_check_from_overviews(
         for e in entries:
             names_by_tier.setdefault(e.tier, []).append((e.level, e.name))
         spell_names = {
-            tier: [n for _, n in sorted(pairs, key=lambda x: -x[0])]
-            for tier, pairs in names_by_tier.items()
+            tier: [n for _, n in sorted(pairs, key=lambda x: -x[0])] for tier, pairs in names_by_tier.items()
         }
 
         rank_label, rank_id = member_rank.get(ov.name, (None, None))
-        out_members.append(MemberSpellTiers(
-            name        = ov.name,
-            rank        = rank_label,
-            rank_id     = rank_id,
-            tiers       = {t: count.get(t, 0) for t in _TIER_ORDER},
-            total       = sum(count.values()),
-            spell_names = spell_names,
-        ))
+        out_members.append(
+            MemberSpellTiers(
+                name=ov.name,
+                rank=rank_label,
+                rank_id=rank_id,
+                tiers={t: count.get(t, 0) for t in _TIER_ORDER},
+                total=sum(count.values()),
+                spell_names=spell_names,
+            )
+        )
 
-    out_members.sort(key=lambda m: (
-        member_rank.get(m.name, (None, 9999))[1]
-        if member_rank.get(m.name, (None, None))[1] is not None else 9999,
-        m.name,
-    ))
+    out_members.sort(
+        key=lambda m: (
+            member_rank.get(m.name, (None, 9999))[1] if member_rank.get(m.name, (None, None))[1] is not None else 9999,
+            m.name,
+        )
+    )
 
     return GuildSpellCheckResponse(
-        guild_name = guild_name,
-        world      = guild_world,
-        tiers      = [t for t in _TIER_ORDER if t in tiers_with_data],
-        members    = out_members,
+        guild_name=guild_name,
+        world=guild_world,
+        tiers=[t for t in _TIER_ORDER if t in tiers_with_data],
+        members=out_members,
     )
 
 
@@ -448,12 +471,14 @@ def _overview_to_char_response(ov: CharacterOverview):  # → CharacterResponse
     two stay in sync (including spell_ids).
     """
     from web.routes.character import _build_char_response  # local to avoid circular import
+
     return _build_char_response(ov)
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/guild/{guild_name}/info", response_model=GuildInfoResponse)
 async def get_guild_info(guild_name: str) -> GuildInfoResponse:
@@ -550,10 +575,10 @@ async def guild_adorn_check(guild_name: str) -> GuildAdornCheckResponse:
     return result
 
 
-
 # ---------------------------------------------------------------------------
 # Guild name search (local DB)
 # ---------------------------------------------------------------------------
+
 
 class GuildNameResult(BaseModel):
     name: str

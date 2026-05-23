@@ -76,9 +76,7 @@ async def test_logout(app):
 @pytest.mark.asyncio
 async def test_login_redirects_to_discord(app):
     """Login endpoint should redirect to discord.com."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test", follow_redirects=False
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", follow_redirects=False) as client:
         response = await client.get("/api/auth/login")
     assert response.status_code in (302, 307)
     assert "discord.com" in response.headers["location"]

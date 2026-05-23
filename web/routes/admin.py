@@ -20,14 +20,13 @@ from web.routes.claim import _refresh_claim_cache
 
 router = APIRouter(tags=["admin"])
 
-_ADMIN_IDS: frozenset[str] = frozenset(
-    filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(","))
-)
+_ADMIN_IDS: frozenset[str] = frozenset(filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(",")))
 
 
 # ---------------------------------------------------------------------------
 # Auth helper
 # ---------------------------------------------------------------------------
+
 
 def _require_admin(request: Request) -> dict:
     user = request.session.get("user")
@@ -42,10 +41,11 @@ def _require_admin(request: Request) -> dict:
 # Models
 # ---------------------------------------------------------------------------
 
+
 class ClaimDetail(BaseModel):
     id: int
     discord_id: str
-    discord_name: str | None = None   # NULL when user row missing (LEFT JOIN)
+    discord_name: str | None = None  # NULL when user row missing (LEFT JOIN)
     discord_username: str | None = None
     avatar: str | None = None
     character_name: str
@@ -61,19 +61,20 @@ class RejectRequest(BaseModel):
 
 
 class UserItem(BaseModel):
-    discord_id:       str
-    discord_name:     str | None = None
+    discord_id: str
+    discord_name: str | None = None
     discord_username: str | None = None
-    avatar:           str | None = None
-    first_seen:       int
-    last_seen:        int
-    access_status:    str
-    claim_count:      int = 0
+    avatar: str | None = None
+    first_seen: int
+    last_seen: int
+    access_status: str
+    claim_count: int = 0
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/admin/claims", response_model=list[ClaimDetail])
 async def list_all_claims(

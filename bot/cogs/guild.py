@@ -1,4 +1,5 @@
 import io
+from collections.abc import Callable
 
 import discord
 from discord import app_commands
@@ -35,13 +36,13 @@ def _build_table(data: GuildData) -> str:
             return f"{ts} ({m.ts_level})"
         return ts or "—"
 
-    cols: list[tuple[str, callable, int]] = [
-        ("Rank",       lambda m: m.rank or "—",                              16),
-        ("Name",       lambda m: m.name,                                     22),
-        ("Class",      _cls,                                                 24),
-        ("AA",         lambda m: str(m.aa_level) if m.aa_level is not None else "—", 4),
-        ("Tradeskill", _ts,                                                  24),
-        ("Deity",      lambda m: m.deity or "—",                             16),
+    cols: list[tuple[str, Callable[[GuildMember], str], int]] = [
+        ("Rank", lambda m: m.rank or "—", 16),
+        ("Name", lambda m: m.name, 22),
+        ("Class", _cls, 24),
+        ("AA", lambda m: str(m.aa_level) if m.aa_level is not None else "—", 4),
+        ("Tradeskill", _ts, 24),
+        ("Deity", lambda m: m.deity or "—", 16),
     ]
 
     # Compute actual column widths (header vs data)
@@ -54,7 +55,7 @@ def _build_table(data: GuildData) -> str:
         return _COL_SEP.join(v.ljust(widths[i]) for i, v in enumerate(values))
 
     header_row = _row([h for h, _, _ in cols])
-    separator  = _COL_SEP.join("─" * w for w in widths)
+    separator = _COL_SEP.join("─" * w for w in widths)
 
     lines = [
         f"{data.name}  —  {data.world}  ({len(members)} members with data)",

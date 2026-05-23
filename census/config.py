@@ -8,18 +8,20 @@ so there is a single place to change defaults and environment variable names.
 load_dotenv() is called here so that scripts don't need to worry about import
 order — importing this module is sufficient to get .env values.
 """
+
 from __future__ import annotations
 
 import os
 
 try:
     from dotenv import load_dotenv
-    load_dotenv()          # no-op if env vars already set; safe to call multiple times
-except ImportError:
-    pass                   # dotenv not installed (e.g. Railway production) — fine
 
-SERVICE_ID: str       = os.getenv("CENSUS_SERVICE_ID", "example")
-WORLD: str            = os.getenv("EQ2_WORLD", "Varsoon")
+    load_dotenv()  # no-op if env vars already set; safe to call multiple times
+except ImportError:
+    pass  # dotenv not installed (e.g. Railway production) — fine
+
+SERVICE_ID: str = os.getenv("CENSUS_SERVICE_ID", "example")
+WORLD: str = os.getenv("EQ2_WORLD", "Varsoon")
 SERVER_MAX_LEVEL: int = int(os.getenv("SERVER_MAX_LEVEL", "50"))
 
 # ISO-8601 UTC datetime for the server launch countdown.
@@ -36,6 +38,4 @@ CORS_ORIGINS: list[str] = [
 # Comma-separated Discord guild IDs that receive instant slash-command syncs.
 # The bot also does a global sync, but guild syncs propagate immediately.
 _raw_sync_ids = os.getenv("DISCORD_SYNC_GUILD_IDS", "648253204760625160,955890381847928892,1502314690041221260")
-DISCORD_SYNC_GUILD_IDS: list[int] = [
-    int(x.strip()) for x in _raw_sync_ids.split(",") if x.strip().isdigit()
-]
+DISCORD_SYNC_GUILD_IDS: list[int] = [int(x.strip()) for x in _raw_sync_ids.split(",") if x.strip().isdigit()]

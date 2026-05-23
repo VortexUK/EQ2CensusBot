@@ -1,4 +1,5 @@
 import sqlite3
+
 conn = sqlite3.connect("data/items/items.db")
 
 print("=== All distinct stat names in item_stats ===")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 
@@ -24,27 +25,23 @@ router = APIRouter(tags=["item"])
 # display names that ItemData.classes carries (title-case, from Census API).
 _ARCHETYPE_DECOMP: list[tuple[frozenset, str]] = [
     # ── Full archetypes ──────────────────────────────────────────────────────
-    (frozenset(["Guardian","Berserker","Monk","Bruiser","Shadowknight","Paladin"]),
-     "All Fighters"),
-    (frozenset(["Templar","Inquisitor","Fury","Warden","Mystic","Defiler","Channeler"]),
-     "All Priests"),
-    (frozenset(["Troubador","Dirge","Assassin","Ranger","Swashbuckler","Brigand","Beastlord"]),
-     "All Scouts"),
-    (frozenset(["Coercer","Illusionist","Conjuror","Necromancer","Wizard","Warlock"]),
-     "All Mages"),
+    (frozenset(["Guardian", "Berserker", "Monk", "Bruiser", "Shadowknight", "Paladin"]), "All Fighters"),
+    (frozenset(["Templar", "Inquisitor", "Fury", "Warden", "Mystic", "Defiler", "Channeler"]), "All Priests"),
+    (frozenset(["Troubador", "Dirge", "Assassin", "Ranger", "Swashbuckler", "Brigand", "Beastlord"]), "All Scouts"),
+    (frozenset(["Coercer", "Illusionist", "Conjuror", "Necromancer", "Wizard", "Warlock"]), "All Mages"),
     # ── Sub-archetypes ───────────────────────────────────────────────────────
-    (frozenset(["Guardian",     "Berserker"]),      "All Warriors"),
-    (frozenset(["Shadowknight", "Paladin"]),         "All Crusaders"),
-    (frozenset(["Monk",         "Bruiser"]),         "All Brawlers"),
-    (frozenset(["Templar",      "Inquisitor"]),      "All Clerics"),
-    (frozenset(["Fury",         "Warden"]),          "All Druids"),
-    (frozenset(["Mystic",       "Defiler"]),         "All Shamans"),
-    (frozenset(["Troubador",    "Dirge"]),           "All Bards"),
-    (frozenset(["Assassin",     "Ranger"]),          "All Predators"),
-    (frozenset(["Swashbuckler", "Brigand"]),         "All Rogues"),
-    (frozenset(["Coercer",      "Illusionist"]),     "All Enchanters"),
-    (frozenset(["Conjuror",     "Necromancer"]),     "All Summoners"),
-    (frozenset(["Wizard",       "Warlock"]),         "All Sorcerers"),
+    (frozenset(["Guardian", "Berserker"]), "All Warriors"),
+    (frozenset(["Shadowknight", "Paladin"]), "All Crusaders"),
+    (frozenset(["Monk", "Bruiser"]), "All Brawlers"),
+    (frozenset(["Templar", "Inquisitor"]), "All Clerics"),
+    (frozenset(["Fury", "Warden"]), "All Druids"),
+    (frozenset(["Mystic", "Defiler"]), "All Shamans"),
+    (frozenset(["Troubador", "Dirge"]), "All Bards"),
+    (frozenset(["Assassin", "Ranger"]), "All Predators"),
+    (frozenset(["Swashbuckler", "Brigand"]), "All Rogues"),
+    (frozenset(["Coercer", "Illusionist"]), "All Enchanters"),
+    (frozenset(["Conjuror", "Necromancer"]), "All Summoners"),
+    (frozenset(["Wizard", "Warlock"]), "All Sorcerers"),
 ]
 
 
@@ -55,28 +52,35 @@ _ARCHETYPE_DECOMP: list[tuple[frozenset, str]] = [
 # Canonical tier display names, ordered highest → lowest quality.
 # DB stores tiers in ALL-CAPS; _TIER_DB_MAP converts them for display.
 _CANONICAL_TIERS = [
-    "Celestial", "Ethereal", "Mythical", "Fabled",
-    "Legendary", "Treasured", "Uncommon",
-    "Mastercrafted", "Handcrafted", "Common",
+    "Celestial",
+    "Ethereal",
+    "Mythical",
+    "Fabled",
+    "Legendary",
+    "Treasured",
+    "Uncommon",
+    "Mastercrafted",
+    "Handcrafted",
+    "Common",
 ]
-_TIER_ORDER_IDX  = {t: i for i, t in enumerate(_CANONICAL_TIERS)}
-_TIER_DB_MAP     = {t.upper(): t for t in _CANONICAL_TIERS}  # e.g. "FABLED" → "Fabled"
+_TIER_ORDER_IDX = {t: i for i, t in enumerate(_CANONICAL_TIERS)}
+_TIER_DB_MAP = {t.upper(): t for t in _CANONICAL_TIERS}  # e.g. "FABLED" → "Fabled"
 
 # typeinfo_name values to exclude from the item-type filter
 _ITEM_TYPE_SKIP = frozenset(["spellscroll", "recipescroll", "coinpurse", "equipmentinfuser"])
 
 # typeinfo_name raw → display name (renames + merges)
 _ITEM_TYPE_RENAME = {
-    "houseitem":     "House Item",
-    "itemcontainer": "Container",   # merged with 'container'
-    "itempattern":   "Pattern",
+    "houseitem": "House Item",
+    "itemcontainer": "Container",  # merged with 'container'
+    "itempattern": "Pattern",
 }
 
 # display name → list of raw DB typeinfo_name values (for search)
 _ITEM_TYPE_DB_MAP: dict[str, list[str]] = {
     "Container": ["container", "itemcontainer"],
     "House Item": ["houseitem"],
-    "Pattern":   ["itempattern", "pattern"],
+    "Pattern": ["itempattern", "pattern"],
 }
 
 # Item types that are identified via classification_list rather than typeinfo_name
@@ -86,15 +90,24 @@ _ITEM_TYPE_CLASSIFICATION: dict[str, str] = {
 }
 
 # Slot names to suppress (mount/horse equipment, not applicable on TLE)
-_SLOT_SKIP = frozenset([
-    "Barding", "Breeching", "Hackamore", "Reins",
-    "Saddle", "Shoes", "Stirrup", "Textures",
-])
+_SLOT_SKIP = frozenset(
+    [
+        "Barding",
+        "Breeching",
+        "Hackamore",
+        "Reins",
+        "Saddle",
+        "Shoes",
+        "Stirrup",
+        "Textures",
+    ]
+)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _format_classes(classes: list[str]) -> str:
     """Collapse a class list into a human-readable label (mirrors image/tooltip.py)."""
@@ -125,6 +138,7 @@ def _format_classes(classes: list[str]) -> str:
 # ---------------------------------------------------------------------------
 # Response models
 # ---------------------------------------------------------------------------
+
 
 class ItemStatResponse(BaseModel):
     display_name: str
@@ -179,6 +193,7 @@ class ItemResponse(BaseModel):
 # Item search models
 # ---------------------------------------------------------------------------
 
+
 class ItemSearchResult(BaseModel):
     id: int
     name: str
@@ -188,8 +203,8 @@ class ItemSearchResult(BaseModel):
     level: int | None = None
     class_label: str | None = None
     icon_id: int | None = None
-    stats: list[str] = []          # canonical stat names present on this item
-    stat_values: dict[str, float] = {}   # stat_name → value for each has_stat filter
+    stats: list[str] = []  # canonical stat names present on this item
+    stat_values: dict[str, float] = {}  # stat_name → value for each has_stat filter
 
 
 class ItemSearchResponse(BaseModel):
@@ -202,6 +217,7 @@ class ItemSearchResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Item filter options (distinct values for dropdowns)
 # ---------------------------------------------------------------------------
+
 
 class ItemFilterOptions(BaseModel):
     tiers: list[str]
@@ -235,19 +251,20 @@ async def get_item_filters() -> ItemFilterOptions:
 # Item search endpoint
 # ---------------------------------------------------------------------------
 
+
 @router.get("/items/search", response_model=ItemSearchResponse)
 async def search_items(
-    name:       str | None            = None,
-    tier:       str | None            = None,   # exact tier_display match
-    slot:       str | None            = None,   # exact slot match
-    item_type:  str | None            = None,   # typeinfo_name LIKE
-    class_name: str | None            = None,   # lowercase class key in classes_json
-    min_level:  int | None            = None,
-    max_level:  int | None            = None,
-    stat_filter: list[str]            = Query(default=[]),  # "StatName" or "StatName:gte:50" or "StatName:lte:50"
-    sort_by:    str                   = "name",  # name | level | tier
-    sort_dir:   str                   = "asc",
-    page:       int                   = 1,
+    name: str | None = None,
+    tier: str | None = None,  # exact tier_display match
+    slot: str | None = None,  # exact slot match
+    item_type: str | None = None,  # typeinfo_name LIKE
+    class_name: str | None = None,  # lowercase class key in classes_json
+    min_level: int | None = None,
+    max_level: int | None = None,
+    stat_filter: list[str] = Query(default=[]),  # "StatName" or "StatName:gte:50" or "StatName:lte:50"
+    sort_by: str = "name",  # name | level | tier
+    sort_dir: str = "asc",
+    page: int = 1,
 ) -> ItemSearchResponse:
     """
     Search the local items DB with optional filters.
@@ -279,8 +296,7 @@ async def search_items(
     has_stat = [s for s, _, __ in parsed_stats]  # plain name list for compat
 
     # Require at least one meaningful filter
-    if not any([name, tier, slot, item_type, class_name,
-                min_level is not None, max_level is not None, parsed_stats]):
+    if not any([name, tier, slot, item_type, class_name, min_level is not None, max_level is not None, parsed_stats]):
         return ItemSearchResponse(results=[], total=0, page=1, per_page=per_page)
 
     if not DB_PATH.exists():
@@ -325,7 +341,7 @@ async def search_items(
             if raw_types:
                 placeholders = ",".join("?" * len(raw_types))
                 conditions.append(f"LOWER(i.typeinfo_name) IN ({placeholders})")
-                where_params.extend(raw_types)      # already lowercase
+                where_params.extend(raw_types)  # already lowercase
             else:
                 # General case: compare lowercase (DB values are all-lowercase)
                 conditions.append("LOWER(i.typeinfo_name) = ?")
@@ -361,8 +377,7 @@ async def search_items(
         if threshold is not None:
             op_sql = ">=" if op == "gte" else "<="
             stat_joins += (
-                f" JOIN item_stats {alias} ON i.id = {alias}.item_id"
-                f" AND {alias}.stat = ? AND {alias}.value {op_sql} ?"
+                f" JOIN item_stats {alias} ON i.id = {alias}.item_id AND {alias}.stat = ? AND {alias}.value {op_sql} ?"
             )
             join_params.extend([stat, threshold])
         else:
@@ -398,18 +413,14 @@ async def search_items(
         db.row_factory = aiosqlite.Row
 
         # Total count  (use subquery to avoid DISTINCT issues with LEFT JOINs)
-        count_sql = (
-            f"SELECT COUNT(DISTINCT i.id) FROM items i{stat_joins} WHERE {where}"
-        )
+        count_sql = f"SELECT COUNT(DISTINCT i.id) FROM items i{stat_joins} WHERE {where}"
         async with db.execute(count_sql, params) as cur:
-            total = (await cur.fetchone())[0]
+            count_row = await cur.fetchone()
+            total = count_row[0] if count_row else 0
 
         # SELECT the value for each has_stat filter — INNER JOINs guarantee
         # non-NULL values, so no COALESCE needed here.
-        stat_val_selects = "".join(
-            f", {stat_alias[stat]}.value AS _sv_{stat_alias[stat]}"
-            for stat in has_stat
-        )
+        stat_val_selects = "".join(f", {stat_alias[stat]}.value AS _sv_{stat_alias[stat]}" for stat in has_stat)
         select_sql = (
             f"SELECT i.id, i.displayname, i.tier_display, i.slot, "
             f"i.typeinfo_name, i.level_to_use, i.class_label, i.icon_id"
@@ -439,18 +450,20 @@ async def search_items(
                 if row[f"_sv_{stat_alias[stat]}"] is not None
             }
 
-            results.append(ItemSearchResult(
-                id          = item_id,
-                name        = row["displayname"],
-                tier        = row["tier_display"],
-                slot        = row["slot"],
-                item_type   = row["typeinfo_name"],
-                level       = row["level_to_use"],
-                class_label = row["class_label"],
-                icon_id     = row["icon_id"],
-                stat_values = stat_vals,
-                stats       = stat_names,
-            ))
+            results.append(
+                ItemSearchResult(
+                    id=item_id,
+                    name=row["displayname"],
+                    tier=row["tier_display"],
+                    slot=row["slot"],
+                    item_type=row["typeinfo_name"],
+                    level=row["level_to_use"],
+                    class_label=row["class_label"],
+                    icon_id=row["icon_id"],
+                    stat_values=stat_vals,
+                    stats=stat_names,
+                )
+            )
 
     return ItemSearchResponse(
         results=results,
@@ -505,10 +518,7 @@ async def get_spell_scroll(name: str, tier: str) -> SpellScrollResult:
         scroll_name = f"{name} ({tier})".lower()
         async with aiosqlite.connect(DB_PATH) as db:
             async with db.execute(
-                "SELECT id FROM items"
-                " WHERE displayname_lower = ?"
-                "   AND LOWER(typeinfo_name) = 'spellscroll'"
-                " LIMIT 1",
+                "SELECT id FROM items WHERE displayname_lower = ?   AND LOWER(typeinfo_name) = 'spellscroll' LIMIT 1",
                 (scroll_name,),
             ) as cur:
                 row = await cur.fetchone()

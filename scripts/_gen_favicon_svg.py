@@ -1,6 +1,8 @@
 """Embed the L&L favicon.ico as a base64 PNG inside an SVG wrapper."""
+
 import base64, io, sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from PIL import Image
 
@@ -18,7 +20,7 @@ svg = (
     'viewBox="0 0 256 256">\n'
     f'  <image width="256" height="256" '
     f'xlink:href="data:image/png;base64,{b64}"/>\n'
-    '</svg>\n'
+    "</svg>\n"
 )
 
 svg_path.write_text(svg, encoding="utf-8")

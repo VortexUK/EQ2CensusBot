@@ -24,6 +24,7 @@ router = APIRouter(tags=["guild"])
 # Models — item watch
 # ---------------------------------------------------------------------------
 
+
 class ItemWatchEntry(BaseModel):
     id: int
     character_name: str
@@ -35,14 +36,16 @@ class ItemWatchEntry(BaseModel):
     last_seen_at: int | None = None
     last_checked_at: int | None = None
 
+
 class AddItemWatchRequest(BaseModel):
     character_name: str
-    item_name: str       # resolved server-side to item_id + canonical display name
+    item_name: str  # resolved server-side to item_id + canonical display name
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 async def _check_watch(watch: dict) -> None:
     """
@@ -52,7 +55,7 @@ async def _check_watch(watch: dict) -> None:
     name_key = f"{watch['character_name'].lower()}:{_WORLD.lower()}"
     cached, _ = character_cache.get_stale(name_key)
     if cached is None:
-        return   # no data available yet — skip, will check later
+        return  # no data available yet — skip, will check later
     item_id_str = str(watch["item_id"])
     seen = any(s.item_id == item_id_str for s in cached.equipment)
     await update_item_watch_check(watch["id"], seen)
@@ -71,6 +74,7 @@ async def _check_all_watches(guild_name: str) -> None:
 # ---------------------------------------------------------------------------
 # Item watch endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/guild/{guild_name}/item-watch", response_model=list[ItemWatchEntry])
 async def get_item_watches(guild_name: str, request: Request) -> list[ItemWatchEntry]:
@@ -140,7 +144,7 @@ async def add_item_watch_entry(
             detail=f"Item '{item_name}' not found. Check the spelling.",
         )
 
-    item_id   = int(raw["id"])
+    item_id = int(raw["id"])
     item_name = raw.get("displayname") or item_name
 
     # Canonical character name from roster (correct capitalisation)
@@ -159,8 +163,8 @@ async def add_item_watch_entry(
     # Use the officer's primary in-game character name as the attribution,
     # falling back to their Discord display name if no primary is set.
     officer_claims = await get_active_claims(user["id"])
-    primary_claim  = next((c for c in officer_claims["approved"] if c.get("is_primary")), None)
-    added_by_name  = (
+    primary_claim = next((c for c in officer_claims["approved"] if c.get("is_primary")), None)
+    added_by_name = (
         primary_claim["character_name"]
         if primary_claim
         else (user.get("global_name") or user.get("username", "Unknown"))
@@ -168,12 +172,12 @@ async def add_item_watch_entry(
 
     try:
         row = await add_item_watch(
-            guild_name     = guild_name,
-            character_name = canon_name,
-            item_id        = item_id,
-            item_name      = item_name,
-            added_by       = user["id"],
-            added_by_name  = added_by_name,
+            guild_name=guild_name,
+            character_name=canon_name,
+            item_id=item_id,
+            item_name=item_name,
+            added_by=user["id"],
+            added_by_name=added_by_name,
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))

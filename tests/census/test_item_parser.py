@@ -1,4 +1,5 @@
 """Tests for census.item_parser — helper functions and parse_item smoke test."""
+
 from __future__ import annotations
 
 import pytest
@@ -16,6 +17,7 @@ from census.item_parser import (
 # ---------------------------------------------------------------------------
 # _armor_type
 # ---------------------------------------------------------------------------
+
 
 class TestArmorType:
     def test_returns_knowledgedesc_when_present(self):
@@ -61,6 +63,7 @@ class TestArmorType:
 # _slot_type
 # ---------------------------------------------------------------------------
 
+
 class TestSlotType:
     def test_top_level_slot_list_takes_priority(self):
         slot_list = [{"name": "Head"}]
@@ -88,6 +91,7 @@ class TestSlotType:
 # ---------------------------------------------------------------------------
 # _fmt_duration
 # ---------------------------------------------------------------------------
+
 
 class TestFmtDuration:
     def test_seconds_only(self):
@@ -122,6 +126,7 @@ class TestFmtDuration:
 # parse_flags
 # ---------------------------------------------------------------------------
 
+
 class TestParseFlags:
     def test_single_flag_set(self):
         flags = {"notrade": {"value": 1}}
@@ -130,9 +135,9 @@ class TestParseFlags:
 
     def test_multiple_flags(self):
         flags = {
-            "heirloom":   {"value": 1},
-            "lore":       {"value": 1},
-            "notrade":    {"value": 0},
+            "heirloom": {"value": 1},
+            "lore": {"value": 1},
+            "notrade": {"value": 0},
         }
         result = parse_flags(flags)
         assert "HEIRLOOM" in result
@@ -165,6 +170,7 @@ class TestParseFlags:
 # ---------------------------------------------------------------------------
 # parse_set_bonuses
 # ---------------------------------------------------------------------------
+
 
 class TestParseSetBonuses:
     def test_empty_list(self):
@@ -223,7 +229,7 @@ class TestParseSetBonuses:
                     "requireditems": 2,
                     "effect": "Effect",
                     "descriptiontag_1": "Real line",
-                    "descriptiontag_2": "  ",   # whitespace only → stripped and skipped
+                    "descriptiontag_2": "  ",  # whitespace only → stripped and skipped
                     "descriptiontag_3": "Another line",
                 }
             ]
@@ -237,6 +243,7 @@ class TestParseSetBonuses:
 # parse_item — smoke test
 # ---------------------------------------------------------------------------
 
+
 class TestParseItem:
     def _minimal_item(self):
         return {
@@ -246,9 +253,7 @@ class TestParseItem:
             "iconid": "1234",
             "typeinfo": {
                 "knowledgedesc": "Cloth Armor",
-                "classes": {
-                    "wizard": {"displayname": "Wizard", "level": 90}
-                },
+                "classes": {"wizard": {"displayname": "Wizard", "level": 90}},
             },
             "slot_list": [{"name": "Head"}],
             "flags": {},
@@ -261,6 +266,7 @@ class TestParseItem:
 
     def test_returns_item_data(self):
         from census.models import ItemData
+
         item = parse_item(self._minimal_item())
         assert isinstance(item, ItemData)
 

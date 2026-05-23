@@ -1,5 +1,6 @@
 import sqlite3, json, sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from census.db import DB_PATH
 
@@ -12,15 +13,11 @@ rows = conn.execute(
 print("Tier column matches:", rows or "none")
 
 # Items with artifact in the name
-name_hits = conn.execute(
-    "SELECT COUNT(*) FROM items WHERE displayname_lower LIKE '%artifact%'"
-).fetchone()[0]
+name_hits = conn.execute("SELECT COUNT(*) FROM items WHERE displayname_lower LIKE '%artifact%'").fetchone()[0]
 print(f"Items with 'artifact' in name: {name_hits:,}")
 
 # Any raw_json mentioning artifact as a tier value
-sample = conn.execute(
-    "SELECT raw_json FROM items WHERE raw_json LIKE '%rtifact%' LIMIT 10"
-).fetchall()
+sample = conn.execute("SELECT raw_json FROM items WHERE raw_json LIKE '%rtifact%' LIMIT 10").fetchall()
 print(f"raw_json hits: {len(sample)}")
 for (raw,) in sample:
     d = json.loads(raw)

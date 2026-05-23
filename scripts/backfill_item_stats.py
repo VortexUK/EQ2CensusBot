@@ -9,6 +9,7 @@ you want to rebuild the stats index from scratch.
 
 --rebuild  : DROP and recreate item_stats before filling (default: incremental)
 """
+
 from __future__ import annotations
 
 import argparse

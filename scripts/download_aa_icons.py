@@ -9,6 +9,7 @@ Files that already exist are skipped.
 Usage:
     python scripts/download_aa_icons.py
 """
+
 import asyncio
 import json
 import sys

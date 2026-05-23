@@ -10,6 +10,7 @@ Designed to be polled cheaply every 60 s from the frontend.
 All heavy lookups go through the existing caches so Census is never
 hit on every poll.
 """
+
 from __future__ import annotations
 
 import os
@@ -23,17 +24,15 @@ from web.config import WORLD as _WORLD
 from web.db import get_active_claims, list_claims, list_pending_users
 from web.routes.guild import _OFFICER_RANKS, _roster_rank_map
 
-_ADMIN_IDS: frozenset[str] = frozenset(
-    filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(","))
-)
+_ADMIN_IDS: frozenset[str] = frozenset(filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(",")))
 
 router = APIRouter(tags=["notifications"])
 
 
 class NotificationsResponse(BaseModel):
     pending_claims: int = 0
-    pending_users:  int = 0
-    officer_guild:  str | None = None   # guild page to navigate to for claim review
+    pending_users: int = 0
+    officer_guild: str | None = None  # guild page to navigate to for claim review
 
 
 @router.get("/notifications", response_model=NotificationsResponse)
@@ -50,11 +49,11 @@ async def get_notifications(request: Request) -> NotificationsResponse:
     if not user:
         return NotificationsResponse()
 
-    is_admin   = user["id"] in _ADMIN_IDS
-    disc_id    = user["id"]
+    is_admin = user["id"] in _ADMIN_IDS
+    disc_id = user["id"]
 
     pending_claims = 0
-    pending_users  = 0
+    pending_users = 0
     officer_guild: str | None = None
 
     # ── Admin: count all users awaiting access ───────────────────────────────
@@ -62,7 +61,7 @@ async def get_notifications(request: Request) -> NotificationsResponse:
         pending_users = len(await list_pending_users())
 
     # ── Officer (or admin who is also an officer): find guilds via cache ─────
-    claims_data    = await get_active_claims(disc_id)
+    claims_data = await get_active_claims(disc_id)
     approved_chars = [c["character_name"] for c in claims_data["approved"]]
 
     if approved_chars:
@@ -76,7 +75,7 @@ async def get_notifications(request: Request) -> NotificationsResponse:
                 guilds_seen.add(cached.guild_name)
 
         if guilds_seen:
-            all_pending  = await list_claims(status="pending")
+            all_pending = await list_claims(status="pending")
             counted_ids: set[int] = set()
 
             for guild_name in guilds_seen:
@@ -89,13 +88,13 @@ async def get_notifications(request: Request) -> NotificationsResponse:
                     continue
 
                 new_ids = {
-                    c["id"] for c in all_pending
-                    if c["id"] not in counted_ids
-                    and c["character_name"].lower() in rank_map
+                    c["id"]
+                    for c in all_pending
+                    if c["id"] not in counted_ids and c["character_name"].lower() in rank_map
                 }
                 if new_ids:
                     counted_ids.update(new_ids)
-                    officer_guild = guild_name      # last guild with claims wins
+                    officer_guild = guild_name  # last guild with claims wins
 
             pending_claims = len(counted_ids)
 

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Download all items from the Census API into data/items/items.db.
 
@@ -10,6 +10,7 @@ Usage:
     python scripts/download_items.py --limit 1000     # stop after N items (testing)
     python scripts/download_items.py --restart        # ignore saved offset, start from 0
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,16 +25,18 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from census.config import SERVICE_ID, WORLD
+
 load_dotenv(override=True)
 
 from census.db import DB_PATH, get_meta, init_db, item_count, set_meta, upsert_items
 from census.client import BASE_URL
-PAGE_SIZE    = 100      # items per request
-CONCURRENCY  = 1        # parallel requests (sequential — most reliable against Census timeouts)
-WRITE_EVERY  = 1000     # upsert to DB after this many items accumulated
-REPORT_EVERY = 1000     # print progress every N items written
-RETRY_MAX    = 5
-RETRY_SLEEP  = 15.0     # seconds before first retry (doubles each attempt)
+
+PAGE_SIZE = 100  # items per request
+CONCURRENCY = 1  # parallel requests (sequential — most reliable against Census timeouts)
+WRITE_EVERY = 1000  # upsert to DB after this many items accumulated
+REPORT_EVERY = 1000  # print progress every N items written
+RETRY_MAX = 5
+RETRY_SLEEP = 15.0  # seconds before first retry (doubles each attempt)
 
 
 async def _fetch_page(
@@ -47,16 +50,14 @@ async def _fetch_page(
       list[dict]  — success (may be shorter than PAGE_SIZE at end of data)
       None        — all retries exhausted; caller should skip and continue
     """
-    url    = f"{BASE_URL}/s:{service_id}/json/get/eq2/item/"
+    url = f"{BASE_URL}/s:{service_id}/json/get/eq2/item/"
     params = {"c:start": start, "c:limit": PAGE_SIZE, "c:sort": "id:-1"}
-    delay  = RETRY_SLEEP
+    delay = RETRY_SLEEP
 
     async with sem:
         for attempt in range(1, RETRY_MAX + 1):
             try:
-                async with session.get(
-                    url, params=params, timeout=aiohttp.ClientTimeout(total=120)
-                ) as resp:
+                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=120)) as resp:
                     if resp.status == 429:
                         print(f"  [429] start={start}, sleeping {delay:.0f}s…")
                         await asyncio.sleep(delay)
@@ -74,7 +75,9 @@ async def _fetch_page(
                     except Exception:
                         # Empty or malformed body — treat like a transient error
                         if attempt < RETRY_MAX:
-                            print(f"  [retry {attempt}/{RETRY_MAX}] start={start}: bad JSON body, sleeping {delay:.0f}s…")
+                            print(
+                                f"  [retry {attempt}/{RETRY_MAX}] start={start}: bad JSON body, sleeping {delay:.0f}s…"
+                            )
                             await asyncio.sleep(delay)
                             delay *= 2
                             continue
@@ -88,7 +91,9 @@ async def _fetch_page(
                     return data.get("item_list") or []
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 if attempt < RETRY_MAX:
-                    print(f"  [retry {attempt}/{RETRY_MAX}] start={start}: {type(exc).__name__}, sleeping {delay:.0f}s…")
+                    print(
+                        f"  [retry {attempt}/{RETRY_MAX}] start={start}: {type(exc).__name__}, sleeping {delay:.0f}s…"
+                    )
                     await asyncio.sleep(delay)
                     delay *= 2
                 else:
@@ -138,8 +143,8 @@ async def main(restart: bool, item_limit: int | None) -> None:
         else:
             print("Starting from offset 0.")
 
-    sem       = asyncio.Semaphore(CONCURRENCY)
-    headers   = {
+    sem = asyncio.Semaphore(CONCURRENCY)
+    headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -155,7 +160,7 @@ async def main(restart: bool, item_limit: int | None) -> None:
         else:
             print("Could not get total count — will stop when pages run dry.")
 
-        written     = 0
+        written = 0
         buffer: list[dict] = []
         reached_end = False
 
@@ -165,14 +170,12 @@ async def main(restart: bool, item_limit: int | None) -> None:
 
             batch_starts = [offset + i * PAGE_SIZE for i in range(CONCURRENCY)]
 
-            pages = await asyncio.gather(
-                *[_fetch_page(session, sem, service_id, s) for s in batch_starts]
-            )
+            pages = await asyncio.gather(*[_fetch_page(session, sem, service_id, s) for s in batch_starts])
 
             # Separate successful pages from failed ones
             # None = error (skip but don't treat as end), list = success
             successful = [(s, p) for s, p in zip(batch_starts, pages) if p is not None]
-            failed     = [s for s, p in zip(batch_starts, pages) if p is None]
+            failed = [s for s, p in zip(batch_starts, pages) if p is None]
 
             if failed:
                 print(f"  [warn] {len(failed)} page(s) failed and will be skipped: offsets {failed}")
@@ -194,8 +197,10 @@ async def main(restart: bool, item_limit: int | None) -> None:
                     if min(empty_starts) >= total - 2 * CONCURRENCY * PAGE_SIZE:
                         reached_end = True
                     else:
-                        print(f"  [warn] empty page(s) at offset(s) {empty_starts} "
-                              f"but total={total:,} — treating as transient gap, continuing")
+                        print(
+                            f"  [warn] empty page(s) at offset(s) {empty_starts} "
+                            f"but total={total:,} — treating as transient gap, continuing"
+                        )
                 else:
                     # No total available — require every successful page to be empty
                     if len(empty_starts) == len(successful):
@@ -240,7 +245,7 @@ async def main(restart: bool, item_limit: int | None) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit",   type=int,  default=None,  help="Max items to download this run (for testing)")
-    parser.add_argument("--restart", action="store_true",       help="Ignore saved offset and start from 0")
+    parser.add_argument("--limit", type=int, default=None, help="Max items to download this run (for testing)")
+    parser.add_argument("--restart", action="store_true", help="Ignore saved offset and start from 0")
     args = parser.parse_args()
     asyncio.run(main(args.restart, args.limit))

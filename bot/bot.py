@@ -15,6 +15,7 @@ class EQ2Bot(commands.Bot):
         from bot.cogs.spellcheck import SpellcheckCog
         from bot.cogs.aacheck import AaCheckCog
         from bot.cogs.fun import FunCog
+
         await self.add_cog(ItemsCog(self))
         await self.add_cog(GuildCog(self))
         await self.add_cog(SpellcheckCog(self))
@@ -28,4 +29,5 @@ class EQ2Bot(commands.Bot):
         print("[Bot] Slash commands synced.")
 
     async def on_ready(self) -> None:
+        assert self.user is not None
         print(f"[Bot] Logged in as {self.user} (ID: {self.user.id})")

@@ -5,13 +5,13 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-DATA_DIR    = Path(__file__).resolve().parent.parent / "data" / "AAs"
-ICONS_DIR   = DATA_DIR / "icons"
-BG_PATH     = DATA_DIR / "background.jpg"
-BG_CLASS    = DATA_DIR / "bg_class.png"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "AAs"
+ICONS_DIR = DATA_DIR / "icons"
+BG_PATH = DATA_DIR / "background.jpg"
+BG_CLASS = DATA_DIR / "bg_class.png"
 BG_SUBCLASS = DATA_DIR / "bg_subclass.png"
-BG_SHADOWS  = DATA_DIR / "bg_shadows.png"
-BG_SPRITE   = DATA_DIR / "bg_sprite.png"
+BG_SHADOWS = DATA_DIR / "bg_shadows.png"
+BG_SPRITE = DATA_DIR / "bg_sprite.png"
 
 # Backdrop sprite sheet: 7 large (44×44) sprites in order, separated by 1px gaps
 # IDs map to x-offsets in the sheet
@@ -20,10 +20,10 @@ _BACKDROP_NATIVE = 44  # sprite size at native scale
 _backdrop_sheet: Image.Image | None = None
 
 # Badge sprites (small 24×24 in the same sheet, after the large ones)
-_BADGE_YELLOW_X = 340   # not maxed
-_BADGE_GREEN_X  = 365   # maxed
-_BADGE_NATIVE   = 24
-BADGE_SIZE      = 32    # output pixels
+_BADGE_YELLOW_X = 340  # not maxed
+_BADGE_GREEN_X = 365  # maxed
+_BADGE_NATIVE = 24
+BADGE_SIZE = 32  # output pixels
 
 
 def _get_backdrop(backdrop_id: int) -> Image.Image | None:
@@ -43,18 +43,19 @@ def _get_backdrop(backdrop_id: int) -> Image.Image | None:
     result.paste(sprite, (0, 0), mask)
     return result
 
+
 # Native grid calibration (640×480 base)
 # x columns for xcoord 1,4,7,10,13
 _COL_X = {1: 86, 4: 206, 7: 327, 10: 447, 13: 567}
 # y rows for ycoord 0-6
-_BASE_Y  = 42
-_ROW_H   = (442 - 42) / 6          # ≈ 66.67 px per row at native scale
-_ROW_Y   = {y: round(_BASE_Y + y * _ROW_H) for y in range(7)}
+_BASE_Y = 42
+_ROW_H = (442 - 42) / 6  # ≈ 66.67 px per row at native scale
+_ROW_Y = {y: round(_BASE_Y + y * _ROW_H) for y in range(7)}
 
-SCALE      = 2                       # render at 2× then no downscale (keep crisp)
-NODE_R     = 44                      # node radius in output pixels
-IMG_W      = 640 * SCALE
-IMG_H      = 480 * SCALE
+SCALE = 2  # render at 2× then no downscale (keep crisp)
+NODE_R = 44  # node radius in output pixels
+IMG_W = 640 * SCALE
+IMG_H = 480 * SCALE
 
 
 def _px(xcoord: int, ycoord: int) -> tuple[int, int]:
@@ -89,8 +90,7 @@ def _circle_icon(icon_id: int, backdrop_id: int = -1) -> Image.Image | None:
     # Outer dark ring
     draw.ellipse((0, 0, d - 1, d - 1), outline=(20, 12, 4, 220), width=bw + 1)
     # Gold ring
-    draw.ellipse((bw, bw, d - bw - 1, d - bw - 1),
-                 outline=(210, 175, 80, 255), width=bw)
+    draw.ellipse((bw, bw, d - bw - 1, d - bw - 1), outline=(210, 175, 80, 255), width=bw)
 
     return result
 
@@ -99,8 +99,7 @@ def _placeholder_node() -> Image.Image:
     d = NODE_R * 2
     img = Image.new("RGBA", (d, d), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    draw.ellipse((0, 0, d - 1, d - 1), fill=(50, 50, 60, 200),
-                 outline=(180, 150, 60, 255), width=4)
+    draw.ellipse((0, 0, d - 1, d - 1), fill=(50, 50, 60, 200), outline=(180, 150, 60, 255), width=4)
     return img
 
 
@@ -160,7 +159,7 @@ def render_aa_tree(tree_id: int, aa_data: dict[int, int] | None = None) -> Image
     tree_path = DATA_DIR / "trees" / f"{tree_id}.json"
     with tree_path.open(encoding="utf-8") as f:
         data = json.load(f)
-    tree  = data["alternateadvancement_list"][0]
+    tree = data["alternateadvancement_list"][0]
     nodes = tree["alternateadvancementnode_list"]
 
     bg = Image.open(BG_PATH).convert("RGBA").resize((IMG_W, IMG_H), Image.LANCZOS)
@@ -186,11 +185,11 @@ def render_aa_tree(tree_id: int, aa_data: dict[int, int] | None = None) -> Image
 #   connector centres at native-scale x=234, 311, 389 correspond to xcoords 15, 21, 27
 #   step = (389-234)/(27-15) = 155/12 ≈ 12.917 px per xcoord unit at native scale
 # Y mapping shares the same top/bottom anchors as the class tree (y=0 → 42px, y=19 → 442px)
-_SUB_ANCHOR_X  = 234         # native-scale pixel x for xcoord 15
-_SUB_ANCHOR_XC = 15          # reference xcoord
-_SUB_STEP_X    = 155 / 12    # native-scale px per xcoord unit
-_SUB_BASE_Y    = 42          # native-scale pixel y for ycoord 0
-_SUB_STEP_Y    = (442 - 42) / 19  # native-scale px per ycoord unit (~21.05)
+_SUB_ANCHOR_X = 234  # native-scale pixel x for xcoord 15
+_SUB_ANCHOR_XC = 15  # reference xcoord
+_SUB_STEP_X = 155 / 12  # native-scale px per xcoord unit
+_SUB_BASE_Y = 42  # native-scale pixel y for ycoord 0
+_SUB_STEP_Y = (442 - 42) / 19  # native-scale px per ycoord unit (~21.05)
 
 
 def _sub_px(xcoord: int, ycoord: int) -> tuple[int, int]:
@@ -203,7 +202,7 @@ def render_subclass_tree(tree_id: int, aa_data: dict[int, int] | None = None) ->
     tree_path = DATA_DIR / "trees" / f"{tree_id}.json"
     with tree_path.open(encoding="utf-8") as f:
         data = json.load(f)
-    tree  = data["alternateadvancement_list"][0]
+    tree = data["alternateadvancement_list"][0]
     nodes = tree["alternateadvancementnode_list"]
 
     bg = Image.open(BG_PATH).convert("RGBA").resize((IMG_W, IMG_H), Image.LANCZOS)
@@ -223,9 +222,9 @@ def render_subclass_tree(tree_id: int, aa_data: dict[int, int] | None = None) ->
 #   ycoord → native_y:  1→44, 6→151, 11→258, 16→362
 _SHADOWS_NATIVE_W = 632
 _SHADOWS_NATIVE_H = 472
-_SHADOWS_ANCHOR_X = 40      # native x for xcoord 0
-_SHADOWS_STEP_X   = 13      # native px per xcoord unit
-_SHADOWS_ROW_Y    = {1: 59, 6: 166, 11: 273, 16: 377}  # native y per ycoord
+_SHADOWS_ANCHOR_X = 40  # native x for xcoord 0
+_SHADOWS_STEP_X = 13  # native px per xcoord unit
+_SHADOWS_ROW_Y = {1: 59, 6: 166, 11: 273, 16: 377}  # native y per ycoord
 
 
 def _shadows_px(xcoord: int, ycoord: int) -> tuple[int, int]:
@@ -242,8 +241,8 @@ def _draw_nodes(
 ) -> None:
     for node in nodes:
         px, py = px_fn(node["xcoord"], node["ycoord"])
-        icon        = node.get("icon") or {}
-        icon_id     = icon.get("id", -1)
+        icon = node.get("icon") or {}
+        icon_id = icon.get("id", -1)
         backdrop_id = int(icon.get("backdrop", -1))
         node_img = _circle_icon(int(icon_id), backdrop_id) if icon_id and icon_id > 0 else _placeholder_node()
         if node_img:
@@ -266,9 +265,9 @@ def render_shadows_tree(tree_id: int, aa_data: dict[int, int] | None = None) -> 
         data = json.load(f)
     nodes = data["alternateadvancement_list"][0]["alternateadvancementnode_list"]
 
-    bg      = Image.open(BG_PATH).convert("RGBA").resize((IMG_W, IMG_H), Image.LANCZOS)
+    bg = Image.open(BG_PATH).convert("RGBA").resize((IMG_W, IMG_H), Image.LANCZOS)
     bg_shad = Image.open(BG_SHADOWS).convert("RGBA").resize((IMG_W, IMG_H), Image.LANCZOS)
-    canvas  = Image.alpha_composite(bg, bg_shad)
+    canvas = Image.alpha_composite(bg, bg_shad)
 
     _draw_nodes(canvas, nodes, _shadows_px, aa_data)
     return canvas.convert("RGB")
@@ -278,10 +277,10 @@ def render_shadows_tree(tree_id: int, aa_data: dict[int, int] | None = None) -> 
 # Tradeskill tree renderer  (no overlay — dark background only)
 # ---------------------------------------------------------------------------
 # xcoords 2–41 (same range as heroic), ycoords 1, 8, 15  (3 rows)
-_TS_BASE_X  = 65   # native x for xcoord 2  (shared with heroic)
-_TS_STEP_X  = 13   # native px per xcoord unit
-_TS_BASE_Y  = 60   # native y for ycoord 1
-_TS_STEP_Y  = 21   # native px per ycoord unit
+_TS_BASE_X = 65  # native x for xcoord 2  (shared with heroic)
+_TS_STEP_X = 13  # native px per xcoord unit
+_TS_BASE_Y = 60  # native y for ycoord 1
+_TS_STEP_Y = 21  # native px per ycoord unit
 
 
 def _ts_px(xcoord: int, ycoord: int) -> tuple[int, int]:
@@ -296,7 +295,7 @@ def render_tradeskill_tree(tree_id: int, aa_data: dict[int, int] | None = None) 
         data = json.load(f)
     nodes = data["alternateadvancement_list"][0]["alternateadvancementnode_list"]
 
-    bg     = Image.open(BG_PATH).convert("RGBA").resize((IMG_W, IMG_H), Image.LANCZOS)
+    bg = Image.open(BG_PATH).convert("RGBA").resize((IMG_W, IMG_H), Image.LANCZOS)
     canvas = bg.copy()
 
     _draw_nodes(canvas, nodes, _ts_px, aa_data)
@@ -308,10 +307,10 @@ def render_tradeskill_tree(tree_id: int, aa_data: dict[int, int] | None = None) 
 # ---------------------------------------------------------------------------
 # xcoords 2–41, ycoords 1–16.  Calibrated against example image layout.
 # pixel = base + (coord - min_coord) * step   (native 640×480 space)
-_HEROIC_BASE_X  = 65    # native x for xcoord 2
-_HEROIC_STEP_X  = 13    # native px per xcoord unit
-_HEROIC_BASE_Y  = 50    # native y for ycoord 1
-_HEROIC_STEP_Y  = 22    # native px per ycoord unit
+_HEROIC_BASE_X = 65  # native x for xcoord 2
+_HEROIC_STEP_X = 13  # native px per xcoord unit
+_HEROIC_BASE_Y = 50  # native y for ycoord 1
+_HEROIC_STEP_Y = 22  # native px per ycoord unit
 
 
 def _heroic_px(xcoord: int, ycoord: int) -> tuple[int, int]:
@@ -326,7 +325,7 @@ def render_heroic_tree(tree_id: int, aa_data: dict[int, int] | None = None) -> I
         data = json.load(f)
     nodes = data["alternateadvancement_list"][0]["alternateadvancementnode_list"]
 
-    bg     = Image.open(BG_PATH).convert("RGBA").resize((IMG_W, IMG_H), Image.LANCZOS)
+    bg = Image.open(BG_PATH).convert("RGBA").resize((IMG_W, IMG_H), Image.LANCZOS)
     canvas = bg.copy()
 
     _draw_nodes(canvas, nodes, _heroic_px, aa_data)
@@ -337,19 +336,19 @@ def render_heroic_tree(tree_id: int, aa_data: dict[int, int] | None = None) -> I
 # Unified entry point — picks renderer based on detected tree type
 # ---------------------------------------------------------------------------
 _RENDERERS = {
-    "class":              render_aa_tree,
-    "subclass":           render_subclass_tree,
+    "class": render_aa_tree,
+    "subclass": render_subclass_tree,
     # remaining types share the subclass coordinate system until their own
     # backgrounds/layouts are calibrated; fall back to subclass renderer
-    "shadows":            render_shadows_tree,
-    "heroic":             render_heroic_tree,
-    "tradeskill":         render_tradeskill_tree,
+    "shadows": render_shadows_tree,
+    "heroic": render_heroic_tree,
+    "tradeskill": render_tradeskill_tree,
     "tradeskill_general": render_subclass_tree,
-    "warder":             render_subclass_tree,
-    "prestige":           render_subclass_tree,
-    "dragon":             render_subclass_tree,
-    "reign_of_shadows":   render_subclass_tree,
-    "far_seas":           render_subclass_tree,
+    "warder": render_subclass_tree,
+    "prestige": render_subclass_tree,
+    "dragon": render_subclass_tree,
+    "reign_of_shadows": render_subclass_tree,
+    "far_seas": render_subclass_tree,
 }
 
 

@@ -10,21 +10,22 @@ _ITEM_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "items" / "i
 
 # JSON flag key → display label (order = display order in tooltip)
 _FLAG_LABELS: dict[str, str] = {
-    "heirloom":   "HEIRLOOM",
+    "heirloom": "HEIRLOOM",
     "lore-equip": "LORE-EQUIP",
-    "lore":       "LORE",
-    "attunable":  "ATTUNEABLE",
-    "notrade":    "NO-TRADE",
-    "nozone":     "NO-ZONE",
-    "novalue":    "NO-VALUE",
-    "prestige":   "PRESTIGE",
-    "relic":      "RELIC",
+    "lore": "LORE",
+    "attunable": "ATTUNEABLE",
+    "notrade": "NO-TRADE",
+    "nozone": "NO-ZONE",
+    "novalue": "NO-VALUE",
+    "prestige": "PRESTIGE",
+    "relic": "RELIC",
 }
 
 
 # ------------------------------------------------------------------
 # Low-level helpers (duplicated from client.py to avoid circular import)
 # ------------------------------------------------------------------
+
 
 def _int(value: Any) -> Optional[int]:
     if value is None:
@@ -46,6 +47,7 @@ def _str(value: Any) -> str:
 # Item-specific helpers
 # ------------------------------------------------------------------
 
+
 def _load_item_icon(icon_id: str) -> Optional[bytes]:
     path = _ITEM_ICONS_DIR / f"{icon_id}.png"
     return path.read_bytes() if path.exists() else None
@@ -56,7 +58,7 @@ def _armor_type(typeinfo: dict) -> str:
     if knowledgedesc and knowledgedesc != "Magic Affinity":
         return knowledgedesc
     # Fall back to building a label from typeinfo color + name (e.g. "Temporary Adornment")
-    name  = typeinfo.get("name", "").replace("_", " ").title()
+    name = typeinfo.get("name", "").replace("_", " ").title()
     color = typeinfo.get("color", "").replace("_", " ").title()
     if color and name:
         return f"{color} {name}"
@@ -86,9 +88,10 @@ def _fmt_duration(seconds: float) -> str:
 # Public parsing functions
 # ------------------------------------------------------------------
 
+
 def parse_item(item: dict) -> ItemData:
-    typeinfo   = item.get("typeinfo") or {}
-    slot_list  = item.get("slot_list") or []
+    typeinfo = item.get("typeinfo") or {}
+    slot_list = item.get("slot_list") or []
 
     # Classes: typeinfo.classes is a dict keyed by internal class name
     classes_dict = typeinfo.get("classes") or {}
@@ -100,37 +103,37 @@ def parse_item(item: dict) -> ItemData:
     # Level comes from the first class entry; fall back to leveltouse
     first_class = next(iter(classes_dict.values()), None)
     class_level = _int(first_class.get("level")) if isinstance(first_class, dict) else None
-    item_level  = class_level or _int(item.get("leveltouse"))
+    item_level = class_level or _int(item.get("leveltouse"))
 
     return ItemData(
-        id          = str(item.get("id", "")),
-        name        = item.get("displayname", "Unknown Item"),
-        quality     = str(item.get("tier", "")).lower(),      # "FABLED" → "fabled"
-        description = _str(item.get("description")),
-        icon_id     = str(item["iconid"]) if item.get("iconid") else None,
-        icon_bytes  = _load_item_icon(str(item["iconid"])) if item.get("iconid") else None,
-        armor_type  = _armor_type(typeinfo),
-        mitigation  = _int(typeinfo.get("maxarmorclass")),
-        slot_type   = _slot_type(slot_list, typeinfo),
-        item_level  = item_level,
-        required_level = _int(item.get("leveltouse")),
-        classes     = classes,
-        stats       = parse_stats(item.get("modifiers") or {}),
-        effects     = parse_effects(
-                          item.get("effect_list") or [],
-                          item.get("adornment_list") or [],
-                      ),
-        adornment_slots = [
+        id=str(item.get("id", "")),
+        name=item.get("displayname", "Unknown Item"),
+        quality=str(item.get("tier", "")).lower(),  # "FABLED" → "fabled"
+        description=_str(item.get("description")),
+        icon_id=str(item["iconid"]) if item.get("iconid") else None,
+        icon_bytes=_load_item_icon(str(item["iconid"])) if item.get("iconid") else None,
+        armor_type=_armor_type(typeinfo),
+        mitigation=_int(typeinfo.get("maxarmorclass")),
+        slot_type=_slot_type(slot_list, typeinfo),
+        item_level=item_level,
+        required_level=_int(item.get("leveltouse")),
+        classes=classes,
+        stats=parse_stats(item.get("modifiers") or {}),
+        effects=parse_effects(
+            item.get("effect_list") or [],
+            item.get("adornment_list") or [],
+        ),
+        adornment_slots=[
             s["color"].capitalize()
             for s in (item.get("adornmentslot_list") or [])
             if isinstance(s, dict) and s.get("color")
         ],
-        flags           = parse_flags(item.get("flags") or {}),
-        game_link       = item.get("gamelink"),
-        container_slots = _int(typeinfo.get("slots")),
-        extra_info      = parse_extra_info(item, typeinfo),
-        set_name        = parse_set_name(item),
-        set_bonuses     = parse_set_bonuses(item),
+        flags=parse_flags(item.get("flags") or {}),
+        game_link=item.get("gamelink"),
+        container_slots=_int(typeinfo.get("slots")),
+        extra_info=parse_extra_info(item, typeinfo),
+        set_name=parse_set_name(item),
+        set_bonuses=parse_set_bonuses(item),
     )
 
 
@@ -140,7 +143,7 @@ def parse_stats(modifiers: dict) -> list[ItemStat]:
     for tag, mod in modifiers.items():
         if not isinstance(mod, dict):
             continue
-        key     = tag.lower()
+        key = tag.lower()
         mapping = STAT_MAP.get(key)
         if mapping:
             display_name, group = mapping
@@ -156,21 +159,20 @@ def parse_stats(modifiers: dict) -> list[ItemStat]:
         if display_name in seen_display_names:
             continue
         seen_display_names.add(display_name)
-        stats.append(ItemStat(
-            name         = key,
-            display_name = display_name,
-            value        = float(mod.get("value", 0)),
-            stat_group   = group,
-        ))
+        stats.append(
+            ItemStat(
+                name=key,
+                display_name=display_name,
+                value=float(mod.get("value", 0)),
+                stat_group=group,
+            )
+        )
     return stats
 
 
 def parse_effects(effect_list: list, adornment_list: list) -> list[ItemEffect]:
     # Spell/effect names come from adornment_list
-    adornment_names: list[str] = [
-        a["name"] for a in adornment_list
-        if isinstance(a, dict) and a.get("name")
-    ]
+    adornment_names: list[str] = [a["name"] for a in adornment_list if isinstance(a, dict) and a.get("name")]
 
     # Group flat effect_list into (trigger, [bullet lines]) blocks.
     # indentation=0 → trigger line ("When Equipped:")
@@ -179,7 +181,7 @@ def parse_effects(effect_list: list, adornment_list: list) -> list[ItemEffect]:
     current: Optional[dict] = None
     for eff in effect_list:
         indent = int(eff.get("indentation", 0))
-        desc   = _str(eff.get("description")) or ""
+        desc = _str(eff.get("description")) or ""
         if indent == 0:
             if current is not None:
                 groups.append(current)
@@ -200,7 +202,7 @@ def parse_effects(effect_list: list, adornment_list: list) -> list[ItemEffect]:
 
 def parse_extra_info(item: dict, typeinfo: dict) -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = []
-    seen_labels: set[str] = set()   # deduplicate — first non-null value wins
+    seen_labels: set[str] = set()  # deduplicate — first non-null value wins
 
     for field, label, fmt in ITEM_DISPLAY:
         if label in seen_labels:
@@ -281,7 +283,7 @@ def parse_set_bonuses(item: dict) -> list[SetBonusEntry]:
             continue
         effect = (bonus.get("effect") or "").strip()
         if not effect:
-            continue   # skip empty/placeholder tiers
+            continue  # skip empty/placeholder tiers
         lines: list[str] = []
         i = 1
         while True:
@@ -291,10 +293,12 @@ def parse_set_bonuses(item: dict) -> list[SetBonusEntry]:
             if str(tag).strip():
                 lines.append(str(tag).strip())
             i += 1
-        entries.append(SetBonusEntry(
-            required_items=int(bonus.get("requireditems", 0)),
-            effect=effect,
-            lines=lines,
-        ))
+        entries.append(
+            SetBonusEntry(
+                required_items=int(bonus.get("requireditems", 0)),
+                effect=effect,
+                lines=lines,
+            )
+        )
     entries.sort(key=lambda e: e.required_items)
     return entries

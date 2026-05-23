@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Fetch a character's AA data and render the chosen tree locally.
 
@@ -7,6 +7,7 @@ Usage:
     python scripts/preview_aacheck.py Menludiir Templar      # render by name
     python scripts/preview_aacheck.py Menludiir 25           # render by ID
 """
+
 import asyncio
 import json
 import os
@@ -19,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from census.config import SERVICE_ID, WORLD
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from census.client import CensusClient
@@ -50,7 +52,7 @@ def _resolve_tree(query: str, available_ids: set[int], tree_names: dict[int, str
 
 
 async def main() -> None:
-    name  = sys.argv[1] if len(sys.argv) > 1 else "Menludiir"
+    name = sys.argv[1] if len(sys.argv) > 1 else "Menludiir"
     world = WORLD
 
     tree_names = _load_tree_names()

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Download all recipes from the Census /recipe/ collection into data/recipes/recipes.db.
 
@@ -14,6 +14,7 @@ Usage:
     python scripts/download_recipes.py --limit 1000     # stop after N recipes (testing)
     python scripts/download_recipes.py --restart        # ignore saved offset, start from 0
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,16 +29,17 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from census.config import SERVICE_ID, WORLD
+
 load_dotenv(override=True)
 
 from census.recipes_db import DB_PATH, get_meta, init_db, recipe_count, set_meta, upsert_recipes
 
-BASE_URL    = "https://census.daybreakgames.com"
-PAGE_SIZE   = 100       # Census silently caps responses at 100 regardless of c:limit
-CONCURRENCY = 1         # sequential is most reliable against Census timeouts
-WRITE_EVERY = 2000      # flush to DB after accumulating this many recipes
-RETRY_MAX   = 5
-RETRY_SLEEP = 15.0      # seconds before first retry (doubles each attempt)
+BASE_URL = "https://census.daybreakgames.com"
+PAGE_SIZE = 100  # Census silently caps responses at 100 regardless of c:limit
+CONCURRENCY = 1  # sequential is most reliable against Census timeouts
+WRITE_EVERY = 2000  # flush to DB after accumulating this many recipes
+RETRY_MAX = 5
+RETRY_SLEEP = 15.0  # seconds before first retry (doubles each attempt)
 
 
 async def _fetch_page(
@@ -46,16 +48,14 @@ async def _fetch_page(
     service_id: str,
     start: int,
 ) -> list[dict] | None:
-    url    = f"{BASE_URL}/s:{service_id}/json/get/eq2/recipe/"
+    url = f"{BASE_URL}/s:{service_id}/json/get/eq2/recipe/"
     params = {"c:start": start, "c:limit": PAGE_SIZE, "c:sort": "id:1"}
-    delay  = RETRY_SLEEP
+    delay = RETRY_SLEEP
 
     async with sem:
         for attempt in range(1, RETRY_MAX + 1):
             try:
-                async with session.get(
-                    url, params=params, timeout=aiohttp.ClientTimeout(total=120)
-                ) as resp:
+                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=120)) as resp:
                     if resp.status == 429:
                         print(f"  [429] start={start}, sleeping {delay:.0f}s…")
                         await asyncio.sleep(delay)
@@ -64,24 +64,31 @@ async def _fetch_page(
                     if resp.status != 200:
                         print(f"  [error] start={start}: HTTP {resp.status}")
                         if attempt < RETRY_MAX:
-                            await asyncio.sleep(delay); delay *= 2; continue
+                            await asyncio.sleep(delay)
+                            delay *= 2
+                            continue
                         return None
                     try:
                         data = await resp.json(content_type=None)
                     except Exception:
                         if attempt < RETRY_MAX:
                             print(f"  [retry {attempt}] start={start}: bad JSON, sleeping {delay:.0f}s…")
-                            await asyncio.sleep(delay); delay *= 2; continue
+                            await asyncio.sleep(delay)
+                            delay *= 2
+                            continue
                         return None
                     if "error" in data or "errorCode" in data:
                         msg = data.get("error") or data.get("errorCode") or "unknown"
                         print(f"  [api-error] start={start}: {msg}, sleeping {delay:.0f}s…")
-                        await asyncio.sleep(delay); delay *= 2; continue
+                        await asyncio.sleep(delay)
+                        delay *= 2
+                        continue
                     return data.get("recipe_list") or []
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 if attempt < RETRY_MAX:
                     print(f"  [retry {attempt}] start={start}: {type(exc).__name__}, sleeping {delay:.0f}s…")
-                    await asyncio.sleep(delay); delay *= 2
+                    await asyncio.sleep(delay)
+                    delay *= 2
                 else:
                     print(f"  [failed] start={start}: {type(exc).__name__} after {RETRY_MAX} attempts — skipping")
                     return None
@@ -119,12 +126,12 @@ async def main(restart: bool, recipe_limit: int | None) -> None:
         offset = 0
         print("Restarting from offset 0.")
     else:
-        saved  = get_meta(conn, "download_offset")
+        saved = get_meta(conn, "download_offset")
         offset = int(saved) if saved else 0
         print(f"{'Resuming from' if offset else 'Starting at'} offset {offset:,}")
 
-    sem       = asyncio.Semaphore(CONCURRENCY)
-    headers   = {
+    sem = asyncio.Semaphore(CONCURRENCY)
+    headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -140,7 +147,7 @@ async def main(restart: bool, recipe_limit: int | None) -> None:
         else:
             print("Could not get total count — will stop when pages run dry.")
 
-        written     = 0
+        written = 0
         buffer: list[dict] = []
         reached_end = False
 
@@ -158,8 +165,10 @@ async def main(restart: bool, recipe_limit: int | None) -> None:
             if not page:
                 # Empty page — check if we're genuinely at the end
                 if total and offset < total - PAGE_SIZE * 2:
-                    print(f"  [warn] empty page at offset {offset:,} but total={total:,} "
-                          "— treating as transient gap, continuing")
+                    print(
+                        f"  [warn] empty page at offset {offset:,} but total={total:,} "
+                        "— treating as transient gap, continuing"
+                    )
                     offset += PAGE_SIZE
                     set_meta(conn, "download_offset", str(offset))
                     continue
@@ -191,16 +200,14 @@ async def main(restart: bool, recipe_limit: int | None) -> None:
     conn.close()
     final_conn = init_db(DB_PATH)
     final = recipe_count(final_conn)
-    spell_rows = final_conn.execute(
-        "SELECT COUNT(*) FROM recipes WHERE crafted_tier IS NOT NULL"
-    ).fetchone()[0]
+    spell_rows = final_conn.execute("SELECT COUNT(*) FROM recipes WHERE crafted_tier IS NOT NULL").fetchone()[0]
     final_conn.close()
     print(f"\nDone. Written this run: {written:,}  |  Total in DB: {final:,}  |  Spell-scroll recipes: {spell_rows:,}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit",   type=int,  default=None, help="Max recipes to download this run (for testing)")
-    parser.add_argument("--restart", action="store_true",      help="Ignore saved offset and start from 0")
+    parser.add_argument("--limit", type=int, default=None, help="Max recipes to download this run (for testing)")
+    parser.add_argument("--restart", action="store_true", help="Ignore saved offset and start from 0")
     args = parser.parse_args()
     asyncio.run(main(args.restart, args.limit))

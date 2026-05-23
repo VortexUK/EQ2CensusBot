@@ -5,24 +5,24 @@ from typing import Optional
 
 @dataclass
 class ItemStat:
-    name: str           # Raw Census API name
-    display_name: str   # Human-readable name
+    name: str  # Raw Census API name
+    display_name: str  # Human-readable name
     value: float
-    stat_group: str     # 'primary' or 'secondary'
+    stat_group: str  # 'primary' or 'secondary'
 
 
 @dataclass
 class ItemEffect:
     name: str
-    trigger: str                    # e.g. "When Equipped:"
-    lines: list[tuple[int, str]]    # (indentation_level, text)
+    trigger: str  # e.g. "When Equipped:"
+    lines: list[tuple[int, str]]  # (indentation_level, text)
 
 
 @dataclass
 class SpellEntry:
     name: str
     tier: str
-    spell_type: str   # 'spells' or 'arts'
+    spell_type: str  # 'spells' or 'arts'
     level: int
 
 
@@ -36,15 +36,15 @@ class CharacterSpells:
 class GuildMember:
     name: str
     level: Optional[int]
-    cls: Optional[str]       # adventurer class
+    cls: Optional[str]  # adventurer class
     ts_class: Optional[str]  # tradeskill class
     ts_level: Optional[int]
     aa_level: Optional[int]
     deity: Optional[str]
     rank: Optional[str]
-    rank_id: Optional[int]   # numeric rank for sort order
-    guild_status: Optional[int] = None   # status points contributed to the guild
-    played_time: Optional[int] = None    # total /played seconds
+    rank_id: Optional[int]  # numeric rank for sort order
+    guild_status: Optional[int] = None  # status points contributed to the guild
+    played_time: Optional[int] = None  # total /played seconds
 
 
 @dataclass
@@ -57,20 +57,20 @@ class GuildData:
 @dataclass
 class SetBonusEntry:
     required_items: int
-    effect: str            # "Applies Focus: ..." header line
-    lines: list[str]       # descriptiontag_1, descriptiontag_2, …
+    effect: str  # "Applies Focus: ..." header line
+    lines: list[str]  # descriptiontag_1, descriptiontag_2, …
 
 
 @dataclass
 class ItemData:
     id: str
     name: str
-    quality: str                    # fabled, legendary, treasured, uncommon, common
+    quality: str  # fabled, legendary, treasured, uncommon, common
     description: str
     icon_id: Optional[str]
-    icon_bytes: Optional[bytes]     # Raw PNG/image bytes for the icon
-    slot_type: str                  # Head, Chest, etc.
-    armor_type: str                 # Leather Armor, Plate Armor, etc.
+    icon_bytes: Optional[bytes]  # Raw PNG/image bytes for the icon
+    slot_type: str  # Head, Chest, etc.
+    armor_type: str  # Leather Armor, Plate Armor, etc.
     mitigation: Optional[int]
     item_level: Optional[int]
     required_level: Optional[int]
@@ -88,9 +88,9 @@ class ItemData:
 
 @dataclass
 class AdornSlot:
-    color: str                      # "White", "Yellow", "Red", etc.
+    color: str  # "White", "Yellow", "Red", etc.
     adorn_name: Optional[str] = None  # None = empty slot
-    adorn_id: Optional[str] = None    # item DB id for tooltip lookup
+    adorn_id: Optional[str] = None  # item DB id for tooltip lookup
 
 
 @dataclass
@@ -99,7 +99,7 @@ class EquipmentSlot:
     item_name: str
     item_id: Optional[str] = None
     icon_id: Optional[str] = None
-    tier: Optional[str] = None      # FABLED, LEGENDARY, etc.
+    tier: Optional[str] = None  # FABLED, LEGENDARY, etc.
     adorn_slots: list = field(default_factory=list)  # list[AdornSlot]
 
 
@@ -108,7 +108,7 @@ class CharacterOverview:
     id: str
     name: str
     level: Optional[int]
-    cls: Optional[str]              # adventurer class
+    cls: Optional[str]  # adventurer class
     race: Optional[str]
     gender: Optional[str]
     deity: Optional[str]
@@ -119,7 +119,7 @@ class CharacterOverview:
     guild_name: Optional[str] = None  # guild the character belongs to (None = no guild)
     stats: dict = field(default_factory=dict)
     equipment: list[EquipmentSlot] = field(default_factory=list)
-    spell_ids: list[int] = field(default_factory=list)   # raw spell IDs from Census
+    spell_ids: list[int] = field(default_factory=list)  # raw spell IDs from Census
 
 
 @dataclass
@@ -139,7 +139,7 @@ class AAProfile:
 class CharacterAAs:
     character_name: str
     aa_list: list[NodeAA]
-    profiles: list['AAProfile'] = field(default_factory=list)
+    profiles: list["AAProfile"] = field(default_factory=list)
 
     def for_tree(self, tree_id: int) -> dict[int, int]:
         """Return {node_id: tier} for all nodes in the given tree."""

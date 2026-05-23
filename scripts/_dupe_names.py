@@ -7,7 +7,7 @@ from census.db import DB_PATH
 
 conn = sqlite3.connect(DB_PATH)
 
-total_names  = conn.execute("SELECT COUNT(DISTINCT displayname_lower) FROM items").fetchone()[0]
+total_names = conn.execute("SELECT COUNT(DISTINCT displayname_lower) FROM items").fetchone()[0]
 shared_names = conn.execute("""
     SELECT COUNT(*) FROM (
         SELECT displayname_lower FROM items

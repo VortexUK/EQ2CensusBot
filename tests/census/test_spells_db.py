@@ -1,4 +1,5 @@
 """Tests for census.spells_db — pure-logic helpers and DB operations."""
+
 from __future__ import annotations
 
 import json
@@ -25,6 +26,7 @@ from census.spells_db import (
 # ---------------------------------------------------------------------------
 # strip_roman
 # ---------------------------------------------------------------------------
+
 
 class TestStripRoman:
     def test_strips_single_digit(self):
@@ -60,6 +62,7 @@ class TestStripRoman:
 # ---------------------------------------------------------------------------
 # _passes_spellcheck
 # ---------------------------------------------------------------------------
+
 
 class TestPassesSpellcheck:
     def test_valid_spell(self):
@@ -108,6 +111,7 @@ class TestPassesSpellcheck:
 # spell_to_row
 # ---------------------------------------------------------------------------
 
+
 class TestSpellToRow:
     def _minimal_spell(self, **overrides):
         base = {
@@ -154,10 +158,12 @@ class TestSpellToRow:
         assert row["effects"] == "[]"
 
     def test_effects_parsed(self):
-        spell = self._minimal_spell(effect_list=[
-            {"description": "Heals target", "indentation": 1},
-            {"description": "  Also buffs", "indentation": 2},
-        ])
+        spell = self._minimal_spell(
+            effect_list=[
+                {"description": "Heals target", "indentation": 1},
+                {"description": "  Also buffs", "indentation": 2},
+            ]
+        )
         row = spell_to_row(spell)
         parsed = json.loads(row["effects"])
         assert len(parsed) == 2
@@ -182,11 +188,12 @@ class TestSpellToRow:
 # unique_highest_entries
 # ---------------------------------------------------------------------------
 
+
 class TestUniqueHighestEntries:
     def test_keeps_highest_level(self):
         entries = [
-            {"name": "Divine Strike I",   "type": "spells", "level": 10},
-            {"name": "Divine Strike II",  "type": "spells", "level": 20},
+            {"name": "Divine Strike I", "type": "spells", "level": 10},
+            {"name": "Divine Strike II", "type": "spells", "level": 20},
             {"name": "Divine Strike III", "type": "spells", "level": 30},
         ]
         result = unique_highest_entries(entries)
@@ -195,16 +202,16 @@ class TestUniqueHighestEntries:
 
     def test_different_types_kept_separately(self):
         entries = [
-            {"name": "Wound I",   "type": "spells", "level": 10},
-            {"name": "Wound I",   "type": "arts",   "level": 10},
+            {"name": "Wound I", "type": "spells", "level": 10},
+            {"name": "Wound I", "type": "arts", "level": 10},
         ]
         result = unique_highest_entries(entries)
         assert len(result) == 2
 
     def test_different_base_names_kept(self):
         entries = [
-            {"name": "Fireball I",  "type": "spells", "level": 10},
-            {"name": "Ice Bolt I",  "type": "spells", "level": 10},
+            {"name": "Fireball I", "type": "spells", "level": 10},
+            {"name": "Ice Bolt I", "type": "spells", "level": 10},
         ]
         result = unique_highest_entries(entries)
         assert len(result) == 2
@@ -219,8 +226,9 @@ class TestUniqueHighestEntries:
 
     def test_works_with_spell_entry_objects(self):
         from census.models import SpellEntry
+
         entries = [
-            SpellEntry(name="Divine Strike I",  tier="Adept", spell_type="spells", level=10),
+            SpellEntry(name="Divine Strike I", tier="Adept", spell_type="spells", level=10),
             SpellEntry(name="Divine Strike II", tier="Master", spell_type="spells", level=20),
         ]
         result = unique_highest_entries(entries)
@@ -230,7 +238,7 @@ class TestUniqueHighestEntries:
     def test_mixed_objects_and_dicts(self):
         # Edge case: all dict-based entries with None level default to 0
         entries = [
-            {"name": "Fiery Blast I",   "type": "spells", "level": None},
+            {"name": "Fiery Blast I", "type": "spells", "level": None},
             {"name": "Fiery Blast III", "type": "spells", "level": 30},
         ]
         result = unique_highest_entries(entries)
@@ -242,12 +250,13 @@ class TestUniqueHighestEntries:
 # load_blocklist
 # ---------------------------------------------------------------------------
 
+
 class TestLoadBlocklist:
     def test_reads_json(self, tmp_path):
         p = tmp_path / "blocklist.json"
         p.write_text('{"blocked": ["Fighting Chance I", "Fiery Blast"]}', encoding="utf-8")
         result = load_blocklist(p)
-        assert "fighting chance" in result    # Roman stripped
+        assert "fighting chance" in result  # Roman stripped
         assert "fiery blast" in result
 
     def test_returns_empty_frozenset_if_missing(self, tmp_path):
@@ -279,6 +288,7 @@ class TestLoadBlocklist:
 # DB operations (find_by_id, find_by_ids, upsert_spells, spell_count)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def db(tmp_path):
     path = tmp_path / "spells.db"
@@ -287,9 +297,15 @@ def db(tmp_path):
     return path
 
 
-def _make_spell(id: int, name: str = "Test Spell I", level: int = 10,
-                spell_type: str = "spells", given_by: str = "any",
-                crc: int = 100, tier: int = 3) -> dict:
+def _make_spell(
+    id: int,
+    name: str = "Test Spell I",
+    level: int = 10,
+    spell_type: str = "spells",
+    given_by: str = "any",
+    crc: int = 100,
+    tier: int = 3,
+) -> dict:
     return {
         "id": id,
         "name": name,
@@ -341,10 +357,13 @@ class TestFindByIds:
 
     def test_returns_matched_ids_only(self, db):
         conn = sqlite3.connect(db)
-        upsert_spells([
-            _make_spell(id=10, name="Spell A"),
-            _make_spell(id=20, name="Spell B"),
-        ], conn)
+        upsert_spells(
+            [
+                _make_spell(id=10, name="Spell A"),
+                _make_spell(id=20, name="Spell B"),
+            ],
+            conn,
+        )
         conn.close()
 
         result = find_by_ids([10, 20, 999], path=db)
@@ -365,10 +384,13 @@ class TestFindByIds:
 class TestUpsertSpellsAndCount:
     def test_inserts_rows(self, db):
         conn = sqlite3.connect(db)
-        n = upsert_spells([
-            _make_spell(id=100, name="Spell One"),
-            _make_spell(id=101, name="Spell Two"),
-        ], conn)
+        n = upsert_spells(
+            [
+                _make_spell(id=100, name="Spell One"),
+                _make_spell(id=101, name="Spell Two"),
+            ],
+            conn,
+        )
         assert n == 2
         assert spell_count(conn) == 2
         conn.close()
@@ -405,11 +427,14 @@ class TestFindByCrc:
 
     def test_returns_exact_tier(self, db):
         conn = sqlite3.connect(db)
-        upsert_spells([
-            _make_spell(id=1, name="Wound I",   crc=555, tier=1),
-            _make_spell(id=2, name="Wound II",  crc=555, tier=2),
-            _make_spell(id=3, name="Wound III", crc=555, tier=3),
-        ], conn)
+        upsert_spells(
+            [
+                _make_spell(id=1, name="Wound I", crc=555, tier=1),
+                _make_spell(id=2, name="Wound II", crc=555, tier=2),
+                _make_spell(id=3, name="Wound III", crc=555, tier=3),
+            ],
+            conn,
+        )
         conn.close()
 
         row = find_by_crc(crc=555, tier=2, path=db)
@@ -418,10 +443,13 @@ class TestFindByCrc:
 
     def test_falls_back_to_highest_tier(self, db):
         conn = sqlite3.connect(db)
-        upsert_spells([
-            _make_spell(id=10, name="Bolt I",   crc=777, tier=1),
-            _make_spell(id=11, name="Bolt III", crc=777, tier=3),
-        ], conn)
+        upsert_spells(
+            [
+                _make_spell(id=10, name="Bolt I", crc=777, tier=1),
+                _make_spell(id=11, name="Bolt III", crc=777, tier=3),
+            ],
+            conn,
+        )
         conn.close()
 
         # Request tier=2 which doesn't exist → should get tier=3 (highest)

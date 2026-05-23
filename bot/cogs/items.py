@@ -43,4 +43,4 @@ class ItemsCog(commands.Cog):
         buf.seek(0)
 
         content = f"```\n{item_data.game_link}\n```" if item_data.game_link else None
-        await interaction.followup.send(content=content, file=discord.File(buf, filename="item.png"))
+        await interaction.followup.send(content=content, file=discord.File(buf, filename="item.png"))  # type: ignore[arg-type]

@@ -8,6 +8,7 @@ Safe to re-run: uses UPDATE ... WHERE id = ?, skips nothing.
 Usage:
     python scripts/backfill_new_columns.py
 """
+
 from __future__ import annotations
 
 import json
@@ -34,8 +35,8 @@ WHERE id = :id
 
 def extract(raw: dict) -> dict:
     typeinfo = raw.get("typeinfo") or {}
-    classes  = typeinfo.get("classes") if isinstance(typeinfo, dict) else None
-    pda      = typeinfo.get("physicaldamageabsorption")
+    classes = typeinfo.get("classes") if isinstance(typeinfo, dict) else None
+    pda = typeinfo.get("physicaldamageabsorption")
 
     visible_raw = raw.get("visible")
     try:
@@ -55,13 +56,13 @@ def extract(raw: dict) -> dict:
         pda_int = None
 
     return {
-        "id":                         raw["id"],
-        "visible":                    visible,
-        "typeinfo_name":              name,
-        "classes_json":               json.dumps(classes) if classes is not None else None,
+        "id": raw["id"],
+        "visible": visible,
+        "typeinfo_name": name,
+        "classes_json": json.dumps(classes) if classes is not None else None,
         "physical_damage_absorption": pda_int,
-        "class_label":                compute_class_label(classes),
-        "class_count":                len(classes) if classes else None,
+        "class_label": compute_class_label(classes),
+        "class_count": len(classes) if classes else None,
     }
 
 
@@ -71,13 +72,11 @@ def main() -> None:
     total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
     print(f"Backfilling {total:,} rows…")
 
-    offset    = 0
+    offset = 0
     processed = 0
 
     while True:
-        rows = conn.execute(
-            "SELECT id, raw_json FROM items LIMIT ? OFFSET ?", (BATCH_SIZE, offset)
-        ).fetchall()
+        rows = conn.execute("SELECT id, raw_json FROM items LIMIT ? OFFSET ?", (BATCH_SIZE, offset)).fetchall()
         if not rows:
             break
 
@@ -86,7 +85,7 @@ def main() -> None:
         conn.commit()
 
         processed += len(rows)
-        offset    += BATCH_SIZE
+        offset += BATCH_SIZE
         pct = processed / total * 100
         print(f"  {processed:>7,} / {total:,}  ({pct:.1f}%)")
 

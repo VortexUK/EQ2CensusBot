@@ -1,10 +1,11 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Render an item tooltip to preview.png without needing Discord.
 
 Usage:
     python scripts/preview_item.py "Faded Black Hood"
 """
+
 import asyncio
 import os
 import subprocess
@@ -17,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from census.config import SERVICE_ID, WORLD
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from census.client import CensusClient

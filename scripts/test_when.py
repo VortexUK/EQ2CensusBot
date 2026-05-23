@@ -7,6 +7,7 @@ Usage:
     python scripts/test_when.py
     python scripts/test_when.py --count 10   # print 10 examples
 """
+
 from __future__ import annotations
 
 import argparse
@@ -49,11 +50,11 @@ def random_metric(minutes: float, metrics: list) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=1, help="Number of examples to generate")
-    parser.add_argument("--user",  type=str, default="TestUser", help="Username to use in the insult")
+    parser.add_argument("--user", type=str, default="TestUser", help="Username to use in the insult")
     args = parser.parse_args()
 
-    now     = datetime.now(timezone.utc)
-    delta   = (LAUNCH_DT - now).total_seconds()
+    now = datetime.now(timezone.utc)
+    delta = (LAUNCH_DT - now).total_seconds()
     minutes = delta / 60
 
     if delta <= 0:
@@ -66,7 +67,7 @@ def main() -> None:
     for i in range(args.count):
         if args.count > 1:
             print(f"--- Example {i + 1} ---")
-        metric_str      = random_metric(minutes, metrics)
+        metric_str = random_metric(minutes, metrics)
         article, insult = random_insult(insults)
         print(f"The server launches in approximately {metric_str}.")
         print(f"You're {article} {insult}, {args.user}.")
