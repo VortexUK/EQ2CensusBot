@@ -46,6 +46,8 @@ STAT_MAP: dict[str, tuple[str, str]] = {
     "accuracy": ("Accuracy", "secondary"),
     "flurry": ("Flurry", "secondary"),
     "block": ("Block", "secondary"),
+    "blockchance": ("Block Chance", "secondary"),
+    "block_chance": ("Block Chance", "secondary"),
     "parry": ("Parry", "secondary"),
     "deflection": ("Deflection", "secondary"),
     "dodge": ("Dodge", "secondary"),

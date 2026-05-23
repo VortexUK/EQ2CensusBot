@@ -270,10 +270,54 @@ def parse_set_name(item: dict) -> str | None:
     return info.get("displayname") or None
 
 
+# Reserved (non-stat) keys inside a setbonus_list entry — anything else is a
+# raw stat shorthand (e.g. {"sta": 120, "blockchance": 10.0}).
+_SETBONUS_RESERVED_KEYS = frozenset({"requireditems", "effect"})
+
+
+def _format_setbonus_stat_value(value: Any) -> str:
+    """Format a setbonus stat value: ints stay as ints, floats keep their
+    fractional part only when non-zero."""
+    if isinstance(value, bool):  # bool is a subclass of int — exclude
+        return str(value)
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if value.is_integer():
+            return str(int(value))
+        return f"{value:g}"
+    return str(value)
+
+
+def _build_setbonus_effect_from_stats(bonus: dict) -> str:
+    """Compose an effect string like '+120 Stamina, +10 Block Chance' from
+    raw stat fields when the bonus dict has no 'effect' key.
+    Returns '' if no stat-like fields are present."""
+    parts: list[str] = []
+    for key, value in bonus.items():
+        kl = key.lower()
+        if kl in _SETBONUS_RESERVED_KEYS or kl.startswith("descriptiontag_"):
+            continue
+        if value is None or value == "" or value == 0:
+            continue
+        # Look up the canonical display name; fall back to a titlised key.
+        mapped = STAT_MAP.get(kl)
+        display_name = mapped[0] if mapped else kl.replace("_", " ").title()
+        val_str = _format_setbonus_stat_value(value)
+        sign = "" if val_str.startswith("-") else "+"
+        parts.append(f"{sign}{val_str} {display_name}")
+    return ", ".join(parts)
+
+
 def parse_set_bonuses(item: dict) -> list[SetBonusEntry]:
     """
     Parse setbonus_list into SetBonusEntry objects.
-    Entries without an 'effect' key are placeholder/empty tiers and are skipped.
+
+    Two formats are supported:
+      1. Effect-string format: {"requireditems": N, "effect": "...", "descriptiontag_1": ...}
+      2. Stat-field format:    {"requireditems": N, "sta": 120, "blockchance": 10.0, ...}
+         (common on adornment item-set bonuses)
+
     Result is sorted ascending by required_items.
     """
     raw = item.get("setbonus_list") or []
@@ -282,8 +326,6 @@ def parse_set_bonuses(item: dict) -> list[SetBonusEntry]:
         if not isinstance(bonus, dict):
             continue
         effect = (bonus.get("effect") or "").strip()
-        if not effect:
-            continue  # skip empty/placeholder tiers
         lines: list[str] = []
         i = 1
         while True:
@@ -293,6 +335,11 @@ def parse_set_bonuses(item: dict) -> list[SetBonusEntry]:
             if str(tag).strip():
                 lines.append(str(tag).strip())
             i += 1
+        # Fall back to building an effect string from raw stat fields.
+        if not effect:
+            effect = _build_setbonus_effect_from_stats(bonus)
+        if not effect and not lines:
+            continue  # truly empty placeholder tier — skip
         entries.append(
             SetBonusEntry(
                 required_items=int(bonus.get("requireditems", 0)),

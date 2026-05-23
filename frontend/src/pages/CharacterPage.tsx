@@ -420,6 +420,13 @@ const STAT_ALIASES: Record<string, string[]> = {
   'elemental mit':      ['resistances', 'resistance'],
   'noxious mit':        ['resistances', 'resistance'],
   'arcane mit':         ['resistances', 'resistance'],
+  // STR / AGI / WIS / INT appear on items as the collective "Primary Attributes"
+  // stat (which grants the wearer's class-appropriate attribute).  Stamina is
+  // a separate stat on items and matches by its own name.
+  'strength':           ['primary attributes'],
+  'agility':            ['primary attributes'],
+  'wisdom':             ['primary attributes'],
+  'intelligence':       ['primary attributes'],
   'crit chance':        ['critical chance'],
   'crit bonus':         ['critical bonus'],
   'ability mod':        ['ability modifier'],
