@@ -323,6 +323,7 @@ _MIGRATIONS = [
     ("spell_power_cost",           "INTEGER"),
     ("spell_resistability",        "TEXT"),
     ("flag_pvp",                   "INTEGER DEFAULT 0"),
+    ("classification_list",        "TEXT"),
 ]
 
 _UPSERT_SQL = """
@@ -349,7 +350,7 @@ INSERT OR REPLACE INTO items (
     flag_heirloom, flag_lore, flag_lore_equip, flag_no_trade, flag_no_value,
     flag_no_zone, flag_prestige, flag_relic, flag_attunable, flag_ornate,
     flag_refined, flag_infusable, flag_indestructible, flag_pvp,
-    raw_json
+    raw_json, classification_list
 ) VALUES (
     :id, :displayname, :displayname_lower, :gamelink, :description, :last_update,
     :tier, :tierid, :type, :typeid, :item_level, :level_to_use, :planar_level, :icon_id, :max_stack_size,
@@ -373,7 +374,7 @@ INSERT OR REPLACE INTO items (
     :flag_heirloom, :flag_lore, :flag_lore_equip, :flag_no_trade, :flag_no_value,
     :flag_no_zone, :flag_prestige, :flag_relic, :flag_attunable, :flag_ornate,
     :flag_refined, :flag_infusable, :flag_indestructible, :flag_pvp,
-    :raw_json
+    :raw_json, :classification_list
 )
 """
 
@@ -616,6 +617,7 @@ def item_to_row(item: dict) -> dict:
         "flag_indestructible":  _flag(flags, "indestructible"),
         "flag_pvp":             _is_pvp_item(item),
         "raw_json":             json.dumps(item),
+        "classification_list":  json.dumps(item.get("classification_list") or []),
     }
 
 
@@ -651,7 +653,26 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     # Backfill effect-derived stats (Haste etc.) for items that predate this
     # feature.  Version-gated — only runs once per _EFFECT_STATS_VERSION.
     _backfill_effect_stats(conn)
+    # Backfill classification_list for rows that predate this column.
+    # Uses json_extract to pull the array out of raw_json; safe to re-run.
+    _backfill_classification_list(conn)
     return conn
+
+
+def _backfill_classification_list(conn: sqlite3.Connection) -> None:
+    """Populate classification_list for rows that predate the column.
+
+    Uses SQLite's json_extract to pull the array straight out of raw_json.
+    Rows that already have a non-NULL value are left untouched, so this is
+    a cheap no-op after the first successful run.
+    """
+    conn.execute("""
+        UPDATE items
+        SET classification_list = json_extract(raw_json, '$.classification_list')
+        WHERE classification_list IS NULL
+          AND raw_json IS NOT NULL
+    """)
+    conn.commit()
 
 
 def _backfill_pvp_flag(conn: sqlite3.Connection) -> None:

@@ -82,6 +82,7 @@ const ITEM_TYPE_OPTIONS = [
   'Expendable',
   'Food',
   'House Item',
+  'Material',
   'Pattern',
   'Shield',
   'Weapon',

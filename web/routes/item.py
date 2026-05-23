@@ -80,6 +80,12 @@ _ITEM_TYPE_DB_MAP: dict[str, list[str]] = {
     "Pattern":   ["itempattern", "pattern"],
 }
 
+# Item types that are identified via classification_list rather than typeinfo_name
+# value → SQL fragment (uses a named param :cl_val)
+_ITEM_TYPE_CLASSIFICATION: dict[str, str] = {
+    "Material": '%"materials"%',
+}
+
 # Slot names to suppress (mount/horse equipment, not applicable on TLE)
 _SLOT_SKIP = frozenset([
     "Barding", "Breeching", "Hackamore", "Reins",
@@ -307,16 +313,22 @@ async def search_items(
         where_params.append(slot)
 
     if item_type:
-        # Map display name back to raw DB typeinfo_name value(s)
-        raw_types = _ITEM_TYPE_DB_MAP.get(item_type)
-        if raw_types:
-            placeholders = ",".join("?" * len(raw_types))
-            conditions.append(f"LOWER(i.typeinfo_name) IN ({placeholders})")
-            where_params.extend(raw_types)          # already lowercase
+        cl_pattern = _ITEM_TYPE_CLASSIFICATION.get(item_type)
+        if cl_pattern:
+            # Filter via classification_list column (e.g. "Material")
+            conditions.append("i.classification_list LIKE ?")
+            where_params.append(cl_pattern)
         else:
-            # General case: compare lowercase (DB values are all-lowercase)
-            conditions.append("LOWER(i.typeinfo_name) = ?")
-            where_params.append(item_type.lower())
+            # Map display name back to raw DB typeinfo_name value(s)
+            raw_types = _ITEM_TYPE_DB_MAP.get(item_type)
+            if raw_types:
+                placeholders = ",".join("?" * len(raw_types))
+                conditions.append(f"LOWER(i.typeinfo_name) IN ({placeholders})")
+                where_params.extend(raw_types)      # already lowercase
+            else:
+                # General case: compare lowercase (DB values are all-lowercase)
+                conditions.append("LOWER(i.typeinfo_name) = ?")
+                where_params.append(item_type.lower())
 
     if class_name:
         # classes_json is a JSON object keyed by lowercase class name
