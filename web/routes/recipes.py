@@ -20,15 +20,13 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
-from pathlib import Path
-from typing import Optional
 
 import aiosqlite
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from census.recipes_db import DB_PATH as RECIPES_DB_PATH
 from census.db import DB_PATH as ITEMS_DB_PATH
+from census.recipes_db import DB_PATH as RECIPES_DB_PATH
 
 router = APIRouter(tags=["recipes"])
 

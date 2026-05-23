@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import aiosqlite
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from census.client import CensusClient
-from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
+from web.config import SERVICE_ID as _SERVICE_ID
+from web.config import WORLD as _WORLD
 from web.db import DB_PATH
+from web.limiter import limiter
 
 router = APIRouter(tags=["characters"])
 
@@ -58,7 +60,8 @@ async def _local_search(q: str) -> list[CharNameResult]:
 
 
 @router.get("/characters/search", response_model=CharSearchResponse)
-async def search_characters(name: str = "") -> CharSearchResponse:
+@limiter.limit("20/minute")
+async def search_characters(request: Request, name: str = "") -> CharSearchResponse:
     """
     Search characters by name prefix.
     Queries the Census API for all characters on the configured world whose

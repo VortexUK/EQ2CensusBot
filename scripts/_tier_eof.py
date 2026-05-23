@@ -1,4 +1,6 @@
-import sqlite3, json, sys
+import json
+import sqlite3
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

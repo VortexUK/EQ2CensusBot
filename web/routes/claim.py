@@ -3,15 +3,17 @@ from __future__ import annotations
 import asyncio
 import logging
 
-_log = logging.getLogger(__name__)
-
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from census.client import CensusClient
 from web.cache import character_cache, claim_cache
-from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
+from web.config import SERVICE_ID as _SERVICE_ID
+from web.config import WORLD as _WORLD
 from web.db import get_active_claims, set_primary, submit_claim, upsert_user, withdraw_claim
+from web.limiter import limiter
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["claim"])
 
@@ -162,7 +164,8 @@ async def get_my_claims(request: Request) -> ClaimsResponse:
 
 
 @router.post("/claim", response_model=ClaimResponse, status_code=201)
-async def create_claim(body: SubmitClaimRequest, request: Request) -> ClaimResponse:
+@limiter.limit("5/minute")
+async def create_claim(request: Request, body: SubmitClaimRequest) -> ClaimResponse:
     """
     Submit a claim for an additional character.
     Validates the character exists on the configured world via Census.

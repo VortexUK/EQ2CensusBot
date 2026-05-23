@@ -118,7 +118,7 @@ scripts/                 # Local preview and download scripts (see below)
 ### 1. Install dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # includes prod deps + test/lint tooling
 cd frontend && npm install
 ```
 

@@ -7,23 +7,32 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Optional
+from typing import Any
 
 _log = logging.getLogger(__name__)
 
 
 class TTLCache:
-    def __init__(self, ttl: int = 300, max_age: int | None = None, name: str = "default"):
+    def __init__(
+        self,
+        ttl: int = 300,
+        max_age: int | None = None,
+        name: str = "default",
+        maxsize: int = 1000,
+    ):
         """
         ttl:     seconds until data is considered stale → background refresh fires,
                  but the cached value is still returned immediately.
         max_age: seconds until data is hard-expired → evicted and caller must fetch
                  synchronously (user waits).  None = never hard-expire.
         name:    label used in Prometheus metrics (character | guild | claim | …).
+        maxsize: maximum number of entries.  When full, the oldest entry is evicted
+                 before inserting a new one (LRU-by-insertion-order).
         """
         self._ttl = ttl
         self._max_age = max_age
         self._name = name
+        self._maxsize = maxsize
         self._store: dict[str, tuple[float, Any]] = {}
 
     # ── Internal helpers ──────────────────────────────────────────────────────
@@ -62,7 +71,7 @@ class TTLCache:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Return value if within TTL, else None (and evict)."""
         entry = self._store.get(key)
         if entry is None:
@@ -78,7 +87,7 @@ class TTLCache:
         self._inc_hit()
         return value
 
-    def get_stale(self, key: str) -> tuple[Optional[Any], bool]:
+    def get_stale(self, key: str) -> tuple[Any | None, bool]:
         """
         Stale-while-revalidate lookup with optional hard expiry.
 
@@ -110,6 +119,11 @@ class TTLCache:
 
     def set(self, key: str, value: Any) -> None:
         _log.debug("[Cache] SET   %s", key)
+        # Evict oldest entry if we're at capacity and this is a new key.
+        if key not in self._store and len(self._store) >= self._maxsize:
+            oldest_key = next(iter(self._store))
+            del self._store[oldest_key]
+            _log.debug("[Cache] EVICT (maxsize) %s", oldest_key)
         self._store[key] = (time.monotonic(), value)
         try:
             from web.metrics import CACHE_SETS
@@ -119,6 +133,24 @@ class TTLCache:
             pass
         self._update_size()
 
+    def sweep(self) -> int:
+        """
+        Proactively evict all entries that have exceeded max_age.
+        Call periodically (e.g. on a background task) to prevent the store from
+        holding stale entries for keys that are never accessed again.
+        Returns the number of entries removed.
+        """
+        if self._max_age is None:
+            return 0
+        now = time.monotonic()
+        expired = [k for k, (ts, _) in self._store.items() if now - ts > self._max_age]
+        for k in expired:
+            del self._store[k]
+        if expired:
+            _log.debug("[Cache] SWEEP removed %d expired entries from %s", len(expired), self._name)
+            self._update_size()
+        return len(expired)
+
     def delete(self, key: str) -> None:
         self._store.pop(key, None)
         _log.info("[Cache] DEL   %s", key)
@@ -126,9 +158,16 @@ class TTLCache:
 
 
 # One instance per domain.
-# ttl=300  → stale after 5 min (background refresh fires, response still instant)
+# ttl=300     → stale after 5 min (background refresh fires, response still instant)
 # max_age=3600 → hard-expired after 1 hr (user waits for a fresh fetch)
-character_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="character")
-guild_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="guild")
-claim_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="claim")
-aa_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="aa")
+# maxsize     → LRU-by-insertion eviction when full, prevents unbounded growth
+#
+# Sizing rationale:
+#   character: one entry per character name; 500 covers a large active guild + visitors
+#   guild:     ~5 cache keys per guild (roster/info/spells/adorns/chars); 50 covers 10 guilds
+#   claim:     one entry per discord_id; 200 covers a large player base
+#   aa:        one entry per character; 200 covers regular users
+character_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="character", maxsize=500)
+guild_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="guild", maxsize=50)
+claim_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="claim", maxsize=200)
+aa_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="aa", maxsize=200)

@@ -15,7 +15,7 @@ from web.db import (
     set_user_access,
 )
 from web.routes.claim import _refresh_claim_cache
-from web.routes.guild import _officer_chars, _roster_rank_map
+from web.routes.guild import _officer_chars, _roster_rank_map, _validate_guild_name
 
 _ADMIN_IDS: frozenset[str] = frozenset(filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(",")))
 
@@ -51,6 +51,7 @@ async def get_officer_status(guild_name: str, request: Request) -> dict:
     Return whether the current user holds an officer rank in this guild.
     Always returns 200 (unauthenticated / non-officer users get is_officer: false).
     """
+    _validate_guild_name(guild_name)
     user = request.session.get("user")
     if not user:
         return {"is_officer": False}
@@ -64,6 +65,7 @@ async def get_guild_claims(guild_name: str, request: Request) -> list[GuildClaim
     List all pending claims for characters that are members of this guild.
     Requires the requesting user to be an officer (rank 0 or 1) of the guild.
     """
+    _validate_guild_name(guild_name)
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -90,6 +92,7 @@ async def get_guild_claims(guild_name: str, request: Request) -> list[GuildClaim
 @router.post("/guild/{guild_name}/claims/{claim_id}/approve", response_model=GuildClaimItem)
 async def officer_approve_claim(guild_name: str, claim_id: int, request: Request) -> GuildClaimItem:
     """Approve a pending claim.  Officers cannot approve their own claims."""
+    _validate_guild_name(guild_name)
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -125,6 +128,7 @@ async def officer_reject_claim(
     request: Request,
 ) -> dict:
     """Reject a pending claim, optionally with a note.  Officers cannot reject their own claims."""
+    _validate_guild_name(guild_name)
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")

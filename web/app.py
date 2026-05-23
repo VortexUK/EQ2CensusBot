@@ -5,31 +5,25 @@ import os
 import threading
 import time
 
-_log = logging.getLogger(__name__)
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response
 
 load_dotenv()
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pathlib import Path
+
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from web.routes.health import router as health_router
-from web.routes.auth import router as auth_router
-from web.routes.character import router as character_router, prewarm_character_cache
-from web.routes.item import router as item_router
-from web.routes.claim import router as claim_router
-from web.routes.admin import router as admin_router
-from web.routes.guild import router as guild_router
-from web.routes.guild_officer import router as guild_officer_router
-from web.routes.item_watch import router as item_watch_router
-from web.routes.characters import router as characters_router
-from web.routes.aa import router as aa_router
-from web.routes.notifications import router as notifications_router
-from web.routes.recipes import router as recipes_router
+from web import db as users_db
+from web.cache import aa_cache, character_cache, claim_cache, guild_cache
+from web.config import CORS_ORIGINS as _CORS_ORIGINS
+from web.config import WORLD as _WORLD
+from web.limiter import limiter
 from web.metrics import (
     APP_INFO,
     CONTENT_TYPE_LATEST,
@@ -42,9 +36,22 @@ from web.metrics import (
     should_track_path,
     should_track_user_view,
 )
-from web.config import WORLD as _WORLD, CORS_ORIGINS as _CORS_ORIGINS
-from web import db as users_db
+from web.routes.aa import router as aa_router
+from web.routes.admin import router as admin_router
+from web.routes.auth import router as auth_router
+from web.routes.character import prewarm_character_cache
+from web.routes.character import router as character_router
+from web.routes.characters import router as characters_router
+from web.routes.claim import router as claim_router
+from web.routes.guild import router as guild_router
+from web.routes.guild_officer import router as guild_officer_router
+from web.routes.health import router as health_router
+from web.routes.item import router as item_router
+from web.routes.item_watch import router as item_watch_router
+from web.routes.notifications import router as notifications_router
+from web.routes.recipes import router as recipes_router
 
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Item-stats startup check
@@ -61,7 +68,9 @@ def _ensure_item_stats() -> None:
       or after the code is upgraded on an existing DB.
     """
     import sqlite3
-    from census.db import DB_PATH as items_db_path, init_db as items_init_db
+
+    from census.db import DB_PATH as items_db_path
+    from census.db import init_db as items_init_db
 
     if not items_db_path.exists():
         return  # No items DB yet — nothing to initialise
@@ -97,6 +106,26 @@ def _ensure_item_stats() -> None:
 # ---------------------------------------------------------------------------
 # HTTP metrics middleware
 # ---------------------------------------------------------------------------
+
+
+class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Adds defensive HTTP security headers to every response."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "geolocation=(), camera=(), microphone=()",
+        )
+        if _HTTPS_ONLY:
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
+        return response
 
 
 class _MetricsMiddleware(BaseHTTPMiddleware):
@@ -154,6 +183,11 @@ if not _SESSION_SECRET:
         'Generate one with: python -c "import secrets; print(secrets.token_hex(32))" '
         "and add it to your .env file or Railway environment."
     )
+if len(_SESSION_SECRET) < 32:
+    raise RuntimeError(
+        "SESSION_SECRET is too short (minimum 32 characters). "
+        'Generate a secure value with: python -c "import secrets; print(secrets.token_hex(32))"'
+    )
 
 # Set HTTPS_ONLY=false only for local HTTP dev; defaults to true (Secure cookie flag)
 _HTTPS_ONLY = os.getenv("HTTPS_ONLY", "true").lower() not in ("0", "false", "no")
@@ -178,6 +212,18 @@ def create_app(session_secret: str | None = None) -> FastAPI:
         import asyncio as _asyncio
 
         _asyncio.create_task(prewarm_character_cache())
+        _asyncio.create_task(_cache_sweep_loop())
+
+    async def _cache_sweep_loop() -> None:
+        """Periodically evict max_age-expired entries from all caches.
+        Without this, entries for keys that are never accessed again stay in
+        memory until the process restarts."""
+        import asyncio as _asyncio
+
+        while True:
+            await _asyncio.sleep(600)  # run every 10 minutes
+            for cache in (character_cache, guild_cache, claim_cache, aa_cache):
+                cache.sweep()
 
     def _init_metrics() -> None:
         # Register the DB gauge collector and set static app info.
@@ -193,7 +239,13 @@ def create_app(session_secret: str | None = None) -> FastAPI:
         openapi_url="/api/openapi.json" if _SHOW_DOCS else None,
     )
 
-    # Metrics middleware first so it sees every request (added last = outermost)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+    # Outermost: security headers on every response
+    app.add_middleware(_SecurityHeadersMiddleware)
+
+    # Metrics middleware (added last = outermost after security headers)
     app.add_middleware(_MetricsMiddleware)
 
     # Sessions must be added before CORS so the cookie is available everywhere
@@ -201,6 +253,7 @@ def create_app(session_secret: str | None = None) -> FastAPI:
         SessionMiddleware,
         secret_key=session_secret or _SESSION_SECRET,
         https_only=_HTTPS_ONLY,
+        same_site="strict",
     )
 
     app.add_middleware(

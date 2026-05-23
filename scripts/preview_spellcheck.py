@@ -15,14 +15,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from census.config import SERVICE_ID, WORLD
-
 from dotenv import load_dotenv
+
+from census.config import SERVICE_ID, WORLD
 
 load_dotenv()
 
-from census.client import CensusClient
 from bot.cogs.spellcheck import _TIER_ORDER, _build_details, _build_table, _unique_highest
+from census.client import CensusClient
 
 
 async def main() -> None:

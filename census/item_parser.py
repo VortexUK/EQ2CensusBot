@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from census.constants import ITEM_DISPLAY, STAT_MAP, TYPEINFO_DISPLAY
 from census.models import ItemData, ItemEffect, ItemStat, SetBonusEntry
@@ -27,7 +27,7 @@ _FLAG_LABELS: dict[str, str] = {
 # ------------------------------------------------------------------
 
 
-def _int(value: Any) -> Optional[int]:
+def _int(value: Any) -> int | None:
     if value is None:
         return None
     try:
@@ -48,7 +48,7 @@ def _str(value: Any) -> str:
 # ------------------------------------------------------------------
 
 
-def _load_item_icon(icon_id: str) -> Optional[bytes]:
+def _load_item_icon(icon_id: str) -> bytes | None:
     path = _ITEM_ICONS_DIR / f"{icon_id}.png"
     return path.read_bytes() if path.exists() else None
 
@@ -178,7 +178,7 @@ def parse_effects(effect_list: list, adornment_list: list) -> list[ItemEffect]:
     # indentation=0 → trigger line ("When Equipped:")
     # indentation>0 → bullet line
     groups: list[dict] = []
-    current: Optional[dict] = None
+    current: dict | None = None
     for eff in effect_list:
         indent = int(eff.get("indentation", 0))
         desc = _str(eff.get("description")) or ""
@@ -262,7 +262,7 @@ def parse_flags(flags_dict: dict) -> list[str]:
     return flags
 
 
-def parse_set_name(item: dict) -> Optional[str]:
+def parse_set_name(item: dict) -> str | None:
     """Return the set display name from setbonus_info, or None."""
     info = item.get("setbonus_info")
     if not isinstance(info, dict):

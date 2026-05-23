@@ -16,19 +16,19 @@ import os
 import re
 import sqlite3
 
-_log = logging.getLogger(__name__)
-
 from prometheus_client import (
-    CONTENT_TYPE_LATEST,
+    CONTENT_TYPE_LATEST,  # noqa: F401  re-exported to web/app.py
+    REGISTRY,
     Counter,
     Gauge,
     Histogram,
     Info,
-    REGISTRY,
-    generate_latest,
+    generate_latest,  # noqa: F401  re-exported to web/app.py
 )
 from prometheus_client.core import GaugeMetricFamily
 from prometheus_client.registry import Collector
+
+_log = logging.getLogger(__name__)
 
 # ── HTTP request metrics ──────────────────────────────────────────────────────
 

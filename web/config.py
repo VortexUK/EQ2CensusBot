@@ -4,10 +4,10 @@ All new web routes should import from here; all bot/census code from census.conf
 """
 
 from census.config import (  # noqa: F401
-    SERVICE_ID,
-    WORLD,
-    SERVER_MAX_LEVEL,
-    LAUNCH_DT_ISO,
     CORS_ORIGINS,
     DISCORD_SYNC_GUILD_IDS,
+    LAUNCH_DT_ISO,
+    SERVER_MAX_LEVEL,
+    SERVICE_ID,
+    WORLD,
 )

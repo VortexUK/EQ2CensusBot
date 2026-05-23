@@ -31,14 +31,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from census.spells_db import (
-    DB_PATH,
     _CREATE_INDEXES,
     _CREATE_META,
     _CREATE_TABLE,
+    DB_PATH,
     _passes_spellcheck,
     strip_roman,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

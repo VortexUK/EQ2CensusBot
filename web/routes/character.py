@@ -5,33 +5,51 @@ import logging
 import sqlite3
 from collections import Counter, defaultdict
 
-_log = logging.getLogger(__name__)
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+
 from census.client import CensusClient
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
-from census.models import AdornSlot as _AdornSlot
-from census.spells_db import (
-    DB_PATH as _SPELLS_DB,
-    find_by_ids as _spell_find_by_ids,
-    load_blocklist as _load_spell_blocklist,
-    strip_roman as _strip_roman,
-    unique_highest_entries as _unique_highest_rows,
-)
+from census.db import DB_PATH as _ITEMS_DB
 from census.recipes_db import (
     DB_PATH as _RECIPES_DB,
+)
+from census.recipes_db import (
     find_spells_by_tier as _find_spell_recipes,
+)
+from census.spells_db import (
+    DB_PATH as _SPELLS_DB,
+)
+from census.spells_db import (
+    find_by_ids as _spell_find_by_ids,
+)
+from census.spells_db import (
+    load_blocklist as _load_spell_blocklist,
+)
+from census.spells_db import (
+    strip_roman as _strip_roman,
+)
+from census.spells_db import (
+    unique_highest_entries as _unique_highest_rows,
+)
+from web.cache import character_cache
+from web.config import SERVICE_ID as _SERVICE_ID
+from web.config import WORLD as _WORLD
+from web.limiter import limiter
+from web.routes.recipes import (
+    IngredientResponse as _RecipeIngredientResponse,
 )
 from web.routes.recipes import (
     RecipeResult as _RecipeResult,
-    IngredientResponse as _RecipeIngredientResponse,
+)
+from web.routes.recipes import (
     _bench_label as _recipe_bench_label,
+)
+from web.routes.recipes import (
     _fuel_to_craft_tier as _recipe_fuel_to_craft_tier,
 )
-from census.db import DB_PATH as _ITEMS_DB
-from web.cache import character_cache
-from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["character"])
 
@@ -253,6 +271,7 @@ async def prewarm_character_cache() -> None:
     Uses a semaphore to avoid hammering Census with too many parallel requests.
     """
     import aiosqlite
+
     from web.db import DB_PATH
 
     try:
@@ -307,7 +326,8 @@ async def _bg_refresh_character(name: str, cache_key: str) -> None:
 
 
 @router.get("/character/{name}", response_model=CharacterResponse)
-async def get_character(name: str) -> CharacterResponse:
+@limiter.limit("30/minute")
+async def get_character(request: Request, name: str) -> CharacterResponse:
     """
     Fetch a character's overview from the EQ2 Census API.
     Always responds instantly from cache; fires a background refresh when stale.
@@ -358,7 +378,8 @@ class CharacterSpellsResponse(BaseModel):
 
 
 @router.get("/character/{name}/spells", response_model=CharacterSpellsResponse)
-async def get_character_spells(name: str) -> CharacterSpellsResponse:
+@limiter.limit("30/minute")
+async def get_character_spells(request: Request, name: str) -> CharacterSpellsResponse:
     """Return a character's deduplicated spell list resolved from the local spells DB.
 
     Spell IDs come from the character record that was already fetched (and cached)
@@ -539,7 +560,8 @@ class UpgradeMaterialsResponse(BaseModel):
 
 
 @router.get("/character/{name}/upgrade-materials", response_model=UpgradeMaterialsResponse)
-async def get_upgrade_materials(name: str) -> UpgradeMaterialsResponse:
+@limiter.limit("20/minute")
+async def get_upgrade_materials(request: Request, name: str) -> UpgradeMaterialsResponse:
     """Return the aggregated crafting materials needed to upgrade all sub-Expert
     spells to Expert tier, using the local recipes DB.
     """
@@ -646,7 +668,8 @@ class UpgradeRecipesResponse(BaseModel):
 
 
 @router.get("/character/{name}/upgrade-recipes", response_model=UpgradeRecipesResponse)
-async def get_upgrade_recipes(name: str) -> UpgradeRecipesResponse:
+@limiter.limit("20/minute")
+async def get_upgrade_recipes(request: Request, name: str) -> UpgradeRecipesResponse:
     """Return full recipe objects needed to upgrade all sub-Expert spells to Expert tier.
 
     The response matches the RecipeResult shape used by the Recipes page so the

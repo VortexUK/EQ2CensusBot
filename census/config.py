@@ -37,5 +37,6 @@ CORS_ORIGINS: list[str] = [
 
 # Comma-separated Discord guild IDs that receive instant slash-command syncs.
 # The bot also does a global sync, but guild syncs propagate immediately.
-_raw_sync_ids = os.getenv("DISCORD_SYNC_GUILD_IDS", "648253204760625160,955890381847928892,1502314690041221260")
+# Set DISCORD_SYNC_GUILD_IDS in your .env or Railway env vars.
+_raw_sync_ids = os.getenv("DISCORD_SYNC_GUILD_IDS", "")
 DISCORD_SYNC_GUILD_IDS: list[int] = [int(x.strip()) for x in _raw_sync_ids.split(",") if x.strip().isdigit()]

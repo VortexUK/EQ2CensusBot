@@ -5,11 +5,9 @@ import logging
 import re
 import time as _time
 from collections import Counter
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
-
-_log = logging.getLogger(__name__)
 
 from census import db as item_db
 from census.item_parser import parse_item as _parse_item_fn
@@ -26,6 +24,8 @@ from census.models import (
     NodeAA,
     SpellEntry,
 )
+
+_log = logging.getLogger(__name__)
 
 BASE_URL = "https://census.daybreakgames.com"
 
@@ -91,7 +91,7 @@ def _build_trace_config() -> aiohttp.TraceConfig:
 class CensusClient:
     def __init__(self, service_id: str = "example") -> None:
         self.service_id = service_id
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     def _session_(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -108,7 +108,7 @@ class CensusClient:
     # Public API
     # ------------------------------------------------------------------
 
-    async def get_item(self, query: str) -> Optional[ItemData]:
+    async def get_item(self, query: str) -> ItemData | None:
         from census.db import DB_PATH
 
         db_exists = DB_PATH.exists()
@@ -133,7 +133,7 @@ class CensusClient:
         self._cache_item(raw_item)
         return _parse_item_fn(raw_item)
 
-    async def _find_in_db(self, query: str) -> Optional[dict]:
+    async def _find_in_db(self, query: str) -> dict | None:
         """Look up an item in the local SQLite DB. Returns raw Census dict or None."""
         query = query.strip()
         # Game link
@@ -159,11 +159,11 @@ class CensusClient:
         except Exception as exc:
             _log.warning("[DB] Failed to cache item %s: %s", raw.get("id"), exc)
 
-    async def get_raw_item(self, query: str) -> Optional[dict]:
+    async def get_raw_item(self, query: str) -> dict | None:
         """Return the raw parsed JSON — used by inspect_item.py."""
         return await self._fetch(self._build_params(query))
 
-    async def get_guild(self, name: str, world: str) -> Optional[GuildData]:
+    async def get_guild(self, name: str, world: str) -> GuildData | None:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
         params = {
             "name": name,
@@ -282,7 +282,7 @@ class CensusClient:
             )
         return equipment
 
-    async def get_character(self, name: str, world: str) -> Optional[CharacterOverview]:
+    async def get_character(self, name: str, world: str) -> CharacterOverview | None:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
             "name.first": name,
@@ -357,7 +357,7 @@ class CensusClient:
             spell_ids=spell_ids,
         )
 
-    async def get_character_aas(self, name: str, world: str) -> Optional[CharacterAAs]:
+    async def get_character_aas(self, name: str, world: str) -> CharacterAAs | None:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
             "name.first": name,
@@ -448,7 +448,7 @@ class CensusClient:
         }
         return rank_map, guild.get("member_list") or []
 
-    async def get_guild_full(self, name: str, world: str) -> Optional[tuple[GuildData, list[CharacterOverview], dict]]:
+    async def get_guild_full(self, name: str, world: str) -> tuple[GuildData, list[CharacterOverview], dict] | None:
         """
         Fetch guild with full member profiles (type + stats + equipment + spell IDs).
         Returns (GuildData, list[CharacterOverview], guild_info_dict) for cache
@@ -585,7 +585,7 @@ class CensusClient:
             guild_info,
         )
 
-    async def get_character_guild_name(self, character_name: str, world: str) -> Optional[str]:
+    async def get_character_guild_name(self, character_name: str, world: str) -> str | None:
         """
         Return the guild name for a character, or None if not in a guild.
         Raises on Census API/network errors so callers can distinguish
@@ -848,7 +848,7 @@ class CensusClient:
             )
         return results
 
-    async def get_character_spells(self, name: str, world: str) -> Optional[CharacterSpells]:
+    async def get_character_spells(self, name: str, world: str) -> CharacterSpells | None:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
             "name.first": name,
@@ -913,7 +913,7 @@ class CensusClient:
         # Display name
         return {"displayname": query, "c:limit": "1"}
 
-    async def _fetch(self, params: dict) -> Optional[dict]:
+    async def _fetch(self, params: dict) -> dict | None:
         url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/item/"
         _log.info("[Census] GET %s params=%s", url, params)
         try:
@@ -934,7 +934,7 @@ class CensusClient:
 # ------------------------------------------------------------------
 
 
-def _int(value: Any) -> Optional[int]:
+def _int(value: Any) -> int | None:
     if value is None:
         return None
     try:

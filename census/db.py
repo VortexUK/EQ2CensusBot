@@ -4,7 +4,7 @@ import json
 import re
 import sqlite3
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
 def _resolve_db_path() -> Path:
@@ -24,7 +24,7 @@ def _resolve_db_path() -> Path:
 DB_PATH = _resolve_db_path()
 
 
-def _resolve_max_level() -> "int | None":
+def _resolve_max_level() -> int | None:
     """
     SERVER_MAX_LEVEL env var caps item lookups by name to items usable at or
     below this level (e.g. 70 for an Echoes of Faydwer TLE).
@@ -36,7 +36,7 @@ def _resolve_max_level() -> "int | None":
     return int(v) if v else None
 
 
-SERVER_MAX_LEVEL: "int | None" = _resolve_max_level()
+SERVER_MAX_LEVEL: int | None = _resolve_max_level()
 
 # ---------------------------------------------------------------------------
 # EQ2 class-group constants and label helper
@@ -101,7 +101,7 @@ _ARCHETYPES = [
 ]
 
 
-def compute_class_label(classes: "dict | None") -> "str | None":
+def compute_class_label(classes: dict | None) -> str | None:
     """
     Return a human-readable class restriction label.
 
@@ -401,7 +401,7 @@ def _flag(flags: dict, key: str) -> int:
     return 1 if val in (1, True, "1", 1.0) else 0
 
 
-def _str_field(item: dict, key: str) -> Optional[str]:
+def _str_field(item: dict, key: str) -> str | None:
     v = item.get(key)
     if v is None or isinstance(v, dict):
         return None
@@ -409,7 +409,7 @@ def _str_field(item: dict, key: str) -> Optional[str]:
     return s if s else None
 
 
-def _int_field(v: Any) -> Optional[int]:
+def _int_field(v: Any) -> int | None:
     if v is None:
         return None
     try:
@@ -418,7 +418,7 @@ def _int_field(v: Any) -> Optional[int]:
         return None
 
 
-def _int_field_zero(v: Any) -> Optional[int]:
+def _int_field_zero(v: Any) -> int | None:
     """Like _int_field but keeps 0."""
     if v is None:
         return None
@@ -724,7 +724,7 @@ def _backfill_effect_stats(conn: sqlite3.Connection) -> None:
     # For now "Attack Speed" covers all patterns in _EFFECT_STAT_PATTERNS.
     keyword_hints = ["attack speed"]  # lowercase; extend when patterns grow
 
-    conditions = " OR ".join(f"LOWER(raw_json) LIKE ?" for _ in keyword_hints)
+    conditions = " OR ".join("LOWER(raw_json) LIKE ?" for _ in keyword_hints)
     rows = conn.execute(
         f"SELECT id, raw_json FROM items WHERE raw_json IS NOT NULL AND ({conditions})",
         [f"%{kw}%" for kw in keyword_hints],
@@ -800,7 +800,7 @@ def item_count(conn: sqlite3.Connection) -> int:
 # ---------------------------------------------------------------------------
 
 
-async def find_by_name(name: str, path: Path = DB_PATH) -> Optional[dict]:
+async def find_by_name(name: str, path: Path = DB_PATH) -> dict | None:
     """Return raw Census JSON dict for the closest name match, or None."""
     try:
         import aiosqlite
@@ -812,7 +812,7 @@ async def find_by_name(name: str, path: Path = DB_PATH) -> Optional[dict]:
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
 
-        async def _best(where_clause: str, params: tuple) -> "aiosqlite.Row | None":
+        async def _best(where_clause: str, params: tuple) -> aiosqlite.Row | None:
             """
             Return the best matching row given a WHERE clause + params.
 
@@ -858,7 +858,7 @@ async def find_by_name(name: str, path: Path = DB_PATH) -> Optional[dict]:
         return json.loads(row["raw_json"]) if row else None
 
 
-async def find_by_id(item_id: int, path: Path = DB_PATH) -> Optional[dict]:
+async def find_by_id(item_id: int, path: Path = DB_PATH) -> dict | None:
     """Return raw Census JSON dict for the given item ID, or None."""
     try:
         import aiosqlite
@@ -874,11 +874,11 @@ async def find_by_id(item_id: int, path: Path = DB_PATH) -> Optional[dict]:
         return json.loads(row["raw_json"]) if row else None
 
 
-def _find_by_name_sync(name: str, path: Path) -> Optional[dict]:
+def _find_by_name_sync(name: str, path: Path) -> dict | None:
     if not path.exists():
         return None
 
-    def _best(conn: sqlite3.Connection, where_clause: str, params: tuple) -> Optional[sqlite3.Row]:
+    def _best(conn: sqlite3.Connection, where_clause: str, params: tuple) -> sqlite3.Row | None:
         if SERVER_MAX_LEVEL is not None:
             row = conn.execute(
                 f"SELECT raw_json FROM items WHERE {where_clause}"
@@ -906,7 +906,7 @@ def _find_by_name_sync(name: str, path: Path) -> Optional[dict]:
         return json.loads(row["raw_json"]) if row else None
 
 
-def _find_by_id_sync(item_id: int, path: Path) -> Optional[dict]:
+def _find_by_id_sync(item_id: int, path: Path) -> dict | None:
     if not path.exists():
         return None
     with sqlite3.connect(path) as conn:

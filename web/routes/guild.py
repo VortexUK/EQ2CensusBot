@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections import Counter
 
-_log = logging.getLogger(__name__)
-
 import aiosqlite
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from census.client import CensusClient
@@ -15,18 +14,44 @@ from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.models import CharacterOverview, GuildData, SpellEntry
 from census.spells_db import (
     DB_PATH as _SPELLS_DB,
+)
+from census.spells_db import (
     find_by_ids as _spell_find_by_ids,
+)
+from census.spells_db import (
     load_blocklist as _load_spell_blocklist,
+)
+from census.spells_db import (
     strip_roman as _strip_roman,
+)
+from census.spells_db import (
     unique_highest_entries as _unique_highest,
 )
 from web.cache import character_cache, guild_cache
-from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
-from web.db import DB_PATH as _USERS_DB_PATH, get_active_claims
+from web.config import SERVICE_ID as _SERVICE_ID
+from web.config import WORLD as _WORLD
+from web.db import DB_PATH as _USERS_DB_PATH
+from web.db import get_active_claims
+from web.limiter import limiter
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["guild"])
 
 _OFFICER_RANKS = frozenset({0, 1})  # rank_ids that count as "officer"
+
+# Guild name validation: EQ2 guild names are letters, digits, spaces, hyphens,
+# apostrophes — max 64 characters.  Reject anything else early.
+_GUILD_NAME_MAX = 64
+
+
+def _validate_guild_name(guild_name: str) -> None:
+    """Raise 400 if guild_name looks malformed or dangerously long."""
+    if not guild_name or len(guild_name) > _GUILD_NAME_MAX:
+        raise HTTPException(status_code=400, detail="Invalid guild name length (max 64 characters).")
+    if not re.fullmatch(r"[A-Za-z0-9 '\-]+", guild_name):
+        raise HTTPException(status_code=400, detail="Guild name contains invalid characters.")
+
 
 # Slots whose adornments are excluded from the adorn check (same as character page)
 _SKIP_SLOTS = frozenset({"ammo", "event slot", "mount adornment", "mount armor"})
@@ -137,12 +162,16 @@ def _int(v) -> int | None:
 
 # In-flight deduplication: one dict covers ALL guild endpoints (roster, info,
 # spell-check, adorn-check) so any concurrent cache-miss fires only one Census call.
-_guild_fetch_tasks: dict[str, "asyncio.Task"] = {}
+_guild_fetch_tasks: dict[str, asyncio.Task] = {}
+
+# Background-refresh dedup: tracks which guilds already have a background
+# refresh task scheduled, so concurrent stale responses don't spawn duplicates.
+_guild_refresh_in_flight: set[str] = set()
 
 
 async def _fetch_and_cache_guild(
     guild_name: str,
-) -> "tuple[GuildData, list, dict] | None":
+) -> tuple[GuildData, list, dict] | None:
     """
     Fetch full guild data via get_guild_full and atomically refresh every
     related cache key in one shot:
@@ -460,7 +489,14 @@ def _prewarm_spell_cache(
 
 async def _bg_refresh_guild(guild_name: str) -> None:
     """Background task: re-fetch all guild data and refresh every related cache."""
-    await _fetch_and_cache_guild(guild_name)
+    key = guild_name.lower()
+    if key in _guild_refresh_in_flight:
+        return
+    _guild_refresh_in_flight.add(key)
+    try:
+        await _fetch_and_cache_guild(guild_name)
+    finally:
+        _guild_refresh_in_flight.discard(key)
 
 
 def _overview_to_char_response(ov: CharacterOverview):  # → CharacterResponse
@@ -481,13 +517,15 @@ def _overview_to_char_response(ov: CharacterOverview):  # → CharacterResponse
 
 
 @router.get("/guild/{guild_name}/info", response_model=GuildInfoResponse)
-async def get_guild_info(guild_name: str) -> GuildInfoResponse:
+@limiter.limit("10/minute")
+async def get_guild_info(request: Request, guild_name: str) -> GuildInfoResponse:
     """
     Return lightweight guild metadata (no member list).
     The info cache is pre-warmed by any guild endpoint that calls
     _fetch_and_cache_guild, so this usually hits cache on first load.
     On cache miss it triggers a full guild fetch (also warms roster/chars).
     """
+    _validate_guild_name(guild_name)
     cache_key = f"info:{guild_name.lower()}:{_WORLD.lower()}"
     cached, is_stale = guild_cache.get_stale(cache_key)
     if cached is not None:
@@ -504,14 +542,14 @@ async def get_guild_info(guild_name: str) -> GuildInfoResponse:
 
 
 @router.get("/guild/{guild_name}", response_model=GuildResponse)
-async def get_guild(guild_name: str) -> GuildResponse:
+@limiter.limit("10/minute")
+async def get_guild(request: Request, guild_name: str) -> GuildResponse:
     """
     Return the guild roster sorted by rank then level descending.
     On cache miss triggers a full guild fetch that simultaneously pre-warms
     the info, per-character, adorn, and spell caches.
     """
-    if len(guild_name) > 64:
-        raise HTTPException(status_code=400, detail="Guild name is too long")
+    _validate_guild_name(guild_name)
     cache_key = f"roster:{guild_name.lower()}:{_WORLD.lower()}"
     cached, is_stale = guild_cache.get_stale(cache_key)
     if cached is not None:
@@ -528,13 +566,15 @@ async def get_guild(guild_name: str) -> GuildResponse:
 
 
 @router.get("/guild/{guild_name}/spell-check", response_model=GuildSpellCheckResponse)
-async def guild_spell_check(guild_name: str) -> GuildSpellCheckResponse:
+@limiter.limit("10/minute")
+async def guild_spell_check(request: Request, guild_name: str) -> GuildSpellCheckResponse:
     """
     Spell tier summary for every guild member.
     Responds instantly from cache; on miss triggers a full guild fetch
     (one Census call) that also warms roster/chars/adorns.
     Spell IDs are resolved locally — no per-character Census calls needed.
     """
+    _validate_guild_name(guild_name)
     cache_key = f"spells:{guild_name.lower()}:{_WORLD.lower()}"
     cached, is_stale = guild_cache.get_stale(cache_key)
     if cached is not None:
@@ -554,12 +594,14 @@ async def guild_spell_check(guild_name: str) -> GuildSpellCheckResponse:
 
 
 @router.get("/guild/{guild_name}/adorn-check", response_model=GuildAdornCheckResponse)
-async def guild_adorn_check(guild_name: str) -> GuildAdornCheckResponse:
+@limiter.limit("10/minute")
+async def guild_adorn_check(request: Request, guild_name: str) -> GuildAdornCheckResponse:
     """
     Adornment slot summary for every guild member.
     Responds instantly from cache; on miss triggers a full guild fetch
     (one Census call) that also warms roster/chars/spells.
     """
+    _validate_guild_name(guild_name)
     cache_key = f"adorns:{guild_name.lower()}:{_WORLD.lower()}"
     cached, is_stale = guild_cache.get_stale(cache_key)
     if cached is not None:

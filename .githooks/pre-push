@@ -44,7 +44,16 @@ if ! python -m ruff format --check .; then
 fi
 echo "${GREEN}  ✓ ruff format OK${RESET}"
 
-# ── 4. Python type checking (pyright) ────────────────────────────────────────
+# ── 4. Python lint (ruff check) ──────────────────────────────────────────────
+echo "${CYAN}→ Python lint (ruff check)${RESET}"
+if ! python -m ruff check .; then
+  echo ""
+  echo "${RED}✗ Lint errors found. Run: python -m ruff check --fix .${RESET}"
+  exit 1
+fi
+echo "${GREEN}  ✓ ruff lint OK${RESET}"
+
+# ── 5. Python type checking (pyright) ────────────────────────────────────────
 echo "${CYAN}→ Python types (pyright)${RESET}"
 if ! python -m pyright; then
   echo ""
@@ -52,6 +61,15 @@ if ! python -m pyright; then
   exit 1
 fi
 echo "${GREEN}  ✓ pyright OK${RESET}"
+
+# ── 6. Python tests (pytest) ─────────────────────────────────────────────────
+echo "${CYAN}→ Python tests (pytest)${RESET}"
+if ! python -m pytest --tb=short -q; then
+  echo ""
+  echo "${RED}✗ Tests failed. Push aborted.${RESET}"
+  exit 1
+fi
+echo "${GREEN}  ✓ pytest OK${RESET}"
 
 echo ""
 echo "${GREEN}All checks passed.${RESET}"

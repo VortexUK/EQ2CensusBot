@@ -1,6 +1,8 @@
 """Sample values for unmapped fields to decide if they're worth storing."""
 
-import json, sqlite3, sys
+import json
+import sqlite3
+import sys
 from collections import Counter
 from pathlib import Path
 

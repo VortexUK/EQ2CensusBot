@@ -7,9 +7,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from census.spells_db import Blocklist
 from web.app import create_app
 from web.routes.character import CharacterResponse, CharacterStats
 
+_EMPTY_BLOCKLIST = Blocklist(frozenset(), [])
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -41,7 +43,7 @@ def _fake_spell_row(
     tier_name: str = "Adept",
     spell_type: str = "spells",
     level: int = 20,
-    given_by: str = "any",
+    given_by: str = "spellscroll",
     icon_id: int | None = 500,
     icon_backdrop: int | None = 456,
 ) -> dict:
@@ -142,7 +144,7 @@ async def test_spells_returns_data(app):
         patch("web.routes.character._SPELLS_DB", mock_db),
         patch("web.routes.character.character_cache") as mock_cache,
         patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=frozenset()),
+        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -175,7 +177,7 @@ async def test_spells_blocklist_applied(app):
     }
 
     # "fighting chance" (stripped roman) is blocklisted
-    blocklist = frozenset({"fighting chance"})
+    blocklist = Blocklist(frozenset({"fighting chance"}), [])
 
     with (
         patch("web.routes.character._SPELLS_DB", mock_db),
@@ -196,28 +198,25 @@ async def test_spells_blocklist_applied(app):
 
 
 @pytest.mark.asyncio
-async def test_spells_includes_combat_arts_given_by_class(app):
-    """Arts with given_by='class' are included (combat arts for scouts/fighters)."""
+async def test_spells_only_includes_spellscroll(app):
+    """Only given_by='spellscroll' entries are included; class/aa/any are excluded."""
     mock_db = MagicMock()
     mock_db.exists.return_value = True
 
-    char = _fake_char(spell_ids=[3001])
+    char = _fake_char(spell_ids=[3001, 3002, 3003])
     spell_rows = {
         3001: _fake_spell_row(
-            3001,
-            name="Cheap Shot I",
-            tier_name="Adept",
-            spell_type="arts",
-            level=15,
-            given_by="class",
+            3001, name="Cheap Shot I", tier_name="Adept", spell_type="arts", level=15, given_by="class"
         ),
+        3002: _fake_spell_row(3002, name="AA Spell I", tier_name="Adept", level=50, given_by="alternateadvancement"),
+        3003: _fake_spell_row(3003, name="Scribed Spell I", tier_name="Adept", level=30, given_by="spellscroll"),
     }
 
     with (
         patch("web.routes.character._SPELLS_DB", mock_db),
         patch("web.routes.character.character_cache") as mock_cache,
         patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=frozenset()),
+        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -227,49 +226,9 @@ async def test_spells_includes_combat_arts_given_by_class(app):
     assert r.status_code == 200
     data = r.json()
     spell_names = {s["name"] for s in data["spells"]}
-    assert "Cheap Shot I" in spell_names
-
-
-@pytest.mark.asyncio
-async def test_spells_excludes_aa_granted(app):
-    """Spells granted by alternateadvancement are excluded."""
-    mock_db = MagicMock()
-    mock_db.exists.return_value = True
-
-    char = _fake_char(spell_ids=[4001, 4002])
-    spell_rows = {
-        4001: _fake_spell_row(
-            4001,
-            name="AA Bonus Spell I",
-            tier_name="Adept",
-            level=50,
-            given_by="alternateadvancement",
-        ),
-        4002: _fake_spell_row(
-            4002,
-            name="Regular Spell I",
-            tier_name="Adept",
-            level=30,
-            given_by="any",
-        ),
-    }
-
-    with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
-        patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=frozenset()),
-    ):
-        mock_cache.get_stale.return_value = (char, False)
-
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            r = await client.get("/api/character/Sihtric/spells")
-
-    assert r.status_code == 200
-    data = r.json()
-    spell_names = {s["name"] for s in data["spells"]}
-    assert "AA Bonus Spell I" not in spell_names
-    assert "Regular Spell I" in spell_names
+    assert "Cheap Shot I" not in spell_names
+    assert "AA Spell I" not in spell_names
+    assert "Scribed Spell I" in spell_names
 
 
 @pytest.mark.asyncio
@@ -288,7 +247,7 @@ async def test_spells_excludes_zero_level(app):
         patch("web.routes.character._SPELLS_DB", mock_db),
         patch("web.routes.character.character_cache") as mock_cache,
         patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=frozenset()),
+        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -319,7 +278,7 @@ async def test_spells_deduplication_keeps_highest_level(app):
         patch("web.routes.character._SPELLS_DB", mock_db),
         patch("web.routes.character.character_cache") as mock_cache,
         patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=frozenset()),
+        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -394,7 +353,7 @@ async def test_spells_response_structure(app):
         patch("web.routes.character._SPELLS_DB", mock_db),
         patch("web.routes.character.character_cache") as mock_cache,
         patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=frozenset()),
+        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 

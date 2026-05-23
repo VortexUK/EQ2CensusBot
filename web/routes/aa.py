@@ -5,8 +5,6 @@ import json
 import logging
 from pathlib import Path
 
-_log = logging.getLogger(__name__)
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -14,7 +12,10 @@ from census.client import CensusClient
 from census.spells_db import find_by_crc
 from image.aa_tree import detect_tree_type
 from web.cache import aa_cache
-from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
+from web.config import SERVICE_ID as _SERVICE_ID
+from web.config import WORLD as _WORLD
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["aa"])
 

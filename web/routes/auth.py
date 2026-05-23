@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 from urllib.parse import urlencode
@@ -11,6 +12,7 @@ from pydantic import BaseModel
 
 from web.db import get_user_access_status, upsert_user
 
+_log = logging.getLogger(__name__)
 router = APIRouter(tags=["auth"])
 
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID", "")
@@ -20,6 +22,10 @@ _DISCORD_API = "https://discord.com/api/v10"
 _SCOPES = "identify"
 
 _ADMIN_IDS: frozenset[str] = frozenset(filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(",")))
+if not _ADMIN_IDS:
+    _log.warning(
+        "ADMIN_DISCORD_IDS is not set — no users will have admin access. Set this env var to your Discord user ID."
+    )
 
 
 class UserResponse(BaseModel):

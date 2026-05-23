@@ -1,5 +1,7 @@
+from unittest.mock import patch
+
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 from web.app import create_app
 
@@ -30,9 +32,15 @@ async def test_health_response_shape(app):
 
 
 @pytest.mark.asyncio
-async def test_openapi_schema_available(app):
-    """OpenAPI schema must be accessible so the API is self-documenting."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+async def test_openapi_schema_available():
+    """OpenAPI schema is available when SHOW_API_DOCS is enabled."""
+    import web.app as app_module
+
+    # _SHOW_DOCS is a module-level constant; patch it so create_app sees True.
+    with patch.object(app_module, "_SHOW_DOCS", True):
+        docs_app = app_module.create_app(session_secret="test-secret")
+
+    async with AsyncClient(transport=ASGITransport(app=docs_app), base_url="http://test") as client:
         response = await client.get("/api/openapi.json")
 
     assert response.status_code == 200

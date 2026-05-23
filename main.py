@@ -30,6 +30,7 @@ async def run_bot() -> None:
 
 async def run_web() -> None:
     import uvicorn
+
     from web.app import app
 
     port = int(os.getenv("PORT", "8000"))

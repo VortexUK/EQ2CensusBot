@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import discord
@@ -100,7 +100,7 @@ class FunCog(commands.Cog):
             await interaction.response.send_message("No launch date configured.", ephemeral=True)
             return
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         delta = (LAUNCH_DT - now).total_seconds()
         dt_str = LAUNCH_DT.strftime("%-d %B %Y, %H:%M UTC") if hasattr(LAUNCH_DT, "strftime") else LAUNCH_DT_ISO
 

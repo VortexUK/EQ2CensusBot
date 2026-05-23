@@ -1,9 +1,9 @@
 [phases.setup]
-nixPkgs = ["python311Full", "nodejs_20"]
+nixPkgs = ["python313Full", "nodejs_20"]
 
 [phases.install]
 cmds = [
-  "python3.11 -m venv /app/.venv",
+  "python3.13 -m venv /app/.venv",
   "/app/.venv/bin/pip install -r requirements.txt",
   "cd frontend && npm install"
 ]

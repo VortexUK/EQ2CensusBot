@@ -1,6 +1,8 @@
 """Embed the L&L favicon.ico as a base64 PNG inside an SVG wrapper."""
 
-import base64, io, sys
+import base64
+import io
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

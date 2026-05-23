@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "AAs"
 ICONS_DIR = DATA_DIR / "icons"

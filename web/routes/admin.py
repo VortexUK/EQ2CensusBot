@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -18,9 +20,16 @@ from web.db import (
 )
 from web.routes.claim import _refresh_claim_cache
 
+_log = logging.getLogger(__name__)
+
 router = APIRouter(tags=["admin"])
 
 _ADMIN_IDS: frozenset[str] = frozenset(filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(",")))
+if not _ADMIN_IDS:
+    _log.warning(
+        "ADMIN_DISCORD_IDS is not set — all /api/admin/* endpoints will return 403. "
+        "Set this env var to your Discord user ID to enable admin access."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +88,7 @@ class UserItem(BaseModel):
 @router.get("/admin/claims", response_model=list[ClaimDetail])
 async def list_all_claims(
     request: Request,
-    status: str | None = None,
+    status: Literal["pending", "approved", "rejected"] | None = None,
 ) -> list[ClaimDetail]:
     """
     List character claims, optionally filtered by status.

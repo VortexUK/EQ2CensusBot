@@ -26,8 +26,6 @@ import os
 import re
 import sqlite3
 from pathlib import Path
-from typing import Optional
-
 
 # Ordered from lowest to highest so tier-comparison logic can use the index.
 SPELL_TIERS: tuple[str, ...] = (
@@ -167,7 +165,7 @@ INSERT OR REPLACE INTO recipes (
 # ---------------------------------------------------------------------------
 
 
-def _int(v) -> Optional[int]:
+def _int(v) -> int | None:
     if v is None:
         return None
     try:
@@ -176,7 +174,7 @@ def _int(v) -> Optional[int]:
         return None
 
 
-def _parse_spell_tier(name: str) -> tuple[Optional[str], Optional[str]]:
+def _parse_spell_tier(name: str) -> tuple[str | None, str | None]:
     """Return (base_name_lower, crafted_tier) for spell-scroll recipe names.
 
     e.g. "Lightning Palm III (Expert)" → ("lightning palm iii", "Expert")
@@ -194,7 +192,7 @@ def _parse_spell_tier(name: str) -> tuple[Optional[str], Optional[str]]:
     return m.group(1).strip().lower(), canonical
 
 
-def recipe_to_row(r: dict) -> Optional[dict]:
+def recipe_to_row(r: dict) -> dict | None:
     """Convert a raw Census /recipe/ dict into a flat DB row dict.
 
     Returns None if the record has no usable id.
@@ -300,11 +298,9 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     conn.execute(_CREATE_META)
     conn.execute(_CREATE_TABLE)
     # Migrate existing DBs that predate the spell-tier columns
-    migrated = False
     for stmt in _MIGRATIONS:
         try:
             conn.execute(stmt)
-            migrated = True
         except sqlite3.OperationalError:
             pass  # column already exists
     for idx in _CREATE_INDEXES:
@@ -316,7 +312,7 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     return conn
 
 
-def get_meta(conn: sqlite3.Connection, key: str, default: Optional[str] = None) -> Optional[str]:
+def get_meta(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
     row = conn.execute("SELECT value FROM _meta WHERE key = ?", (key,)).fetchone()
     return row[0] if row else default
 
@@ -367,7 +363,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     return d
 
 
-def find_by_id(recipe_id: int, path: Path = DB_PATH) -> Optional[dict]:
+def find_by_id(recipe_id: int, path: Path = DB_PATH) -> dict | None:
     """Return a recipe row dict for the given ID, or None."""
     if not path.exists():
         return None

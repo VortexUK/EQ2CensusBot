@@ -22,8 +22,6 @@ import re
 import sqlite3
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
-
 
 # ---------------------------------------------------------------------------
 # Config
@@ -155,14 +153,14 @@ INSERT OR REPLACE INTO spells (
 # ---------------------------------------------------------------------------
 
 
-def _str(v) -> Optional[str]:
+def _str(v) -> str | None:
     if v is None or isinstance(v, dict):
         return None
     s = str(v).strip()
     return s or None
 
 
-def _int(v) -> Optional[int]:
+def _int(v) -> int | None:
     if v is None:
         return None
     try:
@@ -171,7 +169,7 @@ def _int(v) -> Optional[int]:
         return None
 
 
-def _float(v) -> Optional[float]:
+def _float(v) -> float | None:
     if v is None:
         return None
     try:
@@ -287,7 +285,7 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     return conn
 
 
-def get_meta(conn: sqlite3.Connection, key: str, default: Optional[str] = None) -> Optional[str]:
+def get_meta(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
     row = conn.execute("SELECT value FROM _meta WHERE key = ?", (key,)).fetchone()
     return row[0] if row else default
 
@@ -329,7 +327,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     return dict(row)
 
 
-def find_by_id(spell_id: int, path: Path = DB_PATH) -> Optional[dict]:
+def find_by_id(spell_id: int, path: Path = DB_PATH) -> dict | None:
     """Return a spell row dict for the given ID, or None."""
     if not path.exists():
         return None
@@ -354,7 +352,7 @@ def find_by_ids(spell_ids: list[int], path: Path = DB_PATH) -> dict[int, dict]:
 
 
 @lru_cache(maxsize=4096)
-def find_by_crc(crc: int, tier: Optional[int] = None, path: Path = DB_PATH) -> Optional[dict]:
+def find_by_crc(crc: int, tier: int | None = None, path: Path = DB_PATH) -> dict | None:
     """Return the spell row for the given CRC and AA rank tier.
 
     AA nodes reference spells by CRC; multiple rows share a CRC — one per

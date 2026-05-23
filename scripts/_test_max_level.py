@@ -1,6 +1,8 @@
 """Quick test: verify SERVER_MAX_LEVEL filtering logic against the live DB."""
 
-import os, sqlite3, sys
+import os
+import sqlite3
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -9,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["SERVER_MAX_LEVEL"] = "70"
 
 import importlib
+
 import census.db as db
 
 importlib.reload(db)  # pick up the env var we just set

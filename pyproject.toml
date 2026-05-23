@@ -1,6 +1,6 @@
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.format]
 # Black-compatible defaults; double quotes, 4-space indent
@@ -8,12 +8,28 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint]
-# Only run the formatter via the pre-push hook, not the linter.
-# Linting rules can be added here later if desired.
-select = []
+select = [
+    "F",   # pyflakes: undefined names, unused imports, redefined variables
+    "I",   # isort: import ordering
+    "E",   # pycodestyle errors (syntax-level, not style nits)
+    "W",   # pycodestyle warnings
+    "UP",  # pyupgrade: modernise syntax for Python 3.13
+]
+ignore = [
+    "E501",  # line too long — handled by ruff format (line-length = 120)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Scripts are standalone CLI tools; unused imports and broad rules are expected.
+"scripts/*" = ["F", "E", "W", "UP"]
+# Tests use wildcard imports and fixture magic that confuse pyflakes.
+"tests/*" = ["F401", "F811"]
+# web/app.py must call load_dotenv() before importing other project modules
+# so that env vars are available at import time.
+"web/app.py" = ["E402"]
 
 [tool.pyright]
-pythonVersion = "3.11"
+pythonVersion = "3.13"
 typeCheckingMode = "basic"
 include = ["census", "web", "bot"]
 exclude = ["scripts", "data", "frontend", "image", "**/__pycache__"]

@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 from web.app import create_app
 
@@ -47,12 +47,19 @@ async def test_callback_then_me(app):
         MockHttpx.return_value.__aenter__ = AsyncMock(return_value=mock_http)
         MockHttpx.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        # Use follow_redirects=True so the callback redirect lands back on /
-        # but we only care that the session cookie gets set
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test", follow_redirects=False
         ) as client:
-            cb = await client.get("/api/auth/callback?code=fake")
+            # Hit login first so the CSRF state is written into the session cookie.
+            login_r = await client.get("/api/auth/login")
+            assert login_r.status_code in (302, 307)
+            from urllib.parse import parse_qs, urlparse
+
+            login_location = login_r.headers["location"]
+            state = parse_qs(urlparse(login_location).query).get("state", [None])[0]
+            assert state is not None, "login redirect must include state param"
+
+            cb = await client.get(f"/api/auth/callback?code=fake&state={state}")
             assert cb.status_code in (302, 307)
             session_cookie = cb.cookies.get("session")
             assert session_cookie is not None, "callback must set a session cookie"

@@ -7,7 +7,8 @@ from pydantic import BaseModel
 
 from census.client import CensusClient
 from web.cache import character_cache, guild_cache
-from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
+from web.config import SERVICE_ID as _SERVICE_ID
+from web.config import WORLD as _WORLD
 from web.db import (
     add_item_watch,
     get_active_claims,
@@ -15,7 +16,7 @@ from web.db import (
     remove_item_watch,
     update_item_watch_check,
 )
-from web.routes.guild import _officer_chars, _roster_rank_map
+from web.routes.guild import _officer_chars, _roster_rank_map, _validate_guild_name
 
 router = APIRouter(tags=["guild"])
 
@@ -84,6 +85,7 @@ async def get_item_watches(guild_name: str, request: Request) -> list[ItemWatchE
     are updated against the latest cached character data.
     Officer access required.
     """
+    _validate_guild_name(guild_name)
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -108,6 +110,7 @@ async def add_item_watch_entry(
     Returns 409 if the same item is already being watched for that character.
     Officer access required.
     """
+    _validate_guild_name(guild_name)
     from census import db as item_db
 
     user = request.session.get("user")
@@ -191,6 +194,7 @@ async def add_item_watch_entry(
 @router.delete("/guild/{guild_name}/item-watch/{watch_id}", status_code=200)
 async def delete_item_watch(guild_name: str, watch_id: int, request: Request) -> dict:
     """Remove an item watch entry.  Officer access required."""
+    _validate_guild_name(guild_name)
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")

@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from typing import Optional
-
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from census.constants import ARCHETYPES, CLASS_GROUPS, ALL_CLASSES
+from census.constants import ARCHETYPES, CLASS_GROUPS
 from census.models import ItemData, ItemEffect, ItemStat
 
 # ---------------------------------------------------------------------------
@@ -411,9 +409,9 @@ def _draw_effect(
     y: int,
     x: int,
     content_w: int,
-    canvas: Optional[Image.Image] = None,
+    canvas: Image.Image | None = None,
     name_color: tuple = C_EFFECT_NAME,
-    glow_info: Optional[tuple] = EFFECT_GLOW,
+    glow_info: tuple | None = EFFECT_GLOW,
 ) -> int:
     if canvas is not None and glow_info is not None:
         glow_color, glow_radius, glow_passes = glow_info
@@ -556,13 +554,13 @@ def _load_fonts() -> dict:
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"),
     ]
 
-    def _find(candidates: list[Path]) -> Optional[str]:
+    def _find(candidates: list[Path]) -> str | None:
         for p in candidates:
             if p.exists():
                 return str(p)
         return None
 
-    def _load(path: Optional[str], size: int) -> ImageFont.FreeTypeFont:
+    def _load(path: str | None, size: int) -> ImageFont.FreeTypeFont:
         if path:
             try:
                 return ImageFont.truetype(path, size)

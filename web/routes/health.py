@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from web.config import SERVER_MAX_LEVEL, WORLD, LAUNCH_DT_ISO
+from web.config import LAUNCH_DT_ISO, SERVER_MAX_LEVEL, WORLD
 
 router = APIRouter(tags=["health"])
 

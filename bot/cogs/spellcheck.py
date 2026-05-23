@@ -11,7 +11,11 @@ from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.models import CharacterSpells, SpellEntry
 from census.spells_db import (
     load_blocklist as _load_spell_blocklist,
+)
+from census.spells_db import (
     strip_roman as _base_name,
+)
+from census.spells_db import (
     unique_highest_entries as _unique_highest,
 )
 

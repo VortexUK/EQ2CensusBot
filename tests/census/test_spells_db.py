@@ -9,6 +9,7 @@ import time
 import pytest
 
 from census.spells_db import (
+    _passes_spellcheck,
     find_by_crc,
     find_by_id,
     find_by_ids,
@@ -19,9 +20,7 @@ from census.spells_db import (
     strip_roman,
     unique_highest_entries,
     upsert_spells,
-    _passes_spellcheck,
 )
-
 
 # ---------------------------------------------------------------------------
 # strip_roman
@@ -259,10 +258,10 @@ class TestLoadBlocklist:
         assert "fighting chance" in result  # Roman stripped
         assert "fiery blast" in result
 
-    def test_returns_empty_frozenset_if_missing(self, tmp_path):
+    def test_returns_empty_if_missing(self, tmp_path):
         p = tmp_path / "nonexistent.json"
         result = load_blocklist(p)
-        assert result == frozenset()
+        assert not result  # empty Blocklist is falsy
 
     def test_all_lowercase(self, tmp_path):
         p = tmp_path / "blocklist.json"
@@ -274,14 +273,14 @@ class TestLoadBlocklist:
         p = tmp_path / "blocklist.json"
         p.write_text("not valid json", encoding="utf-8")
         result = load_blocklist(p)
-        assert result == frozenset()
+        assert not result  # empty Blocklist is falsy
 
     def test_non_string_entries_skipped(self, tmp_path):
         p = tmp_path / "blocklist.json"
         p.write_text('{"blocked": ["Valid Spell", 42, null]}', encoding="utf-8")
         result = load_blocklist(p)
         assert "valid spell" in result
-        assert len(result) == 1
+        assert "42" not in result
 
 
 # ---------------------------------------------------------------------------

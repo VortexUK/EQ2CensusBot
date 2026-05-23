@@ -1,6 +1,6 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -35,16 +35,16 @@ class CharacterSpells:
 @dataclass
 class GuildMember:
     name: str
-    level: Optional[int]
-    cls: Optional[str]  # adventurer class
-    ts_class: Optional[str]  # tradeskill class
-    ts_level: Optional[int]
-    aa_level: Optional[int]
-    deity: Optional[str]
-    rank: Optional[str]
-    rank_id: Optional[int]  # numeric rank for sort order
-    guild_status: Optional[int] = None  # status points contributed to the guild
-    played_time: Optional[int] = None  # total /played seconds
+    level: int | None
+    cls: str | None  # adventurer class
+    ts_class: str | None  # tradeskill class
+    ts_level: int | None
+    aa_level: int | None
+    deity: str | None
+    rank: str | None
+    rank_id: int | None  # numeric rank for sort order
+    guild_status: int | None = None  # status points contributed to the guild
+    played_time: int | None = None  # total /played seconds
 
 
 @dataclass
@@ -67,39 +67,39 @@ class ItemData:
     name: str
     quality: str  # fabled, legendary, treasured, uncommon, common
     description: str
-    icon_id: Optional[str]
-    icon_bytes: Optional[bytes]  # Raw PNG/image bytes for the icon
+    icon_id: str | None
+    icon_bytes: bytes | None  # Raw PNG/image bytes for the icon
     slot_type: str  # Head, Chest, etc.
     armor_type: str  # Leather Armor, Plate Armor, etc.
-    mitigation: Optional[int]
-    item_level: Optional[int]
-    required_level: Optional[int]
+    mitigation: int | None
+    item_level: int | None
+    required_level: int | None
     classes: list[str]
     stats: list[ItemStat] = field(default_factory=list)
     effects: list[ItemEffect] = field(default_factory=list)
     adornment_slots: list[str] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
-    game_link: Optional[str] = None
-    container_slots: Optional[int] = None
+    game_link: str | None = None
+    container_slots: int | None = None
     extra_info: list[tuple[str, str]] = field(default_factory=list)  # (label, value) rows
-    set_name: Optional[str] = None
+    set_name: str | None = None
     set_bonuses: list[SetBonusEntry] = field(default_factory=list)
 
 
 @dataclass
 class AdornSlot:
     color: str  # "White", "Yellow", "Red", etc.
-    adorn_name: Optional[str] = None  # None = empty slot
-    adorn_id: Optional[str] = None  # item DB id for tooltip lookup
+    adorn_name: str | None = None  # None = empty slot
+    adorn_id: str | None = None  # item DB id for tooltip lookup
 
 
 @dataclass
 class EquipmentSlot:
     slot_name: str
     item_name: str
-    item_id: Optional[str] = None
-    icon_id: Optional[str] = None
-    tier: Optional[str] = None  # FABLED, LEGENDARY, etc.
+    item_id: str | None = None
+    icon_id: str | None = None
+    tier: str | None = None  # FABLED, LEGENDARY, etc.
     adorn_slots: list = field(default_factory=list)  # list[AdornSlot]
 
 
@@ -107,16 +107,16 @@ class EquipmentSlot:
 class CharacterOverview:
     id: str
     name: str
-    level: Optional[int]
-    cls: Optional[str]  # adventurer class
-    race: Optional[str]
-    gender: Optional[str]
-    deity: Optional[str]
+    level: int | None
+    cls: str | None  # adventurer class
+    race: str | None
+    gender: str | None
+    deity: str | None
     aa_count: int
     world: str
-    ts_class: Optional[str] = None  # tradeskill class
-    ts_level: Optional[int] = None
-    guild_name: Optional[str] = None  # guild the character belongs to (None = no guild)
+    ts_class: str | None = None  # tradeskill class
+    ts_level: int | None = None
+    guild_name: str | None = None  # guild the character belongs to (None = no guild)
     stats: dict = field(default_factory=dict)
     equipment: list[EquipmentSlot] = field(default_factory=list)
     spell_ids: list[int] = field(default_factory=list)  # raw spell IDs from Census
@@ -139,7 +139,7 @@ class AAProfile:
 class CharacterAAs:
     character_name: str
     aa_list: list[NodeAA]
-    profiles: list["AAProfile"] = field(default_factory=list)
+    profiles: list[AAProfile] = field(default_factory=list)
 
     def for_tree(self, tree_id: int) -> dict[int, int]:
         """Return {node_id: tier} for all nodes in the given tree."""

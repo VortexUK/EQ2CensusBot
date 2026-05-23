@@ -1,8 +1,13 @@
-import urllib.request, json
+import json
+import sys
+import urllib.request
+
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+from census.config import SERVICE_ID  # noqa: E402
 
 # Test c:sort=id:ASC - does it give stable, sequential ordering?
 for start in [0, 100, 1000, 10000]:
-    url = f"http://census.daybreakgames.com/s:tovortex/get/eq2/item?c:start={start}&c:limit=5&c:sort=id:ASC"
+    url = f"https://census.daybreakgames.com/s:{SERVICE_ID}/get/eq2/item?c:start={start}&c:limit=5&c:sort=id:ASC"
     try:
         with urllib.request.urlopen(url, timeout=15) as r:
             data = json.loads(r.read())
