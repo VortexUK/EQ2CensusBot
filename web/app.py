@@ -128,7 +128,20 @@ _FRONTEND_DIST  = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 _ICONS_DIR           = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
 _AA_ASSETS_DIR       = Path(__file__).resolve().parent.parent / "data" / "AAs"
 _SPELL_ICONS_DIR     = Path(__file__).resolve().parent.parent / "data" / "spells" / "icons"
-_SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-secret-change-in-production")
+
+_SESSION_SECRET = os.getenv("SESSION_SECRET", "")
+if not _SESSION_SECRET:
+    raise RuntimeError(
+        "SESSION_SECRET environment variable is not set. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\" "
+        "and add it to your .env file or Railway environment."
+    )
+
+# Set HTTPS_ONLY=false only for local HTTP dev; defaults to true (Secure cookie flag)
+_HTTPS_ONLY = os.getenv("HTTPS_ONLY", "true").lower() not in ("0", "false", "no")
+
+# Set SHOW_API_DOCS=true to expose /api/docs and /api/openapi.json (off by default)
+_SHOW_DOCS = os.getenv("SHOW_API_DOCS", "false").lower() in ("1", "true", "yes")
 
 
 def create_app(session_secret: str | None = None) -> FastAPI:
@@ -156,16 +169,20 @@ def create_app(session_secret: str | None = None) -> FastAPI:
         on_startup=[_startup, _prewarm, _init_metrics],
         title="EQ2 TLE Companion",
         version="0.1.0",
-        docs_url="/api/docs",
-        redoc_url="/api/redoc",
-        openapi_url="/api/openapi.json",
+        docs_url="/api/docs"         if _SHOW_DOCS else None,
+        redoc_url="/api/redoc"       if _SHOW_DOCS else None,
+        openapi_url="/api/openapi.json" if _SHOW_DOCS else None,
     )
 
     # Metrics middleware first so it sees every request (added last = outermost)
     app.add_middleware(_MetricsMiddleware)
 
     # Sessions must be added before CORS so the cookie is available everywhere
-    app.add_middleware(SessionMiddleware, secret_key=session_secret or _SESSION_SECRET, https_only=False)
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=session_secret or _SESSION_SECRET,
+        https_only=_HTTPS_ONLY,
+    )
 
     app.add_middleware(
         CORSMiddleware,

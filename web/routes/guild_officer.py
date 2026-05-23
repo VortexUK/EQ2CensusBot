@@ -30,7 +30,6 @@ router = APIRouter(tags=["guild"])
 
 class GuildClaimItem(BaseModel):
     id: int
-    discord_id: str
     discord_name: str
     avatar: str | None = None
     character_name: str
@@ -77,7 +76,6 @@ async def get_guild_claims(guild_name: str, request: Request) -> list[GuildClaim
     return [
         GuildClaimItem(
             id             = c["id"],
-            discord_id     = c["discord_id"],
             discord_name   = c["discord_name"],
             avatar         = c.get("avatar"),
             character_name = c["character_name"],
@@ -111,7 +109,6 @@ async def officer_approve_claim(guild_name: str, claim_id: int, request: Request
     asyncio.create_task(_refresh_claim_cache(result["discord_id"]))
     return GuildClaimItem(
         id             = result["id"],
-        discord_id     = result["discord_id"],
         discord_name   = result["discord_name"],
         avatar         = result.get("avatar"),
         character_name = result["character_name"],

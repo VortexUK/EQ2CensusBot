@@ -484,6 +484,8 @@ async def get_guild(guild_name: str) -> GuildResponse:
     Also pre-warms the per-character cache from the single enriched guild call
     so that subsequent /character lookups are served from cache instantly.
     """
+    if len(guild_name) > 64:
+        raise HTTPException(status_code=400, detail="Guild name is too long")
     client = CensusClient(service_id=_SERVICE_ID)
     try:
         cache_key = f"roster:{guild_name.lower()}:{_WORLD.lower()}"
@@ -645,6 +647,8 @@ async def search_guilds(name: str = "") -> GuildSearchResponse:
     """
     q = name.strip()
     if len(q) < 2:
+        return GuildSearchResponse(results=[], total=0)
+    if len(q) > 64:
         return GuildSearchResponse(results=[], total=0)
 
     client = CensusClient(service_id=_SERVICE_ID)

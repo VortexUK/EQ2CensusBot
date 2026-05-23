@@ -148,6 +148,8 @@ async def create_claim(body: SubmitClaimRequest, request: Request) -> ClaimRespo
     name = body.character_name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Character name is required")
+    if len(name) > 64:
+        raise HTTPException(status_code=400, detail="Character name is too long")
 
     # Ensure the user row exists — it may be missing if the DB was reset while
     # the session cookie was still valid (i.e. user never re-authed after reset).

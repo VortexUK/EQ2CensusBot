@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from urllib.parse import urlencode
 
 import httpx
@@ -35,22 +36,29 @@ class UserResponse(BaseModel):
 
 
 @router.get("/auth/login")
-async def login() -> RedirectResponse:
+async def login(request: Request) -> RedirectResponse:
     """Redirect the browser to Discord's OAuth2 authorisation page."""
+    state = secrets.token_urlsafe(16)
+    request.session["oauth_state"] = state
     params = urlencode(
         {
             "client_id": DISCORD_CLIENT_ID,
             "redirect_uri": DISCORD_REDIRECT_URI,
             "response_type": "code",
             "scope": _SCOPES,
+            "state": state,
         }
     )
     return RedirectResponse(f"https://discord.com/api/oauth2/authorize?{params}")
 
 
 @router.get("/auth/callback")
-async def callback(code: str, request: Request) -> RedirectResponse:
+async def callback(code: str, state: str | None = None, *, request: Request) -> RedirectResponse:
     """Exchange the OAuth2 code for a token, fetch user info, store in session."""
+    expected_state = request.session.pop("oauth_state", None)
+    if not expected_state or state != expected_state:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state — please try logging in again")
+
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
             f"{_DISCORD_API}/oauth2/token",

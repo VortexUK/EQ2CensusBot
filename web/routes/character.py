@@ -306,6 +306,8 @@ async def get_character(name: str) -> CharacterResponse:
     Fetch a character's overview from the EQ2 Census API.
     Always responds instantly from cache; fires a background refresh when stale.
     """
+    if len(name) > 64:
+        raise HTTPException(status_code=400, detail="Character name is too long")
     cache_key = f"{name.lower()}:{_WORLD.lower()}"
     cached, is_stale = character_cache.get_stale(cache_key)
     if cached is not None:

@@ -70,6 +70,8 @@ async def search_characters(name: str = "") -> CharSearchResponse:
     q = name.strip()
     if len(q) < 2:
         return CharSearchResponse(results=[], total=0)
+    if len(q) > 64:
+        return CharSearchResponse(results=[], total=0)
 
     client = CensusClient(service_id=_SERVICE_ID)
     try:

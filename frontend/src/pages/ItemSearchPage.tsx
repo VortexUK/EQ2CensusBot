@@ -533,7 +533,7 @@ export default function ItemSearchPage() {
 
             <Field label="Min Level">
               <input
-                type="number" min={1} max={135} placeholder="e.g. 70"
+                type="number" min={0} max={135} placeholder="e.g. 70"
                 value={minLevel} onChange={e => setMinLevel(e.target.value)}
                 style={{ ...CTRL, width: 90 }}
               />
@@ -541,7 +541,7 @@ export default function ItemSearchPage() {
 
             <Field label="Max Level">
               <input
-                type="number" min={1} max={135} placeholder="e.g. 70"
+                type="number" min={0} max={135} placeholder="e.g. 70"
                 value={maxLevel} onChange={e => setMaxLevel(e.target.value)}
                 style={{ ...CTRL, width: 90 }}
               />
