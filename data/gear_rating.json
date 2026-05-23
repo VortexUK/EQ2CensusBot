@@ -1,19 +1,39 @@
 {
   "_comment": "Gear rating rules. Edit and restart the server to apply changes.",
+  "_usage":   "Band labels used in 'bands', 'fallback_band', and 'matrix' must all match each other.",
 
   "bands": [
-    { "label": "A", "min_below_max": 4  },
-    { "label": "B", "min_below_max": 10 }
+    {
+      "label":        "current",
+      "description":  "Within 4 levels of the expansion cap (e.g. 66–70 on a 70-cap server)",
+      "min_below_max": 4
+    },
+    {
+      "label":        "recent",
+      "description":  "Within 5–10 levels of the expansion cap (e.g. 60–65 on a 70-cap server)",
+      "min_below_max": 10
+    }
   ],
-  "fallback_band": "C",
+  "fallback_band": "outdated",
+  "_fallback_note": "Any item below the last band above is treated as 'outdated'",
 
-  "matrix": {
-    "fabled":    { "A": "A", "B": "B", "C": "E" },
-    "legendary": { "A": "B", "B": "C", "C": "F" },
-    "treasured": { "A": "D", "B": "E", "C": "F" }
+  "tier_groups": {
+    "_note":     "Informational only — describes what items fall into each tier key used in 'matrix'.",
+    "fabled":    "Fabled and Mythical items",
+    "legendary": "Legendary and Mastercrafted items",
+    "treasured": "Treasured, Uncommon, Handcrafted, and Common items"
   },
 
+  "_matrix_note": "Grade awarded per quality tier × level band. Rows = tier groups, columns = band labels defined above.",
+  "matrix": {
+    "fabled":    { "current": "A", "recent": "B", "outdated": "E" },
+    "legendary": { "current": "B", "recent": "C", "outdated": "F" },
+    "treasured": { "current": "D", "recent": "E", "outdated": "F" }
+  },
+
+  "_grade_scores_note": "Numeric weight per letter grade, used to compute the average score (0–10 scale).",
   "grade_scores": { "A": 10, "B": 8, "C": 6, "D": 4, "E": 2, "F": 0 },
 
-  "raid_ready_min_avg": 5.5
+  "raid_ready_min_avg": 5.5,
+  "_raid_ready_note": "Minimum average score required for the Raid Ready indicator. 5.5 corresponds to a C+ grade."
 }

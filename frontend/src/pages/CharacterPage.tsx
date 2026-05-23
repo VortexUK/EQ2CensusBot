@@ -99,12 +99,12 @@ interface RatingConfig {
 }
 
 const DEFAULT_RATING_CONFIG: RatingConfig = {
-  bands:              [{ label: 'A', min_below_max: 4 }, { label: 'B', min_below_max: 10 }],
-  fallback_band:      'C',
+  bands:              [{ label: 'current', min_below_max: 4 }, { label: 'recent', min_below_max: 10 }],
+  fallback_band:      'outdated',
   matrix: {
-    fabled:    { A: 'A', B: 'B', C: 'E' },
-    legendary: { A: 'B', B: 'C', C: 'F' },
-    treasured: { A: 'D', B: 'E', C: 'F' },
+    fabled:    { current: 'A', recent: 'B', outdated: 'E' },
+    legendary: { current: 'B', recent: 'C', outdated: 'F' },
+    treasured: { current: 'D', recent: 'E', outdated: 'F' },
   },
   grade_scores:       { A: 10, B: 8, C: 6, D: 4, E: 2, F: 0 },
   raid_ready_min_avg: 5.5,
