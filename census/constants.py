@@ -114,10 +114,18 @@ CLASS_GROUPS: dict[frozenset, str] = {
 # "duration" values are formatted as "X sec / X min / X hr".
 # Add new entries here to display additional typeinfo fields.
 TYPEINFO_DISPLAY: list[tuple[str, str, str]] = [
-    # (api_field, display_label, format)  — format: "duration" | "str"
-    ("duration",   "Duration", "duration"),
-    ("casttime",   "Casting",  "duration"),
-    ("recasttime", "Recast",   "duration"),
+    # (api_field_in_typeinfo, display_label, format)  — format: "duration" | "str"
+    # Spell scroll / ability (Census API stores these with "spell" prefix in typeinfo)
+    ("spelltarget",     "Target",   "str"),
+    ("spellrange",      "Range",    "str"),
+    ("spellcasttime",   "Casting",  "duration"),
+    ("spellrecasttime", "Recast",   "duration"),
+    ("spellduration",   "Duration", "duration"),
+    # Food / drink duration (pre-formatted string like "6 minutes")
+    ("duration",        "Duration", "duration"),
+    # Other items (legacy field names — kept for backward compat; usually no-ops)
+    ("casttime",        "Casting",  "duration"),
+    ("recasttime",      "Recast",   "duration"),
 ]
 
 # Top-level item fields to render as info rows.

@@ -494,7 +494,7 @@ async def get_spell_scroll(name: str, tier: str) -> SpellScrollResult:
             async with db.execute(
                 "SELECT id FROM items"
                 " WHERE displayname_lower = ?"
-                "   AND typeinfo_name = 'spellscroll'"
+                "   AND LOWER(typeinfo_name) = 'spellscroll'"
                 " LIMIT 1",
                 (scroll_name,),
             ) as cur:

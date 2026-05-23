@@ -200,7 +200,11 @@ def parse_effects(effect_list: list, adornment_list: list) -> list[ItemEffect]:
 
 def parse_extra_info(item: dict, typeinfo: dict) -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = []
+    seen_labels: set[str] = set()   # deduplicate — first non-null value wins
+
     for field, label, fmt in ITEM_DISPLAY:
+        if label in seen_labels:
+            continue
         val = item.get(field)
         if val is None:
             continue
@@ -209,11 +213,16 @@ def parse_extra_info(item: dict, typeinfo: dict) -> list[tuple[str, str]]:
             if n == 0:
                 continue
             rows.append((label, "Unlimited" if n == -1 else f"{n}/{n}"))
+            seen_labels.add(label)
         else:
             if str(val) == "0":
                 continue
             rows.append((label, str(val)))
+            seen_labels.add(label)
+
     for field, label, fmt in TYPEINFO_DISPLAY:
+        if label in seen_labels:
+            continue
         val = typeinfo.get(field)
         if val is None:
             continue
@@ -223,16 +232,20 @@ def parse_extra_info(item: dict, typeinfo: dict) -> list[tuple[str, str]]:
                 if seconds == 0:
                     continue
                 rows.append((label, _fmt_duration(seconds)))
+                seen_labels.add(label)
             except (TypeError, ValueError):
-                # Already a pre-formatted string (e.g. '45 minutes')
+                # Already a pre-formatted string (e.g. '6 minutes')
                 formatted = str(val)
                 if formatted in ("0", "0 sec", "0 min", "0 hr"):
                     continue
                 rows.append((label, formatted))
+                seen_labels.add(label)
         else:
             if str(val) == "0":
                 continue
             rows.append((label, str(val)))
+            seen_labels.add(label)
+
     return rows
 
 
