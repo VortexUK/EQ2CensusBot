@@ -42,7 +42,7 @@ from web.metrics import (
     should_track_path,
     should_track_user_view,
 )
-from web.config import WORLD as _WORLD
+from web.config import WORLD as _WORLD, CORS_ORIGINS as _CORS_ORIGINS
 from web import db as users_db
 
 
@@ -200,7 +200,7 @@ def create_app(session_secret: str | None = None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],  # Vite dev server
+        allow_origins=_CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -21,3 +21,21 @@ except ImportError:
 SERVICE_ID: str       = os.getenv("CENSUS_SERVICE_ID", "example")
 WORLD: str            = os.getenv("EQ2_WORLD", "Varsoon")
 SERVER_MAX_LEVEL: int = int(os.getenv("SERVER_MAX_LEVEL", "50"))
+
+# ISO-8601 UTC datetime for the server launch countdown.
+# Set LAUNCH_DT env var to override (e.g. "2027-03-15T18:00:00Z").
+# Set to an empty string or a past date to suppress the countdown widget.
+LAUNCH_DT_ISO: str = os.getenv("LAUNCH_DT", "2026-06-09T20:00:00Z")
+
+# Comma-separated list of origins for CORS (web layer only).
+# In production set CORS_ORIGINS to your actual frontend domain.
+CORS_ORIGINS: list[str] = [
+    o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()
+]
+
+# Comma-separated Discord guild IDs that receive instant slash-command syncs.
+# The bot also does a global sync, but guild syncs propagate immediately.
+_raw_sync_ids = os.getenv("DISCORD_SYNC_GUILD_IDS", "648253204760625160,955890381847928892,1502314690041221260")
+DISCORD_SYNC_GUILD_IDS: list[int] = [
+    int(x.strip()) for x in _raw_sync_ids.split(",") if x.strip().isdigit()
+]

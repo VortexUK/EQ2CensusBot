@@ -10,6 +10,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from census.config import LAUNCH_DT_ISO
+
 # ---------------------------------------------------------------------------
 # Data paths
 # ---------------------------------------------------------------------------
@@ -18,9 +20,13 @@ _INSULTS_PATH     = _DATA / "insult_creator.json"
 _TIME_METRICS_PATH = _DATA / "time_metrics.json"
 
 # ---------------------------------------------------------------------------
-# Launch target
+# Launch target — read from config so it can be updated via env var
 # ---------------------------------------------------------------------------
-LAUNCH_DT = datetime(2026, 6, 9, 20, 0, 0, tzinfo=timezone.utc)
+LAUNCH_DT: datetime | None
+try:
+    LAUNCH_DT = datetime.fromisoformat(LAUNCH_DT_ISO.replace("Z", "+00:00")) if LAUNCH_DT_ISO else None
+except ValueError:
+    LAUNCH_DT = None
 
 # ---------------------------------------------------------------------------
 # Owner identities  (set OWNER_DISCORD_ID env var to your numeric Discord ID
@@ -87,11 +93,16 @@ class FunCog(commands.Cog):
 
     @app_commands.command(
         name="when",
-        description="How long until the EQ2 server launch on June 9th 2026?"
+        description="How long until the EQ2 server launch?"
     )
     async def when(self, interaction: discord.Interaction) -> None:
+        if LAUNCH_DT is None:
+            await interaction.response.send_message("No launch date configured.", ephemeral=True)
+            return
+
         now    = datetime.now(timezone.utc)
         delta  = (LAUNCH_DT - now).total_seconds()
+        dt_str = LAUNCH_DT.strftime("%-d %B %Y, %H:%M UTC") if hasattr(LAUNCH_DT, "strftime") else LAUNCH_DT_ISO
 
         if delta <= 0:
             await interaction.response.send_message(
@@ -103,7 +114,7 @@ class FunCog(commands.Cog):
             countdown = _normal_countdown(delta)
             await interaction.response.send_message(
                 f"⏳ Server launches in: {countdown}\n"
-                f"*(June 9th 2026, 20:00 UTC)*"
+                f"*({dt_str})*"
             )
             return
 

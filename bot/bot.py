@@ -1,6 +1,8 @@
 import discord
 from discord.ext import commands
 
+from census.config import DISCORD_SYNC_GUILD_IDS
+
 
 class EQ2Bot(commands.Bot):
     def __init__(self) -> None:
@@ -18,7 +20,7 @@ class EQ2Bot(commands.Bot):
         await self.add_cog(SpellcheckCog(self))
         await self.add_cog(AaCheckCog(self))
         await self.add_cog(FunCog(self))
-        for guild_id in (648253204760625160, 955890381847928892, 1502314690041221260):
+        for guild_id in DISCORD_SYNC_GUILD_IDS:
             guild = discord.Object(id=guild_id)
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)

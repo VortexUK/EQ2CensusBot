@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from web.config import SERVER_MAX_LEVEL, WORLD
+from web.config import SERVER_MAX_LEVEL, WORLD, LAUNCH_DT_ISO
 
 router = APIRouter(tags=["health"])
 
@@ -44,6 +44,7 @@ class ConfigResponse(BaseModel):
     server_max_level: int
     world: str
     gear_rating: dict[str, Any]
+    launch_dt: str | None   # ISO-8601 UTC; null means no countdown to show
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -59,4 +60,5 @@ async def get_config() -> ConfigResponse:
         server_max_level=SERVER_MAX_LEVEL,
         world=WORLD,
         gear_rating=_load_gear_rating(),
+        launch_dt=LAUNCH_DT_ISO or None,
     )
