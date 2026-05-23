@@ -15,7 +15,7 @@ echo ""
 # ── 1. TypeScript type-check ──────────────────────────────────────────────────
 echo "${CYAN}→ TypeScript (tsc -b)${RESET}"
 cd frontend
-if ! npm run typecheck --silent; then
+if ! ./node_modules/.bin/tsc -b; then
   echo ""
   echo "${RED}✗ TypeScript errors found. Push aborted.${RESET}"
   exit 1
