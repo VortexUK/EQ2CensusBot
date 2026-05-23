@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -10,6 +13,7 @@ from pydantic import BaseModel
 from census.client import CensusClient
 from census.spells_db import find_by_crc
 from image.aa_tree import detect_tree_type
+from web.cache import aa_cache
 from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
 
 router = APIRouter(tags=["aa"])
@@ -178,9 +182,41 @@ def _build_trees(aa_list) -> list[CharAATree]:
     return result
 
 
+async def _bg_refresh_aas(name: str, cache_key: str) -> None:
+    """Background task: silently re-fetch a character's AAs and update the cache."""
+    try:
+        client = CensusClient(service_id=_SERVICE_ID)
+        try:
+            char_aas = await client.get_character_aas(name, _WORLD)
+        finally:
+            await client.close()
+        if char_aas is not None:
+            aa_cache.set(cache_key, CharAAsResponse(
+                character_name = char_aas.character_name,
+                total_spent    = sum(aa.tier for aa in char_aas.aa_list),
+                trees          = _build_trees(char_aas.aa_list),
+                profiles       = [
+                    CharAAProfile(name=p.name, trees=_build_trees(p.aa_list))
+                    for p in char_aas.profiles
+                ],
+            ))
+    except Exception as exc:
+        _log.error("[Cache] Background AA refresh failed for %s: %s", name, exc)
+
+
 @router.get("/character/{name}/aas", response_model=CharAAsResponse)
 async def get_character_aas(name: str) -> CharAAsResponse:
-    """Return a character's spent AAs grouped by tree, sorted by tree type."""
+    """
+    Return a character's spent AAs grouped by tree, sorted by tree type.
+    Responds instantly from cache; fires a background refresh when stale.
+    """
+    cache_key = f"aas:{name.lower()}:{_WORLD.lower()}"
+    cached, is_stale = aa_cache.get_stale(cache_key)
+    if cached is not None:
+        if is_stale:
+            asyncio.create_task(_bg_refresh_aas(name, cache_key))
+        return cached
+
     client = CensusClient(service_id=_SERVICE_ID)
     try:
         char_aas = await client.get_character_aas(name, _WORLD)
@@ -189,7 +225,7 @@ async def get_character_aas(name: str) -> CharAAsResponse:
     if char_aas is None:
         raise HTTPException(status_code=404, detail=f"Character '{name}' not found")
 
-    return CharAAsResponse(
+    result = CharAAsResponse(
         character_name = char_aas.character_name,
         total_spent    = sum(aa.tier for aa in char_aas.aa_list),
         trees          = _build_trees(char_aas.aa_list),
@@ -198,6 +234,8 @@ async def get_character_aas(name: str) -> CharAAsResponse:
             for prof in char_aas.profiles
         ],
     )
+    aa_cache.set(cache_key, result)
+    return result
 
 
 class SpellEffect(BaseModel):

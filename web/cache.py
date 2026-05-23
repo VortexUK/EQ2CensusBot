@@ -125,3 +125,4 @@ class TTLCache:
 character_cache: TTLCache = TTLCache(ttl=300, max_age=3600, name="character")
 guild_cache:     TTLCache = TTLCache(ttl=300, max_age=3600, name="guild")
 claim_cache:     TTLCache = TTLCache(ttl=300, max_age=3600, name="claim")
+aa_cache:        TTLCache = TTLCache(ttl=300, max_age=3600, name="aa")
