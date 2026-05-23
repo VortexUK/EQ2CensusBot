@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Print a character spell summary to the console without needing Discord.
 
@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from census.config import SERVICE_ID, WORLD
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -32,8 +34,8 @@ async def main() -> None:
         sys.exit(1)
 
     name = " ".join(name_parts)
-    service_id = os.getenv("CENSUS_SERVICE_ID", "example")
-    world = os.getenv("EQ2_WORLD", "Varsoon")
+    service_id = SERVICE_ID
+    world = WORLD
 
     client = CensusClient(service_id=service_id)
     try:

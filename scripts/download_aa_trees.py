@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Download AA tree JSON files from the Census API for all adventurer subclasses.
 
@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from census.config import SERVICE_ID, WORLD
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -95,7 +97,7 @@ async def _download_tree(
 
 
 async def main() -> None:
-    service_id = os.getenv("CENSUS_SERVICE_ID", "example")
+    service_id = SERVICE_ID
 
     TREES_DIR.mkdir(parents=True, exist_ok=True)
 

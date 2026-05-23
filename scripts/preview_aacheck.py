@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Fetch a character's AA data and render the chosen tree locally.
 
@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from census.config import SERVICE_ID, WORLD
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -49,11 +51,11 @@ def _resolve_tree(query: str, available_ids: set[int], tree_names: dict[int, str
 
 async def main() -> None:
     name  = sys.argv[1] if len(sys.argv) > 1 else "Menludiir"
-    world = os.getenv("EQ2_WORLD", "Varsoon")
+    world = WORLD
 
     tree_names = _load_tree_names()
 
-    client = CensusClient(service_id=os.getenv("CENSUS_SERVICE_ID", "example"))
+    client = CensusClient(service_id=SERVICE_ID)
     try:
         char_aas = await client.get_character_aas(name, world)
     finally:

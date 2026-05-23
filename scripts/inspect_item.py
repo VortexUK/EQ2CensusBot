@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Dump the raw Census API JSON for an item — useful for checking field names.
 
@@ -13,6 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from census.config import SERVICE_ID, WORLD
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -25,7 +27,7 @@ async def main() -> None:
         sys.exit(1)
 
     name = " ".join(sys.argv[1:])
-    service_id = os.getenv("CENSUS_SERVICE_ID", "example")
+    service_id = SERVICE_ID
 
     client = CensusClient(service_id=service_id)
     try:

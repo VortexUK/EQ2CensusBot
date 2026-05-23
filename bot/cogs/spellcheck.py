@@ -1,11 +1,11 @@
 import io
-import os
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from census.client import CensusClient
+from census.config import SERVICE_ID, WORLD
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.models import CharacterSpells, SpellEntry
 from census.spells_db import (
@@ -83,8 +83,8 @@ def _build_table(data: CharacterSpells) -> str:
 class SpellcheckCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.census = CensusClient(service_id=os.getenv("CENSUS_SERVICE_ID", "example"))
-        self.world = os.getenv("EQ2_WORLD", "Varsoon")
+        self.census = CensusClient(service_id=SERVICE_ID)
+        self.world = WORLD
 
     async def cog_unload(self) -> None:
         await self.census.close()

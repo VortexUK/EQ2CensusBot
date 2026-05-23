@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 
 _log = logging.getLogger(__name__)
 
@@ -11,12 +10,10 @@ from pydantic import BaseModel
 
 from census.client import CensusClient
 from web.cache import claim_cache
+from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
 from web.db import get_active_claims, set_primary, submit_claim, upsert_user, withdraw_claim
 
 router = APIRouter(tags=["claim"])
-
-_SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
-_WORLD = os.getenv("EQ2_WORLD", "Varsoon")
 
 
 # ---------------------------------------------------------------------------

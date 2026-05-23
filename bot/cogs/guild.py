@@ -1,11 +1,11 @@
 import io
-import os
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from census.client import CensusClient
+from census.config import SERVICE_ID, WORLD
 from census.models import GuildData, GuildMember
 
 _COL_SEP = "  "
@@ -72,8 +72,8 @@ def _build_table(data: GuildData) -> str:
 class GuildCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.census = CensusClient(service_id=os.getenv("CENSUS_SERVICE_ID", "example"))
-        self.world = os.getenv("EQ2_WORLD", "Varsoon")
+        self.census = CensusClient(service_id=SERVICE_ID)
+        self.world = WORLD
 
     async def cog_unload(self) -> None:
         await self.census.close()

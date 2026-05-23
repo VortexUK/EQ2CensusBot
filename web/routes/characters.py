@@ -1,18 +1,14 @@
 from __future__ import annotations
 
-import os
-
 import aiosqlite
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from census.client import CensusClient
+from web.config import SERVICE_ID as _SERVICE_ID, WORLD as _WORLD
 from web.db import DB_PATH
 
 router = APIRouter(tags=["characters"])
-
-_SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
-_WORLD      = os.getenv("EQ2_WORLD", "Varsoon")
 
 
 # ---------------------------------------------------------------------------

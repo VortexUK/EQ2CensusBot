@@ -1,4 +1,4 @@
-"""Dump raw Census character JSON so we can see the actual field structure."""
+﻿"""Dump raw Census character JSON so we can see the actual field structure."""
 import asyncio
 import json
 import os
@@ -11,8 +11,8 @@ load_dotenv()
 
 async def main():
     name = sys.argv[1] if len(sys.argv) > 1 else "Menludiir"
-    world = os.getenv("EQ2_WORLD", "Varsoon")
-    service_id = os.getenv("CENSUS_SERVICE_ID", "example")
+    world = WORLD
+    service_id = SERVICE_ID
 
     import aiohttp
     url = f"https://census.daybreakgames.com/s:{service_id}/json/get/eq2/character/"

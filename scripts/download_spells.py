@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Download all spells from the Census /spell/ collection into data/spells/spells.db.
 
@@ -24,6 +24,8 @@ import aiohttp
 from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from census.config import SERVICE_ID, WORLD
 load_dotenv(override=True)
 
 from census.spells_db import DB_PATH, get_meta, init_db, set_meta, spell_count, upsert_spells
@@ -101,7 +103,7 @@ async def _get_total(session: aiohttp.ClientSession, service_id: str) -> int | N
 
 
 async def main(restart: bool, spell_limit: int | None) -> None:
-    service_id = os.getenv("CENSUS_SERVICE_ID", "example")
+    service_id = SERVICE_ID
     if service_id == "example":
         print("WARNING: using 'example' service ID — rate limits will be low.")
 

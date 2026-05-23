@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 from pathlib import Path
 
@@ -13,9 +12,9 @@ from census.client import CensusClient
 from census.constants import ARCHETYPES, CLASS_GROUPS
 from census.db import DB_PATH
 from census.recipes_db import DB_PATH as RECIPES_DB_PATH, find_by_spell
+from web.config import SERVICE_ID as _SERVICE_ID
 
 router = APIRouter(tags=["item"])
-_SERVICE_ID = os.getenv("CENSUS_SERVICE_ID", "example")
 
 # ---------------------------------------------------------------------------
 # Class-label decomposition

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Download all items from the Census API into data/items/items.db.
 
@@ -22,6 +22,8 @@ import aiohttp
 from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from census.config import SERVICE_ID, WORLD
 load_dotenv(override=True)
 
 from census.db import DB_PATH, get_meta, init_db, item_count, set_meta, upsert_items
@@ -114,7 +116,7 @@ async def _get_total(session: aiohttp.ClientSession, service_id: str) -> int | N
 
 
 async def main(restart: bool, item_limit: int | None) -> None:
-    service_id = os.getenv("CENSUS_SERVICE_ID", "example")
+    service_id = SERVICE_ID
     if service_id == "example":
         print("WARNING: using 'example' service ID — rate limits will be low.")
 

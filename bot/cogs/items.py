@@ -1,18 +1,18 @@
 import io
-import os
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from census.client import CensusClient
+from census.config import SERVICE_ID
 from image.tooltip import render_tooltip
 
 
 class ItemsCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.census = CensusClient(service_id=os.getenv("CENSUS_SERVICE_ID", "example"))
+        self.census = CensusClient(service_id=SERVICE_ID)
 
     async def cog_unload(self) -> None:
         await self.census.close()

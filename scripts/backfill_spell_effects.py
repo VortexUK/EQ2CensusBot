@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Backfill the `effects` column for spells that have NULL effects.
 
@@ -21,6 +21,8 @@ import aiohttp
 from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from census.config import SERVICE_ID, WORLD
 load_dotenv(override=True)
 
 from census.spells_db import DB_PATH, init_db, spell_to_row
@@ -62,7 +64,7 @@ async def _fetch_one(
 
 
 async def main(dry_run: bool) -> None:
-    service_id = os.getenv("CENSUS_SERVICE_ID", "example")
+    service_id = SERVICE_ID
     if service_id == "example":
         print("WARNING: using 'example' service ID — rate limits will be low.")
 
