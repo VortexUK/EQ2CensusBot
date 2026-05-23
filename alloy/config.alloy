@@ -1,0 +1,29 @@
+// ── Scrape the EQ2 companion app's /metrics endpoint ─────────────────────────
+
+prometheus.scrape "eq2app" {
+  targets = [{
+    "__address__" = sys.env("APP_HOST"),
+    "job"         = "eq2companion",
+  }]
+
+  scheme          = "https"
+  bearer_token    = sys.env("METRICS_TOKEN")
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// ── Forward scraped metrics to Grafana Cloud ──────────────────────────────────
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    name = "hosted-prometheus"
+    url  = sys.env("GRAFANA_PROM_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_PROM_USER")
+      password = sys.env("GRAFANA_PROM_API_KEY")
+    }
+  }
+}
