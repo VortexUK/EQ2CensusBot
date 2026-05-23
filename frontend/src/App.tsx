@@ -13,7 +13,7 @@ import UserWidget from './components/UserWidget'
 import NotificationBell from './components/NotificationBell'
 import { useAuth } from './hooks/useAuth'
 import { Link } from 'react-router-dom'
-import logo from './L&L.png'
+import logo from './EQ2L.png'
 import ServerLaunchTimer from './components/ServerLaunchTimer'
 
 function LoginGate() {
