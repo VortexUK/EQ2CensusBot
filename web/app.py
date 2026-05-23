@@ -40,6 +40,7 @@ from web.metrics import (
     check_metrics_auth,
     generate_latest,
     should_track_path,
+    should_track_user_view,
 )
 from web.config import WORLD as _WORLD
 from web import db as users_db
@@ -120,7 +121,9 @@ class _MetricsMiddleware(BaseHTTPMiddleware):
 
             # Per-user page views: authenticated GET requests only.
             # Session is already populated by SessionMiddleware (runs before us).
-            if request.method == "GET" and response.status_code < 400:
+            # Polling/background endpoints are excluded via should_track_user_view.
+            if request.method == "GET" and response.status_code < 400 \
+                    and should_track_user_view(label_path):
                 user = request.session.get("user")
                 if user:
                     USER_PAGE_VIEWS.labels(

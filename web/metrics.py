@@ -156,9 +156,22 @@ _SKIP_PREFIXES = (
     "/metrics",
 )
 
+# Routes excluded from per-user page-view tracking (still counted in
+# HTTP_REQUESTS).  Add polling/background endpoints here so they don't
+# inflate individual user activity graphs.
+_USER_VIEW_SKIP = frozenset([
+    "/api/notifications",
+])
+
 
 def should_track_path(path: str) -> bool:
     return not any(path.startswith(p) for p in _SKIP_PREFIXES)
+
+
+def should_track_user_view(route_path: str) -> bool:
+    """Return False for background/polling routes that shouldn't count as
+    meaningful page views in the per-user USER_PAGE_VIEWS metric."""
+    return route_path not in _USER_VIEW_SKIP
 
 
 # ── Token check ───────────────────────────────────────────────────────────────
