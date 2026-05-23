@@ -1,0 +1,37 @@
+#!/bin/sh
+# Pre-push checks — runs automatically before every `git push`.
+# Activate once with:  git config core.hooksPath .githooks
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+RESET='\033[0m'
+
+echo ""
+echo "${CYAN}Running pre-push checks…${RESET}"
+echo ""
+
+# ── 1. TypeScript type-check ──────────────────────────────────────────────────
+echo "${CYAN}→ TypeScript (tsc -b)${RESET}"
+cd frontend
+if ! npm run typecheck --silent; then
+  echo ""
+  echo "${RED}✗ TypeScript errors found. Push aborted.${RESET}"
+  exit 1
+fi
+cd ..
+echo "${GREEN}  ✓ TypeScript OK${RESET}"
+
+# ── 2. Python syntax check ────────────────────────────────────────────────────
+echo "${CYAN}→ Python syntax (compileall)${RESET}"
+if ! python -m compileall -q census web bot image scripts 2>/dev/null; then
+  echo ""
+  echo "${RED}✗ Python syntax errors found. Push aborted.${RESET}"
+  exit 1
+fi
+echo "${GREEN}  ✓ Python OK${RESET}"
+
+echo ""
+echo "${GREEN}All checks passed.${RESET}"
+echo ""
