@@ -3,6 +3,9 @@
 # Activate once with:  git config core.hooksPath .githooks
 set -e
 
+# Ensure Node.js is on PATH (git bash on Windows doesn't inherit it)
+export PATH="/c/Program Files/nodejs:$PATH"
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
