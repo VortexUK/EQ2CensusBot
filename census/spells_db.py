@@ -14,6 +14,7 @@ faster and removing the c:resolve overhead.
 """
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import re
@@ -409,21 +410,79 @@ def unique_highest_entries(entries: list) -> list:
     return list(best.values())
 
 
-def load_blocklist(path: Path = _BLOCKLIST_PATH) -> frozenset[str]:
-    """Return the set of blocked base-spell names (lowercased, Roman suffixes already stripped).
+class Blocklist:
+    """
+    Immutable set of blocked base-spell names that supports both exact matches
+    and wildcard patterns (fnmatch-style).
 
-    Re-reads the file on every call so changes take effect without a restart.
-    The file is tiny so the overhead is negligible.
+    Examples in blocklist.json:
+        "Fighting Chance"   – exact base-name match (Roman suffix stripped by caller)
+        "Illusion:*"        – wildcard: blocks any spell whose base name starts
+                              with "Illusion:" (spaces, colons, etc. all matched by *)
+
+    Usage is identical to a frozenset — callers just use ``name in blocklist``.
+    """
+
+    __slots__ = ("_exact", "_patterns")
+
+    def __init__(self, exact: frozenset[str], patterns: list[str]) -> None:
+        self._exact    = exact      # lowercased, Roman-stripped literals
+        self._patterns = patterns   # lowercased wildcard patterns
+
+    def __contains__(self, name: object) -> bool:
+        if not isinstance(name, str):
+            return False
+        if name in self._exact:
+            return True
+        for pat in self._patterns:
+            if fnmatch.fnmatch(name, pat):
+                return True
+        return False
+
+    def __bool__(self) -> bool:
+        return bool(self._exact or self._patterns)
+
+    def __repr__(self) -> str:
+        return (
+            f"Blocklist(exact={len(self._exact)}, patterns={len(self._patterns)})"
+        )
+
+
+def load_blocklist(path: Path = _BLOCKLIST_PATH) -> Blocklist:
+    """Parse blocklist.json and return a Blocklist.
+
+    Each entry may be:
+      - an exact base-spell name  (Roman suffixes stripped automatically)
+      - a wildcard pattern        (fnmatch: * matches anything, ? matches one char)
+
+    Re-reads the file on every call so edits take effect without a restart.
     """
     if not path.exists():
-        return frozenset()
+        return Blocklist(frozenset(), [])
     try:
-        import json as _json
-        data = _json.loads(path.read_text(encoding="utf-8"))
-        names: list = data.get("blocked", []) if isinstance(data, dict) else data
-        return frozenset(strip_roman(n).lower() for n in names if isinstance(n, str))
+        data  = json.loads(path.read_text(encoding="utf-8"))
+        names: list[str] = data.get("blocked", []) if isinstance(data, dict) else data
+
+        exact:    list[str] = []
+        patterns: list[str] = []
+        for n in names:
+            if not isinstance(n, str):
+                continue
+            lowered = n.strip().lower()
+            if not lowered:
+                continue
+            if "*" in lowered or "?" in lowered:
+                # Wildcard — keep as-is (caller already strips Roman suffixes
+                # before the `in` check, so patterns match the stripped name)
+                patterns.append(lowered)
+            else:
+                # Exact — strip Roman suffix so "Fighting Chance" also blocks
+                # "Fighting Chance I", "Fighting Chance II", etc.
+                exact.append(strip_roman(lowered))
+
+        return Blocklist(frozenset(exact), patterns)
     except Exception:
-        return frozenset()
+        return Blocklist(frozenset(), [])
 
 
 def find_by_name(name: str, path: Path = DB_PATH) -> list[dict]:

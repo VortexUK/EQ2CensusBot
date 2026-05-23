@@ -1,5 +1,5 @@
 {
-  "_comment": "Base spell names to hide from the character spells tab and guild /spellcheck command. Roman-numeral suffixes are stripped automatically, so 'Fighting Chance' matches 'Fighting Chance I', 'Fighting Chance II', etc. One entry per line for easy diffing.",
+  "_comment": "Spells to hide from the character spells tab and the guild /spellcheck command. Roman-numeral suffixes are stripped automatically, so 'Fighting Chance' also blocks 'Fighting Chance I', 'Fighting Chance II', etc. Wildcard patterns use fnmatch syntax: * matches any characters (including spaces), ? matches one character. Patterns are matched against the Roman-stripped, lowercased base name. One entry per line for easy diffing.",
   "blocked": [
     "Fighting Chance",
     "Corpsecrush",
@@ -8,6 +8,8 @@
     "Trick of the Hunter",
     "Dreadfang",
     "Word of Force",
-    "Translocate"
+    "Translocate",
+    "Bounty of the Virtuous",
+    "Illusion:*"
   ]
 }
