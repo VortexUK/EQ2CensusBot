@@ -35,11 +35,19 @@ export function useAuth(): AuthState {
   return state
 }
 
-export function avatarUrl(user: User): string {
-  if (user.avatar) {
-    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
-  }
-  // Default Discord avatar based on discriminator bucket
-  const index = Number(BigInt(user.id) >> 22n) % 6
+/**
+ * Build a Discord CDN avatar URL from a user id + avatar hash.
+ * Falls back to the default avatar bucket when avatar is null.
+ * Used directly by components that receive (id, avatar) separately
+ * (e.g. admin and guild claim lists).
+ */
+export function discordAvatarUrl(id: string, avatar: string | null): string {
+  if (avatar) return `https://cdn.discordapp.com/avatars/${id}/${avatar}.png`
+  const index = Number(BigInt(id) >> 22n) % 6
   return `https://cdn.discordapp.com/embed/avatars/${index}.png`
+}
+
+/** Convenience wrapper for a full User object. */
+export function avatarUrl(user: User): string {
+  return discordAvatarUrl(user.id, user.avatar)
 }

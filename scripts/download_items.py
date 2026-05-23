@@ -25,8 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 load_dotenv(override=True)
 
 from census.db import DB_PATH, get_meta, init_db, item_count, set_meta, upsert_items
-
-BASE_URL     = "https://census.daybreakgames.com"
+from census.client import BASE_URL
 PAGE_SIZE    = 100      # items per request
 CONCURRENCY  = 1        # parallel requests (sequential — most reliable against Census timeouts)
 WRITE_EVERY  = 1000     # upsert to DB after this many items accumulated

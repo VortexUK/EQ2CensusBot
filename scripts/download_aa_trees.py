@@ -24,7 +24,7 @@ load_dotenv()
 
 import aiohttp
 
-BASE_URL = "https://census.daybreakgames.com"
+from census.client import BASE_URL
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "AAs"
 TREES_DIR = DATA_DIR / "trees"
 ADVENTURER_FILE = DATA_DIR / "adventurer.json"

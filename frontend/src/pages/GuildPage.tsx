@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
 import { useClaim } from '../hooks/useClaim'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
+import { CLASS_COLOURS } from '../classConstants'
+import { SPELL_TIER_COLOURS as TIER_COLOURS } from '../spellConstants'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -100,36 +102,6 @@ interface ItemWatchEntry {
 type Tab = 'roster' | 'spells' | 'adorns' | 'claims' | 'watch'
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
-
-// Fighters=Red, Scouts=Yellow, Mages=Blue, Priests=Green
-const CLASS_COLOURS: Record<string, string> = {
-  // Fighters
-  Guardian: '#f87171', Berserker: '#f87171',
-  Paladin: '#f87171', Shadowknight: '#f87171',
-  Monk: '#f87171', Bruiser: '#f87171',
-  // Scouts
-  Ranger: '#fbbf24', Assassin: '#fbbf24',
-  Troubador: '#fbbf24', Dirge: '#fbbf24',
-  Swashbuckler: '#fbbf24', Brigand: '#fbbf24',
-  // Mages
-  Wizard: '#93b4ff', Warlock: '#93b4ff',
-  Conjuror: '#93b4ff', Necromancer: '#93b4ff',
-  Illusionist: '#93b4ff', Coercer: '#93b4ff',
-  // Priests
-  Templar: '#4ade80', Inquisitor: '#4ade80',
-  Mystic: '#4ade80', Defiler: '#4ade80',
-  Warden: '#4ade80', Fury: '#4ade80',
-}
-
-// Tier → colour: below Expert = red tones, Expert+ = green tones
-const TIER_COLOURS: Record<string, { text: string; bg: string }> = {
-  Apprentice:   { text: '#ef4444', bg: 'rgba(239,68,68,0.12)'   },
-  Journeyman:   { text: '#f97316', bg: 'rgba(249,115,22,0.12)'  },
-  Adept:        { text: '#eab308', bg: 'rgba(234,179,8,0.12)'   },
-  Expert:       { text: '#84cc16', bg: 'rgba(132,204,22,0.12)'  },
-  Master:       { text: '#22c55e', bg: 'rgba(34,197,94,0.12)'   },
-  Grandmaster:  { text: '#10b981', bg: 'rgba(16,185,129,0.15)'  },
-}
 
 // Adorn fill rate → colour
 function adornCellStyle(filled: number, total: number): React.CSSProperties {
@@ -714,11 +686,6 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
 
 // ── Claim requests tab (officers only) ───────────────────────────────────────
 
-function discordAvatarUrl(discordId: string, avatar: string | null): string {
-  if (avatar) return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png`
-  const index = Number(BigInt(discordId) >> 22n) % 6
-  return `https://cdn.discordapp.com/embed/avatars/${index}.png`
-}
 
 function ClaimRequestsTab({
   guildName,

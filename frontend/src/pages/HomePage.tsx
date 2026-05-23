@@ -5,27 +5,7 @@ import { useClaim } from '../hooks/useClaim'
 import type { Claim } from '../hooks/useClaim'
 import ServerLaunchTimer from '../components/ServerLaunchTimer'
 import logo from '../assets/EQ2L.png'
-
-// ── Class colours (adventure archetype) ──────────────────────────────────────
-
-const CLASS_COLOURS: Record<string, string> = {
-  // Fighters
-  Guardian: '#f87171', Berserker: '#f87171',
-  Paladin: '#f87171', Shadowknight: '#f87171',
-  Monk: '#f87171', Bruiser: '#f87171',
-  // Scouts
-  Ranger: '#fbbf24', Assassin: '#fbbf24',
-  Troubador: '#fbbf24', Dirge: '#fbbf24',
-  Swashbuckler: '#fbbf24', Brigand: '#fbbf24',
-  // Mages
-  Wizard: '#93b4ff', Warlock: '#93b4ff',
-  Conjuror: '#93b4ff', Necromancer: '#93b4ff',
-  Illusionist: '#93b4ff', Coercer: '#93b4ff',
-  // Priests
-  Templar: '#4ade80', Inquisitor: '#4ade80',
-  Mystic: '#4ade80', Defiler: '#4ade80',
-  Warden: '#4ade80', Fury: '#4ade80',
-}
+import { CLASS_COLOURS } from '../classConstants'
 
 // ── Character detail (fetched from Census cache) ──────────────────────────────
 

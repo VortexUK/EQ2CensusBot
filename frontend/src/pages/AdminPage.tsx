@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,11 +31,7 @@ interface ClaimDetail {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function discordAvatar(id: string, avatar: string | null): string {
-  if (avatar) return `https://cdn.discordapp.com/avatars/${id}/${avatar}.png?size=32`
-  const index = Number(BigInt(id) >> 22n) % 6
-  return `https://cdn.discordapp.com/embed/avatars/${index}.png`
-}
+const discordAvatar = discordAvatarUrl
 
 function fmt(unix: number): string {
   return new Date(unix * 1000).toLocaleDateString(undefined, {
