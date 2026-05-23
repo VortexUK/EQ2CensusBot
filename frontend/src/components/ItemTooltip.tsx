@@ -2,7 +2,7 @@
  * HTML tooltip mirroring image/tooltip.py.
  * Colours, layout order, and section logic kept in sync with that file.
  */
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -338,7 +338,7 @@ export function TooltipContent({ item, qs }: { item: ItemDetail; qs: QualityStyl
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-export function Section({ children }: { children: React.ReactNode }) {
+export function Section({ children }: { children: ReactNode }) {
   return (
     <div style={{ borderTop: `1px solid ${BORDER_INNER}`, marginTop: 6, paddingTop: 5 }}>
       {children}

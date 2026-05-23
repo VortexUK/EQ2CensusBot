@@ -6,7 +6,7 @@
  *   item and, for Journeyman / Expert, the crafting recipe with a ✦ CRAFTABLE
  *   badge.
  */
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   type ItemDetail,
@@ -246,12 +246,19 @@ export function SpellTierPip({
   const [mousePos, setMousePos]       = useState({ x: 0, y: 0 })
   const timerRef                      = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function handleMouseEnter(e: React.MouseEvent) {
+  // Clear pending timer if the component unmounts (e.g., page navigation)
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
+  function handleMouseEnter(e: MouseEvent<HTMLImageElement>) {
     setMousePos({ x: e.clientX, y: e.clientY })
     timerRef.current = setTimeout(() => setShowTooltip(true), 150)
   }
 
-  function handleMouseMove(e: React.MouseEvent) {
+  function handleMouseMove(e: MouseEvent<HTMLImageElement>) {
     setMousePos({ x: e.clientX, y: e.clientY })
   }
 
