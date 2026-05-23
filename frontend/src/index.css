@@ -25,7 +25,7 @@
 /* Background image fixed to viewport */
 html {
   background:
-    url('./web_bg.png') center center / cover no-repeat fixed;
+    url('./assets/web_bg.png') center center / cover no-repeat fixed;
   background-color: #0a0c14;
 }
 

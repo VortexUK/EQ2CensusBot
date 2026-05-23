@@ -12,7 +12,7 @@ import {
   SPELL_TIER_ORDER,
   SPELL_TIER_ICON,
   SPELL_TIER_COLOURS,
-} from './spellConstants'
+} from '../spellConstants'
 
 // ── Shopping-list types (mirrors RecipesPage.tsx) ─────────────────────────────
 

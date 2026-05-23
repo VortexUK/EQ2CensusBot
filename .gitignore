@@ -218,6 +218,9 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Item database (generated locally, not committed)
+data/items.db
+data/items.db-wal
+data/items.db-shm
 data/items/items.db
 data/items/items.db-wal
 data/items/items.db-shm
