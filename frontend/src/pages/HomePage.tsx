@@ -407,7 +407,7 @@ export default function HomePage() {
   const auth = useAuth()
 
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
+    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '0.5rem 1.5rem 4rem' }}>
 
       {/* Hero */}
       <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
