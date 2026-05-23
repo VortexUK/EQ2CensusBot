@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+﻿import { Link } from 'react-router-dom'
 
 export default function NotFoundPage() {
   return (
@@ -13,7 +13,7 @@ export default function NotFoundPage() {
       gap: '1rem',
     }}>
       <div style={{
-        fontFamily: "'Cinzel', serif",
+        fontFamily: "var(--font-heading)",
         fontSize: '5rem',
         fontWeight: 700,
         lineHeight: 1,
@@ -25,7 +25,7 @@ export default function NotFoundPage() {
         404
       </div>
       <h1 style={{
-        fontFamily: "'Cinzel', serif",
+        fontFamily: "var(--font-heading)",
         fontSize: '1.3rem',
         fontWeight: 600,
         color: 'var(--text)',
@@ -44,13 +44,13 @@ export default function NotFoundPage() {
           padding: '0.5rem 1.4rem',
           border: '1px solid rgba(200,169,110,0.4)',
           borderRadius: 6,
-          color: '#c8a96e',
+          color: 'var(--gold)',
           textDecoration: 'none',
           fontSize: '0.88rem',
           fontWeight: 600,
           transition: 'border-color 0.15s',
         }}
-        onMouseEnter={e => (e.currentTarget.style.borderColor = '#c8a96e')}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(200,169,110,0.4)')}
       >
         Return Home

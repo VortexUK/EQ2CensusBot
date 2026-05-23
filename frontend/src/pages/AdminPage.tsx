@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
 
@@ -50,13 +50,13 @@ function relativeTime(unix: number): string {
 const ACCESS_BADGE: Record<string, React.CSSProperties> = {
   pending:  { background: 'rgba(234,179,8,0.18)',   color: '#fbbf24', border: '1px solid rgba(234,179,8,0.4)'  },
   approved: { background: 'rgba(34,197,94,0.13)',   color: '#4ade80', border: '1px solid rgba(34,197,94,0.35)' },
-  denied:   { background: 'rgba(239,68,68,0.13)',   color: '#f87171', border: '1px solid rgba(239,68,68,0.35)' },
+  denied:   { background: 'rgba(239,68,68,0.13)',   color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.35)' },
 }
 
 const CLAIM_BADGE: Record<string, React.CSSProperties> = {
   pending:    { background: 'rgba(234,179,8,0.18)',    color: '#fbbf24', border: '1px solid rgba(234,179,8,0.4)'    },
   approved:   { background: 'rgba(34,197,94,0.13)',    color: '#4ade80', border: '1px solid rgba(34,197,94,0.35)'   },
-  rejected:   { background: 'rgba(239,68,68,0.13)',    color: '#f87171', border: '1px solid rgba(239,68,68,0.35)'   },
+  rejected:   { background: 'rgba(239,68,68,0.13)',    color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.35)'   },
   withdrawn:  { background: 'rgba(100,116,139,0.13)',  color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)'  },
   superseded: { background: 'rgba(100,116,139,0.13)',  color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)'  },
 }
@@ -101,7 +101,7 @@ const BTN_GREEN: React.CSSProperties = {
 }
 const BTN_RED: React.CSSProperties = {
   ...BTN_BASE,
-  background: 'rgba(239,68,68,0.12)', color: '#f87171',
+  background: 'rgba(239,68,68,0.12)', color: 'var(--danger)',
   border: '1px solid rgba(239,68,68,0.35)',
 }
 const BTN_GHOST: React.CSSProperties = {
@@ -181,7 +181,7 @@ function UserRow({ user, onAction }: { user: UserItem; onAction: () => void }) {
       <td style={{ ...TD, whiteSpace: 'nowrap' }}>
         {kickConfirm ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', color: '#f87171' }}>Kick + delete all claims?</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>Kick + delete all claims?</span>
             <button onClick={() => doAccess('kick')} disabled={busy} style={BTN_RED}>
               {busy ? '…' : 'Confirm'}
             </button>
@@ -237,7 +237,7 @@ function UsersTable({ users, onAction }: { users: UserItem[]; onAction: () => vo
             style={{
               ...BTN_BASE,
               background: filter === f ? 'rgba(200,169,110,0.15)' : 'transparent',
-              color: filter === f ? '#c8a96e' : 'var(--text-muted)',
+              color: filter === f ? 'var(--gold)' : 'var(--text-muted)',
               border: filter === f ? '1px solid rgba(200,169,110,0.4)' : '1px solid var(--border)',
             }}
           >
@@ -431,7 +431,7 @@ function ClaimsTable({ claims, onAction }: { claims: ClaimDetail[]; onAction: ()
               style={{
                 ...BTN_BASE,
                 background: filter === f ? 'rgba(200,169,110,0.15)' : 'transparent',
-                color: filter === f ? '#c8a96e' : 'var(--text-muted)',
+                color: filter === f ? 'var(--gold)' : 'var(--text-muted)',
                 border: filter === f ? '1px solid rgba(200,169,110,0.4)' : '1px solid var(--border)',
               }}
             >
@@ -523,7 +523,7 @@ export default function AdminPage() {
   if (auth.status === 'unauthenticated' || !auth.user.is_admin) {
     return (
       <main style={{ maxWidth: 960, margin: '3rem auto', padding: '0 1rem' }}>
-        <p style={{ marginTop: '2rem', color: '#f87171' }}>Access denied.</p>
+        <p style={{ marginTop: '2rem', color: 'var(--danger)' }}>Access denied.</p>
       </main>
     )
   }
@@ -537,13 +537,13 @@ export default function AdminPage() {
   return (
     <main style={{ maxWidth: 1100, margin: '2rem auto', padding: '0 1rem' }}>
       <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
-      <h1 style={{ margin: '0.6rem 0 0.2rem', fontFamily: "'Cinzel', serif" }}>Admin Panel</h1>
+      <h1 style={{ margin: '0.6rem 0 0.2rem', fontFamily: "var(--font-heading)" }}>Admin Panel</h1>
       <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.75rem' }}>
         Manage users and character claims.
       </p>
 
       {loading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
-      {error   && <p style={{ color: '#f87171' }}>{error}</p>}
+      {error   && <p style={{ color: 'var(--danger)' }}>{error}</p>}
 
       {!loading && !error && (
         <>

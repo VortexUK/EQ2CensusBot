@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { Claim, useClaim } from '../hooks/useClaim'
@@ -80,7 +80,7 @@ function ClaimForm({ onSubmitted, label = 'Request claim' }: {
         </button>
       </div>
       {error && (
-        <p style={{ color: '#f87171', fontSize: '0.85rem', marginTop: '0.4rem' }}>{error}</p>
+        <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>{error}</p>
       )}
     </form>
   )
@@ -224,14 +224,14 @@ export default function ClaimPage() {
       {isUnauth && (
         <div style={card}>
           <p style={{ marginBottom: '1rem' }}>You need to sign in with Discord first.</p>
-          <a href="/api/auth/login" style={btn('#5865F2', '#fff')}>Sign in with Discord</a>
+          <a href="/api/auth/login" style={btn('var(--discord-brand)', '#fff')}>Sign in with Discord</a>
         </div>
       )}
 
       {isLoading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
 
       {claimState.status === 'error' && (
-        <p style={{ color: '#f87171' }}>Failed to load. Try refreshing.</p>
+        <p style={{ color: 'var(--danger)' }}>Failed to load. Try refreshing.</p>
       )}
 
       {auth.status === 'authenticated' && claimState.status === 'ready' && (() => {

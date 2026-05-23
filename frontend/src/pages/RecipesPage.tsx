@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+﻿import type { CSSProperties, ReactNode } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -392,7 +392,7 @@ export default function RecipesPage() {
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '1.2rem' }}>
-        <h1 style={{ fontFamily: "'Cinzel', serif", fontSize: '1.7rem', color: '#c8a96e', margin: 0 }}>
+        <h1 style={{ fontFamily: "var(--font-heading)", fontSize: '1.7rem', color: 'var(--gold)', margin: 0 }}>
           Recipes
         </h1>
         {list.length > 0 && (
@@ -403,7 +403,7 @@ export default function RecipesPage() {
               background: 'var(--surface)',
               border: '1px solid var(--border)',
               borderRadius: 6,
-              color: '#c8a96e',
+              color: 'var(--gold)',
               fontSize: '0.85rem',
               padding: '0.3rem 0.8rem',
               cursor: 'pointer',
@@ -414,7 +414,7 @@ export default function RecipesPage() {
           >
             🛒 Shopping List
             <span style={{
-              background: '#c8a96e',
+              background: 'var(--gold)',
               color: '#0f1117',
               borderRadius: '50%',
               width: 18,
@@ -506,7 +506,7 @@ export default function RecipesPage() {
               onClick={handleSearch}
               disabled={loading}
               style={{
-                background: '#c8a96e',
+                background: 'var(--gold)',
                 color: '#0f1117',
                 border: 'none',
                 borderRadius: 6,
@@ -523,7 +523,7 @@ export default function RecipesPage() {
 
           {/* Error */}
           {error && (
-            <p style={{ color: '#f87171', fontSize: '0.9rem', margin: '0 0 0.75rem' }}>{error}</p>
+            <p style={{ color: 'var(--danger)', fontSize: '0.9rem', margin: '0 0 0.75rem' }}>{error}</p>
           )}
 
           {/* Results */}
@@ -583,21 +583,21 @@ export default function RecipesPage() {
             overflowY: 'auto',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1rem', fontFamily: "'Cinzel', serif", color: '#c8a96e' }}>
+              <h2 style={{ margin: 0, fontSize: '1rem', fontFamily: "var(--font-heading)", color: 'var(--gold)' }}>
                 Shopping List
               </h2>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <button
                   onClick={() => downloadShoppingListXml(list, summary)}
                   title="Download as XML"
-                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, color: '#c8a96e', cursor: 'pointer', fontSize: '0.75rem', padding: '2px 7px', lineHeight: 1.5 }}
+                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--gold)', cursor: 'pointer', fontSize: '0.75rem', padding: '2px 7px', lineHeight: 1.5 }}
                 >
                   ⬇ XML
                 </button>
                 <button
                   onClick={clearList}
                   title="Clear list"
-                  style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem' }}
                 >
                   Clear
                 </button>
@@ -621,7 +621,7 @@ export default function RecipesPage() {
                   <span style={{ fontSize: '0.85rem', flex: 1, lineHeight: 1.3 }}>{entry.recipeName}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
                     <QtyBtn onClick={() => changeQty(entry.recipeId, -1)}>−</QtyBtn>
-                    <span style={{ fontSize: '0.82rem', minWidth: 20, textAlign: 'center', color: '#c8a96e', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.82rem', minWidth: 20, textAlign: 'center', color: 'var(--gold)', fontWeight: 600 }}>
                       {entry.qty}
                     </span>
                     <QtyBtn onClick={() => changeQty(entry.recipeId, +1)}>+</QtyBtn>
@@ -644,7 +644,7 @@ export default function RecipesPage() {
                     {summary.regular.map(row => (
                       <div key={row.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '1px 0' }}>
                         <span style={{ color: 'var(--text)' }}>{row.name}</span>
-                        <span style={{ color: '#c8a96e', fontWeight: 600, marginLeft: '0.5rem' }}>×{row.total}</span>
+                        <span style={{ color: 'var(--gold)', fontWeight: 600, marginLeft: '0.5rem' }}>×{row.total}</span>
                       </div>
                     ))}
                   </>
@@ -684,7 +684,7 @@ export default function RecipesPage() {
             position: 'fixed',
             bottom: '1.5rem',
             right: '1.5rem',
-            background: '#c8a96e',
+            background: 'var(--gold)',
             color: '#0f1117',
             border: 'none',
             borderRadius: '50%',
@@ -704,7 +704,7 @@ export default function RecipesPage() {
             position: 'absolute',
             top: -4,
             right: -4,
-            background: '#f87171',
+            background: 'var(--danger)',
             color: '#fff',
             borderRadius: '50%',
             width: 20,
@@ -784,7 +784,7 @@ function RecipeCard({
           {inList > 0 && (
             <>
               <QtyBtn onClick={onDec}>−</QtyBtn>
-              <span style={{ fontSize: '0.82rem', minWidth: 20, textAlign: 'center', color: '#c8a96e', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.82rem', minWidth: 20, textAlign: 'center', color: 'var(--gold)', fontWeight: 600 }}>
                 {inList}
               </span>
             </>
@@ -796,7 +796,7 @@ function RecipeCard({
               background: 'none',
               border: '1px solid #c8a96e',
               borderRadius: 4,
-              color: '#c8a96e',
+              color: 'var(--gold)',
               fontSize: '0.78rem',
               padding: '1px 7px',
               cursor: 'pointer',

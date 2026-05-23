@@ -1,4 +1,4 @@
-/**
+﻿/**
  * HTML tooltip mirroring image/tooltip.py.
  * Colours, layout order, and section logic kept in sync with that file.
  */
@@ -175,7 +175,7 @@ export function ItemTooltip({ state }: { state: TooltipState }) {
     }}>
       <div style={{ border: `1px solid ${BORDER_INNER}`, padding: '8px 10px' }}>
         {loading && <div style={{ color: '#777', fontSize: '0.82rem' }}>Loading…</div>}
-        {!loading && !item && <div style={{ color: '#f87171', fontSize: '0.82rem' }}>Item not found</div>}
+        {!loading && !item && <div style={{ color: 'var(--danger)', fontSize: '0.82rem' }}>Item not found</div>}
         {item && <TooltipContent item={item} qs={qs!} />}
       </div>
     </div>,

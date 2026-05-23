@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared live-search page.
  * Character and Guild search both use this component.
  * Results come from the Census API (all characters/guilds on the server),
@@ -108,7 +108,7 @@ function NameSearchPage({ config }: { config: SearchConfig }) {
       {/* Header */}
       <div style={{ margin: '1.25rem 0 1.75rem' }}>
         <h1 style={{
-          fontFamily: "'Cinzel', serif",
+          fontFamily: "var(--font-heading)",
           fontSize: '1.9rem', fontWeight: 700, letterSpacing: '0.06em',
           margin: '0 0 0.3rem',
           background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 40%, #c8a96e 70%, #a07840 100%)',
@@ -237,7 +237,7 @@ export function GuildSearchPage() {
       placeholder: 'Guild name…',
       apiUrl:      '/api/guilds/search',
       linkPrefix:  '/guild/',
-      linkColor:   '#c8a96e',
+      linkColor:   'var(--gold)',
       sourceNote:  'Searches guilds tracked on this site.',
     }} />
   )

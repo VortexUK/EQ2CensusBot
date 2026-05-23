@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+﻿import type { CSSProperties } from 'react'
 import { Routes, Route, Outlet, NavLink, useLocation } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import CharacterPage from './pages/CharacterPage'
@@ -48,7 +48,7 @@ function LoginGate() {
         style={{
           display: 'inline-block',
           padding: '0.6rem 1.6rem',
-          background: '#5865F2',
+          background: 'var(--discord-brand)',
           color: '#fff',
           borderRadius: 8,
           border: 'none',
@@ -65,7 +65,7 @@ function LoginGate() {
 }
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
-  fontFamily: "'Cinzel', serif",
+  fontFamily: "var(--font-heading)",
   fontSize: '0.82rem',
   fontWeight: 600,
   letterSpacing: '0.07em',
@@ -106,7 +106,7 @@ function AccessPendingGate() {
       alignItems: 'center', justifyContent: 'center',
       gap: '1rem', padding: '2rem', textAlign: 'center',
     }}>
-      <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '1.8rem', color: '#c8a96e' }}>
+      <h2 style={{ fontFamily: "var(--font-heading)", fontSize: '1.8rem', color: 'var(--gold)' }}>
         Access Pending
       </h2>
       <p style={{ color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.6 }}>
@@ -127,7 +127,7 @@ function AccessDeniedGate() {
       alignItems: 'center', justifyContent: 'center',
       gap: '1rem', padding: '2rem', textAlign: 'center',
     }}>
-      <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '1.8rem', color: '#f87171' }}>
+      <h2 style={{ fontFamily: "var(--font-heading)", fontSize: '1.8rem', color: 'var(--danger)' }}>
         Access Denied
       </h2>
       <p style={{ color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.6 }}>

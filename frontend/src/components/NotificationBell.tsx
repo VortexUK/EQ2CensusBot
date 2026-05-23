@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../hooks/useNotifications'
 
@@ -144,7 +144,7 @@ export default function NotificationBell() {
           borderRadius: 6,
           padding:      '0.3rem 0.55rem',
           cursor:       'pointer',
-          color:        '#c8a96e',
+          color:        'var(--gold)',
           fontSize:     '0.82rem',
           lineHeight:   1,
           transition:   'border-color 0.15s, color 0.15s',
@@ -155,7 +155,7 @@ export default function NotificationBell() {
         }}
         onMouseLeave={e => {
           e.currentTarget.style.borderColor = 'rgba(200,169,110,0.35)'
-          e.currentTarget.style.color = '#c8a96e'
+          e.currentTarget.style.color = 'var(--gold)'
         }}
       >
         <BellIcon />
@@ -197,7 +197,7 @@ export default function NotificationBell() {
             letterSpacing: '0.08em',
             color:         'var(--text-muted)',
             borderBottom:  '1px solid var(--border)',
-            fontFamily:    "'Cinzel', serif",
+            fontFamily:    "var(--font-heading)",
           }}>
             Needs Attention
           </div>
@@ -220,7 +220,7 @@ export default function NotificationBell() {
               count={data.pending_users}
               label={`Pending user${data.pending_users !== 1 ? 's' : ''}`}
               sublabel="awaiting access"
-              accentColor="#f87171"
+              accentColor="var(--danger)"
               accentBg="rgba(239,68,68,0.15)"
               accentBorder="rgba(239,68,68,0.4)"
               hasBorder={false}

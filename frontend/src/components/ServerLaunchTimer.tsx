@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Countdown timer to the EQ2 server launch.
  * Hides automatically once the launch time has passed.
  */
@@ -48,7 +48,7 @@ export default function ServerLaunchTimer() {
 
       {/* Eyebrow */}
       <div style={{
-        fontFamily: "'Cinzel', serif",
+        fontFamily: "var(--font-heading)",
         fontSize: '0.68rem',
         fontWeight: 600,
         letterSpacing: '0.2em',
@@ -61,7 +61,7 @@ export default function ServerLaunchTimer() {
 
       {/* Heading */}
       <div style={{
-        fontFamily: "'Cinzel', serif",
+        fontFamily: "var(--font-heading)",
         fontSize: '1.05rem',
         fontWeight: 700,
         letterSpacing: '0.05em',
@@ -81,7 +81,7 @@ export default function ServerLaunchTimer() {
           <Fragment key={label}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
               <div style={{
-                fontFamily: "'Cinzel', serif",
+                fontFamily: "var(--font-heading)",
                 fontSize: '2rem',
                 fontWeight: 700,
                 lineHeight: 1,
@@ -129,7 +129,7 @@ export default function ServerLaunchTimer() {
         fontSize: '0.72rem',
         color: 'rgba(200,169,110,0.4)',
         letterSpacing: '0.1em',
-        fontFamily: "'Cinzel', serif",
+        fontFamily: "var(--font-heading)",
       }}>
         June 9th, 2026 · 20:00 UTC
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+﻿import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
 import { ItemTooltip, TooltipState, getCachedItem, prefetchItem } from '../components/ItemTooltip'
@@ -170,7 +170,7 @@ function gradeLabel(avg: number, cfg: RatingConfig): { grade: string; color: str
     avg >= 7.0 ? '#ffc993' :
     avg >= 5.5 ? '#92d7fd' :
     avg >= 4.5 ? '#a8d4a8' :
-                 '#f87171'
+                 'var(--danger)'
 
   return { grade, color, raidReady }
 }
@@ -220,7 +220,7 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           {/* Grade letter */}
           <div style={{
-            fontFamily: "'Cinzel', serif",
+            fontFamily: "var(--font-heading)",
             fontSize: '2.6rem',
             fontWeight: 700,
             lineHeight: 1,
@@ -235,7 +235,7 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
 
           {/* Status + detail */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : '#f87171', marginBottom: '0.2rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : 'var(--danger)', marginBottom: '0.2rem' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -500,7 +500,7 @@ export default function CharacterPage() {
       <Breadcrumb items={[{ label: 'Characters', to: '/characters' }, { label: name ?? '…' }]} />
       {state.status === 'loading' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Loading…</p>}
       {state.status === 'not_found' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Character <strong>{state.name}</strong> not found.</p>}
-      {state.status === 'error' && <p style={{ marginTop: '2rem', color: '#f87171' }}>Error: {state.message}</p>}
+      {state.status === 'error' && <p style={{ marginTop: '2rem', color: 'var(--danger)' }}>Error: {state.message}</p>}
       {state.status === 'ok' && <CharacterView char={state.char} maxLevel={maxLevel} ratingConfig={ratingConfig} />}
     </main>
   )
@@ -695,7 +695,7 @@ function GeneralBanner({ char }: { char: Character }) {
         flexShrink: 0,
       }}>
         <div style={{
-          fontFamily: "'Cinzel', serif",
+          fontFamily: "var(--font-heading)",
           fontSize: '1.6rem',
           fontWeight: 700,
           lineHeight: 1.2,

@@ -8,6 +8,17 @@
   --accent: #7289da;
   --accent-hover: #5f73c7;
 
+  /* Brand colours */
+  --gold:          #c8a96e;   /* EQ2 gold — headings, borders, active nav */
+  --gold-bright:   #e8d5a3;   /* lighter variant used in gradients */
+  --gold-dim:      #a07840;   /* darker variant used in gradients */
+  --gold-rgb:      200, 169, 110;  /* for rgba(var(--gold-rgb), α) */
+  --danger:        #f87171;   /* error text, destructive actions */
+  --danger-rgb:    248, 113, 113;
+  --success:       #4ade80;   /* approved / online / max-tier */
+  --discord-brand: #5865F2;   /* Discord sign-in button */
+  --font-heading:  'Cinzel', serif;
+
   /* Item tier colours */
   --tier-fabled:     #a335ee;
   --tier-legendary:  #ff8000;
@@ -57,12 +68,12 @@ button {
 
 /* Top-ribbon nav links */
 .nav-ribbon-link:hover {
-  color: #c8a96e !important;
-  border-bottom-color: #c8a96e !important;
+  color: var(--gold) !important;
+  border-bottom-color: var(--gold) !important;
 }
 .nav-ribbon-link.active {
-  color: #e8d5a3 !important;
-  border-bottom-color: #c8a96e !important;
+  color: var(--gold-bright) !important;
+  border-bottom-color: var(--gold) !important;
 }
 
 input {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
 import { useClaim } from '../hooks/useClaim'
@@ -291,7 +291,7 @@ function RosterTable({ members, filter, hiddenRanks, myChars }: { members: Guild
                   {m.name}
                 </Link>
                 {myChars.has(m.name.toLowerCase()) && (
-                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: '#c8a96e', verticalAlign: 'middle' }}>★</span>
+                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: 'var(--gold)', verticalAlign: 'middle' }}>★</span>
                 )}
               </td>
               <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
@@ -416,7 +416,7 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
                   {m.name}
                 </Link>
                 {myChars.has(m.name.toLowerCase()) && (
-                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: '#c8a96e', verticalAlign: 'middle' }}>★</span>
+                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: 'var(--gold)', verticalAlign: 'middle' }}>★</span>
                 )}
               </td>
               <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
@@ -615,7 +615,7 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
                   {m.name}
                 </Link>
                 {myChars.has(m.name.toLowerCase()) && (
-                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: '#c8a96e', verticalAlign: 'middle' }}>★</span>
+                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: 'var(--gold)', verticalAlign: 'middle' }}>★</span>
                 )}
               </td>
               <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
@@ -741,7 +741,7 @@ function ClaimRequestsTab({
   }
 
   if (loading) return <p style={{ color: 'var(--text-muted)', padding: '1rem' }}>Loading claim requests…</p>
-  if (error)   return <p style={{ color: '#f87171', padding: '1rem' }}>{error}</p>
+  if (error)   return <p style={{ color: 'var(--danger)', padding: '1rem' }}>{error}</p>
   if (!claims) return null
 
   if (claims.length === 0) {
@@ -784,7 +784,7 @@ function ClaimRequestsTab({
                   <span style={{
                     fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem',
                     borderRadius: 4, background: 'rgba(200,169,110,0.15)',
-                    color: '#c8a96e', border: '1px solid rgba(200,169,110,0.3)',
+                    color: 'var(--gold)', border: '1px solid rgba(200,169,110,0.3)',
                     textTransform: 'uppercase', letterSpacing: '0.05em',
                   }}>Your claim</span>
                 )}
@@ -809,7 +809,7 @@ function ClaimRequestsTab({
                     disabled={isBusy}
                     style={{
                       padding: '0.3rem 0.8rem', borderRadius: 5, cursor: 'pointer',
-                      background: 'rgba(239,68,68,0.15)', color: '#f87171',
+                      background: 'rgba(239,68,68,0.15)', color: 'var(--danger)',
                       border: '1px solid rgba(239,68,68,0.35)', fontSize: '0.85rem',
                     }}
                   >
@@ -949,7 +949,7 @@ function ItemWatchTab({ guildName }: { guildName: string }) {
   }
 
   if (loading) return <p style={{ color: 'var(--text-muted)', padding: '1rem' }}>Loading item watches…</p>
-  if (error)   return <p style={{ color: '#f87171', padding: '1rem' }}>{error}</p>
+  if (error)   return <p style={{ color: 'var(--danger)', padding: '1rem' }}>{error}</p>
 
   return (
     <div style={{ padding: '0.85rem 1rem' }}>
@@ -1001,7 +1001,7 @@ function ItemWatchTab({ guildName }: { guildName: string }) {
           </button>
         </div>
         {addError && (
-          <div style={{ width: '100%', color: '#f87171', fontSize: '0.83rem', marginTop: '0.2rem' }}>
+          <div style={{ width: '100%', color: 'var(--danger)', fontSize: '0.83rem', marginTop: '0.2rem' }}>
             {addError}
           </div>
         )}
@@ -1205,7 +1205,7 @@ export default function GuildPage() {
       {/* Header */}
       <div style={{ margin: '1rem 0 1.5rem' }}>
         <h1 style={{
-          fontFamily: "'Cinzel', serif",
+          fontFamily: "var(--font-heading)",
           fontSize: '2.2rem',
           fontWeight: 700,
           letterSpacing: '0.06em',
@@ -1328,7 +1328,7 @@ export default function GuildPage() {
 
       {/* Error */}
       {!isLoading && error && (
-        <p style={{ color: '#f87171' }}>{error}</p>
+        <p style={{ color: 'var(--danger)' }}>{error}</p>
       )}
 
       {/* Tables */}

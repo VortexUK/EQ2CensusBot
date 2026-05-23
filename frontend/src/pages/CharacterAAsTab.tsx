@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { AATree, AATreeData } from '../components/AATree'
 import { StatGroup, StatRow } from './CharacterPage'
 
@@ -63,7 +63,7 @@ function AARaidReady({ spent, cap }: { spent: number; cap: number }) {
   if (cap <= 0) return null
   const pct       = Math.min(100, Math.round(spent / cap * 100))
   const raidReady = pct >= 90
-  const color     = raidReady ? '#4ade80' : pct >= 70 ? '#fbbf24' : '#f87171'
+  const color     = raidReady ? '#4ade80' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
 
   return (
     <div style={{ marginBottom: '0.75rem' }}>
@@ -82,7 +82,7 @@ function AARaidReady({ spent, cap }: { spent: number; cap: number }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           {/* Percentage */}
           <div style={{
-            fontFamily: "'Cinzel', serif",
+            fontFamily: "var(--font-heading)",
             fontSize: '2rem',
             fontWeight: 700,
             lineHeight: 1,
@@ -96,7 +96,7 @@ function AARaidReady({ spent, cap }: { spent: number; cap: number }) {
           </div>
           {/* Status + detail */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : '#f87171', marginBottom: '0.2rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : 'var(--danger)', marginBottom: '0.2rem' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -235,7 +235,7 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
     return <p style={{ marginTop: '1.5rem', color: 'var(--text-muted)' }}>Loading AA data…</p>
   }
   if (state.status === 'error') {
-    return <p style={{ marginTop: '1.5rem', color: '#f87171' }}>Error: {state.message}</p>
+    return <p style={{ marginTop: '1.5rem', color: 'var(--danger)' }}>Error: {state.message}</p>
   }
 
   const { charAAs, config, treeData } = state

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ItemTooltip, TooltipState } from '../components/ItemTooltip'
 
@@ -443,7 +443,7 @@ export default function ItemSearchPage() {
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
       <h1 style={{
-        fontFamily: "'Cinzel', serif",
+        fontFamily: "var(--font-heading)",
         fontSize: '1.9rem', fontWeight: 700, letterSpacing: '0.06em',
         margin: '1rem 0 0.25rem',
         background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 40%, #c8a96e 70%, #a07840 100%)',
@@ -622,7 +622,7 @@ export default function ItemSearchPage() {
                       onClick={() => removeStatFilter(f.id)}
                       style={{
                         background: 'none', border: 'none',
-                        color: '#f87171', cursor: 'pointer', fontSize: '1rem', lineHeight: 1,
+                        color: 'var(--danger)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1,
                       }}
                       title="Remove"
                     >
@@ -651,7 +651,7 @@ export default function ItemSearchPage() {
       </form>
 
       {/* ── Error ──────────────────────────────────────────────────────────── */}
-      {error && <p style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</p>}
 
       {/* ── Prompt ─────────────────────────────────────────────────────────── */}
       {!searched && !loading && (

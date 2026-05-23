@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { avatarUrl, useAuth } from '../hooks/useAuth'
 
@@ -29,7 +29,7 @@ export default function UserWidget() {
         style={{
           display: 'inline-block',
           padding: '0.4rem 1rem',
-          background: '#5865F2',
+          background: 'var(--discord-brand)',
           color: 'var(--text)',
           borderRadius: 6,
           border: '1px solid var(--border)',
@@ -107,7 +107,7 @@ export default function UserWidget() {
             style={{
               display: 'block', width: '100%', textAlign: 'left',
               padding: '0.6rem 1rem', background: 'transparent',
-              border: 'none', color: '#f87171', fontSize: '0.88rem', cursor: 'pointer',
+              border: 'none', color: 'var(--danger)', fontSize: '0.88rem', cursor: 'pointer',
             }}
           >
             Sign out

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StatGroup } from './CharacterPage'
 import { SpellTierPip } from '../components/SpellScrollTooltip'
@@ -65,7 +65,7 @@ function SpellRaidReady({ expertOrBetter, totalSpells }: { expertOrBetter: numbe
   if (totalSpells === 0) return null
   const pct       = Math.min(100, Math.round(expertOrBetter / totalSpells * 100))
   const raidReady = pct >= 90
-  const color     = raidReady ? '#4ade80' : pct >= 70 ? '#fbbf24' : '#f87171'
+  const color     = raidReady ? '#4ade80' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
 
   return (
     <div style={{ marginBottom: '0.75rem' }}>
@@ -83,7 +83,7 @@ function SpellRaidReady({ expertOrBetter, totalSpells }: { expertOrBetter: numbe
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <div style={{
-            fontFamily: "'Cinzel', serif",
+            fontFamily: "var(--font-heading)",
             fontSize: '2rem', fontWeight: 700, lineHeight: 1,
             color, textShadow: `0 0 20px ${color}55`,
             flexShrink: 0, minWidth: '3ch', textAlign: 'center',
@@ -91,7 +91,7 @@ function SpellRaidReady({ expertOrBetter, totalSpells }: { expertOrBetter: numbe
             {pct}%
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : '#f87171', marginBottom: '0.2rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : 'var(--danger)', marginBottom: '0.2rem' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -147,7 +147,7 @@ function SpellProgressBar({ label, subtitle, value, total, pct, color }: {
 // ── Upgrade materials section ─────────────────────────────────────────────────
 
 const _CAT_COLOUR: Record<string, string> = {
-  primary:   '#c8a96e',   // gold  — the key component
+  primary:   'var(--gold)',   // gold  — the key component
   secondary: '#94a3b8',   // slate — stackable mats
   fuel:      '#64748b',   // muted — bulk fuel
 }
@@ -394,7 +394,7 @@ function MaterialsSection({ charName }: { charName: string }) {
               padding: '5px 0',
               fontSize: '0.78rem',
               fontWeight: 600,
-              color: addingToList ? 'var(--text-muted)' : '#c8a96e',
+              color: addingToList ? 'var(--text-muted)' : 'var(--gold)',
               background: 'none',
               border: '1px solid ' + (addingToList ? 'var(--border)' : '#c8a96e55'),
               borderRadius: 4,
@@ -409,7 +409,7 @@ function MaterialsSection({ charName }: { charName: string }) {
             {addingToList ? '⏳ Adding…' : '🛒 Add upgrades to shopping list'}
           </button>
           {addError && (
-            <div style={{ fontSize: '0.68rem', color: '#f87171', marginTop: 3 }}>
+            <div style={{ fontSize: '0.68rem', color: 'var(--danger)', marginTop: 3 }}>
               Error: {addError}
             </div>
           )}
@@ -457,7 +457,7 @@ export function SpellsTab({ charName }: { charName: string }) {
     return <p style={{ marginTop: '1.5rem', color: 'var(--text-muted)' }}>Loading spell data…</p>
   }
   if (state.status === 'error') {
-    return <p style={{ marginTop: '1.5rem', color: '#f87171' }}>Error: {state.message}</p>
+    return <p style={{ marginTop: '1.5rem', color: 'var(--danger)' }}>Error: {state.message}</p>
   }
 
   const { data } = state

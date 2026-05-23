@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useClaim } from '../hooks/useClaim'
@@ -23,7 +23,7 @@ function CharacterCard({ claim, detail, isPrimary }: {
   detail: CharDetail | null
   isPrimary: boolean
 }) {
-  const accentColour = detail?.cls ? (CLASS_COLOURS[detail.cls] ?? '#c8a96e') : '#c8a96e'
+  const accentColour = detail?.cls ? (CLASS_COLOURS[detail.cls] ?? 'var(--gold)') : 'var(--gold)'
   const navigate = useNavigate()
 
   return (
@@ -61,7 +61,7 @@ function CharacterCard({ claim, detail, isPrimary }: {
         {isPrimary && (
           <span style={{
             position: 'absolute', top: '0.7rem', right: '0.8rem',
-            fontSize: '0.7rem', color: '#c8a96e', opacity: 0.8,
+            fontSize: '0.7rem', color: 'var(--gold)', opacity: 0.8,
             letterSpacing: '0.04em',
           }}>
             ★ Primary
@@ -70,7 +70,7 @@ function CharacterCard({ claim, detail, isPrimary }: {
 
         {/* Character name */}
         <div style={{
-          fontFamily: "'Cinzel', serif",
+          fontFamily: "var(--font-heading)",
           fontSize: '1.25rem',
           fontWeight: 700,
           letterSpacing: '0.04em',
@@ -88,7 +88,7 @@ function CharacterCard({ claim, detail, isPrimary }: {
         <div style={{
           fontSize: '0.8rem',
           color: 'var(--text-muted)',
-          fontFamily: "'Cinzel', serif",
+          fontFamily: "var(--font-heading)",
           letterSpacing: '0.03em',
           marginBottom: '0.8rem',
           minHeight: '1em',
@@ -184,7 +184,7 @@ function GuildsSidebar({ approved }: { approved: Claim[] }) {
       flexShrink: 0,
     }}>
       <h2 style={{
-        fontFamily: "'Cinzel', serif",
+        fontFamily: "var(--font-heading)",
         fontSize: '0.88rem',
         fontWeight: 600,
         letterSpacing: '0.1em',
@@ -218,9 +218,9 @@ function GuildsSidebar({ approved }: { approved: Claim[] }) {
             onMouseLeave={e => (e.currentTarget.style.background = '')}
           >
             <span style={{
-              fontFamily: "'Cinzel', serif",
+              fontFamily: "var(--font-heading)",
               fontSize: '0.82rem',
-              color: '#c8a96e',
+              color: 'var(--gold)',
               fontWeight: 500,
               letterSpacing: '0.02em',
               overflow: 'hidden',
@@ -330,7 +330,7 @@ function MyCharacters() {
         {/* Section header */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '1.1rem' }}>
           <h2 style={{
-            fontFamily: "'Cinzel', serif",
+            fontFamily: "var(--font-heading)",
             fontSize: '0.88rem',
             fontWeight: 600,
             letterSpacing: '0.1em',

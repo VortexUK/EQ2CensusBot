@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 
 interface ItemStat   { display_name: string; value: number; stat_group: string }
@@ -56,7 +56,7 @@ export default function ItemPage() {
   if (error || !item) return (
     <main style={{ maxWidth: 700, margin: '0 auto', padding: '2rem 1.5rem' }}>
       <Link to="/items" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textDecoration: 'none' }}>← Item Search</Link>
-      <p style={{ color: '#f87171', marginTop: '1rem' }}>{error ?? 'Item not found.'}</p>
+      <p style={{ color: 'var(--danger)', marginTop: '1rem' }}>{error ?? 'Item not found.'}</p>
     </main>
   )
 
@@ -77,7 +77,7 @@ export default function ItemPage() {
         )}
         <div>
           <h1 style={{
-            fontFamily: "'Cinzel', serif", fontSize: '1.6rem', fontWeight: 700,
+            fontFamily: "var(--font-heading)", fontSize: '1.6rem', fontWeight: 700,
             margin: '0 0 0.2rem', color: colour,
             textShadow: colour !== 'var(--text)' ? `0 0 12px ${colour}55` : 'none',
           }}>
@@ -103,7 +103,7 @@ export default function ItemPage() {
                 <span key={f} style={{
                   fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em',
                   padding: '0.1rem 0.4rem', borderRadius: 3,
-                  background: 'rgba(200,169,110,0.15)', color: '#c8a96e',
+                  background: 'rgba(200,169,110,0.15)', color: 'var(--gold)',
                   border: '1px solid rgba(200,169,110,0.3)',
                 }}>
                   {f}
