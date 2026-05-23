@@ -78,6 +78,7 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
 function NavLinks() {
   return (
     <nav style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+      <NavLink to="/" end      style={navLinkStyle}>Home</NavLink>
       <NavLink to="/characters" style={navLinkStyle}>Character</NavLink>
       <NavLink to="/guilds"     style={navLinkStyle}>Guild</NavLink>
       <NavLink to="/items"      style={navLinkStyle}>Item</NavLink>
