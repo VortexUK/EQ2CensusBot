@@ -39,7 +39,7 @@ interface AACacheEntry {
   config:   AAConfig
   treeData: Map<number, AATreeData>
 }
-export const _aaCache = new Map<string, AACacheEntry>()
+const _aaCache = new Map<string, AACacheEntry>()
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
