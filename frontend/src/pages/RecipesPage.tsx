@@ -119,6 +119,42 @@ const CTRL: CSSProperties = {
 
 const STORAGE_KEY = 'eq2-shopping-list'
 
+// ── XML download ──────────────────────────────────────────────────────────────
+
+function _xmlEsc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function downloadShoppingListXml(list: ShoppingEntry[], summary: IngredientSummary): void {
+  const lines: string[] = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<shoppinglist>',
+    '  <spells>',
+    ...list.map(e => `    <spell Name="${_xmlEsc(e.recipeName)}">${e.qty}</spell>`),
+    '  </spells>',
+    '  <materials>',
+    ...summary.regular.map(m => `    <material Name="${_xmlEsc(m.name)}">${m.total}</material>`),
+    '  </materials>',
+    '  <fuels>',
+    ...summary.fuel.map(f => `    <fuel Name="${_xmlEsc(f.name)}">${f.total}</fuel>`),
+    '  </fuels>',
+    '</shoppinglist>',
+  ]
+  const blob = new Blob([lines.join('\n')], { type: 'application/xml' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = 'shopping-list.xml'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 // ── localStorage helpers ───────────────────────────────────────────────────────
 
 function loadList(): ShoppingEntry[] {
@@ -552,7 +588,14 @@ export default function RecipesPage() {
               <h2 style={{ margin: 0, fontSize: '1rem', fontFamily: "'Cinzel', serif", color: '#c8a96e' }}>
                 Shopping List
               </h2>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  onClick={() => downloadShoppingListXml(list, summary)}
+                  title="Download as XML"
+                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, color: '#c8a96e', cursor: 'pointer', fontSize: '0.75rem', padding: '2px 7px', lineHeight: 1.5 }}
+                >
+                  ⬇ XML
+                </button>
                 <button
                   onClick={clearList}
                   title="Clear list"
