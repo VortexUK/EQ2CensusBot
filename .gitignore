@@ -236,16 +236,19 @@ data/recipes/recipes.db-wal
 data/recipes/recipes.db-shm
 
 # Census API dump files (analysis artifacts)
-example_items.json
-example_character.json
-example_character2.json
-example_character3.json
-example_guild.json
-example_recipe.json
+# Kept under tests/fixtures/ locally; not committed.
+tests/fixtures/example_*.json
+tests/fixtures/test_character.json
+# Also catch any that get re-created at the repo root.
+example_*.json
 
-# Local preview output
+# Local preview output (PIL renders from scripts/preview_*.py)
+previews/
 preview*.png
 test_*.png
+
+# Local log dumps
+logs/
 
 # Claude Code
 .claude/
@@ -262,5 +265,3 @@ data/users.db-shm
 # Frontend build artefacts
 frontend/tsconfig.app.tsbuildinfo
 
-# Local test/debug dumps
-test_character.json

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from collections.abc import Awaitable, Callable
 
 from dotenv import load_dotenv
 
@@ -46,10 +47,39 @@ async def run_web() -> None:
     await server.serve()
 
 
+async def _supervise(
+    name: str,
+    factory: Callable[[], Awaitable[None]],
+    max_restarts: int = 10,
+) -> None:
+    """Run `factory()`; on unexpected crash, log + back off + restart so one
+    side's bug doesn't take the other down. Gives up after max_restarts
+    consecutive failures rather than spinning forever on a config error."""
+    log = logging.getLogger(f"supervisor.{name}")
+    delay = 2.0
+    restarts = 0
+    while True:
+        try:
+            log.info("starting")
+            await factory()
+            log.info("exited cleanly")
+            return
+        except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            restarts += 1
+            if restarts > max_restarts:
+                log.exception("crashed %d times in a row — giving up", restarts - 1)
+                return
+            log.exception("crashed; restart %d/%d in %.1fs", restarts, max_restarts, delay)
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 60.0)
+
+
 async def main() -> None:
     await asyncio.gather(
-        run_bot(),
-        run_web(),
+        _supervise("bot", run_bot),
+        _supervise("web", run_web),
     )
 
 

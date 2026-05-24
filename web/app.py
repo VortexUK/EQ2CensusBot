@@ -6,7 +6,7 @@ import threading
 import time
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 
 load_dotenv()
 from pathlib import Path
@@ -327,6 +327,10 @@ def create_app(session_secret: str | None = None) -> FastAPI:
             """Catch-all: serve real files from the build root if they exist
             (favicon.svg, favicon.ico, robots.txt, og-image.png, etc.) and fall
             back to index.html so React Router can handle in-app navigation."""
+            # Don't swallow unmatched /api/* paths — let FastAPI return a real
+            # 404 JSON response so typos surface as errors instead of HTML.
+            if full_path == "api" or full_path.startswith("api/"):
+                raise HTTPException(status_code=404, detail="Not Found")
             if full_path:
                 candidate = _FRONTEND_DIST / full_path
                 # Resolve to defeat path-traversal (../../etc/passwd) and ensure

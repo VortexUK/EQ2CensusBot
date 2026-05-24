@@ -122,6 +122,12 @@ pip install -r requirements-dev.txt   # includes prod deps + test/lint tooling
 cd frontend && npm install
 ```
 
+**Activate the pre-push hook** (recommended) — runs the same lint, type, and test checks as CI before every `git push`, so you find out about a regression in seconds instead of after CI runs:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ### 2. Configure environment
 
 ```bash
