@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS encounters (
     kills           INTEGER NOT NULL DEFAULT 0,
     deaths          INTEGER NOT NULL DEFAULT 0,
     source_dsn      TEXT    NOT NULL,
+    uploaded_by     TEXT    NOT NULL DEFAULT 'local',
+    guild_name      TEXT,
     ingested_at     INTEGER NOT NULL
 );
 """
@@ -178,6 +180,7 @@ CREATE TABLE IF NOT EXISTS ingest_log (
 _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_encounters_started_desc  ON encounters (started_at DESC);",
     "CREATE INDEX IF NOT EXISTS idx_encounters_zone          ON encounters (zone);",
+    "CREATE INDEX IF NOT EXISTS idx_encounters_uploaded_by   ON encounters (uploaded_by, started_at DESC);",
     "CREATE INDEX IF NOT EXISTS idx_combatants_encounter     ON combatants (encounter_id);",
     "CREATE INDEX IF NOT EXISTS idx_combatants_name          ON combatants (name);",
     "CREATE INDEX IF NOT EXISTS idx_combatants_ally          ON combatants (encounter_id, ally);",
@@ -186,10 +189,19 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_attack_types_damage_desc ON attack_types (combatant_id, damage DESC);",
 ]
 
-# Empty for a fresh feature. Append idempotent ALTER TABLE statements here
-# when schema changes — `init_db` swallows OperationalError so duplicate-column
-# attempts are safe.
-_MIGRATIONS: list[str] = []
+# Append idempotent ALTER TABLE statements here when the schema evolves —
+# `init_db` swallows OperationalError so re-applying on an up-to-date DB is
+# a no-op.
+_MIGRATIONS: list[str] = [
+    # Added when the /parses UI started grouping by uploader. Existing rows
+    # default to 'local' (the local-only-ingest era).
+    "ALTER TABLE encounters ADD COLUMN uploaded_by TEXT NOT NULL DEFAULT 'local'",
+    # Guild attribution stamped on each encounter at ingest time. NULL means
+    # 'unresolved' (either uploader='local', Census lookup failed, or the
+    # character isn't currently in a guild). Pre-existing rows stay NULL
+    # until backfilled via `ingest.py --backfill-guilds`.
+    "ALTER TABLE encounters ADD COLUMN guild_name TEXT",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +254,8 @@ def insert_encounter(
     *,
     source_dsn: str,
     ingested_at: int,
+    uploaded_by: str = "local",
+    guild_name: str | None = None,
 ) -> int:
     cur = conn.execute(
         """
@@ -249,8 +263,8 @@ def insert_encounter(
             act_encid, title, zone,
             started_at, ended_at, duration_s,
             total_damage, encdps, kills, deaths,
-            source_dsn, ingested_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            source_dsn, uploaded_by, guild_name, ingested_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             enc.encid,
@@ -264,6 +278,8 @@ def insert_encounter(
             enc.kills,
             enc.deaths,
             source_dsn,
+            uploaded_by,
+            guild_name,
             ingested_at,
         ),
     )
@@ -517,19 +533,122 @@ def get_combatants_for_encounter(conn: sqlite3.Connection, encounter_id: int) ->
     return [dict(r) for r in rows]
 
 
+# ACT swing_type semantics confirmed against real EQ2 data:
+#   1   = melee auto-attack
+#   2   = skill/spell damage
+#   3   = heal events (resist column: 'Hitpoints' regular heal, 'Absorption' ward)
+#   20  = cures (resist='relieves'; the `damage` column is the number of
+#         detrimental effects removed)
+#   100 + type='All'  = aggregate rollup (filtered out at ingest)
+#   100 + type!='All' = threat / buff procs (resist='Increase' for threat
+#                       boosters like 'Undeniable Malice')
+# ACT writes everything as 'AttackType' rows at depth 4 — we split by
+# swing_type at query so each category gets its own UI tab.
+_DAMAGE_SWING_TYPES = (1, 2)
+_HEAL_SWING_TYPES = (3,)
+_CURE_SWING_TYPES = (20,)
+_THREAT_SWING_TYPES = (100,)  # callers should additionally filter type != 'All'
+
+
 def get_top_attacks_for_combatant(
     conn: sqlite3.Connection,
     combatant_id: int,
     limit: int = 10,
 ) -> list[dict]:
+    """Top damage abilities (excludes heals and the swing_type=100 rollup)."""
     conn.row_factory = sqlite3.Row
+    placeholders = ",".join("?" * len(_DAMAGE_SWING_TYPES))
     rows = conn.execute(
-        """
+        f"""
         SELECT * FROM attack_types
-        WHERE combatant_id = ?
+        WHERE combatant_id = ? AND swing_type IN ({placeholders})
         ORDER BY damage DESC
         LIMIT ?
         """,
-        (combatant_id, limit),
+        (combatant_id, *_DAMAGE_SWING_TYPES, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_top_heals_for_combatant(
+    conn: sqlite3.Connection,
+    combatant_id: int,
+    limit: int = 10,
+) -> list[dict]:
+    """Top heal abilities (swing_type=3). `damage` column = amount healed;
+    `resist` column distinguishes regular 'Hitpoints' heals from
+    'Absorption' wards."""
+    conn.row_factory = sqlite3.Row
+    placeholders = ",".join("?" * len(_HEAL_SWING_TYPES))
+    rows = conn.execute(
+        f"""
+        SELECT * FROM attack_types
+        WHERE combatant_id = ? AND swing_type IN ({placeholders})
+        ORDER BY damage DESC
+        LIMIT ?
+        """,
+        (combatant_id, *_HEAL_SWING_TYPES, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_top_cures_for_combatant(
+    conn: sqlite3.Connection,
+    combatant_id: int,
+    limit: int = 10,
+) -> list[dict]:
+    """Cure events (swing_type=20). The `damage` column is the count of
+    detrimental effects removed; `hits` is how many times the cure was cast."""
+    conn.row_factory = sqlite3.Row
+    placeholders = ",".join("?" * len(_CURE_SWING_TYPES))
+    rows = conn.execute(
+        f"""
+        SELECT * FROM attack_types
+        WHERE combatant_id = ? AND swing_type IN ({placeholders})
+        ORDER BY hits DESC, damage DESC
+        LIMIT ?
+        """,
+        (combatant_id, *_CURE_SWING_TYPES, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_top_threats_for_combatant(
+    conn: sqlite3.Connection,
+    combatant_id: int,
+    limit: int = 10,
+) -> list[dict]:
+    """Threat / buff-proc rows (swing_type=100, type != 'All'). For threat
+    procs the `damage` column is the threat-increase value; `hits` is
+    proc count."""
+    conn.row_factory = sqlite3.Row
+    placeholders = ",".join("?" * len(_THREAT_SWING_TYPES))
+    rows = conn.execute(
+        f"""
+        SELECT * FROM attack_types
+        WHERE combatant_id = ?
+          AND swing_type IN ({placeholders})
+          AND attack_name <> 'All'
+        ORDER BY damage DESC
+        LIMIT ?
+        """,
+        (combatant_id, *_THREAT_SWING_TYPES, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_damage_types_for_combatant(
+    conn: sqlite3.Connection,
+    combatant_id: int,
+) -> list[dict]:
+    """All damage_types rows for a combatant, sorted by damage DESC."""
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """
+        SELECT * FROM damage_types
+        WHERE combatant_id = ?
+        ORDER BY damage DESC
+        """,
+        (combatant_id,),
     ).fetchall()
     return [dict(r) for r in rows]

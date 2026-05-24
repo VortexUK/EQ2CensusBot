@@ -526,6 +526,37 @@ def _seed_act_db(conn: sqlite3.Connection) -> None:
                 "100%",
                 "0.0%L - 0.0%F - 0.0%M",
             ),
+            # Threat/buff proc — observed in real data as swingtype=100 with
+            # resist='Increase' (e.g. 'Undeniable Malice'). MUST come through
+            # the filter; only type='All' rollups are stripped.
+            (
+                "18cf3eb9",
+                "Menludiir",
+                "",
+                100,
+                "Undeniable Malice",
+                "2026-05-24 13:51:56",
+                "2026-05-24 13:52:43",
+                47,
+                27240,
+                579.57,
+                579.57,
+                579.57,
+                2724.0,
+                2700,
+                100,
+                5000,
+                "Increase",
+                10,
+                0,
+                0,
+                0,
+                10,
+                100.0,
+                4.7,
+                "0%",
+                "-",
+            ),
         ],
     )
     conn.commit()

@@ -26,6 +26,8 @@ _FAKE_ENCOUNTER = {
     "kills": 4,
     "deaths": 0,
     "source_dsn": "eq2act",
+    "uploaded_by": "Menludiir",
+    "guild_name": "Exordium",
     "ingested_at": 1716561200,
 }
 
@@ -42,11 +44,18 @@ _FAKE_COMBATANTS = [
         "encdps": 10928.65,
         "healed": 11637,
         "enchps": 252.98,
+        "heals": 40,
+        "crit_heals": 1,
+        "cure_dispels": 0,
+        "power_drain": 0,
+        "power_replenish": 0,
+        "heals_taken": 11637,
+        "damage_taken": 27557,
+        "threat_delta": 20000,
         "deaths": 0,
         "kills": 4,
         "crit_hits": 123,
         "crit_dam_perc": 93.0,
-        "damage_taken": 27557,
     },
     {
         "id": 11,
@@ -60,13 +69,54 @@ _FAKE_COMBATANTS = [
         "encdps": 124.26,
         "healed": 0,
         "enchps": 0.0,
+        "heals": 0,
+        "crit_heals": 0,
+        "cure_dispels": 0,
+        "power_drain": 0,
+        "power_replenish": 0,
+        "heals_taken": 0,
+        "damage_taken": 145877,
+        "threat_delta": 0,
         "deaths": 1,
         "kills": 0,
         "crit_hits": 0,
         "crit_dam_perc": 0.0,
-        "damage_taken": 145877,
     },
 ]
+
+_FAKE_DAMAGE_TYPES = {
+    10: [
+        {
+            "damage_type": "divine",
+            "damage": 400000,
+            "dps": 8500.0,
+            "hits": 100,
+            "swings": 100,
+            "max_hit": 8000,
+            "crit_perc": 90.0,
+        },
+        {
+            "damage_type": "melee",
+            "damage": 102718,
+            "dps": 2185.0,
+            "hits": 32,
+            "swings": 32,
+            "max_hit": 4500,
+            "crit_perc": 100.0,
+        },
+    ],
+    11: [
+        {
+            "damage_type": "physical",
+            "damage": 5716,
+            "dps": 381.07,
+            "hits": 11,
+            "swings": 12,
+            "max_hit": 1297,
+            "crit_perc": 0.0,
+        },
+    ],
+}
 
 _FAKE_TOP_ATTACKS = {
     10: [
@@ -93,6 +143,45 @@ _FAKE_TOP_ATTACKS = {
             "max_hit": 1297,
         },
     ],
+}
+
+_FAKE_TOP_HEALS = {
+    10: [
+        {
+            "attack_name": "Reverence",
+            "damage": 7818,  # amount healed
+            "hits": 12,
+            "swings": 12,
+            "crit_perc": 0.0,
+            "max_hit": 1297,
+            "resist": "Hitpoints",
+        },
+        {
+            "attack_name": "Stonewill",
+            "damage": 3819,
+            "hits": 12,
+            "swings": 12,
+            "crit_perc": 0.0,
+            "max_hit": 1297,
+            "resist": "Absorption",  # ward
+        },
+    ],
+    11: [],
+}
+
+_FAKE_TOP_CURES = {
+    10: [
+        {"attack_name": "Cure", "damage": 4, "hits": 4, "max_hit": 1, "resist": "relieves"},
+        {"attack_name": "Devoted Resolve", "damage": 2, "hits": 2, "max_hit": 1, "resist": "relieves"},
+    ],
+    11: [],
+}
+
+_FAKE_TOP_THREATS = {
+    10: [
+        {"attack_name": "Undeniable Malice", "damage": 27240, "hits": 10, "max_hit": 5000, "resist": "Increase"},
+    ],
+    11: [],
 }
 
 
@@ -145,6 +234,8 @@ async def test_list_parses_returns_results(app):
     assert enc["zone"] == "Great Divide"
     assert enc["combatant_count"] == 2
     assert enc["player_count"] == 1
+    assert enc["uploaded_by"] == "Menludiir"
+    assert enc["guild_name"] == "Exordium"
     assert enc["encdps"] == 10928.65
 
 
@@ -229,7 +320,16 @@ async def test_size_buckets_defined():
 async def test_get_parse_returns_detail(app):
     fake_enc = dict(_FAKE_ENCOUNTER)
     fake_enc["combatants"] = [
-        dict(c, ally=bool(c["ally"]), top_attacks=_FAKE_TOP_ATTACKS[c["id"]]) for c in _FAKE_COMBATANTS
+        dict(
+            c,
+            ally=bool(c["ally"]),
+            top_attacks=_FAKE_TOP_ATTACKS[c["id"]],
+            top_heals=_FAKE_TOP_HEALS[c["id"]],
+            top_cures=_FAKE_TOP_CURES[c["id"]],
+            top_threats=_FAKE_TOP_THREATS[c["id"]],
+            damage_types=_FAKE_DAMAGE_TYPES[c["id"]],
+        )
+        for c in _FAKE_COMBATANTS
     ]
 
     fake_detail_sync = MagicMock(return_value=fake_enc)
@@ -251,12 +351,43 @@ async def test_get_parse_returns_detail(app):
     assert menludiir["ally"] is True
     assert menludiir["damage"] == 502718
     assert menludiir["crit_dam_perc"] == 93.0
+    assert menludiir["heals"] == 40
+    assert menludiir["threat_delta"] == 20000
     assert len(menludiir["top_attacks"]) == 1
     assert menludiir["top_attacks"][0]["attack_name"] == "Smite"
+    assert len(menludiir["damage_types"]) == 2
+    assert menludiir["damage_types"][0]["damage_type"] == "divine"
+    assert menludiir["damage_types"][0]["damage"] == 400000
+
+    # Heal abilities surfaced separately, with heal_type carried through.
+    assert len(menludiir["top_heals"]) == 2
+    rev = next(h for h in menludiir["top_heals"] if h["heal_name"] == "Reverence")
+    assert rev["healed"] == 7818
+    assert rev["heal_type"] == "Hitpoints"
+    sw = next(h for h in menludiir["top_heals"] if h["heal_name"] == "Stonewill")
+    assert sw["heal_type"] == "Absorption"
+
+    # Cures (swing_type=20)
+    assert len(menludiir["top_cures"]) == 2
+    cure = next(c for c in menludiir["top_cures"] if c["cure_name"] == "Cure")
+    assert cure["effects_removed"] == 4
+    assert cure["times_cast"] == 4
+
+    # Threat procs (swing_type=100, type != 'All')
+    assert len(menludiir["top_threats"]) == 1
+    um = menludiir["top_threats"][0]
+    assert um["ability_name"] == "Undeniable Malice"
+    assert um["value"] == 27240
+    assert um["procs"] == 10
+    assert um["kind"] == "Increase"
 
     mob = next(c for c in data["combatants"] if c["name"] == "a krait patriarch")
     assert mob["ally"] is False
     assert mob["damage_taken"] == 145877
+    assert len(mob["damage_types"]) == 1
+    assert mob["top_heals"] == []
+    assert mob["top_cures"] == []
+    assert mob["top_threats"] == []
 
 
 @pytest.mark.asyncio

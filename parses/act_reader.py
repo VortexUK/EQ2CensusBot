@@ -276,11 +276,17 @@ def get_damage_types(
 # Attack types
 # ---------------------------------------------------------------------------
 
-# ACT writes a per-combatant rollup row with type='All' (usually swingtype=100,
-# but observed at swingtype=2 for combatants like 'Unknown'). We filter on the
-# `type` column directly — that's the actually-reliable signal — and keep the
-# swingtype check as belt-and-suspenders.
-_SKIP_ALL_ROLLUP = "type <> 'All' AND swingtype <> 100"
+# ACT writes a per-combatant rollup row with type='All' across various
+# swingtypes (commonly 100, but observed at swingtype=2 for synthetic
+# combatants like 'Unknown'). We filter on type='All' alone — that's the
+# reliable signal.
+#
+# IMPORTANT: do NOT also filter `swingtype=100`. ACT uses swingtype=100 for
+# more than just the 'All' rollup — it also stores per-ability stat-increase
+# rows (threat procs like 'Undeniable Malice' with resist='Increase', and
+# likely other proc/buff categories at depth 4). Filtering by swingtype here
+# silently drops legitimate non-damage event rows from our DB.
+_SKIP_ALL_ROLLUP = "type <> 'All'"
 
 
 def get_attack_types(

@@ -20,8 +20,7 @@ export const CLASS_COLOURS: Record<string, string> = {
   Templar: '#4ade80', Inquisitor: '#4ade80',
   Mystic: '#4ade80', Defiler: '#4ade80',
   Warden: '#4ade80', Fury: '#4ade80',
+  Channeler: '#4ade80',
   // Beastlord (animalist — scout-adjacent)
   Beastlord: '#fbbf24',
-  // Channeler (shaper — mage-adjacent)
-  Channeler: '#93b4ff',
 }

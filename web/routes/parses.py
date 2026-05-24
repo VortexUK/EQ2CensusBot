@@ -43,6 +43,8 @@ class ParseEncounterSummary(BaseModel):
     deaths: int
     combatant_count: int
     player_count: int  # ally combatants with single-word names, excluding 'Unknown'
+    uploaded_by: str  # who ingested this encounter; 'local' for the local-only era
+    guild_name: str | None  # stamped at ingest time from uploader's Census guild
 
 
 class ParsesListResponse(BaseModel):
@@ -59,6 +61,53 @@ class AttackSummary(BaseModel):
     max_hit: int
 
 
+class HealSummary(BaseModel):
+    """Per-ability heal rollup. ACT writes heals into attacktype_table at
+    swing_type=3; the `damage` column there is the amount healed, and
+    `resist` distinguishes regular heals ('Hitpoints') from wards
+    ('Absorption')."""
+
+    heal_name: str
+    healed: int
+    hits: int
+    swings: int
+    crit_perc: float
+    max_hit: int
+    heal_type: str | None  # 'Hitpoints' (regular heal) or 'Absorption' (ward)
+
+
+class CureSummary(BaseModel):
+    """Cure events (swing_type=20). `effects_removed` is the count of
+    detrimental effects cleared (ACT writes this into the `damage` column);
+    `times_cast` is hit count."""
+
+    cure_name: str
+    effects_removed: int
+    times_cast: int
+    max_at_once: int
+
+
+class ThreatSummary(BaseModel):
+    """Threat / buff proc (swing_type=100, type != 'All'). For threat
+    procs `value` is the threat amount; `procs` is how many times it fired."""
+
+    ability_name: str
+    value: int
+    procs: int
+    max_proc: int
+    kind: str | None  # ACT's `resist` column — 'Increase' for threat procs
+
+
+class DamageTypeBreakdown(BaseModel):
+    damage_type: str
+    damage: int
+    dps: float
+    hits: int
+    swings: int
+    max_hit: int
+    crit_perc: float
+
+
 class CombatantSummary(BaseModel):
     id: int
     name: str
@@ -70,12 +119,23 @@ class CombatantSummary(BaseModel):
     encdps: float
     healed: int
     enchps: float
+    heals: int
+    crit_heals: int
+    cure_dispels: int
+    power_drain: int
+    power_replenish: int
+    heals_taken: int
+    damage_taken: int
+    threat_delta: int
     deaths: int
     kills: int
     crit_hits: int
     crit_dam_perc: float
-    damage_taken: int
     top_attacks: list[AttackSummary]
+    top_heals: list[HealSummary]
+    top_cures: list[CureSummary]
+    top_threats: list[ThreatSummary]
+    damage_types: list[DamageTypeBreakdown]
 
 
 class ParseDetailResponse(BaseModel):
@@ -199,6 +259,10 @@ def _encounter_detail_sync(encounter_id: int, top_attacks_per_combatant: int) ->
         combatants = parses_db.get_combatants_for_encounter(conn, enc["id"])
         for c in combatants:
             c["top_attacks"] = parses_db.get_top_attacks_for_combatant(conn, c["id"], limit=top_attacks_per_combatant)
+            c["top_heals"] = parses_db.get_top_heals_for_combatant(conn, c["id"], limit=top_attacks_per_combatant)
+            c["top_cures"] = parses_db.get_top_cures_for_combatant(conn, c["id"], limit=top_attacks_per_combatant)
+            c["top_threats"] = parses_db.get_top_threats_for_combatant(conn, c["id"], limit=top_attacks_per_combatant)
+            c["damage_types"] = parses_db.get_damage_types_for_combatant(conn, c["id"])
             c["ally"] = bool(c["ally"])
         enc["combatants"] = combatants
         return enc
@@ -247,6 +311,8 @@ async def list_parses(
             deaths=e["deaths"],
             combatant_count=e.get("combatant_count", 0),
             player_count=e.get("player_count", 0),
+            uploaded_by=e.get("uploaded_by") or "local",
+            guild_name=e.get("guild_name"),
         )
         for e in encounters
     ]
@@ -281,11 +347,18 @@ async def get_parse(
             encdps=c["encdps"],
             healed=c["healed"],
             enchps=c["enchps"],
+            heals=c["heals"],
+            crit_heals=c["crit_heals"],
+            cure_dispels=c["cure_dispels"],
+            power_drain=c["power_drain"],
+            power_replenish=c["power_replenish"],
+            heals_taken=c["heals_taken"],
+            damage_taken=c["damage_taken"],
+            threat_delta=c["threat_delta"],
             deaths=c["deaths"],
             kills=c["kills"],
             crit_hits=c["crit_hits"],
             crit_dam_perc=c["crit_dam_perc"],
-            damage_taken=c["damage_taken"],
             top_attacks=[
                 AttackSummary(
                     attack_name=a["attack_name"],
@@ -296,6 +369,49 @@ async def get_parse(
                     max_hit=a["max_hit"],
                 )
                 for a in c["top_attacks"]
+            ],
+            top_heals=[
+                HealSummary(
+                    heal_name=h["attack_name"],
+                    healed=h["damage"],  # `damage` column = amount healed for swing_type=3
+                    hits=h["hits"],
+                    swings=h["swings"],
+                    crit_perc=h["crit_perc"],
+                    max_hit=h["max_hit"],
+                    heal_type=h["resist"],
+                )
+                for h in c["top_heals"]
+            ],
+            top_cures=[
+                CureSummary(
+                    cure_name=cu["attack_name"],
+                    effects_removed=cu["damage"],
+                    times_cast=cu["hits"],
+                    max_at_once=cu["max_hit"],
+                )
+                for cu in c["top_cures"]
+            ],
+            top_threats=[
+                ThreatSummary(
+                    ability_name=t["attack_name"],
+                    value=t["damage"],
+                    procs=t["hits"],
+                    max_proc=t["max_hit"],
+                    kind=t["resist"],
+                )
+                for t in c["top_threats"]
+            ],
+            damage_types=[
+                DamageTypeBreakdown(
+                    damage_type=d["damage_type"],
+                    damage=d["damage"],
+                    dps=d["dps"],
+                    hits=d["hits"],
+                    swings=d["swings"],
+                    max_hit=d["max_hit"],
+                    crit_perc=d["crit_perc"],
+                )
+                for d in c["damage_types"]
             ],
         )
         for c in enc["combatants"]

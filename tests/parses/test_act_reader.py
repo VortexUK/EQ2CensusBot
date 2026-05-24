@@ -108,21 +108,31 @@ class TestGetDamageTypes:
 
 class TestGetAttackTypes:
     def test_filters_out_all_rollup_rows(self, act_db_fake):
-        """swingtype=100 with type='All' is ACT's per-combatant rollup —
-        the reader must drop it or we'd double-count."""
+        """Any row with type='All' is ACT's per-combatant rollup — the reader
+        must drop it or we'd double-count. swingtype on its own is NOT a
+        reliable signal because non-rollup swing_type=100 rows exist (threat
+        procs like 'Undeniable Malice')."""
         rows = act_reader.get_attack_types(act_db_fake, "18cf3eb9")
-        # Fixture has 5 attacktype rows total: 2 'All' rollups + 3 real abilities.
-        # The reader should return only the 3 real ones.
-        assert len(rows) == 3
-        assert all(r.swing_type != 100 for r in rows)
+        # Fixture has 7 attacktype rows: 3 'All' rollups + 3 damage abilities
+        # + 1 swing_type=100 non-All ('Undeniable Malice'). Filter keeps 4.
+        assert len(rows) == 4
         assert all(r.attack_name != "All" for r in rows)
         attack_names = {r.attack_name for r in rows}
-        assert attack_names == {"Smite", "Auto-Attack", "melee"}
+        assert attack_names == {"Smite", "Auto-Attack", "melee", "Undeniable Malice"}
+
+    def test_non_All_swing_type_100_row_kept(self, act_db_fake):
+        """Threat/buff procs (e.g. Undeniable Malice) live at swing_type=100
+        with type != 'All'. They must survive the filter so the ingest path
+        captures them — otherwise the Threat tab can never have data."""
+        rows = act_reader.get_attack_types(act_db_fake, "18cf3eb9", "Menludiir")
+        um = next((r for r in rows if r.attack_name == "Undeniable Malice"), None)
+        assert um is not None
+        assert um.swing_type == 100
+        assert um.resist == "Increase"
 
     def test_filter_by_combatant_uses_attacker_column(self, act_db_fake):
         rows = act_reader.get_attack_types(act_db_fake, "18cf3eb9", "Menludiir")
-        assert len(rows) == 2
-        assert {r.attack_name for r in rows} == {"Smite", "Auto-Attack"}
+        assert {r.attack_name for r in rows} == {"Smite", "Auto-Attack", "Undeniable Malice"}
 
     def test_crit_perc_parsed_from_varchar(self, act_db_fake):
         rows = act_reader.get_attack_types(act_db_fake, "18cf3eb9", "Menludiir")

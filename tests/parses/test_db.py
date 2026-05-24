@@ -99,6 +99,61 @@ class TestInsertHelpers:
         )
         assert eid >= 1
 
+    def test_insert_encounter_writes_uploaded_by(self, parses_db_conn):
+        parses_db.insert_encounter(
+            parses_db_conn,
+            _sample_encounter(),
+            source_dsn="eq2act",
+            ingested_at=1700000000,
+            uploaded_by="Menludiir",
+        )
+        row = parses_db_conn.execute(
+            "SELECT uploaded_by FROM encounters WHERE act_encid = ?",
+            ("18cf3eb9",),
+        ).fetchone()
+        assert row[0] == "Menludiir"
+
+    def test_insert_encounter_defaults_uploaded_by_to_local(self, parses_db_conn):
+        parses_db.insert_encounter(
+            parses_db_conn,
+            _sample_encounter(),
+            source_dsn="eq2act",
+            ingested_at=1700000000,
+        )
+        row = parses_db_conn.execute(
+            "SELECT uploaded_by FROM encounters WHERE act_encid = ?",
+            ("18cf3eb9",),
+        ).fetchone()
+        assert row[0] == "local"
+
+    def test_insert_encounter_writes_guild_name(self, parses_db_conn):
+        parses_db.insert_encounter(
+            parses_db_conn,
+            _sample_encounter(),
+            source_dsn="eq2act",
+            ingested_at=1700000000,
+            uploaded_by="Menludiir",
+            guild_name="Exordium",
+        )
+        row = parses_db_conn.execute(
+            "SELECT guild_name FROM encounters WHERE act_encid = ?",
+            ("18cf3eb9",),
+        ).fetchone()
+        assert row[0] == "Exordium"
+
+    def test_insert_encounter_defaults_guild_to_null(self, parses_db_conn):
+        parses_db.insert_encounter(
+            parses_db_conn,
+            _sample_encounter(),
+            source_dsn="eq2act",
+            ingested_at=1700000000,
+        )
+        row = parses_db_conn.execute(
+            "SELECT guild_name FROM encounters WHERE act_encid = ?",
+            ("18cf3eb9",),
+        ).fetchone()
+        assert row[0] is None
+
     def test_full_ingest_chain(self, parses_db_conn):
         enc = _sample_encounter()
         eid = parses_db.insert_encounter(
@@ -271,3 +326,98 @@ class TestLookupHelpers:
 
     def test_find_encounter_missing_returns_none(self, parses_db_conn):
         assert parses_db.find_encounter_by_act_encid(parses_db_conn, "NOPE") is None
+
+
+class TestSwingTypeSplit:
+    """get_top_attacks vs get_top_heals must partition attack_types rows by
+    swing_type (1/2 = damage, 3 = heal) — heal rows would otherwise leak into
+    the Damage tab and out-rank damage abilities for support classes."""
+
+    def _seed(self, parses_db_conn):
+        enc = _sample_encounter()
+        eid = parses_db.insert_encounter(
+            parses_db_conn,
+            enc,
+            source_dsn="eq2act",
+            ingested_at=1700000000,
+        )
+        name_to_id = parses_db.insert_combatants_bulk(
+            parses_db_conn,
+            eid,
+            [_sample_combatant("Menludiir", ally=True, damage=10000)],
+        )
+        cid = name_to_id["Menludiir"]
+        # Insert rows directly to control swing_type per row.
+        parses_db_conn.executemany(
+            """
+            INSERT INTO attack_types (
+                combatant_id, victim, swing_type, attack_name,
+                damage, hits, swings, crit_hits, max_hit, resist
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (cid, "", 1, "crush", 7000, 10, 10, 1, 1500, "crushing"),
+                (cid, "", 2, "Smite", 5000, 5, 5, 2, 2000, "divine"),
+                (cid, "", 3, "Reverence", 8000, 12, 12, 0, 1297, "Hitpoints"),
+                (cid, "", 3, "Stonewill", 3000, 8, 8, 0, 700, "Absorption"),
+                # Cure (swing_type=20, resist='relieves'; `damage` column = effects removed)
+                (cid, "", 20, "Cure", 4, 4, 4, 0, 1, "relieves"),
+                # Threat proc (swing_type=100, type != 'All')
+                (cid, "", 100, "Undeniable Malice", 27240, 10, 10, 0, 5000, "Increase"),
+            ],
+        )
+        return cid
+
+    def test_top_attacks_excludes_heals_and_rollups(self, parses_db_conn):
+        cid = self._seed(parses_db_conn)
+        attacks = parses_db.get_top_attacks_for_combatant(parses_db_conn, cid)
+        names = [a["attack_name"] for a in attacks]
+        assert names == ["crush", "Smite"]  # heals + rollup absent
+
+    def test_top_heals_only_swing_type_3(self, parses_db_conn):
+        cid = self._seed(parses_db_conn)
+        heals = parses_db.get_top_heals_for_combatant(parses_db_conn, cid)
+        names = [h["attack_name"] for h in heals]
+        # Sorted by damage DESC
+        assert names == ["Reverence", "Stonewill"]
+        rev = next(h for h in heals if h["attack_name"] == "Reverence")
+        assert rev["resist"] == "Hitpoints"
+        sw = next(h for h in heals if h["attack_name"] == "Stonewill")
+        assert sw["resist"] == "Absorption"
+
+    def test_top_cures_only_swing_type_20(self, parses_db_conn):
+        cid = self._seed(parses_db_conn)
+        cures = parses_db.get_top_cures_for_combatant(parses_db_conn, cid)
+        assert [c["attack_name"] for c in cures] == ["Cure"]
+        assert cures[0]["resist"] == "relieves"
+
+    def test_top_threats_excludes_All_rollup(self, parses_db_conn):
+        """swing_type=100 + type='All' must NOT be returned, but
+        swing_type=100 + type != 'All' (Undeniable Malice) must be."""
+        cid = self._seed(parses_db_conn)
+        # Add an aggregate that we expect to be filtered.
+        parses_db_conn.execute(
+            "INSERT INTO attack_types (combatant_id, victim, swing_type, attack_name, "
+            "damage, hits, swings, crit_hits, max_hit, resist) "
+            "VALUES (?, '', 100, 'All', 999999, 999, 999, 0, 0, 'All')",
+            (cid,),
+        )
+        threats = parses_db.get_top_threats_for_combatant(parses_db_conn, cid)
+        names = [t["attack_name"] for t in threats]
+        assert names == ["Undeniable Malice"]
+        assert threats[0]["resist"] == "Increase"
+
+    def test_no_heals_returns_empty(self, parses_db_conn):
+        enc = _sample_encounter()
+        eid = parses_db.insert_encounter(
+            parses_db_conn,
+            enc,
+            source_dsn="eq2act",
+            ingested_at=1700000000,
+        )
+        name_to_id = parses_db.insert_combatants_bulk(
+            parses_db_conn,
+            eid,
+            [_sample_combatant("Sihtric", ally=True, damage=5000)],
+        )
+        assert parses_db.get_top_heals_for_combatant(parses_db_conn, name_to_id["Sihtric"]) == []

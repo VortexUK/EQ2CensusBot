@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from census.client import CensusClient
+from web.cache import character_cache
 from web.config import SERVICE_ID as _SERVICE_ID
 from web.config import WORLD as _WORLD
 from web.db import DB_PATH
@@ -100,3 +101,62 @@ async def search_characters(request: Request, name: str = "") -> CharSearchRespo
     # Census returned nothing or failed — fall back to local claims
     results = await _local_search(q)
     return CharSearchResponse(results=results, total=len(results), source="local")
+
+
+# ---------------------------------------------------------------------------
+# Bulk lookup — cache-only (no Census fallback)
+# ---------------------------------------------------------------------------
+
+
+class BulkLookupEntry(BaseModel):
+    found: bool
+    guild_name: str | None = None
+    cls: str | None = None
+    level: int | None = None
+
+
+class BulkLookupResponse(BaseModel):
+    results: dict[str, BulkLookupEntry]
+
+
+@router.get("/characters/lookup", response_model=BulkLookupResponse)
+@limiter.limit("60/minute")
+async def lookup_characters(request: Request, names: str = "") -> BulkLookupResponse:
+    """
+    Bulk character lookup that reads ONLY from the in-memory character_cache.
+
+    Designed for views like /parse/:id that need to know guild affiliation
+    for many characters at once without burning 24+ Census API calls per
+    page load. Cache misses simply return `found=False`; as users browse
+    individual character pages the cache warms up and subsequent parse
+    views become richer.
+
+    Query: comma-separated `names`. Max 50 names per call.
+    """
+    raw = [n.strip() for n in names.split(",") if n.strip()]
+    # Dedupe while preserving order so the response dict is stable.
+    seen: set[str] = set()
+    unique: list[str] = []
+    for n in raw:
+        lower = n.lower()
+        if lower in seen:
+            continue
+        seen.add(lower)
+        unique.append(n)
+    unique = unique[:50]
+
+    out: dict[str, BulkLookupEntry] = {}
+    for name in unique:
+        cache_key = f"{name.lower()}:{_WORLD.lower()}"
+        cached = character_cache.get_stale(cache_key)[0]
+        if cached is None:
+            out[name] = BulkLookupEntry(found=False)
+            continue
+        # `cached` is a CharacterResponse — pull only the fields we surface
+        out[name] = BulkLookupEntry(
+            found=True,
+            guild_name=getattr(cached, "guild_name", None),
+            cls=getattr(cached, "cls", None),
+            level=getattr(cached, "level", None),
+        )
+    return BulkLookupResponse(results=out)
