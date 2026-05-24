@@ -2,7 +2,16 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "/app/.venv/bin/python main.py"
+# Start sequence (see litestream.yml for context):
+#   1. Make sure the volume dirs exist (first deploy after volume creation).
+#   2. Restore both DBs from R2 if-replica-exists (no-op if the volume
+#      already has them, recovers them if the volume was wiped, and skipped
+#      cleanly when the R2 env vars aren't set yet — `|| true`).
+#   3. Exec the app under litestream's supervision so every write is
+#      streamed to R2 in near-real-time.
+# The trailing `exec` matters: litestream then becomes PID 1's child and
+# Railway's restart policy applies to the app process correctly.
+startCommand = "mkdir -p /app/data/parses && (litestream restore -if-replica-exists -config /app/litestream.yml /app/data/users.db || true) && (litestream restore -if-replica-exists -config /app/litestream.yml /app/data/parses/parses.db || true) && exec litestream replicate -config /app/litestream.yml -exec '/app/.venv/bin/python main.py'"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 watchPaths = ["**", "!alloy/**", "!grafana/**"]

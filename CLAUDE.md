@@ -46,6 +46,13 @@ FastAPI backend + React/TypeScript frontend. Key design decisions:
 | `DISCORD_TOKEN` | Bot token from Discord developer portal |
 | `CENSUS_SERVICE_ID` | Census API service ID (default `example`, rate-limited) |
 | `EQ2_WORLD` | EQ2 server name used for guild/spellcheck/aacheck lookups (default `Varsoon`) |
+| `ADMIN_DISCORD_IDS` | Comma-separated Discord IDs allowed to hit `/api/admin/*` and delete arbitrary parses |
+| `USERS_DB_PATH` | Override the default `data/users.db` location (set on Railway to the persistent-volume mount) |
+| `PARSES_DB_PATH` | Override the default `data/parses/parses.db` location (set on Railway to the persistent-volume mount) |
+| `R2_ENDPOINT` | Litestream backups → `https://<account>.r2.cloudflarestorage.com` |
+| `R2_BUCKET` | Litestream backups → bucket name (e.g. `eq2lexicon-backups`) |
+| `R2_ACCESS_KEY_ID` | Litestream backups → R2 API token Access Key ID |
+| `R2_SECRET_ACCESS_KEY` | Litestream backups → R2 API token Secret Access Key |
 
 ## Census API patterns
 
@@ -156,7 +163,41 @@ python scripts/download_recipes.py --restart         # ignore saved offset, re-d
 
 ## Deployment
 
-- Platform: Railway, Nixpacks builder, `python main.py` start command
+- Platform: Railway, Nixpacks builder
 - Push to `main` branch triggers redeploy
 - New slash commands may take up to 1 hour to propagate globally, but appear instantly in the registered guild IDs above
 - Do not push until the user confirms local testing passes
+
+### Backups (parses.db + users.db → Cloudflare R2)
+
+[litestream](https://litestream.io) replicates both SQLite DBs to R2 in near-real-time. On container start, `litestream restore -if-replica-exists` rehydrates either DB from R2 if the Railway volume is wiped. After that the long-running `litestream replicate -exec` keeps both DBs in sync (RPO ~10 s, retention 7 days, snapshot every 24 h). Config lives in `litestream.yml`; the orchestration in `railway.toml`'s `startCommand`.
+
+**One-time R2 setup:**
+
+1. Sign in at https://dash.cloudflare.com → **R2**.
+2. **Create bucket** — e.g. `eq2lexicon-backups`. Default region (auto-managed) is fine.
+3. Note the **Account ID** from the R2 dashboard URL (or the bucket details page). The S3 endpoint is `https://<account_id>.r2.cloudflarestorage.com`.
+4. **Manage R2 API Tokens → Create API Token**:
+   - Name: `eq2lexicon-litestream`
+   - Permissions: **Object Read & Write**
+   - Specify bucket: the one you created
+   - TTL: forever (or rotate quarterly)
+5. Copy the **Access Key ID** and **Secret Access Key** (shown once).
+6. In **Railway → Variables**, add:
+   - `R2_ENDPOINT` = `https://<account_id>.r2.cloudflarestorage.com`
+   - `R2_BUCKET` = `eq2lexicon-backups`
+   - `R2_ACCESS_KEY_ID` = *(from step 5)*
+   - `R2_SECRET_ACCESS_KEY` = *(from step 5)*
+7. Next deploy starts streaming. Verify in R2 console — you should see `parses/` and `users/` prefixes appear within a minute.
+
+**Manual restore** (e.g. testing recovery, or restoring a specific point-in-time):
+
+```bash
+# Restore latest from R2 into a chosen path (won't overwrite if file exists)
+litestream restore -config /app/litestream.yml /app/data/parses/parses.db
+
+# Restore an older snapshot
+litestream restore -config /app/litestream.yml -timestamp 2026-05-24T18:00:00Z -o ./parses.db-snapshot /app/data/parses/parses.db
+```
+
+**Skipping backup before R2 is set up:** if the R2 env vars aren't populated, the startCommand's `|| true` makes the restore step a no-op and litestream's replicate-exec falls through cleanly (it just logs a "no replicas configured" warning per DB). The app still runs; you just don't have backups until the env vars land.

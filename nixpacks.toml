@@ -1,5 +1,7 @@
 [phases.setup]
-nixPkgs = ["python313Full", "nodejs_20", "uv"]
+# `litestream` ships the binary we use in the startCommand to back up
+# parses.db + users.db to Cloudflare R2.
+nixPkgs = ["python313Full", "nodejs_20", "uv", "litestream"]
 
 [phases.install]
 cmds = [

@@ -1,0 +1,45 @@
+# Litestream — continuous replication of the SQLite DBs to Cloudflare R2.
+#
+# Two databases are backed up: the parses corpus (parses.db) and the
+# Discord/claims/api_tokens store (users.db). Both live on the persistent
+# Railway volume mounted at /app/data; without off-volume backup, a Railway
+# volume failure or accidental wipe is unrecoverable.
+#
+# Configuration via env vars (set in Railway → Variables):
+#   R2_ENDPOINT          https://<account>.r2.cloudflarestorage.com
+#   R2_BUCKET            e.g. eq2lexicon-backups
+#   R2_ACCESS_KEY_ID     R2 API token "Access Key ID"
+#   R2_SECRET_ACCESS_KEY R2 API token "Secret Access Key"
+#
+# Recovery: on container start, railway.toml's startCommand first runs
+# `litestream restore -if-replica-exists` for each DB, so a wiped volume
+# auto-reseeds from R2 before the app starts. After that the long-running
+# `litestream replicate` keeps both DBs in sync (RPO ~10 s).
+
+dbs:
+  - path: /app/data/parses/parses.db
+    replicas:
+      - type: s3
+        endpoint: ${R2_ENDPOINT}
+        bucket: ${R2_BUCKET}
+        path: parses
+        access-key-id: ${R2_ACCESS_KEY_ID}
+        secret-access-key: ${R2_SECRET_ACCESS_KEY}
+        region: auto
+        # Keep ~7 days of recoverable history; older snapshots GC'd.
+        retention: 168h
+        retention-check-interval: 24h
+        snapshot-interval: 24h
+
+  - path: /app/data/users.db
+    replicas:
+      - type: s3
+        endpoint: ${R2_ENDPOINT}
+        bucket: ${R2_BUCKET}
+        path: users
+        access-key-id: ${R2_ACCESS_KEY_ID}
+        secret-access-key: ${R2_SECRET_ACCESS_KEY}
+        region: auto
+        retention: 168h
+        retention-check-interval: 24h
+        snapshot-interval: 24h
