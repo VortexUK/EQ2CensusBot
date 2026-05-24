@@ -13,6 +13,7 @@ filtering is a Phase 3 concern (when uploads are added).
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import sqlite3
 import time
@@ -21,8 +22,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from census.client import CensusClient
 from parses import db as parses_db
-from parses.ingest import _resolve_guild_sync
 from parses.models import (
     AttackType,
     Combatant,
@@ -35,7 +36,12 @@ from parses.models import (
     _to_ts,
 )
 from web.auth_deps import require_user_session_or_token
+from web.cache import character_cache
+from web.config import SERVICE_ID as _SERVICE_ID
+from web.config import WORLD as _WORLD
 from web.limiter import limiter
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["parses"])
 
@@ -55,6 +61,64 @@ def _uploader_discord_id(source_dsn: str | None) -> str | None:
     if not source_dsn or not source_dsn.startswith("plugin:"):
         return None
     return source_dsn[len("plugin:") :] or None
+
+
+async def _resolve_uploader_guild_async(uploader: str) -> str | None:
+    """Cache-aware guild lookup for the upload path. Order of attempts:
+
+      1. character_cache hit on the uploader's character → return its
+         guild_name (zero Census traffic).
+      2. Miss → single-character Census call via get_character_guild_name
+         to learn the guild name for this upload.
+      3. If we learned a guild, fire-and-forget _fetch_and_cache_guild()
+         to pull the full roster into character_cache so the rest of the
+         raid hits step 1. Thundering-herd guard inside the helper
+         dedupes concurrent prewarms for the same guild.
+
+    Returns None for: uploader='local', Census error, character not found,
+    or character is unguilded — callers store guild_name as NULL in all
+    those cases.
+    """
+    if not uploader or uploader == "local":
+        return None
+
+    world_lower = _WORLD.lower()
+    cache_key = f"{uploader.lower()}:{world_lower}"
+    cached, _ = character_cache.get_stale(cache_key)
+    if cached is not None:
+        return getattr(cached, "guild_name", None) or None
+
+    client = CensusClient(service_id=_SERVICE_ID)
+    try:
+        guild_name = await client.get_character_guild_name(uploader, _WORLD)
+    except Exception as exc:
+        _log.warning("Census guild lookup failed for %r: %s", uploader, exc)
+        return None
+    finally:
+        await client.close()
+
+    if not guild_name:
+        return None
+
+    # Background full-guild fetch — populates character_cache for every
+    # member, so subsequent raid uploads from the same guild are
+    # zero-Census. We don't await it; the encounter ingest can proceed
+    # while the roster pre-warm runs.
+    asyncio.create_task(_prewarm_guild_silently(guild_name))
+    return guild_name
+
+
+async def _prewarm_guild_silently(guild_name: str) -> None:
+    """Background roster pre-warm used by _resolve_uploader_guild_async.
+    Imports lazily to dodge the web.routes.guild ↔ web.routes.parses
+    circular dependency, and never raises — pre-warm failure must not
+    affect ingest success."""
+    try:
+        from web.routes.guild import _fetch_and_cache_guild
+
+        await _fetch_and_cache_guild(guild_name)
+    except Exception as exc:
+        _log.debug("Background guild prewarm failed for %s: %s", guild_name, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -797,10 +861,11 @@ async def ingest_parse(
     if not uploader:
         raise HTTPException(status_code=400, detail="logger_name must not be empty")
 
-    # Resolve guild via Census from the logger character. Single call per
-    # upload — same pattern as local ingest's _resolve_guild_sync.
+    # Cache-aware guild resolve: hits character_cache first; on miss does a
+    # one-character Census call and pre-warms the full roster in the
+    # background so the rest of the raid's uploads are zero-Census.
+    guild_name = await _resolve_uploader_guild_async(uploader)
     loop = asyncio.get_event_loop()
-    guild_name = await loop.run_in_executor(None, _resolve_guild_sync, uploader)
 
     status, encounter_id, n_c, n_dt, n_at = await loop.run_in_executor(
         None,

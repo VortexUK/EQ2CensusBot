@@ -200,6 +200,12 @@ _SHOW_DOCS = os.getenv("SHOW_API_DOCS", "false").lower() in ("1", "true", "yes")
 def create_app(session_secret: str | None = None) -> FastAPI:
     def _startup() -> None:
         users_db.init_db()
+        # Initialise the parses DB too so the schema + migrations are in place
+        # before the first /api/parses/ingest hits — otherwise the first
+        # upload's request pays that cost on the request thread.
+        from parses import db as parses_db
+
+        parses_db.init_db()
         # Run the item-stats check in a background thread so it never blocks
         # startup or Railway health checks.  On a fresh deployment the backfill
         # may take ~60–90 s; stat-filter searches will return 0 results until it

@@ -173,7 +173,7 @@ async def test_ingest_inserts_encounter(app):
 
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_guild_sync", return_value="Exordium"),
+        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
         patch(
             "web.routes.parses._ingest_payload_sync",
             new=MagicMock(return_value=sync_result),
@@ -203,7 +203,7 @@ async def test_ingest_returns_skipped_on_duplicate(app):
 
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_guild_sync", return_value="Exordium"),
+        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
         patch(
             "web.routes.parses._ingest_payload_sync",
             new=MagicMock(return_value=sync_result),
@@ -230,7 +230,7 @@ async def test_ingest_rejects_empty_logger_name(app):
 
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_guild_sync", return_value=None),
+        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post(
@@ -290,7 +290,7 @@ async def test_bearer_token_path_resolves_to_user(app):
             "web.auth_deps.users_db.lookup_api_token",
             new=AsyncMock(return_value=fake_lookup_row),
         ),
-        patch("web.routes.parses._resolve_guild_sync", return_value=None),
+        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
         patch(
             "web.routes.parses._ingest_payload_sync",
             new=MagicMock(return_value=sync_result),
