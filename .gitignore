@@ -235,6 +235,14 @@ data/recipes/recipes.db
 data/recipes/recipes.db-wal
 data/recipes/recipes.db-shm
 
+# Parses feature (v1, local-only) — ACT-written export and our normalized DB
+data/parses/act_export.db
+data/parses/act_export.db-wal
+data/parses/act_export.db-shm
+data/parses/parses.db
+data/parses/parses.db-wal
+data/parses/parses.db-shm
+
 # Census API dump files (analysis artifacts)
 # Kept under tests/fixtures/ locally; not committed.
 tests/fixtures/example_*.json

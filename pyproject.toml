@@ -67,7 +67,7 @@ ignore = [
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "basic"
-include = ["census", "web", "bot"]
+include = ["census", "web", "bot", "parses"]
 exclude = ["scripts", "data", "frontend", "image", "**/__pycache__"]
 # Third-party stubs (aiohttp, discord.py, etc.) are often missing — suppress
 # the noise so only real type errors block the push.
