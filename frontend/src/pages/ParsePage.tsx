@@ -3,7 +3,9 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 
 import Breadcrumb from '../components/Breadcrumb'
+import Caret from '../components/Caret'
 import { CLASS_COLOURS } from '../classConstants'
+import { fmtDuration, fmtLocalDateTime, fmtNum } from '../formatters'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -108,21 +110,6 @@ interface BulkLookupResponse {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmtNum(n: number): string {
-  return Math.round(n).toLocaleString()
-}
-
-function fmtDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}m${String(s).padStart(2, '0')}s`
-}
-
-function fmtLocalDateTime(unixSeconds: number): string {
-  const d = new Date(unixSeconds * 1000)
-  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
 
 // Single-word ally names are probably players (mirrors backend's player_count
 // heuristic). Used to decide whether to render the name as a link.
@@ -787,21 +774,6 @@ function DamageBar({ share }: { share: number }) {
 }
 
 // ── Caret ────────────────────────────────────────────────────────────────────
-
-function Caret({ open }: { open: boolean }) {
-  return (
-    <span style={{
-      display: 'inline-block',
-      width: '0.65rem',
-      transform: `rotate(${open ? 90 : 0}deg)`,
-      transition: 'transform 0.15s',
-      fontSize: '0.7rem',
-      color: 'var(--text-muted)',
-    }}>
-      ▶
-    </span>
-  )
-}
 
 // ── Style constants ──────────────────────────────────────────────────────────
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import sqlite3
 import time
 from typing import Any
@@ -32,10 +31,19 @@ from parses.models import (
     _to_bool_tf,
     _to_float,
     _to_int,
+    _to_perc,
     _to_str_or_none,
     _to_ts,
 )
-from web.auth_deps import require_user_session_or_token
+from web.auth_deps import (
+    is_admin as _is_admin,
+)
+from web.auth_deps import (
+    require_user_session as _require_user,
+)
+from web.auth_deps import (
+    require_user_session_or_token,
+)
 from web.cache import character_cache
 from web.config import SERVICE_ID as _SERVICE_ID
 from web.config import WORLD as _WORLD
@@ -44,14 +52,6 @@ from web.limiter import limiter
 _log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["parses"])
-
-# Admin allow-list mirrors the one in web/routes/admin.py — duplicated rather
-# than imported so this route doesn't depend on the admin route module.
-_ADMIN_IDS: frozenset[str] = frozenset(filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(",")))
-
-
-def _is_admin(user: dict | None) -> bool:
-    return bool(user and user.get("id") in _ADMIN_IDS)
 
 
 def _uploader_discord_id(source_dsn: str | None) -> str | None:
@@ -259,18 +259,6 @@ class ParseDetailResponse(BaseModel):
     kills: int
     deaths: int
     combatants: list[CombatantSummary]
-
-
-# ---------------------------------------------------------------------------
-# Auth helper
-# ---------------------------------------------------------------------------
-
-
-def _require_user(request: Request) -> dict:
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return user
 
 
 # ---------------------------------------------------------------------------
@@ -659,8 +647,6 @@ def _encounter_from_payload(p: IngestEncounter) -> Encounter | None:
 
 
 def _combatants_from_payload(rows: list[dict], encid: str) -> list[Combatant]:
-    from parses.models import _to_perc
-
     out: list[Combatant] = []
     for r in rows:
         name = str(r.get("name") or "").strip()
@@ -707,8 +693,6 @@ def _combatants_from_payload(rows: list[dict], encid: str) -> list[Combatant]:
 
 
 def _damage_types_from_payload(rows: list[dict], encid: str) -> list[DamageType]:
-    from parses.models import _to_perc
-
     out: list[DamageType] = []
     for r in rows:
         combatant = str(r.get("combatant") or "").strip()
@@ -749,8 +733,6 @@ def _damage_types_from_payload(rows: list[dict], encid: str) -> list[DamageType]
 def _attack_types_from_payload(rows: list[dict], encid: str) -> list[AttackType]:
     """ACT writes per-combatant rollups as type='All' across various
     swingtypes — strip those (same rule as the file-based reader)."""
-    from parses.models import _to_perc
-
     out: list[AttackType] = []
     for r in rows:
         attacker = str(r.get("attacker") or "").strip()

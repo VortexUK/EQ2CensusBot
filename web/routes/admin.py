@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from web.auth_deps import require_admin as _require_admin
 from web.cache import claim_cache
 from web.db import (
     delete_claim,
@@ -23,27 +23,6 @@ from web.routes.claim import _refresh_claim_cache
 _log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["admin"])
-
-_ADMIN_IDS: frozenset[str] = frozenset(filter(None, os.getenv("ADMIN_DISCORD_IDS", "").split(",")))
-if not _ADMIN_IDS:
-    _log.warning(
-        "ADMIN_DISCORD_IDS is not set — all /api/admin/* endpoints will return 403. "
-        "Set this env var to your Discord user ID to enable admin access."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Auth helper
-# ---------------------------------------------------------------------------
-
-
-def _require_admin(request: Request) -> dict:
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    if user["id"] not in _ADMIN_IDS:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 
 import Breadcrumb from '../components/Breadcrumb'
+import { fmtLocalDateTime } from '../formatters'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,11 +23,7 @@ interface MintResponse {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtTs(unix: number | null): string {
-  if (!unix) return '—'
-  return new Date(unix * 1000).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
+  return unix ? fmtLocalDateTime(unix) : '—'
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────

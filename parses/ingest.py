@@ -1,6 +1,18 @@
 """
-Top-level ingest orchestrator: read new encounters from ACT's SQLite export,
-write them into our normalized `parses.db`.
+Legacy local-only ingest path. Kept as a dev/debug tool.
+
+The PRIMARY ingest path in production is the ACT plugin posting to
+`POST /api/parses/ingest` (see `web/routes/parses.py:ingest_parse`).
+This module reads ACT's SQLite ODBC export off disk and writes it
+into `parses.db` directly — useful when:
+
+  * You want to backfill historical fights from an `act_export.db` you
+    already have on disk without going through the upload path.
+  * You're debugging a payload-shape question and want to bypass HTTP.
+  * The remote site is down and you want local-only continuity.
+
+Driven by the `scripts/parses/*.py` CLIs (`ingest.py`, `list_encounters.py`,
+`show_encounter.py`). No web/Discord-bot code calls these functions.
 
 Idempotent — each ACT encid is checked against `ingest_log` before insertion.
 The full copy of one encounter runs in a single transaction so an interrupted

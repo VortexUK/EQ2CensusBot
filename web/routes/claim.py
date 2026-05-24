@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from census.client import CensusClient
+from web.auth_deps import require_user_session as _require_user
 from web.cache import character_cache, claim_cache
 from web.config import SERVICE_ID as _SERVICE_ID
 from web.config import WORLD as _WORLD
@@ -16,18 +17,6 @@ from web.limiter import limiter
 _log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["claim"])
-
-
-# ---------------------------------------------------------------------------
-# Auth helper
-# ---------------------------------------------------------------------------
-
-
-def _require_user(request: Request) -> dict:
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return user
 
 
 # ---------------------------------------------------------------------------

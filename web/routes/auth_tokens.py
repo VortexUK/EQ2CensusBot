@@ -15,22 +15,15 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from web import db as users_db
-from web.auth_deps import require_user_session_or_token
+from web.auth_deps import (
+    require_user_session as _require_user,
+)
+from web.auth_deps import (
+    require_user_session_or_token,
+)
 from web.limiter import limiter
 
 router = APIRouter(tags=["auth"])
-
-
-# ---------------------------------------------------------------------------
-# Auth helper
-# ---------------------------------------------------------------------------
-
-
-def _require_user(request: Request) -> dict:
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return user
 
 
 # ---------------------------------------------------------------------------
