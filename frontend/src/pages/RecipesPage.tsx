@@ -276,6 +276,14 @@ export default function RecipesPage() {
   // ── Shopping list state (localStorage) ───────────────────────────────────────
   const [list,     setList]     = useState<ShoppingEntry[]>(() => loadList())
   const [listOpen, setListOpen] = useState(() => searchParams.get('list') === 'open')
+  const [showMats, setShowMats] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem('eq2-shopping-show-mats')
+      return raw === null ? true : raw === 'true'
+    } catch {
+      return true
+    }
+  })
 
   // ── URL sync ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -289,6 +297,9 @@ export default function RecipesPage() {
 
   // ── Persist shopping list ─────────────────────────────────────────────────────
   useEffect(() => { saveList(list) }, [list])
+  useEffect(() => {
+    try { localStorage.setItem('eq2-shopping-show-mats', String(showMats)) } catch { /* ignore */ }
+  }, [showMats])
 
   // ── Auto-search on mount if URL has params ───────────────────────────────────
   const didAutoSearch = useRef(false)
@@ -610,6 +621,28 @@ export default function RecipesPage() {
               </div>
             </div>
 
+            {/* View options */}
+            {list.length > 0 && (
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                fontSize: '0.76rem',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                marginBottom: '0.6rem',
+                userSelect: 'none',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={showMats}
+                  onChange={e => setShowMats(e.target.checked)}
+                  style={{ cursor: 'pointer', accentColor: 'var(--gold)' }}
+                />
+                Show materials per spell
+              </label>
+            )}
+
             {/* List entries */}
             {list.map(entry => (
               <div key={entry.recipeId} style={{
@@ -617,7 +650,7 @@ export default function RecipesPage() {
                 paddingBottom: '0.55rem',
                 marginBottom: '0.55rem',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: showMats ? '0.2rem' : 0 }}>
                   <span style={{ fontSize: '0.85rem', flex: 1, lineHeight: 1.3 }}>{entry.recipeName}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
                     <QtyBtn onClick={() => changeQty(entry.recipeId, -1)}>−</QtyBtn>
@@ -627,7 +660,7 @@ export default function RecipesPage() {
                     <QtyBtn onClick={() => changeQty(entry.recipeId, +1)}>+</QtyBtn>
                   </div>
                 </div>
-                <IngredientList comps={buildIngredientList(entry)} compact />
+                {showMats && <IngredientList comps={buildIngredientList(entry)} compact />}
               </div>
             ))}
 
