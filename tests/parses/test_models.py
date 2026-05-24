@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from parses.models import _to_float, _to_int, _to_str_or_none, _to_ts
+from parses.models import (
+    _to_bool_tf,
+    _to_float,
+    _to_int,
+    _to_perc,
+    _to_str_or_none,
+    _to_ts,
+)
 
 
 class TestToInt:
@@ -56,6 +63,56 @@ class TestToStrOrNone:
 
     def test_none_passthrough(self):
         assert _to_str_or_none(None) is None
+
+
+class TestToPerc:
+    """ACT writes percentages as VARCHARs: '100%', '93%', '0%', '--', or empty."""
+
+    def test_full_percent(self):
+        assert _to_perc("100%") == 100.0
+
+    def test_partial_percent(self):
+        assert _to_perc("93%") == 93.0
+
+    def test_zero_percent(self):
+        assert _to_perc("0%") == 0.0
+
+    def test_double_dash_to_zero(self):
+        # ACT emits '--' when the value is meaningless (e.g. zero-damage combatant's damageperc)
+        assert _to_perc("--") == 0.0
+
+    def test_empty_to_zero(self):
+        assert _to_perc("") == 0.0
+
+    def test_none_to_zero(self):
+        assert _to_perc(None) == 0.0
+
+    def test_no_suffix(self):
+        # Defensive: if ACT ever emits a bare number, still parse
+        assert _to_perc("42.5") == 42.5
+
+    def test_garbage_to_zero(self):
+        assert _to_perc("???") == 0.0
+
+
+class TestToBoolTf:
+    """ACT writes 'T'/'F' for combatant_table.ally."""
+
+    def test_true(self):
+        assert _to_bool_tf("T") is True
+
+    def test_false(self):
+        assert _to_bool_tf("F") is False
+
+    def test_case_insensitive(self):
+        assert _to_bool_tf("t") is True
+        assert _to_bool_tf("f") is False
+
+    def test_none(self):
+        assert _to_bool_tf(None) is False
+
+    def test_unexpected_value(self):
+        assert _to_bool_tf("Y") is False
 
 
 class TestToTs:

@@ -77,16 +77,21 @@ def main() -> int:
             print("(no combatants)")
             return 0
 
-        print(f"{'COMBATANT':<22} {'CLASS':<14} {'DMG':>12} {'DPS':>10} {'HPS':>10} {'CRITS':>7} {'D':>3}")
-        print("-" * 92)
+        print(
+            f"{'COMBATANT':<24} {'ALLY':<5} {'DMG':>12} {'DPS':>10} {'HEALED':>10} "
+            f"{'HPS':>8} {'TAKEN':>10} {'CRIT%':>6} {'D':>3}"
+        )
+        print("-" * 96)
         for c in combatants:
             print(
-                f"{c['name'][:22]:<22} "
-                f"{(c['eq2_class'] or '—')[:14]:<14} "
+                f"{c['name'][:24]:<24} "
+                f"{('Y' if c['ally'] else 'N'):<5} "
                 f"{c['damage']:>12,} "
                 f"{int(c['dps']):>10,} "
-                f"{int(c['hps']):>10,} "
-                f"{c['crits']:>7} "
+                f"{c['healed']:>10,} "
+                f"{int(c['enchps']):>8,} "
+                f"{c['damage_taken']:>10,} "
+                f"{c['crit_dam_perc']:>5.1f}% "
                 f"{c['deaths']:>3}"
             )
 

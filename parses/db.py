@@ -9,6 +9,9 @@ Mirrors the layout pattern of `census/recipes_db.py`:
 
 Lives at `data/parses/parses.db` by default. Override with the
 `PARSES_DB_PATH` env var.
+
+Schema reflects the real columns ACT exports at AttackType depth — see
+parses/act_reader.py for the source-side column-name mapping.
 """
 
 from __future__ import annotations
@@ -62,19 +65,37 @@ CREATE TABLE IF NOT EXISTS combatants (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     encounter_id    INTEGER NOT NULL,
     name            TEXT    NOT NULL,
-    eq2_class       TEXT,
-    role            TEXT,
+    ally            INTEGER NOT NULL DEFAULT 0,   -- 0/1 (ACT's 'T'/'F')
+    started_at      INTEGER NOT NULL DEFAULT 0,
+    ended_at        INTEGER NOT NULL DEFAULT 0,
     duration_s      INTEGER NOT NULL DEFAULT 0,
     damage          INTEGER NOT NULL DEFAULT 0,
+    damage_perc     REAL    NOT NULL DEFAULT 0,
+    kills           INTEGER NOT NULL DEFAULT 0,
+    healed          INTEGER NOT NULL DEFAULT 0,
+    healed_perc     REAL    NOT NULL DEFAULT 0,
+    crit_heals      INTEGER NOT NULL DEFAULT 0,
+    heals           INTEGER NOT NULL DEFAULT 0,
+    cure_dispels    INTEGER NOT NULL DEFAULT 0,
+    power_drain     INTEGER NOT NULL DEFAULT 0,
+    power_replenish INTEGER NOT NULL DEFAULT 0,
     dps             REAL    NOT NULL DEFAULT 0,
     encdps          REAL    NOT NULL DEFAULT 0,
-    hps             REAL    NOT NULL DEFAULT 0,
-    healed          INTEGER NOT NULL DEFAULT 0,
-    crits           INTEGER NOT NULL DEFAULT 0,
-    max_hit         INTEGER NOT NULL DEFAULT 0,
-    kills           INTEGER NOT NULL DEFAULT 0,
+    enchps          REAL    NOT NULL DEFAULT 0,
+    hits            INTEGER NOT NULL DEFAULT 0,
+    crit_hits       INTEGER NOT NULL DEFAULT 0,
+    blocked         INTEGER NOT NULL DEFAULT 0,
+    misses          INTEGER NOT NULL DEFAULT 0,
+    swings          INTEGER NOT NULL DEFAULT 0,
+    heals_taken     INTEGER NOT NULL DEFAULT 0,
+    damage_taken    INTEGER NOT NULL DEFAULT 0,
     deaths          INTEGER NOT NULL DEFAULT 0,
-    grouping_label  TEXT,
+    to_hit          REAL    NOT NULL DEFAULT 0,
+    crit_dam_perc   REAL    NOT NULL DEFAULT 0,
+    crit_heal_perc  REAL    NOT NULL DEFAULT 0,
+    crit_types      TEXT,
+    threat_str      TEXT,
+    threat_delta    INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (encounter_id) REFERENCES encounters(id) ON DELETE CASCADE,
     UNIQUE (encounter_id, name)
 );
@@ -84,11 +105,28 @@ _CREATE_DAMAGE_TYPES = """
 CREATE TABLE IF NOT EXISTS damage_types (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     combatant_id    INTEGER NOT NULL,
+    grouping_label  TEXT,
     damage_type     TEXT    NOT NULL,
+    started_at      INTEGER NOT NULL DEFAULT 0,
+    ended_at        INTEGER NOT NULL DEFAULT 0,
+    duration_s      INTEGER NOT NULL DEFAULT 0,
     damage          INTEGER NOT NULL DEFAULT 0,
-    swings          INTEGER NOT NULL DEFAULT 0,
+    encdps          REAL    NOT NULL DEFAULT 0,
+    char_dps        REAL    NOT NULL DEFAULT 0,
+    dps             REAL    NOT NULL DEFAULT 0,
+    average         REAL    NOT NULL DEFAULT 0,
+    median          INTEGER NOT NULL DEFAULT 0,
+    min_hit         INTEGER NOT NULL DEFAULT 0,
+    max_hit         INTEGER NOT NULL DEFAULT 0,
     hits            INTEGER NOT NULL DEFAULT 0,
+    crit_hits       INTEGER NOT NULL DEFAULT 0,
+    blocked         INTEGER NOT NULL DEFAULT 0,
     misses          INTEGER NOT NULL DEFAULT 0,
+    swings          INTEGER NOT NULL DEFAULT 0,
+    to_hit          REAL    NOT NULL DEFAULT 0,
+    average_delay   REAL    NOT NULL DEFAULT 0,
+    crit_perc       REAL    NOT NULL DEFAULT 0,
+    crit_types      TEXT,
     FOREIGN KEY (combatant_id) REFERENCES combatants(id) ON DELETE CASCADE,
     UNIQUE (combatant_id, damage_type)
 );
@@ -98,25 +136,30 @@ _CREATE_ATTACK_TYPES = """
 CREATE TABLE IF NOT EXISTS attack_types (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     combatant_id    INTEGER NOT NULL,
+    victim          TEXT,
+    swing_type      INTEGER NOT NULL DEFAULT 0,
     attack_name     TEXT    NOT NULL,
-    swings          INTEGER NOT NULL DEFAULT 0,
-    hits            INTEGER NOT NULL DEFAULT 0,
-    misses          INTEGER NOT NULL DEFAULT 0,
-    blocked         INTEGER NOT NULL DEFAULT 0,
-    crit_hits       INTEGER NOT NULL DEFAULT 0,
-    damage          INTEGER NOT NULL DEFAULT 0,
-    max_hit         INTEGER NOT NULL DEFAULT 0,
-    min_hit         INTEGER NOT NULL DEFAULT 0,
-    average         REAL    NOT NULL DEFAULT 0,
-    median          REAL    NOT NULL DEFAULT 0,
-    dps             REAL    NOT NULL DEFAULT 0,
-    char_dps        REAL    NOT NULL DEFAULT 0,
-    enc_dps         REAL    NOT NULL DEFAULT 0,
+    started_at      INTEGER NOT NULL DEFAULT 0,
+    ended_at        INTEGER NOT NULL DEFAULT 0,
     duration_s      INTEGER NOT NULL DEFAULT 0,
-    average_delay   REAL    NOT NULL DEFAULT 0,
-    to_hit          REAL    NOT NULL DEFAULT 0,
-    crit_perc       REAL    NOT NULL DEFAULT 0,
+    damage          INTEGER NOT NULL DEFAULT 0,
+    encdps          REAL    NOT NULL DEFAULT 0,
+    char_dps        REAL    NOT NULL DEFAULT 0,
+    dps             REAL    NOT NULL DEFAULT 0,
+    average         REAL    NOT NULL DEFAULT 0,
+    median          INTEGER NOT NULL DEFAULT 0,
+    min_hit         INTEGER NOT NULL DEFAULT 0,
+    max_hit         INTEGER NOT NULL DEFAULT 0,
     resist          TEXT,
+    hits            INTEGER NOT NULL DEFAULT 0,
+    crit_hits       INTEGER NOT NULL DEFAULT 0,
+    blocked         INTEGER NOT NULL DEFAULT 0,
+    misses          INTEGER NOT NULL DEFAULT 0,
+    swings          INTEGER NOT NULL DEFAULT 0,
+    to_hit          REAL    NOT NULL DEFAULT 0,
+    average_delay   REAL    NOT NULL DEFAULT 0,
+    crit_perc       REAL    NOT NULL DEFAULT 0,
+    crit_types      TEXT,
     FOREIGN KEY (combatant_id) REFERENCES combatants(id) ON DELETE CASCADE,
     UNIQUE (combatant_id, attack_name)
 );
@@ -137,6 +180,7 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_encounters_zone          ON encounters (zone);",
     "CREATE INDEX IF NOT EXISTS idx_combatants_encounter     ON combatants (encounter_id);",
     "CREATE INDEX IF NOT EXISTS idx_combatants_name          ON combatants (name);",
+    "CREATE INDEX IF NOT EXISTS idx_combatants_ally          ON combatants (encounter_id, ally);",
     "CREATE INDEX IF NOT EXISTS idx_damage_types_combatant   ON damage_types (combatant_id);",
     "CREATE INDEX IF NOT EXISTS idx_attack_types_combatant   ON attack_types (combatant_id);",
     "CREATE INDEX IF NOT EXISTS idx_attack_types_damage_desc ON attack_types (combatant_id, damage DESC);",
@@ -185,8 +229,6 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
 
 
 def _to_unix(dt) -> int:
-    """Treat naive datetimes as UTC; this matches what ACT writes."""
-
     if dt is None:
         return 0
     if dt.tzinfo is None:
@@ -201,7 +243,6 @@ def insert_encounter(
     source_dsn: str,
     ingested_at: int,
 ) -> int:
-    """Insert one encounter row. Returns the new row's id."""
     cur = conn.execute(
         """
         INSERT INTO encounters (
@@ -234,34 +275,68 @@ def insert_combatants_bulk(
     encounter_id: int,
     combatants: list[Combatant],
 ) -> dict[str, int]:
-    """Insert combatants for the given encounter. Returns name → new row id."""
     name_to_id: dict[str, int] = {}
     for c in combatants:
         cur = conn.execute(
             """
             INSERT INTO combatants (
-                encounter_id, name, eq2_class, role,
-                duration_s, damage, dps, encdps,
-                hps, healed, crits, max_hit, kills, deaths,
-                grouping_label
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                encounter_id, name, ally,
+                started_at, ended_at, duration_s,
+                damage, damage_perc, kills,
+                healed, healed_perc, crit_heals, heals, cure_dispels,
+                power_drain, power_replenish,
+                dps, encdps, enchps,
+                hits, crit_hits, blocked, misses, swings,
+                heals_taken, damage_taken, deaths,
+                to_hit, crit_dam_perc, crit_heal_perc, crit_types,
+                threat_str, threat_delta
+            ) VALUES (
+                ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?
+            )
             """,
             (
                 encounter_id,
                 c.name,
-                c.eq2_class,
-                c.role,
+                1 if c.ally else 0,
+                _to_unix(c.started_at),
+                _to_unix(c.ended_at),
                 c.duration_s,
                 c.damage,
+                c.damage_perc,
+                c.kills,
+                c.healed,
+                c.healed_perc,
+                c.crit_heals,
+                c.heals,
+                c.cure_dispels,
+                c.power_drain,
+                c.power_replenish,
                 c.dps,
                 c.encdps,
-                c.hps,
-                c.healed,
-                c.crits,
-                c.max_hit,
-                c.kills,
+                c.enchps,
+                c.hits,
+                c.crit_hits,
+                c.blocked,
+                c.misses,
+                c.swings,
+                c.heals_taken,
+                c.damage_taken,
                 c.deaths,
-                c.grouping_label,
+                c.to_hit,
+                c.crit_dam_perc,
+                c.crit_heal_perc,
+                c.crit_types,
+                c.threat_str,
+                c.threat_delta,
             ),
         )
         name_to_id[c.name] = int(cur.lastrowid or 0)
@@ -273,15 +348,31 @@ def insert_damage_types_bulk(
     combatant_name_to_id: dict[str, int],
     damage_types: list[DamageType],
 ) -> int:
-    """Insert damage types for the given combatants. Returns rows inserted."""
     rows = [
         (
             combatant_name_to_id[dt.combatant_name],
+            dt.grouping_label,
             dt.damage_type,
+            _to_unix(dt.started_at),
+            _to_unix(dt.ended_at),
+            dt.duration_s,
             dt.damage,
-            dt.swings,
+            dt.encdps,
+            dt.char_dps,
+            dt.dps,
+            dt.average,
+            dt.median,
+            dt.min_hit,
+            dt.max_hit,
             dt.hits,
+            dt.crit_hits,
+            dt.blocked,
             dt.misses,
+            dt.swings,
+            dt.to_hit,
+            dt.average_delay,
+            dt.crit_perc,
+            dt.crit_types,
         )
         for dt in damage_types
         if dt.combatant_name in combatant_name_to_id
@@ -289,8 +380,13 @@ def insert_damage_types_bulk(
     conn.executemany(
         """
         INSERT INTO damage_types (
-            combatant_id, damage_type, damage, swings, hits, misses
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            combatant_id, grouping_label, damage_type,
+            started_at, ended_at, duration_s,
+            damage, encdps, char_dps, dps,
+            average, median, min_hit, max_hit,
+            hits, crit_hits, blocked, misses, swings,
+            to_hit, average_delay, crit_perc, crit_types
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows,
     )
@@ -302,29 +398,33 @@ def insert_attack_types_bulk(
     combatant_name_to_id: dict[str, int],
     attack_types: list[AttackType],
 ) -> int:
-    """Insert attack types for the given combatants. Returns rows inserted."""
     rows = [
         (
             combatant_name_to_id[at.combatant_name],
+            at.victim,
+            at.swing_type,
             at.attack_name,
-            at.swings,
-            at.hits,
-            at.misses,
-            at.blocked,
-            at.crit_hits,
+            _to_unix(at.started_at),
+            _to_unix(at.ended_at),
+            at.duration_s,
             at.damage,
-            at.max_hit,
-            at.min_hit,
+            at.encdps,
+            at.char_dps,
+            at.dps,
             at.average,
             at.median,
-            at.dps,
-            at.char_dps,
-            at.enc_dps,
-            at.duration_s,
-            at.average_delay,
-            at.to_hit,
-            at.crit_perc,
+            at.min_hit,
+            at.max_hit,
             at.resist,
+            at.hits,
+            at.crit_hits,
+            at.blocked,
+            at.misses,
+            at.swings,
+            at.to_hit,
+            at.average_delay,
+            at.crit_perc,
+            at.crit_types,
         )
         for at in attack_types
         if at.combatant_name in combatant_name_to_id
@@ -332,12 +432,13 @@ def insert_attack_types_bulk(
     conn.executemany(
         """
         INSERT INTO attack_types (
-            combatant_id, attack_name,
-            swings, hits, misses, blocked, crit_hits,
-            damage, max_hit, min_hit, average, median,
-            dps, char_dps, enc_dps, duration_s,
-            average_delay, to_hit, crit_perc, resist
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            combatant_id, victim, swing_type, attack_name,
+            started_at, ended_at, duration_s,
+            damage, encdps, char_dps, dps,
+            average, median, min_hit, max_hit, resist,
+            hits, crit_hits, blocked, misses, swings,
+            to_hit, average_delay, crit_perc, crit_types
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows,
     )

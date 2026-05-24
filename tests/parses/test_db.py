@@ -18,14 +18,12 @@ class TestInitDb:
 
     def test_creates_indexes(self, parses_db_conn):
         indexes = {r[0] for r in parses_db_conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()}
-        # Just a couple of representative ones; full set is enforced by init_db
         assert "idx_encounters_started_desc" in indexes
         assert "idx_attack_types_damage_desc" in indexes
+        assert "idx_combatants_ally" in indexes
 
     def test_migrations_idempotent(self, parses_db_conn):
-        # Calling init_db again on the SAME path should be safe. We can't share
-        # a :memory: DB across calls, so prove idempotency by re-running the
-        # CREATE / migration SQL on the existing connection directly.
+        # Re-running every CREATE / migration on the same connection should be safe.
         for stmt in (
             parses_db._CREATE_ENCOUNTERS,
             parses_db._CREATE_COMBATANTS,
@@ -40,56 +38,55 @@ class TestInitDb:
 
 def _sample_encounter() -> Encounter:
     return Encounter(
-        encid="1A2B3C4D",
-        title="a goblin grunt",
-        zone="Antonica",
-        started_at=datetime(2026, 5, 24, 12, 0, 0),
-        ended_at=datetime(2026, 5, 24, 12, 0, 30),
-        duration_s=30,
-        total_damage=12500,
-        encdps=416.66,
-        kills=1,
+        encid="18cf3eb9",
+        title="a krait patriarch",
+        zone="Great Divide",
+        started_at=datetime(2026, 5, 24, 13, 51, 56),
+        ended_at=datetime(2026, 5, 24, 13, 52, 42),
+        duration_s=46,
+        total_damage=502718,
+        encdps=10928.65,
+        kills=4,
         deaths=0,
     )
 
 
-def _sample_combatants(encid: str) -> list[Combatant]:
-    return [
-        Combatant(
-            encid=encid,
-            name="Sihtric",
-            eq2_class="Wizard",
-            role="DPS",
-            duration_s=30,
-            damage=8000,
-            dps=266.6,
-            encdps=266.6,
-            hps=0.0,
-            healed=0,
-            crits=5,
-            max_hit=1500,
-            kills=1,
-            deaths=0,
-            grouping_label="Group 1",
-        ),
-        Combatant(
-            encid=encid,
-            name="Menludiir",
-            eq2_class="Templar",
-            role="Healer",
-            duration_s=30,
-            damage=4500,
-            dps=150.0,
-            encdps=150.0,
-            hps=200.0,
-            healed=6000,
-            crits=1,
-            max_hit=700,
-            kills=0,
-            deaths=0,
-            grouping_label="Group 1",
-        ),
-    ]
+def _sample_combatant(name: str, *, ally: bool, damage: int) -> Combatant:
+    return Combatant(
+        encid="18cf3eb9",
+        name=name,
+        ally=ally,
+        started_at=datetime(2026, 5, 24, 13, 51, 56),
+        ended_at=datetime(2026, 5, 24, 13, 52, 42),
+        duration_s=46,
+        damage=damage,
+        damage_perc=100.0 if ally else 0.0,
+        kills=4 if ally else 0,
+        healed=11637 if ally else 0,
+        healed_perc=100.0 if ally else 0.0,
+        crit_heals=1,
+        heals=40,
+        cure_dispels=0,
+        power_drain=0,
+        power_replenish=0,
+        dps=10696.13,
+        encdps=10928.65,
+        enchps=252.98,
+        hits=132,
+        crit_hits=123,
+        blocked=0,
+        misses=0,
+        swings=132,
+        heals_taken=11637,
+        damage_taken=27557 if ally else 145877,
+        deaths=0 if ally else 1,
+        to_hit=100.0,
+        crit_dam_perc=93.0,
+        crit_heal_perc=3.0,
+        crit_types="0.8%L - 0.0%F - 0.0%M",
+        threat_str="+(0)20000/-(0)0",
+        threat_delta=20000,
+    )
 
 
 class TestInsertHelpers:
@@ -110,18 +107,39 @@ class TestInsertHelpers:
             source_dsn="eq2act",
             ingested_at=1700000000,
         )
-        name_to_id = parses_db.insert_combatants_bulk(parses_db_conn, eid, _sample_combatants(enc.encid))
-        assert set(name_to_id) == {"Sihtric", "Menludiir"}
+        combatants = [
+            _sample_combatant("Menludiir", ally=True, damage=502718),
+            _sample_combatant("a krait patriarch", ally=False, damage=5716),
+        ]
+        name_to_id = parses_db.insert_combatants_bulk(parses_db_conn, eid, combatants)
+        assert set(name_to_id) == {"Menludiir", "a krait patriarch"}
 
         damage_types = [
             DamageType(
                 encid=enc.encid,
-                combatant_name="Sihtric",
-                damage_type="magic",
-                damage=7500,
-                swings=30,
-                hits=28,
-                misses=2,
+                combatant_name="Menludiir",
+                grouping_label="Group 1",
+                damage_type="divine",
+                started_at=datetime(2026, 5, 24, 13, 51, 56),
+                ended_at=datetime(2026, 5, 24, 13, 52, 42),
+                duration_s=46,
+                damage=400000,
+                encdps=8000.0,
+                char_dps=8000.0,
+                dps=8500.0,
+                average=3030.0,
+                median=3000,
+                min_hit=100,
+                max_hit=8000,
+                hits=100,
+                crit_hits=90,
+                blocked=0,
+                misses=0,
+                swings=100,
+                to_hit=100.0,
+                average_delay=0.47,
+                crit_perc=90.0,
+                crit_types="0.8%L - 0.0%F - 0.0%M",
             ),
         ]
         n = parses_db.insert_damage_types_bulk(parses_db_conn, name_to_id, damage_types)
@@ -130,26 +148,31 @@ class TestInsertHelpers:
         attacks = [
             AttackType(
                 encid=enc.encid,
-                combatant_name="Sihtric",
-                attack_name="Ice Comet",
-                swings=8,
-                hits=8,
-                misses=0,
+                combatant_name="Menludiir",
+                victim="a krait patriarch",
+                swing_type=1,
+                attack_name="Smite",
+                started_at=datetime(2026, 5, 24, 13, 51, 56),
+                ended_at=datetime(2026, 5, 24, 13, 52, 42),
+                duration_s=46,
+                damage=400000,
+                encdps=8000.0,
+                char_dps=8500.0,
+                dps=8500.0,
+                average=4000.0,
+                median=3500,
+                min_hit=100,
+                max_hit=8000,
+                resist="divine",
+                hits=100,
+                crit_hits=90,
                 blocked=0,
-                crit_hits=3,
-                damage=6000,
-                max_hit=1500,
-                min_hit=200,
-                average=750.0,
-                median=700.0,
-                dps=200.0,
-                char_dps=200.0,
-                enc_dps=200.0,
-                duration_s=30,
-                average_delay=3.75,
+                misses=0,
+                swings=100,
                 to_hit=100.0,
-                crit_perc=37.5,
-                resist=None,
+                average_delay=0.47,
+                crit_perc=90.0,
+                crit_types="0.8%L - 0.0%F - 0.0%M",
             ),
         ]
         n = parses_db.insert_attack_types_bulk(parses_db_conn, name_to_id, attacks)
@@ -190,9 +213,10 @@ class TestUniqueConstraints:
             source_dsn="eq2act",
             ingested_at=1700000000,
         )
-        parses_db.insert_combatants_bulk(parses_db_conn, eid, _sample_combatants(enc.encid))
+        cs = [_sample_combatant("Menludiir", ally=True, damage=1)]
+        parses_db.insert_combatants_bulk(parses_db_conn, eid, cs)
         with pytest.raises(sqlite3.IntegrityError):
-            parses_db.insert_combatants_bulk(parses_db_conn, eid, _sample_combatants(enc.encid))
+            parses_db.insert_combatants_bulk(parses_db_conn, eid, cs)
 
 
 class TestLookupHelpers:
@@ -202,8 +226,8 @@ class TestLookupHelpers:
             encid="2B3C4D5E",
             title="a goblin shaman",
             zone="Antonica",
-            started_at=datetime(2026, 5, 24, 12, 5, 0),
-            ended_at=datetime(2026, 5, 24, 12, 5, 30),
+            started_at=datetime(2026, 5, 24, 14, 5, 0),
+            ended_at=datetime(2026, 5, 24, 14, 5, 30),
             duration_s=30,
             total_damage=20000,
             encdps=666.66,
@@ -213,7 +237,7 @@ class TestLookupHelpers:
         parses_db.insert_encounter(parses_db_conn, e1, source_dsn="eq2act", ingested_at=1)
         parses_db.insert_encounter(parses_db_conn, e2, source_dsn="eq2act", ingested_at=2)
         rows = parses_db.recent_encounters(parses_db_conn, limit=10)
-        assert [r["act_encid"] for r in rows] == ["2B3C4D5E", "1A2B3C4D"]
+        assert [r["act_encid"] for r in rows] == ["2B3C4D5E", "18cf3eb9"]
 
     def test_recent_encounters_zone_filter(self, parses_db_conn):
         e1 = _sample_encounter()
@@ -221,8 +245,8 @@ class TestLookupHelpers:
             encid="2B3C4D5E",
             title="b",
             zone="Commonlands",
-            started_at=datetime(2026, 5, 24, 13, 0, 0),
-            ended_at=datetime(2026, 5, 24, 13, 0, 30),
+            started_at=datetime(2026, 5, 24, 15, 0, 0),
+            ended_at=datetime(2026, 5, 24, 15, 0, 30),
             duration_s=30,
             total_damage=1,
             encdps=1,
@@ -231,8 +255,8 @@ class TestLookupHelpers:
         )
         parses_db.insert_encounter(parses_db_conn, e1, source_dsn="eq2act", ingested_at=1)
         parses_db.insert_encounter(parses_db_conn, e2, source_dsn="eq2act", ingested_at=2)
-        rows = parses_db.recent_encounters(parses_db_conn, zone="Antonica")
-        assert [r["act_encid"] for r in rows] == ["1A2B3C4D"]
+        rows = parses_db.recent_encounters(parses_db_conn, zone="Great Divide")
+        assert [r["act_encid"] for r in rows] == ["18cf3eb9"]
 
     def test_find_encounter_by_act_encid(self, parses_db_conn):
         parses_db.insert_encounter(
@@ -241,9 +265,9 @@ class TestLookupHelpers:
             source_dsn="eq2act",
             ingested_at=1700000000,
         )
-        row = parses_db.find_encounter_by_act_encid(parses_db_conn, "1A2B3C4D")
+        row = parses_db.find_encounter_by_act_encid(parses_db_conn, "18cf3eb9")
         assert row is not None
-        assert row["title"] == "a goblin grunt"
+        assert row["title"] == "a krait patriarch"
 
     def test_find_encounter_missing_returns_none(self, parses_db_conn):
         assert parses_db.find_encounter_by_act_encid(parses_db_conn, "NOPE") is None
