@@ -7,6 +7,7 @@ import AdminPage from './pages/AdminPage'
 import GuildPage from './pages/GuildPage'
 import ItemPage from './pages/ItemPage'
 import ItemSearchPage from './pages/ItemSearchPage'
+import ParsesPage from './pages/ParsesPage'
 import RecipesPage from './pages/RecipesPage'
 import { CharacterSearchPage, GuildSearchPage } from './pages/SearchPage'
 import UserWidget from './components/UserWidget'
@@ -95,6 +96,7 @@ function NavLinks() {
       <NavItem to="/guilds"     label="Guilds"      also="/guild/" />
       <NavItem to="/items"      label="Items"       also="/item/" />
       <NavItem to="/recipes"    label="Recipes" />
+      <NavItem to="/parses"     label="Parses"      also="/parse/" />
     </nav>
   )
 }
@@ -230,6 +232,7 @@ function App() {
         <Route path="/claim" element={<ClaimPage />} />
         <Route path="/admin"   element={<AdminPage />} />
         <Route path="/recipes" element={<RecipesPage />} />
+        <Route path="/parses"  element={<ParsesPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

@@ -126,7 +126,7 @@ async def test_get_parse_requires_auth(app):
 
 @pytest.mark.asyncio
 async def test_list_parses_returns_results(app):
-    fake_list_sync = MagicMock(return_value=([dict(_FAKE_ENCOUNTER, combatant_count=2)], 1))
+    fake_list_sync = MagicMock(return_value=([dict(_FAKE_ENCOUNTER, combatant_count=2, player_count=1)], 1))
 
     with (
         patch("web.routes.parses._require_user", _fake_user),
@@ -144,6 +144,7 @@ async def test_list_parses_returns_results(app):
     assert enc["title"] == "a krait patriarch"
     assert enc["zone"] == "Great Divide"
     assert enc["combatant_count"] == 2
+    assert enc["player_count"] == 1
     assert enc["encdps"] == 10928.65
 
 
@@ -151,9 +152,10 @@ async def test_list_parses_returns_results(app):
 async def test_list_parses_clamps_limit(app):
     captured = {}
 
-    def fake_list_sync(limit, zone):
+    def fake_list_sync(limit, zone, size):
         captured["limit"] = limit
         captured["zone"] = zone
+        captured["size"] = size
         return ([], 0)
 
     with (
@@ -161,9 +163,9 @@ async def test_list_parses_clamps_limit(app):
         patch("web.routes.parses._list_encounters_sync", side_effect=fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            # Asking for 999 should be clamped to the max (100).
-            await client.get("/api/parses?limit=999")
-            assert captured["limit"] == 100
+            # Asking for 9999 should be clamped to the max (500).
+            await client.get("/api/parses?limit=9999")
+            assert captured["limit"] == 500
             # Asking for 0 should be floored to the min (1).
             await client.get("/api/parses?limit=0")
             assert captured["limit"] == 1
@@ -173,7 +175,7 @@ async def test_list_parses_clamps_limit(app):
 async def test_list_parses_passes_zone_filter(app):
     captured = {}
 
-    def fake_list_sync(limit, zone):
+    def fake_list_sync(limit, zone, size):
         captured["zone"] = zone
         return ([], 0)
 
@@ -184,6 +186,38 @@ async def test_list_parses_passes_zone_filter(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/api/parses?zone=Great+Divide")
             assert captured["zone"] == "Great Divide"
+
+
+@pytest.mark.asyncio
+async def test_list_parses_passes_size_filter(app):
+    captured = {}
+
+    def fake_list_sync(limit, zone, size):
+        captured["size"] = size
+        return ([], 0)
+
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._list_encounters_sync", side_effect=fake_list_sync),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            await client.get("/api/parses?size=raid24")
+            assert captured["size"] == "raid24"
+
+            # Unknown bucket values are silently dropped (no filter).
+            await client.get("/api/parses?size=nonsense")
+            assert captured["size"] is None
+
+
+@pytest.mark.asyncio
+async def test_size_buckets_defined():
+    """Sanity-check the bucket ranges so the frontend can rely on them."""
+    from web.routes.parses import SIZE_BUCKETS
+
+    assert SIZE_BUCKETS["individual"] == (1, 1)
+    assert SIZE_BUCKETS["group"] == (2, 6)
+    assert SIZE_BUCKETS["raid12"] == (7, 12)
+    assert SIZE_BUCKETS["raid24"] == (13, 24)
 
 
 # ---------------------------------------------------------------------------

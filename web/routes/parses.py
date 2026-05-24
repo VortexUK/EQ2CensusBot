@@ -42,6 +42,7 @@ class ParseEncounterSummary(BaseModel):
     kills: int
     deaths: int
     combatant_count: int
+    player_count: int  # ally combatants with single-word names, excluding 'Unknown'
 
 
 class ParsesListResponse(BaseModel):
@@ -109,31 +110,75 @@ def _require_user(request: Request) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _list_encounters_sync(limit: int, zone: str | None) -> tuple[list[dict], int]:
-    """Return (encounters_with_combatant_count, total_count)."""
+# Encounter "size" buckets — mapped to a (min_players, max_players) range
+# inclusive on both ends. Used to filter the list endpoint via ?size=...
+SIZE_BUCKETS: dict[str, tuple[int, int]] = {
+    "individual": (1, 1),
+    "group": (2, 6),
+    "raid12": (7, 12),
+    "raid24": (13, 24),
+}
+
+# Player detection: ally combatants whose name is one word and isn't the
+# 'Unknown' fallback row ACT writes for un-attributed damage. Pets nearly
+# always either consolidate into the owner or have multi-word descriptive
+# names, so this catches real player count without false positives.
+_PLAYER_COUNT_SQL = (
+    "SELECT COUNT(*) FROM combatants c "
+    "WHERE c.encounter_id = e.id "
+    "  AND c.ally = 1 "
+    "  AND c.name != '' "
+    "  AND c.name != 'Unknown' "
+    "  AND instr(c.name, ' ') = 0"
+)
+
+
+def _list_encounters_sync(
+    limit: int,
+    zone: str | None,
+    size: str | None,
+) -> tuple[list[dict], int]:
+    """Return (encounters_with_counts, total_count) ordered started_at DESC."""
     if not parses_db.DB_PATH.exists():
         return [], 0
+
+    # Build the encounter list (with computed player_count + combatant_count).
+    where_clauses: list[str] = []
+    params: list = []
+    if zone:
+        where_clauses.append("e.zone = ?")
+        params.append(zone)
+    if size and size in SIZE_BUCKETS:
+        lo, hi = SIZE_BUCKETS[size]
+        where_clauses.append("player_count BETWEEN ? AND ?")
+        params.extend([lo, hi])
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+    list_sql = f"""
+        SELECT * FROM (
+            SELECT e.*,
+                ({_PLAYER_COUNT_SQL}) AS player_count,
+                (SELECT COUNT(*) FROM combatants c2 WHERE c2.encounter_id = e.id) AS combatant_count
+            FROM encounters e
+        )
+        {where_sql}
+        ORDER BY started_at DESC
+        LIMIT ?
+    """
+    count_sql = f"""
+        SELECT COUNT(*) FROM (
+            SELECT e.id,
+                ({_PLAYER_COUNT_SQL}) AS player_count
+            FROM encounters e
+        )
+        {where_sql}
+    """
+
     conn = parses_db.init_db()
     try:
-        encounters = parses_db.recent_encounters(conn, limit=limit, zone=zone)
-        # Attach combatant_count per encounter in a single query.
-        if encounters:
-            ids = tuple(e["id"] for e in encounters)
-            placeholders = ",".join("?" * len(ids))
-            counts = {
-                row[0]: row[1]
-                for row in conn.execute(
-                    f"SELECT encounter_id, COUNT(*) FROM combatants "
-                    f"WHERE encounter_id IN ({placeholders}) GROUP BY encounter_id",
-                    ids,
-                ).fetchall()
-            }
-            for e in encounters:
-                e["combatant_count"] = counts.get(e["id"], 0)
-        if zone:
-            total = conn.execute("SELECT COUNT(*) FROM encounters WHERE zone = ?", (zone,)).fetchone()[0]
-        else:
-            total = conn.execute("SELECT COUNT(*) FROM encounters").fetchone()[0]
+        conn.row_factory = sqlite3.Row
+        encounters = [dict(r) for r in conn.execute(list_sql, [*params, limit]).fetchall()]
+        total = conn.execute(count_sql, params).fetchone()[0]
         return encounters, total
     finally:
         conn.close()
@@ -170,16 +215,22 @@ def _encounter_detail_sync(encounter_id: int, top_attacks_per_combatant: int) ->
 @limiter.limit("30/minute")
 async def list_parses(
     request: Request,
-    limit: int = 25,
+    limit: int = 200,
     zone: str | None = None,
+    size: str | None = None,
 ) -> ParsesListResponse:
     _require_user(request)
 
     # Clamp limit so a hostile caller can't ask for millions.
-    limit = max(1, min(limit, 100))
+    limit = max(1, min(limit, 500))
+
+    # Unknown `size` value is silently dropped (no filter applied) — same
+    # forgiving behaviour as the recipes route's bench filter.
+    if size and size not in SIZE_BUCKETS:
+        size = None
 
     loop = asyncio.get_event_loop()
-    encounters, total = await loop.run_in_executor(None, _list_encounters_sync, limit, zone)
+    encounters, total = await loop.run_in_executor(None, _list_encounters_sync, limit, zone, size)
 
     results = [
         ParseEncounterSummary(
@@ -195,6 +246,7 @@ async def list_parses(
             kills=e["kills"],
             deaths=e["deaths"],
             combatant_count=e.get("combatant_count", 0),
+            player_count=e.get("player_count", 0),
         )
         for e in encounters
     ]
