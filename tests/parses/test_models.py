@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from parses.models import (
     _to_bool_tf,
@@ -137,3 +137,19 @@ class TestToTs:
     def test_datetime_passthrough(self):
         dt = datetime(2026, 5, 24, 12, 34, 56)
         assert _to_ts(dt) is dt
+
+    def test_iso_utc_z_suffix_returns_aware(self):
+        """Plugin v0.1.1+ sends explicit UTC. We must round-trip with tzinfo set
+        so _to_unix uses the proper offset (rather than re-labelling naive as
+        UTC and silently drifting by the local-vs-UTC offset)."""
+        got = _to_ts("2026-05-24T12:34:56Z")
+        assert got == datetime(2026, 5, 24, 12, 34, 56, tzinfo=UTC)
+        assert got is not None
+        assert got.tzinfo is not None
+
+    def test_legacy_naive_stays_naive(self):
+        """Plugin v0.1.0 uploads (no Z, no offset) must continue to parse as
+        a naive datetime — _to_unix treats them as UTC for backwards compat."""
+        got = _to_ts("2026-05-24 12:34:56")
+        assert got is not None
+        assert got.tzinfo is None

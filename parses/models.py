@@ -69,13 +69,29 @@ def _to_bool_tf(v) -> bool:
 
 
 def _to_ts(v) -> datetime | None:
-    """Parse ACT's TIMESTAMP into a naive datetime. Empirically the SQLite
-    ODBC driver writes them as `'YYYY-MM-DD HH:MM:SS'` (local clock)."""
+    """Parse a timestamp string into a datetime.
+
+    Two input shapes:
+      * Plugin v0.1.1+ → ``"YYYY-MM-DDTHH:MM:SSZ"`` — explicit UTC, returns
+        a tz-aware datetime.
+      * Plugin v0.1.0 and the local ODBC ingest path → ``"YYYY-MM-DD HH:MM:SS"``
+        — naive (represents the player's local clock). ``_to_unix`` later
+        treats naive datetimes as UTC, which is the legacy behaviour:
+        off by the local-vs-UTC offset for cross-timezone viewers, but
+        self-consistent for a single user.
+    """
     if v is None or v == "":
         return None
     if isinstance(v, datetime):
         return v
     s = str(v).strip()
+    # ISO-with-Z form first — fromisoformat (Python 3.11+) handles trailing Z.
+    if s.endswith("Z"):
+        try:
+            return datetime.fromisoformat(s)
+        except ValueError:
+            pass
+    # Legacy naive shapes from older plugin / local ingest.
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"):
         try:
             return datetime.strptime(s, fmt)
