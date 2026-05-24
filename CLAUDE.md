@@ -1,4 +1,4 @@
-# CLAUDE.md — EQ2CensusBot
+# CLAUDE.md — EQ2Lexicon
 
 ## What this project is
 

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Development launcher for EQ2CensusBot on Windows.
+    Development launcher for EQ2 Lexicon on Windows.
 
 .DESCRIPTION
     Opens separate terminal windows for the backend API server and the Vite

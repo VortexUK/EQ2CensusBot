@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for the EQ2CensusBot test suite.
+"""Shared pytest fixtures for the EQ2 Lexicon test suite.
 
 Test isolation note
 -------------------
