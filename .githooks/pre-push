@@ -15,6 +15,14 @@ echo ""
 echo "${CYAN}Running pre-push checks…${RESET}"
 echo ""
 
+# uv must be on PATH — install with `pip install uv` or via the installer at
+# https://astral.sh/uv. `uv run` ensures every tool below resolves to the
+# project-pinned version from uv.lock instead of whatever happens to be on PATH.
+if ! command -v uv >/dev/null 2>&1; then
+  echo "${RED}✗ uv is not on PATH. Install it: https://docs.astral.sh/uv/${RESET}"
+  exit 1
+fi
+
 # ── 1. TypeScript type-check ──────────────────────────────────────────────────
 echo "${CYAN}→ TypeScript (tsc -b)${RESET}"
 cd frontend
@@ -26,45 +34,36 @@ fi
 cd ..
 echo "${GREEN}  ✓ TypeScript OK${RESET}"
 
-# ── 2. Python syntax check ────────────────────────────────────────────────────
-echo "${CYAN}→ Python syntax (compileall)${RESET}"
-if ! python -m compileall -q census web bot image scripts 2>/dev/null; then
-  echo ""
-  echo "${RED}✗ Python syntax errors found. Push aborted.${RESET}"
-  exit 1
-fi
-echo "${GREEN}  ✓ Python OK${RESET}"
-
-# ── 3. Python formatting (ruff) ───────────────────────────────────────────────
+# ── 2. Python formatting (ruff) ───────────────────────────────────────────────
 echo "${CYAN}→ Python formatting (ruff format --check)${RESET}"
-if ! python -m ruff format --check .; then
+if ! uv run --frozen ruff format --check .; then
   echo ""
-  echo "${RED}✗ Formatting issues found. Run: python -m ruff format .${RESET}"
+  echo "${RED}✗ Formatting issues found. Run: uv run ruff format .${RESET}"
   exit 1
 fi
 echo "${GREEN}  ✓ ruff format OK${RESET}"
 
-# ── 4. Python lint (ruff check) ──────────────────────────────────────────────
+# ── 3. Python lint (ruff check) ──────────────────────────────────────────────
 echo "${CYAN}→ Python lint (ruff check)${RESET}"
-if ! python -m ruff check .; then
+if ! uv run --frozen ruff check .; then
   echo ""
-  echo "${RED}✗ Lint errors found. Run: python -m ruff check --fix .${RESET}"
+  echo "${RED}✗ Lint errors found. Run: uv run ruff check --fix .${RESET}"
   exit 1
 fi
 echo "${GREEN}  ✓ ruff lint OK${RESET}"
 
-# ── 5. Python type checking (pyright) ────────────────────────────────────────
+# ── 4. Python type checking (pyright) ────────────────────────────────────────
 echo "${CYAN}→ Python types (pyright)${RESET}"
-if ! python -m pyright; then
+if ! uv run --frozen pyright; then
   echo ""
   echo "${RED}✗ Pyright type errors found. Push aborted.${RESET}"
   exit 1
 fi
 echo "${GREEN}  ✓ pyright OK${RESET}"
 
-# ── 6. Python tests (pytest) ─────────────────────────────────────────────────
+# ── 5. Python tests (pytest) ─────────────────────────────────────────────────
 echo "${CYAN}→ Python tests (pytest)${RESET}"
-if ! python -m pytest --tb=short -q; then
+if ! uv run --frozen pytest --tb=short -q; then
   echo ""
   echo "${RED}✗ Tests failed. Push aborted.${RESET}"
   exit 1

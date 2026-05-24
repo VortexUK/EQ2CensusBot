@@ -1,3 +1,39 @@
+[project]
+name = "eq2censusbot"
+version = "0.1.0"
+description = "Discord bot and web companion site for the EverQuest 2 Daybreak Census API"
+requires-python = ">=3.13"
+dependencies = [
+    # Bot / shared
+    "discord.py>=2.3.0",
+    "aiohttp>=3.9.0",
+    "Pillow>=10.0.0",
+    "python-dotenv>=1.0.0",
+    "aiosqlite>=0.20.0",
+    # Web
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27.0",
+    "itsdangerous>=2.2.0",
+    "slowapi>=0.1.9",
+    # Observability
+    "prometheus-client>=0.20.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.5.0",
+    "pyright>=1.1.0",
+]
+
+[tool.uv]
+# This is an application, not a library — don't try to build/install the
+# project itself, just resolve and install its dependencies.
+package = false
+
 [tool.ruff]
 line-length = 120
 target-version = "py313"

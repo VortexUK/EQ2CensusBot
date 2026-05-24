@@ -14,22 +14,22 @@ help:
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 install:
-	pip install -r requirements-dev.txt
+	uv sync --all-groups
 	cd frontend && npm install
 
 # ── Development ───────────────────────────────────────────────────────────────
 dev:
 	@echo "Starting backend on :8000 and frontend dev server on :5173 ..."
 	@trap 'kill 0' INT; \
-	python -m uvicorn web.app:app --reload --port 8000 & \
+	uv run uvicorn web.app:app --reload --port 8000 & \
 	(cd frontend && npm run dev) & \
 	wait
 
 web:
-	python -m uvicorn web.app:app --reload --port 8000
+	uv run uvicorn web.app:app --reload --port 8000
 
 bot:
-	python main.py
+	uv run python main.py
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 build:
@@ -37,7 +37,7 @@ build:
 
 # ── Testing ───────────────────────────────────────────────────────────────────
 test:
-	pytest
+	uv run pytest
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 clean:

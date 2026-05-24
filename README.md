@@ -112,14 +112,24 @@ scripts/                 # Local preview and download scripts (see below)
 
 ### Prerequisites
 
-- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (manages Python + Python deps — install with `pip install uv` or the standalone installer at https://astral.sh/uv)
 - Node.js 18+ (for the web frontend)
 
 ### 1. Install dependencies
 
 ```bash
-pip install -r requirements-dev.txt   # includes prod deps + test/lint tooling
+uv sync --all-groups      # creates .venv, installs prod + dev deps from uv.lock
 cd frontend && npm install
+```
+
+uv reads `.python-version` (3.13) and will download a matching CPython automatically if you don't have one.
+
+Run any Python tool with `uv run <tool>` — uv resolves it inside the project venv without needing to activate it manually:
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run python main.py
 ```
 
 **Activate the pre-push hook** (recommended) — runs the same lint, type, and test checks as CI before every `git push`, so you find out about a regression in seconds instead of after CI runs:
@@ -127,6 +137,16 @@ cd frontend && npm install
 ```bash
 git config core.hooksPath .githooks
 ```
+
+**Adding or removing a dependency:**
+
+```bash
+uv add httpx              # adds to [project.dependencies] and updates uv.lock
+uv add --group dev mypy   # adds to [dependency-groups.dev]
+uv remove slowapi
+```
+
+Commit both `pyproject.toml` and `uv.lock` so deploys reproduce the exact resolved versions.
 
 ### 2. Configure environment
 

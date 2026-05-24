@@ -28,7 +28,7 @@ $Root = Split-Path $PSScriptRoot -Parent
 function Start-Backend {
     Write-Host "Starting backend on http://localhost:8000 ..." -ForegroundColor Cyan
     Start-Process powershell -ArgumentList "-NoExit", "-Command",
-        "cd '$Root'; python -m uvicorn web.app:app --reload --port 8000"
+        "cd '$Root'; uv run uvicorn web.app:app --reload --port 8000"
 }
 
 function Start-Frontend {
@@ -40,7 +40,7 @@ function Start-Frontend {
 function Start-Bot {
     Write-Host "Starting Discord bot ..." -ForegroundColor Cyan
     Start-Process powershell -ArgumentList "-NoExit", "-Command",
-        "cd '$Root'; python main.py"
+        "cd '$Root'; uv run python main.py"
 }
 
 function Build-Frontend {
