@@ -215,7 +215,8 @@ async def test_get_parse_requires_auth(app):
 
 @pytest.mark.asyncio
 async def test_list_parses_returns_results(app):
-    fake_list_sync = MagicMock(return_value=([dict(_FAKE_ENCOUNTER, combatant_count=2, player_count=1)], 1))
+    # Solo fight, single uploader — no mirror grouping needed.
+    fake_list_sync = MagicMock(return_value=[dict(_FAKE_ENCOUNTER, combatant_count=2, player_count=1)])
 
     with (
         patch("web.routes.parses._require_user", _fake_user),
@@ -226,7 +227,7 @@ async def test_list_parses_returns_results(app):
 
     assert r.status_code == 200
     data = r.json()
-    assert data["total"] == 1
+    assert data["total"] == 1  # one fight
     assert len(data["results"]) == 1
     enc = data["results"][0]
     assert enc["act_encid"] == "18cf3eb9"
@@ -237,38 +238,131 @@ async def test_list_parses_returns_results(app):
     assert enc["uploaded_by"] == "Menludiir"
     assert enc["guild_name"] == "Exordium"
     assert enc["encdps"] == 10928.65
+    # Even a solo fight has a single-element uploads list (it's the canonical
+    # itself) so the frontend can render the per-uploader expansion uniformly.
+    assert len(enc["uploads"]) == 1
+    assert enc["uploads"][0]["id"] == enc["id"]
+    assert enc["uploads"][0]["uploaded_by"] == "Menludiir"
 
 
 @pytest.mark.asyncio
-async def test_list_parses_clamps_limit(app):
+async def test_list_parses_groups_mirror_uploads(app):
+    """Two raiders uploading the same fight (same guild + title + ±60 s)
+    collapse into one row with both in the `uploads` list."""
+    base_started = 1716561116
+    raider_a = dict(_FAKE_ENCOUNTER, id=1, uploaded_by="Menludiir", duration_s=46, started_at=base_started)
+    raider_b = dict(
+        _FAKE_ENCOUNTER,
+        id=2,
+        uploaded_by="Sihtric",
+        started_at=base_started + 5,
+        duration_s=50,
+        combatant_count=2,
+        player_count=1,
+    )
+    raider_a["combatant_count"] = 2
+    raider_a["player_count"] = 1
+    fake_list_sync = MagicMock(return_value=[raider_b, raider_a])  # arbitrary order
+
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/parses")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total"] == 1, "two mirror uploads should collapse to one fight"
+    assert len(data["results"]) == 1
+    fight = data["results"][0]
+    # Canonical = longer-duration upload (Sihtric's at 50s).
+    assert fight["id"] == 2
+    assert fight["uploaded_by"] == "Sihtric"
+    assert {u["uploaded_by"] for u in fight["uploads"]} == {"Menludiir", "Sihtric"}
+
+
+@pytest.mark.asyncio
+async def test_list_parses_does_not_group_different_titles(app):
+    """Same guild + close start times but different titles → different
+    fights (distinct mirror groups)."""
+    a = dict(_FAKE_ENCOUNTER, id=1, title="Boss A", started_at=1716561116)
+    b = dict(_FAKE_ENCOUNTER, id=2, title="Boss B", started_at=1716561120)
+    fake_list_sync = MagicMock(return_value=[a, b])
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/parses")
+    data = r.json()
+    assert data["total"] == 2
+    assert {f["title"] for f in data["results"]} == {"Boss A", "Boss B"}
+
+
+@pytest.mark.asyncio
+async def test_list_parses_does_not_group_outside_window(app):
+    """Same title but start times > MIRROR_WINDOW_S apart → separate
+    fights (e.g. same boss killed twice an hour apart)."""
+    a = dict(_FAKE_ENCOUNTER, id=1, started_at=1716561116)
+    b = dict(_FAKE_ENCOUNTER, id=2, started_at=1716561116 + 600)  # 10 minutes later
+    fake_list_sync = MagicMock(return_value=[a, b])
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/parses")
+    data = r.json()
+    assert data["total"] == 2
+
+
+@pytest.mark.asyncio
+async def test_list_parses_does_not_group_across_guilds(app):
+    """Same title, same start time, different guilds → different fights."""
+    a = dict(_FAKE_ENCOUNTER, id=1, guild_name="Exordium")
+    b = dict(_FAKE_ENCOUNTER, id=2, guild_name="OtherGuild")
+    fake_list_sync = MagicMock(return_value=[a, b])
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/parses")
+    assert r.json()["total"] == 2
+
+
+@pytest.mark.asyncio
+async def test_list_parses_clamps_fight_limit(app):
+    """`limit` clamps the number of FIGHTS returned (not raw uploads).
+    The inner SQL cap is generous (limit*30) so grouping has headroom."""
     captured = {}
 
-    def fake_list_sync(limit, zone, size):
-        captured["limit"] = limit
+    def fake_list_sync(inner_cap, zone, size):
+        captured["inner_cap"] = inner_cap
         captured["zone"] = zone
         captured["size"] = size
-        return ([], 0)
+        return []
 
     with (
         patch("web.routes.parses._require_user", _fake_user),
         patch("web.routes.parses._list_encounters_sync", side_effect=fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            # Asking for 9999 should be clamped to the max (500).
+            # Asking for 9999 should clamp the fight cap to 500 → inner=15000.
             await client.get("/api/parses?limit=9999")
-            assert captured["limit"] == 500
-            # Asking for 0 should be floored to the min (1).
+            assert captured["inner_cap"] == 500 * 30
+            # Asking for 0 should floor the fight cap to 1 → inner=max(30, 2000) = 2000.
             await client.get("/api/parses?limit=0")
-            assert captured["limit"] == 1
+            assert captured["inner_cap"] == 2000
 
 
 @pytest.mark.asyncio
 async def test_list_parses_passes_zone_filter(app):
     captured = {}
 
-    def fake_list_sync(limit, zone, size):
+    def fake_list_sync(inner_cap, zone, size):
         captured["zone"] = zone
-        return ([], 0)
+        return []
 
     with (
         patch("web.routes.parses._require_user", _fake_user),
@@ -283,9 +377,9 @@ async def test_list_parses_passes_zone_filter(app):
 async def test_list_parses_passes_size_filter(app):
     captured = {}
 
-    def fake_list_sync(limit, zone, size):
+    def fake_list_sync(inner_cap, zone, size):
         captured["size"] = size
-        return ([], 0)
+        return []
 
     with (
         patch("web.routes.parses._require_user", _fake_user),

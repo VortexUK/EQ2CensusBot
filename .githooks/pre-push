@@ -31,8 +31,17 @@ if ! ./node_modules/.bin/tsc -b; then
   echo "${RED}✗ TypeScript errors found. Push aborted.${RESET}"
   exit 1
 fi
-cd ..
 echo "${GREEN}  ✓ TypeScript OK${RESET}"
+
+# ── 1b. Frontend tests (vitest) ───────────────────────────────────────────────
+echo "${CYAN}→ Frontend tests (vitest)${RESET}"
+if ! ./node_modules/.bin/vitest run --reporter=dot; then
+  echo ""
+  echo "${RED}✗ Frontend tests failed. Push aborted.${RESET}"
+  exit 1
+fi
+cd ..
+echo "${GREEN}  ✓ vitest OK${RESET}"
 
 # ── 2. Python formatting (ruff) ───────────────────────────────────────────────
 echo "${CYAN}→ Python formatting (ruff format --check)${RESET}"

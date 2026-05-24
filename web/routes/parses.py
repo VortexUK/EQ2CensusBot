@@ -135,7 +135,28 @@ class ParsePermissions(BaseModel):
     can_delete: bool = False
 
 
+class ParseUploadSummary(BaseModel):
+    """One raider's submission within a mirror group. Smaller than
+    ParseEncounterSummary — just the fields the expansion UI on /parses
+    actually needs (per-uploader link, duration, damage, dps, deletion
+    rights)."""
+
+    id: int
+    uploaded_by: str
+    started_at: int
+    duration_s: int
+    total_damage: int
+    encdps: float
+    success_level: int
+    permissions: ParsePermissions = ParsePermissions()
+
+
 class ParseEncounterSummary(BaseModel):
+    """One FIGHT. Top-level fields are from the canonical upload (the
+    raider whose ACT captured the longest duration); `uploads` holds every
+    raider's view of the same fight. Mirror grouping is by
+    (guild_name, title, started_at within ±MIRROR_WINDOW_S)."""
+
     id: int
     act_encid: str
     title: str
@@ -150,14 +171,22 @@ class ParseEncounterSummary(BaseModel):
     success_level: int  # ACT enum: 0=unknown, 1=win, 2=loss, 3=mixed
     combatant_count: int
     player_count: int  # ally combatants with single-word names, excluding 'Unknown'
-    uploaded_by: str  # who ingested this encounter; 'local' for the local-only era
+    uploaded_by: str  # who ingested the canonical upload; 'local' for local-only era
     guild_name: str | None  # stamped at ingest time from uploader's Census guild
     permissions: ParsePermissions = ParsePermissions()
+    uploads: list[ParseUploadSummary] = []  # always at least 1 (the canonical itself)
 
 
 class ParsesListResponse(BaseModel):
     results: list[ParseEncounterSummary]
-    total: int
+    total: int  # total number of FIGHTS matching the filter (pre-limit)
+
+
+# Two upload rows are treated as the same fight when their guild + title
+# match and their start times are within this window. Kept identical to
+# the frontend's previous client-side rule (was `MIRROR_WINDOW_S` in
+# ParsesPage.tsx) so display behaviour doesn't change.
+MIRROR_WINDOW_S = 60
 
 
 class AttackSummary(BaseModel):
@@ -258,6 +287,7 @@ class ParseDetailResponse(BaseModel):
     encdps: float
     kills: int
     deaths: int
+    success_level: int  # ACT enum: 0=unknown, 1=win, 2=loss, 3=mixed
     combatants: list[CombatantSummary]
 
 
@@ -290,15 +320,17 @@ _PLAYER_COUNT_SQL = (
 
 
 def _list_encounters_sync(
-    limit: int,
+    inner_cap: int,
     zone: str | None,
     size: str | None,
-) -> tuple[list[dict], int]:
-    """Return (encounters_with_counts, total_count) ordered started_at DESC."""
+) -> list[dict]:
+    """Return matching encounter rows most-recent-first, capped at
+    ``inner_cap`` raw uploads (not fights). Mirror grouping happens after
+    this call — inner_cap must be generous enough to cover the requested
+    fight limit × the worst-case mirror count per fight."""
     if not parses_db.DB_PATH.exists():
-        return [], 0
+        return []
 
-    # Build the encounter list (with computed player_count + combatant_count).
     where_clauses: list[str] = []
     params: list = []
     if zone:
@@ -321,23 +353,66 @@ def _list_encounters_sync(
         ORDER BY started_at DESC
         LIMIT ?
     """
-    count_sql = f"""
-        SELECT COUNT(*) FROM (
-            SELECT e.id,
-                ({_PLAYER_COUNT_SQL}) AS player_count
-            FROM encounters e
-        )
-        {where_sql}
-    """
 
     conn = parses_db.init_db()
     try:
         conn.row_factory = sqlite3.Row
-        encounters = [dict(r) for r in conn.execute(list_sql, [*params, limit]).fetchall()]
-        total = conn.execute(count_sql, params).fetchone()[0]
-        return encounters, total
+        return [dict(r) for r in conn.execute(list_sql, [*params, inner_cap]).fetchall()]
     finally:
         conn.close()
+
+
+def _group_into_fights(encounters: list[dict]) -> list[dict]:
+    """Greedy mirror-grouping. Two uploads are the same fight when their
+    guild + title match and any pair of start times falls within
+    ``MIRROR_WINDOW_S``. The canonical upload (carried as the top-level
+    fields on the returned dict) is the longest-duration upload in the
+    group — the raider whose ACT captured the most fight time.
+
+    Each returned group dict looks like::
+
+        {
+            # ...all fields of the canonical upload row...
+            "uploads": [<every upload dict, including the canonical>],
+        }
+
+    Stable behaviour: the previous client-side ``detectMirrors`` in
+    ParsesPage used the same rule; this is a faithful Python port."""
+    if not encounters:
+        return []
+    # Sort by started_at ASC so we attach in chronological order — late
+    # stragglers reach the group whose existing members include their
+    # closest neighbour.
+    sorted_encs = sorted(encounters, key=lambda e: e["started_at"])
+    groups: list[dict] = []
+    for e in sorted_encs:
+        attached = False
+        for g in groups:
+            if g["title"] != e["title"]:
+                continue
+            if g.get("guild_name") != e.get("guild_name"):
+                continue
+            # Compare against every member so a late straggler still attaches
+            # even if the first uploader's start time drifted out of window.
+            if not any(abs(u["started_at"] - e["started_at"]) <= MIRROR_WINDOW_S for u in g["uploads"]):
+                continue
+            g["uploads"].append(e)
+            # Promote to canonical if this upload captured a longer fight.
+            if e["duration_s"] > g["duration_s"]:
+                kept_uploads = g["uploads"]
+                g.clear()
+                g.update(e)
+                g["uploads"] = kept_uploads
+            attached = True
+            break
+        if not attached:
+            new_group = dict(e)
+            new_group["uploads"] = [e]
+            groups.append(new_group)
+
+    # Render order: most-recent fight first.
+    groups.sort(key=lambda g: g["started_at"], reverse=True)
+    return groups
 
 
 def _encounter_detail_sync(encounter_id: int, top_attacks_per_combatant: int) -> dict | None:
@@ -416,7 +491,9 @@ async def list_parses(
 ) -> ParsesListResponse:
     _require_user(request)
 
-    # Clamp limit so a hostile caller can't ask for millions.
+    # `limit` is now a FIGHT cap, not an upload cap. Clamp to 500 — the
+    # whole page is rendered client-side; bigger pages stall the browser
+    # before they stall the server.
     limit = max(1, min(limit, 500))
 
     # Unknown `size` value is silently dropped (no filter applied) — same
@@ -424,33 +501,64 @@ async def list_parses(
     if size and size not in SIZE_BUCKETS:
         size = None
 
+    # Inner SQL cap: generous enough that even a worst-case 24-mirror raid
+    # would yield well over `limit` fights after grouping. 30x is the magic
+    # number — for limit=500, inner=15000 uploads covers 625 fights at the
+    # 24-mirror worst case, or 15000 unique fights at one-upload-per-fight.
+    inner_cap = max(limit * 30, 2000)
+
     loop = asyncio.get_event_loop()
-    encounters, total = await loop.run_in_executor(None, _list_encounters_sync, limit, zone, size)
-    permissions = await _compute_permissions(request, encounters)
+    encounters = await loop.run_in_executor(None, _list_encounters_sync, inner_cap, zone, size)
+
+    # Group uploads into fights, then apply the user-facing limit to the
+    # FIGHT list. `total` reports total fights (pre-limit) so the UI can
+    # surface "showing X of Y" if it ever wants to.
+    fights = _group_into_fights(encounters)
+    total_fights = len(fights)
+    fights = fights[:limit]
+
+    # Permission compute needs the flat upload list (perms are per-upload,
+    # not per-fight) because trash buttons on the expanded uploader rows
+    # need their own per-row can_delete.
+    all_uploads_in_view: list[dict] = [u for f in fights for u in f["uploads"]]
+    permissions = await _compute_permissions(request, all_uploads_in_view)
+
+    def _upload_summary(u: dict) -> ParseUploadSummary:
+        return ParseUploadSummary(
+            id=u["id"],
+            uploaded_by=u.get("uploaded_by") or "local",
+            started_at=u["started_at"],
+            duration_s=u["duration_s"],
+            total_damage=u["total_damage"],
+            encdps=u["encdps"],
+            success_level=u.get("success_level", 0) or 0,
+            permissions=permissions.get(u["id"], ParsePermissions()),
+        )
 
     results = [
         ParseEncounterSummary(
-            id=e["id"],
-            act_encid=e["act_encid"],
-            title=e["title"],
-            zone=e["zone"],
-            started_at=e["started_at"],
-            ended_at=e["ended_at"],
-            duration_s=e["duration_s"],
-            total_damage=e["total_damage"],
-            encdps=e["encdps"],
-            kills=e["kills"],
-            deaths=e["deaths"],
-            success_level=e.get("success_level", 0) or 0,
-            combatant_count=e.get("combatant_count", 0),
-            player_count=e.get("player_count", 0),
-            uploaded_by=e.get("uploaded_by") or "local",
-            guild_name=e.get("guild_name"),
-            permissions=permissions.get(e["id"], ParsePermissions()),
+            id=f["id"],
+            act_encid=f["act_encid"],
+            title=f["title"],
+            zone=f["zone"],
+            started_at=f["started_at"],
+            ended_at=f["ended_at"],
+            duration_s=f["duration_s"],
+            total_damage=f["total_damage"],
+            encdps=f["encdps"],
+            kills=f["kills"],
+            deaths=f["deaths"],
+            success_level=f.get("success_level", 0) or 0,
+            combatant_count=f.get("combatant_count", 0),
+            player_count=f.get("player_count", 0),
+            uploaded_by=f.get("uploaded_by") or "local",
+            guild_name=f.get("guild_name"),
+            permissions=permissions.get(f["id"], ParsePermissions()),
+            uploads=[_upload_summary(u) for u in f["uploads"]],
         )
-        for e in encounters
+        for f in fights
     ]
-    return ParsesListResponse(results=results, total=total)
+    return ParsesListResponse(results=results, total=total_fights)
 
 
 @router.get("/parses/{encounter_id}", response_model=ParseDetailResponse)
@@ -562,6 +670,7 @@ async def get_parse(
         encdps=enc["encdps"],
         kills=enc["kills"],
         deaths=enc["deaths"],
+        success_level=enc.get("success_level", 0) or 0,
         combatants=combatants,
     )
 

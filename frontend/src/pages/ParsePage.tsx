@@ -95,6 +95,7 @@ interface ParseDetail {
   encdps: number
   kills: number
   deaths: number
+  success_level: number    // ACT enum: 0=unknown, 1=win, 2=loss, 3=mixed
   combatants: CombatantSummary[]
 }
 
@@ -229,12 +230,19 @@ export default function ParsePage() {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 function Header({ data }: { data: ParseDetail }) {
+  // Match the /parses list title-colour rule for visual consistency.
+  // 1=win→green, 2=loss→red, 3=mixed→gold-warning, 0=unknown→default gold.
+  const titleColor =
+    data.success_level === 1 ? 'var(--success, #4caf50)'
+    : data.success_level === 2 ? 'var(--danger, #e57373)'
+    : data.success_level === 3 ? 'var(--warning, #d8a657)'
+    : 'var(--gold)'
   return (
     <section style={{ marginBottom: '1.4rem' }}>
       <h1 style={{
         fontFamily: 'var(--font-heading)',
         fontSize: '1.7rem',
-        color: 'var(--gold)',
+        color: titleColor,
         margin: '0 0 0.25rem',
       }}>
         {data.title}

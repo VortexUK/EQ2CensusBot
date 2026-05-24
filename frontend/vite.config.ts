@@ -1,8 +1,16 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    // Keep coverage off the dev-time critical path; run on demand.
+    coverage: { enabled: false },
+  },
   server: {
     proxy: {
       '/api': {
