@@ -102,6 +102,7 @@ interface ParseDetail {
   kills: number
   deaths: number
   success_level: number    // ACT enum: 0=unknown, 1=win, 2=loss, 3=mixed
+  hidden?: boolean
   combatants: CombatantSummary[]
 }
 
@@ -220,6 +221,11 @@ export default function ParsePage() {
     <main className={PAGE_CLS}>
       <Breadcrumb items={[{ label: 'Parses', to: '/parses' }, { label: data.title }]} />
       <Header data={data} />
+      {data.hidden && (
+        <p className="text-text-muted text-[0.8rem] mb-3 border border-border rounded-md px-3 py-2">
+          This parse has been removed from the parses list, but is preserved here because it holds a ranking.
+        </p>
+      )}
       {allies.length > 0 && (
         <CombatantSection title="Allies" combatants={allies} lookup={lookup} />
       )}
