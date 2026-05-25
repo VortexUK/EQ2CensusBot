@@ -5,19 +5,43 @@
   --border: rgba(46, 49, 80, 0.85);
   --text: #e2e4f0;
   --text-muted: #8b90ab;
-  --accent: #7289da;
-  --accent-hover: #5f73c7;
 
   /* Brand colours */
   --gold:          #c8a96e;   /* EQ2 gold — headings, borders, active nav */
-  --gold-bright:   #e8d5a3;   /* lighter variant used in gradients */
+  --gold-bright:   #e8d5a3;   /* lighter variant — hovers, active text */
   --gold-dim:      #a07840;   /* darker variant used in gradients */
   --gold-rgb:      200, 169, 110;  /* for rgba(var(--gold-rgb), α) */
   --danger:        #f87171;   /* error text, destructive actions */
   --danger-rgb:    248, 113, 113;
   --success:       #4ade80;   /* approved / online / max-tier */
-  --discord-brand: #5865F2;   /* Discord sign-in button */
-  --font-heading:  'Cinzel', serif;
+  --discord-brand: #5865F2;   /* Discord sign-in button ONLY */
+
+  /* Primary accent = the brand gold. Unified identity: links, focus
+     rings, active tabs, section labels and accent fills all read gold.
+     Discord blurple is deliberately confined to --discord-brand so the
+     sign-in button is the one place the app speaks "Discord" rather
+     than "Norrath". Kept as --accent so the ~46 existing references
+     pick up the new identity without per-file edits. */
+  --accent:        var(--gold);
+  --accent-hover:  var(--gold-bright);
+
+  /* Type */
+  --font-heading:  'Cinzel', serif;          /* classical display caps */
+  --font-body:     'Spectral', Georgia, serif; /* screen-optimised serif — the "lexicon/tome" voice */
+
+  /* Radius scale — collapses the ad-hoc 2–20px sprawl to three steps. */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-pill: 999px;
+
+  /* Spacing scale (4px base) for adoption during the component pass. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
 
   /* Item tier colours */
   --tier-fabled:     #a335ee;
@@ -45,9 +69,9 @@ body {
   z-index: 1;
   background: transparent;
   color: var(--text);
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.55;
   min-height: 100vh;
 }
 
@@ -82,7 +106,7 @@ input {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
   outline: none;
 }

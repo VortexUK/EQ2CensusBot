@@ -75,7 +75,7 @@ function ClaimForm({ onSubmitted, label = 'Request claim' }: {
           disabled={busy}
           style={{ flex: 1 }}
         />
-        <button type="submit" disabled={busy || !name.trim()} style={btn('var(--accent)')}>
+        <button type="submit" disabled={busy || !name.trim()} style={btn('var(--accent)', 'var(--bg)')}>
           {busy ? 'Checking…' : label}
         </button>
       </div>

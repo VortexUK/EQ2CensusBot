@@ -201,3 +201,14 @@ litestream restore -config /app/litestream.yml -timestamp 2026-05-24T18:00:00Z -
 ```
 
 **Skipping backup before R2 is set up:** if the R2 env vars aren't populated, the startCommand's `|| true` makes the restore step a no-op and litestream's replicate-exec falls through cleanly (it just logs a "no replicas configured" warning per DB). The app still runs; you just don't have backups until the env vars land.
+
+## Frontend design principles
+
+When building or changing the React frontend, hold to these — the goal is a distinctive, cohesive interface that reads as *deliberately designed for an EverQuest 2 guild tool*, not a generic dashboard.
+
+- **Typography**: Use characterful, intentional fonts. The heading face is **Cinzel** (`var(--font-heading)`) — a classical serif that fits Norrath's high-fantasy tone. In-game-style tooltips (`ItemTooltip`, `SpellScrollTooltip`, `AATree`) deliberately use Times New Roman to mirror EQ2's actual client. Don't introduce generic UI fonts (Inter, Roboto, Arial) for display text.
+- **Color & theme**: Commit to one cohesive palette driven by CSS variables (the `--gold` / parchment / deep-stone direction). Dominant base colours with sharp metallic accents beat timid, evenly-distributed palettes. Avoid the clichéd purple-gradient-on-white "AI slop" look.
+- **Motion**: Favour CSS-only transitions and micro-interactions. Spend the budget on a few high-impact moments (a staggered page-load reveal) rather than scattering small effects everywhere.
+- **Backgrounds & depth**: Build atmosphere with layered gradients, subtle texture, and decorative borders rather than flat solid fills — but keep it legible.
+- **Cohesion over novelty**: Every page should feel part of the same product. Reuse the shared tokens and component patterns; don't reinvent spacing, card, or button styles per page.
+
