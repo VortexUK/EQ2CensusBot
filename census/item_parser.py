@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from census.constants import ITEM_DISPLAY, STAT_MAP, TYPEINFO_DISPLAY
-from census.models import ItemData, ItemEffect, ItemStat, SetBonusEntry
+from census.models import ItemData, ItemEffect, ItemStat, RecipeBookEntry, SetBonusEntry
 
 _ITEM_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
 
@@ -134,6 +134,11 @@ def parse_item(item: dict) -> ItemData:
         extra_info=parse_extra_info(item, typeinfo),
         set_name=parse_set_name(item),
         set_bonuses=parse_set_bonuses(item),
+        recipe_list=[
+            RecipeBookEntry(id=str(r.get("id", "")), name=_str(r.get("name")))
+            for r in (typeinfo.get("recipe_list") or [])
+            if isinstance(r, dict) and r.get("name")
+        ],
     )
 
 

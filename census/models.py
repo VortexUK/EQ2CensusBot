@@ -62,6 +62,14 @@ class SetBonusEntry:
 
 
 @dataclass
+class RecipeBookEntry:
+    """One recipe taught by a recipe-book item (from typeinfo.recipe_list)."""
+
+    id: str
+    name: str
+
+
+@dataclass
 class ItemData:
     id: str
     name: str
@@ -84,6 +92,9 @@ class ItemData:
     extra_info: list[tuple[str, str]] = field(default_factory=list)  # (label, value) rows
     set_name: str | None = None
     set_bonuses: list[SetBonusEntry] = field(default_factory=list)
+    # Recipe-book items (typeinfo.name == "recipescroll") list the recipes they
+    # teach in typeinfo.recipe_list; empty for every other item type.
+    recipe_list: list[RecipeBookEntry] = field(default_factory=list)
 
 
 @dataclass

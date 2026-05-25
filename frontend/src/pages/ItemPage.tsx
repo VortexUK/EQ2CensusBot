@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Card } from '../components/ui'
+import { Card, SectionLabel } from '../components/ui'
 import { itemRarityColor } from '../rarityColors'
 
 interface ItemStat   { display_name: string; value: number; stat_group: string }
@@ -25,6 +25,7 @@ interface ItemDetail {
   adornment_slots: string[]
   flags: string[]
   extra_info: [string, string][]
+  recipe_list: { id: string; name: string }[]
 }
 
 
@@ -187,6 +188,24 @@ export default function ItemPage() {
                 {s}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Recipe book — the recipes this volume teaches */}
+        {item.recipe_list.length > 0 && (
+          <div className="mt-4">
+            <SectionLabel>Teaches {item.recipe_list.length} {item.recipe_list.length === 1 ? 'Recipe' : 'Recipes'}</SectionLabel>
+            <div className="flex flex-col gap-px">
+              {item.recipe_list.map(r => (
+                <Link
+                  key={r.id}
+                  to={`/recipes?q=${encodeURIComponent(r.name)}`}
+                  className="text-[0.88rem] text-gold hover:text-gold-bright no-underline py-[0.15rem]"
+                >
+                  {r.name}
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 

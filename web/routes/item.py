@@ -161,6 +161,11 @@ class SetBonusResponse(BaseModel):
     lines: list[str]
 
 
+class RecipeBookEntryResponse(BaseModel):
+    id: str
+    name: str
+
+
 class ItemResponse(BaseModel):
     id: str
     name: str
@@ -181,6 +186,7 @@ class ItemResponse(BaseModel):
     extra_info: list[tuple[str, str]] = []
     set_name: str | None = None
     set_bonuses: list[SetBonusResponse] = []
+    recipe_list: list[RecipeBookEntryResponse] = []  # recipe-book items only
 
 
 # ---------------------------------------------------------------------------
@@ -605,4 +611,5 @@ async def get_item(item_id: str) -> ItemResponse:
             )
             for b in item.set_bonuses
         ],
+        recipe_list=[RecipeBookEntryResponse(id=r.id, name=r.name) for r in item.recipe_list],
     )
