@@ -26,7 +26,7 @@ Live at <https://eq2lexicon.up.railway.app>.
 
 ## Web Companion Site
 
-A React + FastAPI site served at `http://localhost:8000` (dev: `http://localhost:5173`).
+A React + TypeScript (Tailwind v4) + FastAPI site served at `http://localhost:8000` (dev: `http://localhost:5173`). Styling is Tailwind utilities throughout, themed from CSS tokens; see [CLAUDE.md → Frontend styling](CLAUDE.md) for the conventions new work must follow.
 
 ### Features
 
@@ -84,7 +84,10 @@ web/
 
 frontend/
   src/
-    App.tsx              # React Router routes
+    App.tsx              # React Router routes + layout shell
+    index.css            # Tailwind v4 entry + @theme design tokens + base/component layers
+    rarityColors.ts      # Single source of truth for EQ2 rarity/tier colours
+    components/ui/        # Shared primitives: Button, Card, SectionLabel
     pages/
       HomePage.tsx       # Search + login + claim status strip
       CharacterPage.tsx  # Full character sheet with stat panel, paperdoll, tooltips
