@@ -1094,3 +1094,47 @@ async def test_purge_forbidden_for_non_admin(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1?purge=1")
     assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_boss_soft_deletes_each(app):
+    rows = [
+        {"id": 1, "guild_name": "Exordium", "source_dsn": "plugin:OTHER1", "title": "Tarinax", "hidden_at": None},
+        {"id": 2, "guild_name": "Exordium", "source_dsn": "plugin:OTHER2", "title": "Tarinax", "hidden_at": None},
+    ]
+    soft = MagicMock(return_value=True)
+    hard = MagicMock(return_value=True)
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._is_admin", return_value=True),
+        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.parses_db.delete_encounter", hard),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.delete("/api/parses/batch?ids=1,2")
+    assert r.status_code == 200 and r.json() == {"deleted": 2}
+    assert soft.call_count == 2
+    hard.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_purge_hard_deletes_each(app):
+    rows = [
+        {"id": 1, "guild_name": "Exordium", "source_dsn": "plugin:OTHER1", "title": "Tarinax", "hidden_at": None},
+        {"id": 2, "guild_name": "Exordium", "source_dsn": "plugin:OTHER2", "title": "Tarinax", "hidden_at": None},
+    ]
+    soft = MagicMock(return_value=True)
+    hard = MagicMock(return_value=True)
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._is_admin", return_value=True),
+        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.parses_db.delete_encounter", hard),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.delete("/api/parses/batch?ids=1,2&purge=1")
+    assert r.status_code == 200 and r.json() == {"deleted": 2}
+    assert hard.call_count == 2
+    soft.assert_not_called()
