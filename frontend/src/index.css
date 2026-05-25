@@ -1,41 +1,75 @@
-:root {
-  --bg: #0f1117;
-  --surface: rgba(28, 31, 46, 0.82);
-  --surface-raised: rgba(37, 40, 64, 0.88);
-  --border: rgba(46, 49, 80, 0.85);
-  --text: #e2e4f0;
-  --text-muted: #8b90ab;
+/* ─────────────────────────────────────────────────────────────────────────
+   Tailwind v4. We import the theme + utilities layers but NOT Preflight —
+   the app predates Tailwind and has its own reset + element styles below,
+   so skipping Preflight keeps the migration zero-visual-change. Utilities
+   are generated from the @theme tokens below.
+   ───────────────────────────────────────────────────────────────────────── */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 
-  /* Brand colours */
-  --gold:          #c8a96e;   /* EQ2 gold — headings, borders, active nav */
-  --gold-bright:   #e8d5a3;   /* lighter variant — hovers, active text */
-  --gold-dim:      #a07840;   /* darker variant used in gradients */
-  --gold-rgb:      200, 169, 110;  /* for rgba(var(--gold-rgb), α) */
-  --danger:        #f87171;   /* error text, destructive actions */
-  --danger-rgb:    248, 113, 113;
-  --success:       #4ade80;   /* approved / online / max-tier */
-  --discord-brand: #5865F2;   /* Discord sign-in button ONLY */
+/* Design tokens → Tailwind theme. These are the single source of truth: each
+   generates utilities (e.g. --color-gold → bg-gold/text-gold/border-gold,
+   --radius-md → rounded-md, --font-heading → font-heading) AND is emitted as
+   a CSS custom property. Spacing intentionally uses Tailwind's built-in 4px
+   scale (p-4 = 1rem), which already matched our --space-* values. */
+@theme {
+  --color-bg:             #0f1117;
+  --color-surface:        rgba(28, 31, 46, 0.82);
+  --color-surface-raised: rgba(37, 40, 64, 0.88);
+  --color-border:         rgba(46, 49, 80, 0.85);
+  --color-text:           #e2e4f0;
+  --color-text-muted:     #8b90ab;
 
-  /* Primary accent = the brand gold. Unified identity: links, focus
-     rings, active tabs, section labels and accent fills all read gold.
-     Discord blurple is deliberately confined to --discord-brand so the
-     sign-in button is the one place the app speaks "Discord" rather
-     than "Norrath". Kept as --accent so the ~46 existing references
-     pick up the new identity without per-file edits. */
-  --accent:        var(--gold);
-  --accent-hover:  var(--gold-bright);
+  --color-gold:           #c8a96e;   /* EQ2 gold — headings, borders, active nav */
+  --color-gold-bright:    #e8d5a3;   /* hovers, active text */
+  --color-gold-dim:       #a07840;   /* gradients, dim links */
+  --color-danger:         #f87171;
+  --color-success:        #4ade80;
+  --color-discord:        #5865f2;   /* Discord sign-in button ONLY */
 
-  /* Type */
-  --font-heading:  'Cinzel', serif;          /* classical display caps */
-  --font-body:     'Spectral', Georgia, serif; /* screen-optimised serif — the "lexicon/tome" voice */
+  /* Item rarity / tier ladder — one source of truth (see src/rarityColors.ts) */
+  --color-rarity-common:      #9d9d9d;  /* Common / Apprentice */
+  --color-rarity-handcrafted: #beff93;  /* Handcrafted / Uncommon / Journeyman */
+  --color-rarity-treasured:   #93d9ff;  /* Treasured / Mastercrafted / Adept */
+  --color-rarity-legendary:   #ffc993;  /* Legendary / Expert */
+  --color-rarity-fabled:      #ff939d;  /* Fabled / Master (game-accurate reddish-pink) */
+  --color-rarity-mythical:    #ffb6ff;  /* Mythical */
+  --color-rarity-ethereal:    #e8bbff;  /* Ethereal */
+  --color-rarity-celestial:   #ffe566;  /* Celestial / Grandmaster */
+  --color-rarity-ancient:     #ff6666;  /* Ancient */
 
-  /* Radius scale — collapses the ad-hoc 2–20px sprawl to three steps. */
+  --font-heading: 'Cinzel', serif;            /* classical display caps */
+  --font-body:    'Spectral', Georgia, serif; /* screen-optimised serif */
+
   --radius-sm:   4px;
   --radius-md:   8px;
   --radius-lg:   12px;
   --radius-pill: 999px;
+}
 
-  /* Spacing scale (4px base) for adoption during the component pass. */
+/* Legacy aliases. The ~810 existing `var(--name)` usages keep resolving while
+   pages are migrated to utilities (Phase C); these get retired as each page
+   is converted. The font and radius tokens already match the @theme names,
+   so they need no alias here. */
+:root {
+  --bg:            var(--color-bg);
+  --surface:       var(--color-surface);
+  --surface-raised:var(--color-surface-raised);
+  --border:        var(--color-border);
+  --text:          var(--color-text);
+  --text-muted:    var(--color-text-muted);
+  --gold:          var(--color-gold);
+  --gold-bright:   var(--color-gold-bright);
+  --gold-dim:      var(--color-gold-dim);
+  --gold-rgb:      200, 169, 110;     /* literal — used in rgba(var(--gold-rgb), α) */
+  --danger:        var(--color-danger);
+  --danger-rgb:    248, 113, 113;
+  --success:       var(--color-success);
+  --discord-brand: var(--color-discord);
+  --accent:        var(--gold);
+  --accent-hover:  var(--gold-bright);
+
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -43,188 +77,169 @@
   --space-6: 1.5rem;
   --space-8: 2rem;
 
-  /* ── Item rarity / tier colour ladder (EQ2) ──────────────────────────
-     ONE source of truth. Item quality names, recipe tiers, and the
-     in-game-style tooltips all map their names onto these tokens via
-     src/rarityColors.ts. Ordered low → high rarity. Previously this was
-     duplicated as four divergent TIER_COLOUR maps across pages. */
-  --rarity-common:       #9d9d9d;  /* Common / Apprentice */
-  --rarity-handcrafted:  #beff93;  /* Handcrafted / Uncommon / Journeyman */
-  --rarity-treasured:    #93d9ff;  /* Treasured / Mastercrafted / Adept */
-  --rarity-legendary:    #ffc993;  /* Legendary / Expert */
-  --rarity-fabled:       #ff939d;  /* Fabled / Master (game-accurate reddish-pink) */
-  --rarity-mythical:     #ffb6ff;  /* Mythical */
-  --rarity-ethereal:     #e8bbff;  /* Ethereal */
-  --rarity-celestial:    #ffe566;  /* Celestial / Grandmaster */
-  --rarity-ancient:      #ff6666;  /* Ancient */
+  --rarity-common:      var(--color-rarity-common);
+  --rarity-handcrafted: var(--color-rarity-handcrafted);
+  --rarity-treasured:   var(--color-rarity-treasured);
+  --rarity-legendary:   var(--color-rarity-legendary);
+  --rarity-fabled:      var(--color-rarity-fabled);
+  --rarity-mythical:    var(--color-rarity-mythical);
+  --rarity-ethereal:    var(--color-rarity-ethereal);
+  --rarity-celestial:   var(--color-rarity-celestial);
+  --rarity-ancient:     var(--color-rarity-ancient);
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* Base layer: reset + element defaults. In @layer base so Tailwind utilities
+   (utilities layer, declared last) override them when applied during the page
+   migration. */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-/* Background image fixed to viewport */
-html {
-  background:
-    url('./assets/web_bg.png') center center / cover no-repeat fixed;
-  background-color: #0a0c14;
-}
+  /* Background image fixed to viewport */
+  html {
+    background:
+      url('./assets/web_bg.png') center center / cover no-repeat fixed;
+    background-color: #0a0c14;
+  }
 
-body {
-  position: relative;
-  z-index: 1;
-  background: transparent;
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.55;
-  min-height: 100vh;
-}
+  body {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
 
-/* Atmospheric depth over the background image: a warm gold glow from the
-   top (as if light falls from above) and an edge vignette that pulls focus
-   to the centre. Fixed + behind content, non-interactive. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(125% 70% at 50% -10%, rgba(var(--gold-rgb), 0.07), transparent 55%),
-    radial-gradient(150% 120% at 50% 45%, transparent 50%, rgba(6, 8, 16, 0.72));
-}
+  /* Atmospheric depth over the background image: a warm gold glow from the
+     top (as if light falls from above) and an edge vignette that pulls focus
+     to the centre. Fixed + behind content, non-interactive. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(125% 70% at 50% -10%, rgba(var(--gold-rgb), 0.07), transparent 55%),
+      radial-gradient(150% 120% at 50% 45%, transparent 50%, rgba(6, 8, 16, 0.72));
+  }
 
-a {
-  color: var(--accent);
-  text-decoration: none;
-}
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-hover); }
 
-a:hover {
-  color: var(--accent-hover);
-}
+  button { cursor: pointer; font-family: inherit; font-size: inherit; }
 
-button {
-  cursor: pointer;
-  font-family: inherit;
-  font-size: inherit;
-}
-
-/* Top-ribbon nav links */
-.nav-ribbon-link:hover {
-  color: var(--gold) !important;
-  border-bottom-color: var(--gold) !important;
-}
-.nav-ribbon-link.active {
-  color: var(--gold-bright) !important;
-  border-bottom-color: var(--gold) !important;
-}
-
-input {
-  font-family: inherit;
-  font-size: inherit;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.5rem 0.75rem;
-  outline: none;
-}
-
-input:focus {
-  border-color: var(--accent);
+  input {
+    font-family: inherit;
+    font-size: inherit;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.5rem 0.75rem;
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   UI primitives. Defined as classes (not inline styles) so hover / focus /
-   disabled states work and so every page shares one source of truth for
-   buttons, cards, and section labels. React wrappers live in
-   components/ui/. Components still accept `style` for one-off layout.
+   UI primitives + shared component classes. In @layer components so page-level
+   utilities still win. The reusable Button/Card primitives are kept as
+   component classes (rather than utility soup) — the idiomatic Tailwind
+   treatment for design-system components with multiple states/variants.
+   SectionLabel was converted to inline utilities in its component as the
+   reference for the page migration.
    ───────────────────────────────────────────────────────────────────────── */
+@layer components {
+  /* Top-ribbon nav links */
+  .nav-ribbon-link:hover {
+    color: var(--gold) !important;
+    border-bottom-color: var(--gold) !important;
+  }
+  .nav-ribbon-link.active {
+    color: var(--gold-bright) !important;
+    border-bottom-color: var(--gold) !important;
+  }
 
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
-  line-height: 1.2;
-  padding: 0.45rem 1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
-  cursor: pointer;
-  white-space: nowrap;
-  text-decoration: none;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.05s ease;
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: 0.45rem 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.05s ease;
+  }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn--primary   { background: var(--gold); color: var(--bg); border-color: var(--gold-dim); }
+  .btn--primary:hover:not(:disabled)   { background: var(--gold-bright); }
+
+  .btn--secondary { background: var(--surface-raised); color: var(--text); border-color: var(--border); }
+  .btn--secondary:hover:not(:disabled) { border-color: var(--gold); color: var(--gold-bright); }
+
+  .btn--ghost     { background: transparent; color: var(--text-muted); border-color: transparent; }
+  .btn--ghost:hover:not(:disabled)     { color: var(--gold); }
+
+  .btn--danger    { background: transparent; color: var(--danger); border-color: rgba(var(--danger-rgb), 0.4); }
+  .btn--danger:hover:not(:disabled)    { background: rgba(var(--danger-rgb), 0.12); }
+
+  .btn--sm { padding: 0.25rem 0.6rem; font-size: 0.78rem; }
+
+  /* Cards — gilded panels: a faint gold-tinted edge catches the light, a soft
+     drop shadow lifts them off the textured background, and a hairline gold
+     gradient sits along the top edge like leaf on a tome cover. */
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid rgba(var(--gold-rgb), 0.16);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(var(--gold-rgb), 0.5) 50%,
+      transparent
+    );
+    pointer-events: none;
+  }
+  .card--raised { background: var(--surface-raised); }
+
+  /* Page entrance: one orchestrated fade-up per route navigation (App.tsx keys
+     the content wrapper by pathname so this replays on each page). */
+  .page-enter {
+    animation: pageReveal 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
 }
-.btn:active:not(:disabled) { transform: translateY(1px); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.btn--primary   { background: var(--gold); color: var(--bg); border-color: var(--gold-dim); }
-.btn--primary:hover:not(:disabled)   { background: var(--gold-bright); }
-
-.btn--secondary { background: var(--surface-raised); color: var(--text); border-color: var(--border); }
-.btn--secondary:hover:not(:disabled) { border-color: var(--gold); color: var(--gold-bright); }
-
-.btn--ghost     { background: transparent; color: var(--text-muted); border-color: transparent; }
-.btn--ghost:hover:not(:disabled)     { color: var(--gold); }
-
-.btn--danger    { background: transparent; color: var(--danger); border-color: rgba(var(--danger-rgb), 0.4); }
-.btn--danger:hover:not(:disabled)    { background: rgba(var(--danger-rgb), 0.12); }
-
-.btn--sm { padding: 0.25rem 0.6rem; font-size: 0.78rem; }
-
-/* Cards — gilded panels: a faint gold-tinted edge catches the light, a soft
-   drop shadow lifts them off the textured background, and a hairline gold
-   gradient sits along the top edge like leaf on a tome cover. */
-.card {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid rgba(var(--gold-rgb), 0.16);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
-}
-.card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 1px;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(var(--gold-rgb), 0.5) 50%,
-    transparent
-  );
-  pointer-events: none;
-}
-.card--raised { background: var(--surface-raised); }
-
-/* Section label — the uppercase gold eyebrow used above stat groups, tabs, etc. */
-.section-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--gold);
-  font-weight: 600;
-  margin-bottom: var(--space-1);
-}
-
-/* Page entrance: one orchestrated fade-up per route navigation (App.tsx keys
-   the content wrapper by pathname so this replays on each page). Kept to a
-   single content reveal rather than scattered per-element motion. */
+/* Keyframes must live at top level (not inside @layer). */
 @keyframes pageReveal {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
-}
-.page-enter {
-  animation: pageReveal 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @media (prefers-reduced-motion: reduce) {
   .page-enter { animation: none; }
