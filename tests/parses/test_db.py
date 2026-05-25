@@ -37,6 +37,10 @@ class TestInitDb:
         # Migration runner is also idempotent on an already-migrated DB.
         parses_db._migrate_attack_types_unique(parses_db_conn)
 
+    def test_encounters_has_hidden_at_column(self, parses_db_conn):
+        cols = [r[1] for r in parses_db_conn.execute("PRAGMA table_info(encounters)").fetchall()]
+        assert "hidden_at" in cols
+
     def test_migrates_legacy_attack_types_unique(self):
         """A DB created with the old UNIQUE(combatant_id, attack_name)
         constraint gets transparently recreated with the new tuple, and

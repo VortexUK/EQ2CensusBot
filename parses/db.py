@@ -64,7 +64,11 @@ CREATE TABLE IF NOT EXISTS encounters (
     source_dsn      TEXT    NOT NULL,
     uploaded_by     TEXT    NOT NULL DEFAULT 'local',
     guild_name      TEXT,
-    ingested_at     INTEGER NOT NULL
+    ingested_at     INTEGER NOT NULL,
+    -- Soft-delete marker (unix seconds). NULL = visible. Set when a boss-kill
+    -- parse is "deleted" so the leaderboard entry + its link survive while the
+    -- row is hidden from the /parses list. Hard purge removes the row entirely.
+    hidden_at       INTEGER
 );
 """
 
@@ -221,6 +225,8 @@ _MIGRATIONS: list[str] = [
     "ALTER TABLE combatants ADD COLUMN level INTEGER",
     "ALTER TABLE combatants ADD COLUMN guild_name TEXT",
     "ALTER TABLE combatants ADD COLUMN cls TEXT",
+    # Soft-delete marker for parses. Pre-existing rows are visible (NULL).
+    "ALTER TABLE encounters ADD COLUMN hidden_at INTEGER",
 ]
 
 
