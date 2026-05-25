@@ -28,6 +28,7 @@ from parses import db as parses_db
 from parses.models import (
     AttackType,
     Combatant,
+    CombatantSnapshot,
     DamageType,
     Encounter,
     _to_bool_tf,
@@ -130,6 +131,62 @@ async def _prewarm_guild_silently(guild_name: str) -> None:
         await _fetch_and_cache_guild(guild_name)
     except Exception as exc:
         _log.debug("Background guild prewarm failed for %s: %s", guild_name, exc)
+
+
+async def _resolve_combatant_snapshots(
+    names: list[str],
+    world: str | None = None,
+) -> dict[str, CombatantSnapshot]:
+    """Freeze each named player's identity (level / guild / class) at ingest
+    time, reusing the website's character_cache.
+
+    Per-name strategy, in order:
+      1. character_cache hit → snapshot it (zero Census traffic).
+      2. Miss → one Census call (get_character_guild_name) to find the
+         character's guild, then *await* a full roster fetch which caches
+         every guildmate. Re-check the cache for this character.
+
+    Because a raid is overwhelmingly one guild, the first miss warms the
+    whole roster, so every subsequent name is a step-1 hit — one guild
+    fetch covers the parse. Unguilded players / pugs / Census errors leave
+    that name absent from the result (combatant row stores NULLs).
+
+    Never raises — snapshot resolution is best-effort and must not block a
+    valid upload.
+    """
+    effective_world = (world or "").strip() or _WORLD
+    world_lower = effective_world.lower()
+    out: dict[str, CombatantSnapshot] = {}
+    client: CensusClient | None = None
+    try:
+        for name in names:
+            cache_key = f"{name.lower()}:{world_lower}"
+            cached, _ = character_cache.get_stale(cache_key)
+            if cached is None:
+                if client is None:
+                    client = CensusClient(service_id=_SERVICE_ID)
+                try:
+                    guild_name = await client.get_character_guild_name(name, effective_world)
+                except Exception as exc:
+                    _log.warning("Combatant guild lookup failed for %r: %s", name, exc)
+                    guild_name = None
+                if guild_name:
+                    # Awaited (not fire-and-forget) so the roster is warm for
+                    # the remaining names. The thundering-herd guard in
+                    # _fetch_and_cache_guild dedupes against the uploader's
+                    # own prewarm for the same guild.
+                    await _prewarm_guild_silently(guild_name)
+                    cached, _ = character_cache.get_stale(cache_key)
+            if cached is not None:
+                out[name] = CombatantSnapshot(
+                    level=getattr(cached, "level", None),
+                    guild_name=getattr(cached, "guild_name", None),
+                    cls=getattr(cached, "cls", None),
+                )
+    finally:
+        if client is not None:
+            await client.close()
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +318,12 @@ class CombatantSummary(BaseModel):
     id: int
     name: str
     ally: bool
+    # Identity frozen at ingest time (resolved from character_cache). NULL for
+    # pets/NPCs, unresolved players, and parses ingested before this existed —
+    # the frontend falls back to the live /api/characters/lookup for those.
+    level: int | None = None
+    guild_name: str | None = None
+    cls: str | None = None
     duration_s: int
     damage: int
     damage_perc: float
@@ -603,6 +666,9 @@ async def get_parse(
             id=c["id"],
             name=c["name"],
             ally=c["ally"],
+            level=c.get("level"),
+            guild_name=c.get("guild_name"),
+            cls=c.get("cls"),
             duration_s=c["duration_s"],
             damage=c["damage"],
             damage_perc=c["damage_perc"],
@@ -913,6 +979,7 @@ def _ingest_payload_sync(
     uploaded_by: str,
     guild_name: str | None,
     source_dsn: str,
+    snapshots: dict[str, CombatantSnapshot] | None = None,
 ) -> tuple[str, int | None, int, int, int]:
     """Write the payload into parses.db. Returns (status, encounter_id,
     n_combatants, n_damage_types, n_attack_types).
@@ -948,7 +1015,7 @@ def _ingest_payload_sync(
                 uploaded_by=uploaded_by,
                 guild_name=guild_name,
             )
-            name_to_id = parses_db.insert_combatants_bulk(conn, encounter_id, combatants)
+            name_to_id = parses_db.insert_combatants_bulk(conn, encounter_id, combatants, snapshots)
             n_dt = parses_db.insert_damage_types_bulk(conn, name_to_id, damage_types)
             n_at = parses_db.insert_attack_types_bulk(conn, name_to_id, attack_types)
             parses_db.mark_ingested(
@@ -1068,6 +1135,22 @@ async def ingest_parse(
     # enables a Varsoon-configured deployment to correctly resolve a
     # Kaladim upload, for instance.
     guild_name = await _resolve_uploader_guild_async(uploader, body.logger_server)
+
+    # Freeze each player ally's level/guild/class at ingest. Same cache-first
+    # resolution as the uploader guild lookup; the first guildmate's roster
+    # fetch warms the cache for the rest of the raid. Restricted to
+    # player-like names (single-word ally, not the 'Unknown' rollup) so we
+    # never burn Census calls on pets/NPCs that don't exist as characters.
+    player_names = [
+        name
+        for r in body.combatants
+        if _to_bool_tf(r.get("ally"))
+        and (name := str(r.get("name") or "").strip())
+        and " " not in name
+        and name != "Unknown"
+    ]
+    snapshots = await _resolve_combatant_snapshots(player_names, body.logger_server)
+
     loop = asyncio.get_event_loop()
 
     status, encounter_id, n_c, n_dt, n_at = await loop.run_in_executor(
@@ -1077,6 +1160,7 @@ async def ingest_parse(
         uploader,
         guild_name,
         f"plugin:{user['id']}",  # source_dsn marks the auth path
+        snapshots,
     )
 
     return IngestResponse(

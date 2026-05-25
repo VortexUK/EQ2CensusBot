@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -201,6 +202,7 @@ async def test_ingest_inserts_encounter(app):
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
         patch(
             "web.routes.parses._ingest_payload_sync",
             new=MagicMock(return_value=sync_result),
@@ -227,6 +229,7 @@ async def test_ingest_returns_skipped_on_duplicate(app):
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
         patch(
             "web.routes.parses._ingest_payload_sync",
             new=MagicMock(return_value=sync_result),
@@ -250,6 +253,7 @@ async def test_ingest_rejects_empty_logger_name(app):
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
@@ -302,6 +306,7 @@ async def test_bearer_token_path_resolves_to_user(app):
             new=AsyncMock(return_value=fake_lookup_row),
         ),
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
         patch(
             "web.routes.parses._ingest_payload_sync",
             new=MagicMock(return_value=sync_result),
@@ -392,6 +397,7 @@ async def test_signature_accepted_when_correct(app):
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
         patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -427,6 +433,7 @@ async def test_signature_rejected_when_body_tampered(app):
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post(
@@ -453,6 +460,7 @@ async def test_signature_rejected_when_wrong_key(app):
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post(
@@ -592,6 +600,7 @@ async def test_signature_absent_with_session_auth_is_allowed(app):
     with (
         patch("web.routes.parses.require_user_session_or_token", _fake_session_user),
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
         patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -625,3 +634,79 @@ async def test_signature_with_session_auth_is_rejected(app):
                 },
             )
     assert r.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# _resolve_combatant_snapshots — cache-first per-combatant level/guild/class
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_resolve_snapshots_cache_hit_skips_census():
+    """A character already in character_cache is snapshotted with zero Census
+    traffic — no CensusClient is even constructed."""
+    from web.routes import parses as parses_mod
+
+    cached = SimpleNamespace(level=90, guild_name="Exordium", cls="Templar")
+    fake_cache = MagicMock()
+    fake_cache.get_stale.return_value = (cached, 0)
+
+    with (
+        patch.object(parses_mod, "character_cache", fake_cache),
+        patch.object(parses_mod, "CensusClient", side_effect=AssertionError("Census must not be hit on a cache hit")),
+    ):
+        out = await parses_mod._resolve_combatant_snapshots(["Menludiir"], "Varsoon")
+
+    assert out["Menludiir"].level == 90
+    assert out["Menludiir"].guild_name == "Exordium"
+    assert out["Menludiir"].cls == "Templar"
+
+
+@pytest.mark.asyncio
+async def test_resolve_snapshots_miss_warms_roster_then_hits():
+    """On a cache miss: one Census guild lookup, an awaited roster prewarm,
+    then a re-check that now hits. This is the path that lets the first
+    raider's lookup cover the rest of the (same-guild) raid."""
+    from web.routes import parses as parses_mod
+
+    cached = SimpleNamespace(level=88, guild_name="Exordium", cls="Fury")
+    fake_cache = MagicMock()
+    # 1st check → miss; after prewarm → hit.
+    fake_cache.get_stale.side_effect = [(None, 0), (cached, 0)]
+
+    client = MagicMock()
+    client.get_character_guild_name = AsyncMock(return_value="Exordium")
+    client.close = AsyncMock()
+
+    with (
+        patch.object(parses_mod, "character_cache", fake_cache),
+        patch.object(parses_mod, "CensusClient", return_value=client),
+        patch.object(parses_mod, "_prewarm_guild_silently", new=AsyncMock()) as prewarm,
+    ):
+        out = await parses_mod._resolve_combatant_snapshots(["Sihtric"], "Varsoon")
+
+    prewarm.assert_awaited_once_with("Exordium")
+    client.get_character_guild_name.assert_awaited_once_with("Sihtric", "Varsoon")
+    assert out["Sihtric"].level == 88
+
+
+@pytest.mark.asyncio
+async def test_resolve_snapshots_unguilded_miss_is_absent():
+    """A character with no resolvable guild (pug / Census miss) is simply
+    omitted from the result — its combatant row stores NULLs."""
+    from web.routes import parses as parses_mod
+
+    fake_cache = MagicMock()
+    fake_cache.get_stale.return_value = (None, 0)  # always a miss
+
+    client = MagicMock()
+    client.get_character_guild_name = AsyncMock(return_value=None)
+    client.close = AsyncMock()
+
+    with (
+        patch.object(parses_mod, "character_cache", fake_cache),
+        patch.object(parses_mod, "CensusClient", return_value=client),
+    ):
+        out = await parses_mod._resolve_combatant_snapshots(["Randompug"], "Varsoon")
+
+    assert out == {}

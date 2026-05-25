@@ -57,6 +57,12 @@ interface CombatantSummary {
   id: number
   name: string
   ally: boolean
+  // Identity frozen at ingest time. null for pets/NPCs, unresolved players,
+  // and parses ingested before snapshots existed — we fall back to the live
+  // /api/characters/lookup for those.
+  level: number | null
+  guild_name: string | null
+  cls: string | null
   duration_s: number
   damage: number
   damage_perc: number
@@ -310,8 +316,11 @@ function CombatantRow({
 }) {
   const [open, setOpen] = useState(false)
   const player = isLikelyPlayer(c)
-  const guildName = lookupEntry?.guild_name ?? null
-  const cls = lookupEntry?.cls ?? null
+  // Prefer the parse-time snapshot stored on the row; fall back to the live
+  // lookup for parses ingested before snapshots existed.
+  const guildName = c.guild_name ?? lookupEntry?.guild_name ?? null
+  const cls = c.cls ?? lookupEntry?.cls ?? null
+  const level = c.level ?? lookupEntry?.level ?? null
   const tint = rowTintFor(cls)
 
   return (
@@ -323,7 +332,7 @@ function CombatantRow({
       >
         <div className="flex items-center gap-[0.35rem] min-w-0">
           <Caret open={open} />
-          <NameCell combatant={c} player={player} guildName={guildName} cls={cls} />
+          <NameCell combatant={c} player={player} level={level} guildName={guildName} cls={cls} />
         </div>
         <div className={CELL_RIGHT_CLS}>{fmtNum(c.damage)}</div>
         <div className={`${CELL_RIGHT_CLS} text-gold`}>{fmtNum(c.encdps)}</div>
@@ -345,10 +354,11 @@ function CombatantRow({
 }
 
 function NameCell({
-  combatant: c, player, guildName, cls,
+  combatant: c, player, level, guildName, cls,
 }: {
   combatant: CombatantSummary
   player: boolean
+  level: number | null
   guildName: string | null
   cls: string | null
 }) {
@@ -378,6 +388,9 @@ function NameCell({
       >
         {c.name}
       </Link>
+      {level != null && (
+        <span className="text-[0.75rem] text-text-muted whitespace-nowrap tabular-nums">({level})</span>
+      )}
       {guildName && (
         <Link
           to={`/guild/${encodeURIComponent(guildName)}`}

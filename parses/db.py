@@ -21,7 +21,10 @@ import sqlite3
 from datetime import UTC
 from pathlib import Path
 
-from parses.models import AttackType, Combatant, DamageType, Encounter
+from parses.models import AttackType, Combatant, CombatantSnapshot, DamageType, Encounter
+
+# Reused for combatants with no resolved identity snapshot — stores NULLs.
+_EMPTY_SNAPSHOT = CombatantSnapshot()
 
 # ---------------------------------------------------------------------------
 # Config
@@ -101,6 +104,11 @@ CREATE TABLE IF NOT EXISTS combatants (
     crit_types      TEXT,
     threat_str      TEXT,
     threat_delta    INTEGER NOT NULL DEFAULT 0,
+    -- Identity snapshot frozen at ingest (resolved via character_cache).
+    -- NULL for pets/NPCs and players we couldn't resolve at upload time.
+    level           INTEGER,
+    guild_name      TEXT,
+    cls             TEXT,
     FOREIGN KEY (encounter_id) REFERENCES encounters(id) ON DELETE CASCADE,
     UNIQUE (encounter_id, name)
 );
@@ -207,6 +215,12 @@ _MIGRATIONS: list[str] = [
     # Win/loss flag from ACT's GetEncounterSuccessLevel(). 0 for pre-existing
     # rows where the uploader didn't supply it.
     "ALTER TABLE encounters ADD COLUMN success_level INTEGER NOT NULL DEFAULT 0",
+    # Per-combatant identity snapshot frozen at ingest time (resolved from the
+    # character_cache). Pre-existing rows stay NULL — the parse page falls back
+    # to the live /api/characters/lookup for those.
+    "ALTER TABLE combatants ADD COLUMN level INTEGER",
+    "ALTER TABLE combatants ADD COLUMN guild_name TEXT",
+    "ALTER TABLE combatants ADD COLUMN cls TEXT",
 ]
 
 
@@ -327,9 +341,14 @@ def insert_combatants_bulk(
     conn: sqlite3.Connection,
     encounter_id: int,
     combatants: list[Combatant],
+    snapshots: dict[str, CombatantSnapshot] | None = None,
 ) -> dict[str, int]:
+    """Insert combatant rows. ``snapshots`` (name → CombatantSnapshot) carries
+    the level/guild/class frozen at ingest time; missing names store NULLs."""
+    snap_by_lower = {k.lower(): v for k, v in (snapshots or {}).items()}
     name_to_id: dict[str, int] = {}
     for c in combatants:
+        snap = snap_by_lower.get(c.name.lower(), _EMPTY_SNAPSHOT)
         cur = conn.execute(
             """
             INSERT INTO combatants (
@@ -342,7 +361,8 @@ def insert_combatants_bulk(
                 hits, crit_hits, blocked, misses, swings,
                 heals_taken, damage_taken, deaths,
                 to_hit, crit_dam_perc, crit_heal_perc, crit_types,
-                threat_str, threat_delta
+                threat_str, threat_delta,
+                level, guild_name, cls
             ) VALUES (
                 ?, ?, ?,
                 ?, ?, ?,
@@ -353,7 +373,8 @@ def insert_combatants_bulk(
                 ?, ?, ?, ?, ?,
                 ?, ?, ?,
                 ?, ?, ?, ?,
-                ?, ?
+                ?, ?,
+                ?, ?, ?
             )
             """,
             (
@@ -390,6 +411,9 @@ def insert_combatants_bulk(
                 c.crit_types,
                 c.threat_str,
                 c.threat_delta,
+                snap.level,
+                snap.guild_name,
+                snap.cls,
             ),
         )
         name_to_id[c.name] = int(cur.lastrowid or 0)

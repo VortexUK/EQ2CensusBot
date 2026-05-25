@@ -164,6 +164,19 @@ class Combatant:
 
 
 @dataclass(frozen=True)
+class CombatantSnapshot:
+    """A character's identity FROZEN at parse-ingest time. Resolved from the
+    website's character_cache (Census-backed) when an upload arrives, then
+    written onto the combatant row so it never changes if the player later
+    levels up or switches guild. All fields are None for non-players (pets,
+    NPCs) and for players we couldn't resolve at ingest time."""
+
+    level: int | None = None
+    guild_name: str | None = None
+    cls: str | None = None
+
+
+@dataclass(frozen=True)
 class DamageType:
     encid: str
     combatant_name: str  # ACT column is `combatant`

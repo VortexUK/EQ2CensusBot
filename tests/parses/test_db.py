@@ -234,6 +234,36 @@ class TestInsertHelpers:
         ).fetchone()
         assert row[0] is None
 
+    def test_insert_combatants_writes_snapshot(self, parses_db_conn):
+        from parses.models import CombatantSnapshot
+
+        enc = _sample_encounter()
+        eid = parses_db.insert_encounter(parses_db_conn, enc, source_dsn="eq2act", ingested_at=1700000000)
+        combatants = [
+            _sample_combatant("Menludiir", ally=True, damage=500000),
+            _sample_combatant("a krait patriarch", ally=False, damage=5716),
+        ]
+        snapshots = {"Menludiir": CombatantSnapshot(level=90, guild_name="Exordium", cls="Templar")}
+        parses_db.insert_combatants_bulk(parses_db_conn, eid, combatants, snapshots)
+
+        rows = {r["name"]: r for r in parses_db.get_combatants_for_encounter(parses_db_conn, eid)}
+        assert (rows["Menludiir"]["level"], rows["Menludiir"]["guild_name"], rows["Menludiir"]["cls"]) == (
+            90,
+            "Exordium",
+            "Templar",
+        )
+        # Unresolved combatant (no snapshot) stores NULLs.
+        assert rows["a krait patriarch"]["level"] is None
+        assert rows["a krait patriarch"]["guild_name"] is None
+
+    def test_insert_combatants_snapshot_optional(self, parses_db_conn):
+        # Back-compat: omitting snapshots leaves the columns NULL.
+        enc = _sample_encounter()
+        eid = parses_db.insert_encounter(parses_db_conn, enc, source_dsn="eq2act", ingested_at=1700000000)
+        parses_db.insert_combatants_bulk(parses_db_conn, eid, [_sample_combatant("Solo", ally=True, damage=1)])
+        row = parses_db.get_combatants_for_encounter(parses_db_conn, eid)[0]
+        assert row["level"] is None and row["cls"] is None
+
     def test_full_ingest_chain(self, parses_db_conn):
         enc = _sample_encounter()
         eid = parses_db.insert_encounter(
