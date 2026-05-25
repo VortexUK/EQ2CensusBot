@@ -177,6 +177,7 @@ _FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 _ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
 _AA_ASSETS_DIR = Path(__file__).resolve().parent.parent / "data" / "AAs"
 _SPELL_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "spells" / "icons"
+_CLASS_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "classes" / "icons"
 
 _SESSION_SECRET = os.getenv("SESSION_SECRET", "")
 if not _SESSION_SECRET:
@@ -324,6 +325,10 @@ def create_app(session_secret: str | None = None) -> FastAPI:
     # Spell icons
     if _SPELL_ICONS_DIR.exists():
         app.mount("/spell-icons", StaticFiles(directory=_SPELL_ICONS_DIR), name="spell-icons")
+
+    # Class icons
+    if _CLASS_ICONS_DIR.exists():
+        app.mount("/class-icons", StaticFiles(directory=_CLASS_ICONS_DIR), name="class-icons")
 
     # Serve the React build in production
     if _FRONTEND_DIST.exists():
