@@ -166,7 +166,8 @@ class ParseEncounterSummary(BaseModel):
     """One FIGHT. Top-level fields are from the canonical upload (the
     raider whose ACT captured the longest duration); `uploads` holds every
     raider's view of the same fight. Mirror grouping is by
-    (guild_name, title, started_at within ±MIRROR_WINDOW_S)."""
+    (guild_name, title, started_at within ±MIRROR_WINDOW_S) and only ever
+    merges uploads from *distinct* uploaders."""
 
     id: int
     act_encid: str
@@ -374,9 +375,11 @@ def _list_encounters_sync(
 
 
 def _group_into_fights(encounters: list[dict]) -> list[dict]:
-    """Greedy mirror-grouping. Two uploads are the same fight when their
-    guild + title match and any pair of start times falls within
-    ``MIRROR_WINDOW_S``. The canonical upload (carried as the top-level
+    """Greedy mirror-grouping. Two uploads are the same fight when they come
+    from *different* uploaders, their guild + title match, and any pair of
+    start times falls within ``MIRROR_WINDOW_S``. Same-uploader uploads are
+    never merged — one raider can't mirror their own fight, so two of their
+    uploads are two real fights. The canonical upload (carried as the top-level
     fields on the returned dict) is the longest-duration upload in the
     group — the raider whose ACT captured the most fight time.
 
@@ -402,6 +405,13 @@ def _group_into_fights(encounters: list[dict]) -> list[dict]:
             if g["title"] != e["title"]:
                 continue
             if g.get("guild_name") != e.get("guild_name"):
+                continue
+            # A mirror is the SAME fight captured by a DIFFERENT raider. Two
+            # uploads from the same uploader are always distinct fights (a
+            # same-encid re-upload is deduped at ingest), so never merge
+            # them — even if title/guild/start-time all line up (e.g. the
+            # same boss pulled twice within the window).
+            if any((u.get("uploaded_by") or "local") == (e.get("uploaded_by") or "local") for u in g["uploads"]):
                 continue
             # Compare against every member so a late straggler still attaches
             # even if the first uploader's start time drifted out of window.

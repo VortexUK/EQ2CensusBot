@@ -282,6 +282,26 @@ async def test_list_parses_groups_mirror_uploads(app):
 
 
 @pytest.mark.asyncio
+async def test_list_parses_does_not_group_same_uploader(app):
+    """One uploader's two uploads of the same title within the mirror window
+    are distinct fights (e.g. the same boss pulled twice in quick succession)
+    — only different uploaders mirror a single fight."""
+    base_started = 1716561116
+    first = dict(_FAKE_ENCOUNTER, id=1, uploaded_by="Menludiir", started_at=base_started)
+    second = dict(_FAKE_ENCOUNTER, id=2, uploaded_by="Menludiir", started_at=base_started + 5)
+    fake_list_sync = MagicMock(return_value=[first, second])
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/parses")
+    data = r.json()
+    assert data["total"] == 2, "same uploader's two uploads must not collapse"
+    assert {f["id"] for f in data["results"]} == {1, 2}
+
+
+@pytest.mark.asyncio
 async def test_list_parses_does_not_group_different_titles(app):
     """Same guild + close start times but different titles → different
     fights (distinct mirror groups)."""
