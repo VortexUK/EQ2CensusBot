@@ -38,7 +38,6 @@ interface AdminParse {
   guild_name:    string | null
   uploaded_by:   string | null
   started_at:    number
-  duration_s:    number
   success_level: number   // 1=win, 2=loss, 3=mixed, 0=unknown
   player_count:  number
   hidden:        boolean
@@ -98,6 +97,7 @@ function Badge({ label, style }: { label: string; style?: React.CSSProperties })
 
 // ── Shared table classes ──────────────────────────────────────────────────────
 
+const SECTION_TITLE_CLS = 'text-[0.8rem] uppercase tracking-[0.07em] text-text-muted mb-3 font-semibold'
 const TABLE_CLS = 'w-full border-collapse text-[0.875rem]'
 const TH_CLS = 'text-left px-3 py-[0.45rem] text-text-muted text-[0.72rem] font-semibold uppercase tracking-[0.05em] border-b border-border whitespace-nowrap'
 const TD_CLS = 'px-3 py-2 border-b border-white/5 align-middle'
@@ -484,12 +484,12 @@ function ParsesAdminTable() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function load() {
+  async function load(signal?: AbortSignal) {
     setLoading(true)
     setError(null)
     try {
       const url = `/api/admin/parses?search=${encodeURIComponent(query)}`
-      const res = await fetch(url, { credentials: 'include' })
+      const res = await fetch(url, { credentials: 'include', signal })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         setError(`Error: ${body.detail ?? 'Failed to load parses'}`)
@@ -498,7 +498,8 @@ function ParsesAdminTable() {
       const data: AdminParse[] = await res.json()
       setRows(data)
       setSelected(new Set())
-    } catch {
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
       setError('Network error — could not load parses.')
     } finally {
       setLoading(false)
@@ -506,7 +507,9 @@ function ParsesAdminTable() {
   }
 
   useEffect(() => {
-    load()
+    const controller = new AbortController()
+    load(controller.signal)
+    return () => controller.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
@@ -550,12 +553,16 @@ function ParsesAdminTable() {
     setBusy(true)
     setError(null)
     try {
-      const url = `/api/parses/batch?ids=${ids.join(',')}&purge=1`
-      const res = await fetch(url, { method: 'DELETE', credentials: 'include' })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError(`Error: ${body.detail ?? 'Bulk purge failed'}`)
-        return
+      const CHUNK = 64
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK)
+        const url = `/api/parses/batch?ids=${chunk.join(',')}&purge=1`
+        const res = await fetch(url, { method: 'DELETE', credentials: 'include' })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          setError(`Error: ${body.detail ?? 'Bulk purge failed'}`)
+          return
+        }
       }
       setSelected(new Set())
       await load()
@@ -570,6 +577,10 @@ function ParsesAdminTable() {
 
   return (
     <div>
+      <p className={SECTION_TITLE_CLS}>
+        Parses ({rows.length})
+      </p>
+
       {/* Search + bulk action bar */}
       <form
         onSubmit={e => { e.preventDefault(); setQuery(search) }}
@@ -727,7 +738,6 @@ export default function AdminPage() {
   }
 
   const SECTION_CLS = 'mb-10'
-  const SECTION_TITLE_CLS = 'text-[0.8rem] uppercase tracking-[0.07em] text-text-muted mb-3 font-semibold'
 
   return (
     <main className="max-w-[1100px] mx-auto my-8 px-4">
@@ -760,9 +770,6 @@ export default function AdminPage() {
 
           {/* Parses (sanitize) */}
           <div className={SECTION_CLS}>
-            <p className={SECTION_TITLE_CLS}>
-              Parses
-            </p>
             <ParsesAdminTable />
           </div>
         </>
