@@ -49,9 +49,9 @@ export default function ItemPage() {
 
   if (loading) return <LoadingShell />
   if (error || !item) return (
-    <main style={{ maxWidth: 700, margin: '0 auto', padding: '2rem 1.5rem' }}>
-      <Link to="/items" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textDecoration: 'none' }}>← Item Search</Link>
-      <p style={{ color: 'var(--danger)', marginTop: '1rem' }}>{error ?? 'Item not found.'}</p>
+    <main className="max-w-[700px] mx-auto py-8 px-6">
+      <Link to="/items" className="text-text-muted text-[0.9rem] no-underline">← Item Search</Link>
+      <p className="text-danger mt-4">{error ?? 'Item not found.'}</p>
     </main>
   )
 
@@ -59,48 +59,52 @@ export default function ItemPage() {
   const iconUrl = item.icon_id ? `/icons/${item.icon_id}.png` : null
 
   return (
-    <main style={{ maxWidth: 700, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
-      <Link to="/items" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textDecoration: 'none' }}>
+    <main className="max-w-[700px] mx-auto pt-8 px-6 pb-16">
+      <Link to="/items" className="text-text-muted text-[0.9rem] no-underline">
         ← Item Search
       </Link>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', margin: '1rem 0 1.5rem' }}>
+      <div className="flex items-start gap-4 mt-4 mb-6">
         {iconUrl && (
           <img src={iconUrl} alt="" width={48} height={48}
-            style={{ borderRadius: 4, border: '1px solid var(--border)', flexShrink: 0 }} />
+            className="rounded-sm border border-border shrink-0" />
         )}
         <div>
-          <h1 style={{
-            fontFamily: "var(--font-heading)", fontSize: '1.6rem', fontWeight: 700,
-            margin: '0 0 0.2rem', color: colour,
-            textShadow: colour !== 'var(--text)' ? `0 0 12px ${colour}55` : 'none',
-          }}>
+          <h1
+            className="font-heading text-[1.6rem] font-bold mt-0 mx-0 mb-[0.2rem]"
+            style={{
+              color: colour,
+              textShadow: colour !== 'var(--text)' ? `0 0 12px ${colour}55` : 'none',
+            }}
+          >
             {item.name}
           </h1>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ color: colour, fontSize: '0.85rem', fontWeight: 600 }}>
+          <div className="flex gap-2 flex-wrap items-center">
+            <span className="text-[0.85rem] font-semibold" style={{ color: colour }}>
               {item.quality}
             </span>
             {item.slot_type && (
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>· {item.slot_type}</span>
+              <span className="text-text-muted text-[0.82rem]">· {item.slot_type}</span>
             )}
             {item.required_level && (
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>· Level {item.required_level}</span>
+              <span className="text-text-muted text-[0.82rem]">· Level {item.required_level}</span>
             )}
             {item.classes_label && (
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>· {item.classes_label}</span>
+              <span className="text-text-muted text-[0.82rem]">· {item.classes_label}</span>
             )}
           </div>
           {item.flags.length > 0 && (
-            <div style={{ marginTop: '0.3rem', display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+            <div className="mt-[0.3rem] flex gap-[0.3rem] flex-wrap">
               {item.flags.map(f => (
-                <span key={f} style={{
-                  fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em',
-                  padding: '0.1rem 0.4rem', borderRadius: 3,
-                  background: 'rgba(200,169,110,0.15)', color: 'var(--gold)',
-                  border: '1px solid rgba(200,169,110,0.3)',
-                }}>
+                <span
+                  key={f}
+                  className="text-[0.68rem] font-bold tracking-[0.05em] py-[0.1rem] px-[0.4rem] rounded-[3px] text-gold"
+                  style={{
+                    background: 'rgba(200,169,110,0.15)',
+                    border: '1px solid rgba(200,169,110,0.3)',
+                  }}
+                >
                   {f}
                 </span>
               ))}
@@ -113,7 +117,7 @@ export default function ItemPage() {
 
         {/* Description */}
         {item.description && (
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', marginBottom: '1rem' }}>
+          <p className="text-text-muted text-[0.85rem] italic mb-4">
             {item.description}
           </p>
         )}
@@ -130,17 +134,16 @@ export default function ItemPage() {
 
         {/* Stats */}
         {item.stats.length > 0 && (
-          <div style={{ margin: '1rem 0' }}>
+          <div className="my-4">
             {item.stats.map(s => (
-              <div key={s.display_name} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-                padding: '0.12rem 0', borderBottom: '1px solid var(--border)',
-                fontSize: '0.88rem',
-              }}>
+              <div
+                key={s.display_name}
+                className="flex justify-between items-baseline py-[0.12rem] border-b border-border text-[0.88rem]"
+              >
                 <span style={{ color: s.stat_group === 'primary' ? '#22ff22' : '#00e5ff' }}>
                   {s.display_name}
                 </span>
-                <span style={{ color: s.stat_group === 'primary' ? '#22ff22' : '#00e5ff', fontWeight: 600 }}>
+                <span className="font-semibold" style={{ color: s.stat_group === 'primary' ? '#22ff22' : '#00e5ff' }}>
                   {s.value > 0 ? '+' : ''}{s.value}
                 </span>
               </div>
@@ -150,23 +153,26 @@ export default function ItemPage() {
 
         {/* Effects */}
         {item.effects.map((eff, i) => (
-          <div key={i} style={{ margin: '0.75rem 0', fontSize: '0.85rem' }}>
+          <div key={i} className="my-3 text-[0.85rem]">
             {eff.name && (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '0.2rem', fontStyle: 'italic' }}>
+              <div className="text-text-muted text-[0.75rem] mb-[0.2rem] italic">
                 {eff.name}
               </div>
             )}
             {eff.trigger && (
-              <div style={{ color: 'var(--text)', fontWeight: 600, marginBottom: '0.15rem' }}>
+              <div className="text-text font-semibold mb-[0.15rem]">
                 {eff.trigger}
               </div>
             )}
             {eff.lines.map((ln, j) => (
-              <div key={j} style={{
-                paddingLeft: `${ln.indentation * 1.1}rem`,
-                color: ln.indentation === 0 ? 'var(--text)' : 'var(--text-muted)',
-                fontSize: '0.83rem', lineHeight: 1.5,
-              }}>
+              <div
+                key={j}
+                className="text-[0.83rem] leading-normal"
+                style={{
+                  paddingLeft: `${ln.indentation * 1.1}rem`,
+                  color: ln.indentation === 0 ? 'var(--text)' : 'var(--text-muted)',
+                }}
+              >
                 {ln.indentation > 0 ? '• ' : ''}{ln.text}
               </div>
             ))}
@@ -175,9 +181,9 @@ export default function ItemPage() {
 
         {/* Adornment slots */}
         {item.adornment_slots.length > 0 && (
-          <div style={{ marginTop: '0.75rem' }}>
+          <div className="mt-3">
             {item.adornment_slots.map(s => (
-              <div key={s} style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              <div key={s} className="text-[0.82rem] text-text-muted">
                 {s}
               </div>
             ))}
@@ -186,7 +192,7 @@ export default function ItemPage() {
 
       </Card>
 
-      <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+      <div className="mt-2 text-[0.75rem] text-text-muted text-right">
         ID: {item.id}
       </div>
     </main>
@@ -195,21 +201,18 @@ export default function ItemPage() {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-      padding: '0.12rem 0', borderBottom: '1px solid var(--border)', fontSize: '0.85rem',
-    }}>
-      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <span style={{ color: 'var(--text)' }}>{value}</span>
+    <div className="flex justify-between items-baseline py-[0.12rem] border-b border-border text-[0.85rem]">
+      <span className="text-text-muted">{label}</span>
+      <span className="text-text">{value}</span>
     </div>
   )
 }
 
 function LoadingShell() {
   return (
-    <main style={{ maxWidth: 700, margin: '0 auto', padding: '2rem 1.5rem' }}>
-      <Link to="/items" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textDecoration: 'none' }}>← Item Search</Link>
-      <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>Loading…</p>
+    <main className="max-w-[700px] mx-auto py-8 px-6">
+      <Link to="/items" className="text-text-muted text-[0.9rem] no-underline">← Item Search</Link>
+      <p className="text-text-muted mt-4">Loading…</p>
     </main>
   )
 }

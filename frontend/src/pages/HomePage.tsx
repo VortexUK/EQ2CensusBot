@@ -35,19 +35,14 @@ function CharacterCard({ claim, detail, isPrimary }: {
       tabIndex={0}
       onClick={() => navigate(`/character/${encodeURIComponent(claim.character_name)}`)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') navigate(`/character/${encodeURIComponent(claim.character_name)}`) }}
-      style={{ textDecoration: 'none', display: 'block', cursor: 'pointer' }}
+      className="no-underline block cursor-pointer"
     >
-      <div style={{
-        position: 'relative',
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderLeft: `3px solid ${accentColour}`,
-        borderRadius: 8,
-        padding: '1.1rem 1.2rem 1.1rem 1.15rem',
-        cursor: 'pointer',
-        transition: 'border-color 0.15s, background 0.15s',
-        overflow: 'hidden',
-      }}
+      <div
+        className="relative border border-border rounded-md pt-[1.1rem] pr-[1.2rem] pb-[1.1rem] pl-[1.15rem] cursor-pointer overflow-hidden [transition:border-color_0.15s,background_0.15s]"
+        style={{
+          background: 'var(--surface)',
+          borderLeft: `3px solid ${accentColour}`,
+        }}
         onMouseEnter={e => {
           ;(e.currentTarget as HTMLDivElement).style.borderColor = accentColour
           ;(e.currentTarget as HTMLDivElement).style.background = 'var(--surface-raised)'
@@ -61,91 +56,79 @@ function CharacterCard({ claim, detail, isPrimary }: {
 
         {/* Primary star */}
         {isPrimary && (
-          <span style={{
-            position: 'absolute', top: '0.7rem', right: '0.8rem',
-            fontSize: '0.7rem', color: 'var(--gold)', opacity: 0.8,
-            letterSpacing: '0.04em',
-          }}>
+          <span className="absolute top-[0.7rem] right-[0.8rem] text-[0.7rem] text-gold opacity-80 tracking-[0.04em]">
             ★ Primary
           </span>
         )}
 
         {/* Character name */}
-        <div style={{
-          fontFamily: "var(--font-heading)",
-          fontSize: '1.25rem',
-          fontWeight: 700,
-          letterSpacing: '0.04em',
-          lineHeight: 1.15,
-          marginBottom: '0.2rem',
-          color: isPrimary ? '#ffc993' : '#93d9ff',
-          textShadow: isPrimary
-            ? '0 0 10px rgba(213,105,0,0.4)'
-            : '0 0 8px rgba(0,120,180,0.35)',
-        }}>
+        <div
+          className="font-heading text-[1.25rem] font-bold tracking-[0.04em] leading-[1.15] mb-[0.2rem]"
+          style={{
+            color: isPrimary ? '#ffc993' : '#93d9ff',
+            textShadow: isPrimary
+              ? '0 0 10px rgba(213,105,0,0.4)'
+              : '0 0 8px rgba(0,120,180,0.35)',
+          }}
+        >
           {claim.character_name}
         </div>
 
         {/* Guild */}
-        <div style={{
-          fontSize: '0.8rem',
-          color: 'var(--text-muted)',
-          fontFamily: "var(--font-heading)",
-          letterSpacing: '0.03em',
-          marginBottom: '0.8rem',
-          minHeight: '1em',
-        }}>
+        <div className="text-[0.8rem] text-text-muted font-heading tracking-[0.03em] mb-[0.8rem] min-h-[1em]">
           {claim.guild_name
             ? <span onClick={e => { e.preventDefault(); e.stopPropagation() }}>
                 <Link
                   to={`/guild/${encodeURIComponent(claim.guild_name)}`}
-                  style={{ color: 'rgba(200,169,110,0.7)', textDecoration: 'none' }}
+                  className="text-gold/70 no-underline"
                   onClick={e => e.stopPropagation()}
                 >
                   &lt;{claim.guild_name}&gt;
                 </Link>
               </span>
-            : <span style={{ opacity: 0.4 }}>&lt;No guild&gt;</span>
+            : <span className="opacity-40">&lt;No guild&gt;</span>
           }
         </div>
 
         {/* Stats row */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.28rem' }}>
+        <div className="flex flex-col gap-[0.28rem]">
           {/* Adventure class */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+          <div className="flex items-baseline gap-2">
             {detail ? (
-              <span style={{
-                fontSize: '0.92rem', fontWeight: 600,
-                color: detail.cls ? (CLASS_COLOURS[detail.cls] ?? 'var(--text)') : 'var(--text-muted)',
-              }}>
+              <span
+                className="text-[0.92rem] font-semibold"
+                style={{
+                  color: detail.cls ? (CLASS_COLOURS[detail.cls] ?? 'var(--text)') : 'var(--text-muted)',
+                }}
+              >
                 {detail.cls ?? '—'}
                 {detail.level != null && (
-                  <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.82rem', marginLeft: '0.35rem' }}>
+                  <span className="font-normal text-text-muted text-[0.82rem] ml-[0.35rem]">
                     ({detail.level})
                   </span>
                 )}
               </span>
             ) : (
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', opacity: 0.5 }}>loading…</span>
+              <span className="text-[0.82rem] text-text-muted opacity-50">loading…</span>
             )}
           </div>
 
           {/* Tradeskill class */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+          <div className="flex items-baseline gap-2">
             {detail ? (
-              <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+              <span className="text-[0.88rem] text-text-muted font-medium">
                 {detail.ts_class
                   ? `${detail.ts_class.charAt(0).toUpperCase()}${detail.ts_class.slice(1)}`
                   : '—'
                 }
                 {detail.ts_level != null && (
-                  <span style={{ fontWeight: 400, fontSize: '0.82rem', marginLeft: '0.35rem' }}>
+                  <span className="font-normal text-[0.82rem] ml-[0.35rem]">
                     ({detail.ts_level})
                   </span>
                 )}
               </span>
             ) : (
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', opacity: 0.5 }}>loading…</span>
+              <span className="text-[0.82rem] text-text-muted opacity-50">loading…</span>
             )}
           </div>
         </div>
@@ -169,62 +152,27 @@ function GuildsSidebar({ approved }: { approved: Claim[] }) {
   if (guilds.length === 0) return null
 
   return (
-    <aside style={{
-      width: 210,
-      flexShrink: 0,
-    }}>
-      <h2 style={{
-        fontFamily: "var(--font-heading)",
-        fontSize: '0.88rem',
-        fontWeight: 600,
-        letterSpacing: '0.1em',
-        textTransform: 'uppercase',
-        color: 'rgba(200,169,110,0.7)',
-        margin: '0 0 0.85rem',
-      }}>
+    <aside className="w-[210px] shrink-0">
+      <h2 className="font-heading text-[0.88rem] font-semibold tracking-[0.1em] uppercase text-gold/70 mt-0 mx-0 mb-[0.85rem]">
         My Guilds
       </h2>
 
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
+      <Card className="p-0 overflow-hidden">
         {guilds.map(([name, count], i) => (
           <Link
             key={name}
             to={`/guild/${encodeURIComponent(name)}`}
+            className="flex items-center justify-between py-[0.6rem] px-[0.85rem] no-underline [transition:background_0.1s]"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '0.6rem 0.85rem',
               borderBottom: i < guilds.length - 1 ? '1px solid var(--border)' : 'none',
-              textDecoration: 'none',
-              transition: 'background 0.1s',
             }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-raised)')}
             onMouseLeave={e => (e.currentTarget.style.background = '')}
           >
-            <span style={{
-              fontFamily: "var(--font-heading)",
-              fontSize: '0.82rem',
-              color: 'var(--gold)',
-              fontWeight: 500,
-              letterSpacing: '0.02em',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              flex: 1,
-              marginRight: '0.5rem',
-            }}>
+            <span className="font-heading text-[0.82rem] text-gold font-medium tracking-[0.02em] overflow-hidden text-ellipsis whitespace-nowrap flex-1 mr-2">
               {name}
             </span>
-            <span style={{
-              fontSize: '0.72rem',
-              color: 'var(--text-muted)',
-              background: 'var(--surface-raised)',
-              border: '1px solid var(--border)',
-              borderRadius: 10,
-              padding: '0.05rem 0.45rem',
-              flexShrink: 0,
-            }}>
+            <span className="text-[0.72rem] text-text-muted bg-surface-raised border border-border rounded-[10px] py-[0.05rem] px-[0.45rem] shrink-0">
               {count}
             </span>
           </Link>
@@ -271,7 +219,7 @@ function MyCharacters() {
   }, [claimState.status === 'ready' ? claimState.data.approved.map(c => c.character_name).join(',') : ''])
 
   if (claimState.status === 'loading') return (
-    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', marginTop: '2rem' }}>
+    <p className="text-text-muted text-[0.9rem] text-center mt-8">
       Loading…
     </p>
   )
@@ -282,22 +230,16 @@ function MyCharacters() {
 
   if (approved.length === 0 && !pending) {
     return (
-      <div style={{ textAlign: 'center', marginTop: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+      <div className="text-center mt-12 flex flex-col items-center gap-3">
+        <p className="text-text-muted text-[0.95rem]">
           You haven't claimed a character yet.
         </p>
         <Link
           to="/claim"
+          className="inline-block py-2 px-[1.4rem] text-gold rounded-md no-underline text-[0.9rem] font-semibold"
           style={{
-            display: 'inline-block',
-            padding: '0.5rem 1.4rem',
             background: 'rgba(var(--accent-rgb,99,210,130),0.12)',
-            color: 'var(--accent)',
             border: '1px solid rgba(var(--accent-rgb,99,210,130),0.35)',
-            borderRadius: 6,
-            textDecoration: 'none',
-            fontSize: '0.9rem',
-            fontWeight: 600,
           }}
         >
           Claim a character
@@ -307,35 +249,23 @@ function MyCharacters() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+    <div className="flex gap-8 items-start">
 
       {/* Left: character cards */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex-1 min-w-0">
 
         {/* Section header */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '1.1rem' }}>
-          <h2 style={{
-            fontFamily: "var(--font-heading)",
-            fontSize: '0.88rem',
-            fontWeight: 600,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'rgba(200,169,110,0.7)',
-            margin: 0,
-          }}>
+        <div className="flex items-baseline gap-3 mb-[1.1rem]">
+          <h2 className="font-heading text-[0.88rem] font-semibold tracking-[0.1em] uppercase text-gold/70 m-0">
             My Characters
           </h2>
-          <Link to="/claim" style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textDecoration: 'none' }}>
+          <Link to="/claim" className="text-text-muted text-[0.78rem] no-underline">
             manage
           </Link>
         </div>
 
         {/* Cards grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-          gap: '0.85rem',
-        }}>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-[0.85rem]">
           {approved.map(c => (
             <CharacterCard
               key={c.id}
@@ -348,14 +278,10 @@ function MyCharacters() {
 
         {/* Pending claim notice */}
         {pending && (
-          <div style={{
-            marginTop: '1rem',
-            display: 'flex', alignItems: 'center', gap: '0.5rem',
-            fontSize: '0.83rem', color: 'var(--text-muted)',
-          }}>
+          <div className="mt-4 flex items-center gap-2 text-[0.83rem] text-text-muted">
             <span>⏳</span>
-            <span style={{ fontStyle: 'italic' }}>{pending.character_name}</span>
-            <Link to="/claim" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>· pending approval</Link>
+            <span className="italic">{pending.character_name}</span>
+            <Link to="/claim" className="text-text-muted no-underline">· pending approval</Link>
           </div>
         )}
       </div>
@@ -373,21 +299,18 @@ export default function HomePage() {
   const auth = useAuth()
 
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '0.5rem 1.5rem 4rem' }}>
+    <main className="max-w-[1100px] mx-auto pt-2 px-6 pb-16">
 
       {/* Hero */}
-      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+      <div className="text-center mb-8">
 
         {/* Logo image — dark edges blend into page background */}
-        <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
+        <div className="relative inline-block leading-none">
           <img
             src={logo}
             alt="EQ2 Lexicon"
+            className="w-full max-w-[520px] block mx-auto"
             style={{
-              width: '100%',
-              maxWidth: 520,
-              display: 'block',
-              margin: '0 auto',
               // Mask the bottom edge so it dissolves into the page rather than cutting hard
               WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
               maskImage:        'linear-gradient(to bottom, black 60%, transparent 100%)',
@@ -395,10 +318,8 @@ export default function HomePage() {
           />
         </div>
 
-        <p style={{
-          color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6,
-          marginTop: '-0.5rem',  // pull up slightly under the faded bottom of the image
-        }}>
+        {/* pull up slightly under the faded bottom of the image */}
+        <p className="text-text-muted text-[0.95rem] leading-[1.6] -mt-2">
           EverQuest 2 companion — track characters, spells,
           gear and guild rosters across the realm of Norrath.
         </p>

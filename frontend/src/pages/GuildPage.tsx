@@ -117,32 +117,20 @@ function adornCellStyle(filled: number, total: number): React.CSSProperties {
 
 // ── Shared table styles ───────────────────────────────────────────────────────
 
-const TH: React.CSSProperties = {
-  padding: '0.5rem 0.6rem',
-  fontSize: '0.72rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  color: 'var(--text-muted)',
-  fontWeight: 600,
-  whiteSpace: 'nowrap',
-  textAlign: 'left',
-}
-
-const TD: React.CSSProperties = {
-  padding: '0.42rem 0.6rem',
-  fontSize: '0.88rem',
-  whiteSpace: 'nowrap',
-}
+// Invariant table-cell utilities. Dynamic bits (active colour, alignment,
+// per-cell colour/background) stay inline at each call site.
+const TH_CLS = 'px-[0.6rem] py-2 text-[0.72rem] uppercase tracking-[0.05em] font-semibold whitespace-nowrap'
+const TD_CLS = 'px-[0.6rem] py-[0.42rem] text-[0.88rem] whitespace-nowrap'
 
 // ── Guild info stat chip ──────────────────────────────────────────────────────
 
 function InfoStat({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-      <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
+    <div className="flex flex-col gap-[0.1rem]">
+      <span className="text-[0.68rem] uppercase tracking-[0.07em] text-text-muted">
         {label}
       </span>
-      <span style={{ fontSize: '0.92rem', color: 'var(--text)', fontWeight: 500 }}>
+      <span className="text-[0.92rem] text-text font-medium">
         {value}
       </span>
     </div>
@@ -155,14 +143,11 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
   return (
     <button
       onClick={onClick}
+      className="px-4 py-[0.4rem] rounded-[6px] border cursor-pointer text-[0.88rem]"
       style={{
-        padding: '0.4rem 1rem',
-        borderRadius: 6,
-        border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+        borderColor: active ? 'var(--accent)' : 'var(--border)',
         background: active ? 'rgba(var(--accent-rgb,99,210,130),0.12)' : 'var(--surface)',
         color: active ? 'var(--accent)' : 'var(--text-muted)',
-        cursor: 'pointer',
-        fontSize: '0.88rem',
         fontWeight: active ? 600 : 400,
       }}
     >
@@ -245,26 +230,23 @@ function RosterTable({ members, filter, hiddenRanks, myChars }: { members: Guild
   }, [members, filter, hiddenRanks, sortKey, sortDir])
 
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <table className="w-full border-collapse">
       <thead>
-        <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
+        <tr className="border-b-2 border-border bg-surface-raised">
           {ROSTER_COLS.map(col => {
             const active = sortKey === col.key
             return (
               <th
                 key={col.key}
                 onClick={() => handleSort(col.key)}
+                className={`${TH_CLS} cursor-pointer select-none`}
                 style={{
-                  ...TH,
                   textAlign: col.align ?? 'left',
-                  cursor: 'pointer',
-                  userSelect: 'none',
                   color: active ? 'var(--accent)' : 'var(--text-muted)',
-                  whiteSpace: 'nowrap',
                 }}
               >
                 {col.label}
-                <span style={{ marginLeft: '0.3rem', opacity: active ? 1 : 0.3, fontSize: '0.65rem' }}>
+                <span className="ml-[0.3rem] text-[0.65rem]" style={{ opacity: active ? 1 : 0.3 }}>
                   {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
                 </span>
               </th>
@@ -274,7 +256,7 @@ function RosterTable({ members, filter, hiddenRanks, myChars }: { members: Guild
       </thead>
       <tbody>
         {sorted.length === 0 ? (
-          <tr><td colSpan={8} style={{ ...TD, textAlign: 'center', color: 'var(--text-muted)' }}>No members match your filter.</td></tr>
+          <tr><td colSpan={8} className={`${TD_CLS} text-center text-text-muted`}>No members match your filter.</td></tr>
         ) : sorted.map(m => {
           const clsLabel = m.cls
             ? m.level != null ? `${m.cls} (${m.level})` : m.cls
@@ -285,23 +267,23 @@ function RosterTable({ members, filter, hiddenRanks, myChars }: { members: Guild
               : m.ts_class
             : '—'
           return (
-            <tr key={m.name} style={{ borderBottom: '1px solid var(--border)', background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
-              <td style={TD}>
+            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
+              <td className={TD_CLS}>
                 <Link to={`/character/${encodeURIComponent(m.name)}`}
-                  style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
+                  className="text-gold no-underline font-medium">
                   {m.name}
                 </Link>
                 {myChars.has(m.name.toLowerCase()) && (
-                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: 'var(--gold)', verticalAlign: 'middle' }}>★</span>
+                  <span className="ml-[0.4rem] text-[0.65rem] text-gold align-middle">★</span>
                 )}
               </td>
-              <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
-              <td style={{ ...TD, color: m.cls ? (CLASS_COLOURS[m.cls] ?? 'var(--text)') : 'var(--text-muted)' }}>{clsLabel}</td>
-              <td style={{ ...TD, textAlign: 'right', color: 'var(--text-muted)' }}>{m.aa_level ?? '—'}</td>
-              <td style={{ ...TD, color: 'var(--text-muted)' }}>{tsLabel}</td>
-              <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.82rem' }}>{m.deity ?? '—'}</td>
-              <td style={{ ...TD, textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{fmtGuildStatus(m.guild_status)}</td>
-              <td style={{ ...TD, textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.82rem' }}>{fmtPlayTime(m.played_time)}</td>
+              <td className={`${TD_CLS} text-text-muted text-[0.85rem]`}>{m.rank ?? '—'}</td>
+              <td className={TD_CLS} style={{ color: m.cls ? (CLASS_COLOURS[m.cls] ?? 'var(--text)') : 'var(--text-muted)' }}>{clsLabel}</td>
+              <td className={`${TD_CLS} text-right text-text-muted`}>{m.aa_level ?? '—'}</td>
+              <td className={`${TD_CLS} text-text-muted`}>{tsLabel}</td>
+              <td className={`${TD_CLS} text-text-muted text-[0.82rem]`}>{m.deity ?? '—'}</td>
+              <td className={`${TD_CLS} text-right text-text-muted text-[0.82rem]`}>{fmtGuildStatus(m.guild_status)}</td>
+              <td className={`${TD_CLS} text-right text-text-muted text-[0.82rem]`}>{fmtPlayTime(m.played_time)}</td>
             </tr>
           )
         })}
@@ -366,17 +348,14 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
     return (
       <th
         onClick={() => handleSort(colKey)}
+        className={`${TH_CLS} cursor-pointer select-none`}
         style={{
-          ...TH,
           textAlign: align ?? 'left',
-          cursor: 'pointer',
-          userSelect: 'none',
           color: active ? 'var(--accent)' : (color ?? 'var(--text-muted)'),
-          whiteSpace: 'nowrap',
         }}
       >
         {label}
-        <span style={{ marginLeft: '0.3rem', opacity: active ? 1 : 0.3, fontSize: '0.65rem' }}>
+        <span className="ml-[0.3rem] text-[0.65rem]" style={{ opacity: active ? 1 : 0.3 }}>
           {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
         </span>
       </th>
@@ -397,9 +376,9 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
 
   return (
     <>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table className="w-full border-collapse">
         <thead>
-          <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
+          <tr className="border-b-2 border-border bg-surface-raised">
             <SortTh label="Name"  colKey="name" />
             <SortTh label="Rank"  colKey="rank" />
             {data.tiers.map(t => (
@@ -410,17 +389,17 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
         </thead>
         <tbody>
           {sorted.map(m => (
-            <tr key={m.name} style={{ borderBottom: '1px solid var(--border)', background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
-              <td style={TD}>
+            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
+              <td className={TD_CLS}>
                 <Link to={`/character/${encodeURIComponent(m.name)}`}
-                  style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
+                  className="text-gold no-underline font-medium">
                   {m.name}
                 </Link>
                 {myChars.has(m.name.toLowerCase()) && (
-                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: 'var(--gold)', verticalAlign: 'middle' }}>★</span>
+                  <span className="ml-[0.4rem] text-[0.65rem] text-gold align-middle">★</span>
                 )}
               </td>
-              <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
+              <td className={`${TD_CLS} text-text-muted text-[0.85rem]`}>{m.rank ?? '—'}</td>
               {data.tiers.map(t => {
                 const count = m.tiers[t] ?? 0
                 const tc = TIER_COLOURS[t]
@@ -430,8 +409,8 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
                     key={t}
                     onMouseEnter={count > 0 ? e => showTooltip(e, t, names) : undefined}
                     onMouseLeave={count > 0 ? () => setTooltip(null) : undefined}
+                    className={`${TD_CLS} text-right`}
                     style={{
-                      ...TD, textAlign: 'right',
                       color: count > 0 ? (tc?.text ?? 'var(--text)') : 'var(--text-muted)',
                       background: count > 0 ? (tc?.bg ?? 'transparent') : 'transparent',
                       fontWeight: count > 0 ? 500 : 400,
@@ -442,7 +421,7 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
                   </td>
                 )
               })}
-              <td style={{ ...TD, textAlign: 'right', fontWeight: 600, color: 'var(--text)' }}>
+              <td className={`${TD_CLS} text-right font-semibold text-text`}>
                 {m.total}
               </td>
             </tr>
@@ -453,33 +432,23 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
       {/* Spell name tooltip — fixed so it escapes the scrollable table container */}
       {tooltip && (
         <div
+          className="fixed -translate-x-1/2 -translate-y-full rounded-[6px] px-[0.8rem] py-2 z-[9999] pointer-events-none max-w-[280px]"
           style={{
-            position: 'fixed',
             left: tooltip.x,
             top: tooltip.y,
-            transform: 'translate(-50%, -100%)',
             background: '#1a1d26',
             border: `1px solid ${TIER_COLOURS[tooltip.tier]?.text ?? 'var(--border)'}`,
-            borderRadius: 6,
-            padding: '0.5rem 0.8rem',
-            zIndex: 9999,
-            pointerEvents: 'none',
-            maxWidth: 280,
             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
           }}
         >
-          <div style={{
-            fontSize: '0.68rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            color: TIER_COLOURS[tooltip.tier]?.text ?? 'var(--text-muted)',
-            fontWeight: 700,
-            marginBottom: '0.35rem',
-          }}>
+          <div
+            className="text-[0.68rem] uppercase tracking-[0.06em] font-bold mb-[0.35rem]"
+            style={{ color: TIER_COLOURS[tooltip.tier]?.text ?? 'var(--text-muted)' }}
+          >
             {tooltip.tier} · {tooltip.names.length}
           </div>
           {tooltip.names.map((name, i) => (
-            <div key={i} style={{ fontSize: '0.83rem', color: 'var(--text)', lineHeight: 1.65 }}>
+            <div key={i} className="text-[0.83rem] text-text leading-[1.65]">
               {name}
             </div>
           ))}
@@ -567,17 +536,14 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
     return (
       <th
         onClick={() => handleSort(colKey)}
+        className={`${TH_CLS} cursor-pointer select-none`}
         style={{
-          ...TH,
           textAlign: align ?? 'left',
-          cursor: 'pointer',
-          userSelect: 'none',
           color: active ? 'var(--accent)' : 'var(--text-muted)',
-          whiteSpace: 'nowrap',
         }}
       >
         {label}
-        <span style={{ marginLeft: '0.3rem', opacity: active ? 1 : 0.3, fontSize: '0.65rem' }}>
+        <span className="ml-[0.3rem] text-[0.65rem]" style={{ opacity: active ? 1 : 0.3 }}>
           {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
         </span>
       </th>
@@ -597,9 +563,9 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
 
   return (
     <>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table className="w-full border-collapse">
         <thead>
-          <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
+          <tr className="border-b-2 border-border bg-surface-raised">
             <SortTh label="Name" colKey="name" />
             <SortTh label="Rank" colKey="rank" />
             {activeColors.map(c => (
@@ -609,30 +575,30 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
         </thead>
         <tbody>
           {sorted.map(m => (
-            <tr key={m.name} style={{ borderBottom: '1px solid var(--border)', background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
-              <td style={TD}>
+            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
+              <td className={TD_CLS}>
                 <Link to={`/character/${encodeURIComponent(m.name)}`}
-                  style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
+                  className="text-gold no-underline font-medium">
                   {m.name}
                 </Link>
                 {myChars.has(m.name.toLowerCase()) && (
-                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: 'var(--gold)', verticalAlign: 'middle' }}>★</span>
+                  <span className="ml-[0.4rem] text-[0.65rem] text-gold align-middle">★</span>
                 )}
               </td>
-              <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.85rem' }}>{m.rank ?? '—'}</td>
+              <td className={`${TD_CLS} text-text-muted text-[0.85rem]`}>{m.rank ?? '—'}</td>
               {activeColors.map(c => {
                 const stats = m.adorns[c]
                 const missingSlots = m.missing?.[c] ?? []
                 if (!stats) return (
-                  <td key={c} style={{ ...TD, textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
+                  <td key={c} className={`${TD_CLS} text-right text-text-muted`}>—</td>
                 )
                 return (
                   <td
                     key={c}
                     onMouseEnter={missingSlots.length > 0 ? e => showTooltip(e, c, missingSlots) : undefined}
                     onMouseLeave={missingSlots.length > 0 ? () => setTooltip(null) : undefined}
+                    className={`${TD_CLS} text-right font-medium`}
                     style={{
-                      ...TD, textAlign: 'right', fontWeight: 500,
                       cursor: missingSlots.length > 0 ? 'default' : undefined,
                       ...adornCellStyle(stats.filled, stats.total),
                     }}
@@ -649,33 +615,23 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
       {/* Missing adorn tooltip — fixed so it escapes the scrollable container */}
       {tooltip && (
         <div
+          className="fixed -translate-x-1/2 -translate-y-full rounded-[6px] px-[0.8rem] py-2 z-[9999] pointer-events-none max-w-[220px]"
           style={{
-            position: 'fixed',
             left: tooltip.x,
             top: tooltip.y,
-            transform: 'translate(-50%, -100%)',
             background: '#1a1d26',
             border: `1px solid ${ADORN_COLOURS[tooltip.colour] ?? 'var(--border)'}`,
-            borderRadius: 6,
-            padding: '0.5rem 0.8rem',
-            zIndex: 9999,
-            pointerEvents: 'none',
-            maxWidth: 220,
             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
           }}
         >
-          <div style={{
-            fontSize: '0.68rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            color: ADORN_COLOURS[tooltip.colour] ?? 'var(--text-muted)',
-            fontWeight: 700,
-            marginBottom: '0.35rem',
-          }}>
+          <div
+            className="text-[0.68rem] uppercase tracking-[0.06em] font-bold mb-[0.35rem]"
+            style={{ color: ADORN_COLOURS[tooltip.colour] ?? 'var(--text-muted)' }}
+          >
             Missing {tooltip.colour}
           </div>
           {tooltip.slots.map((s, i) => (
-            <div key={i} style={{ fontSize: '0.83rem', color: 'var(--text)', lineHeight: 1.65 }}>
+            <div key={i} className="text-[0.83rem] text-text leading-[1.65]">
               {s}
             </div>
           ))}
@@ -741,20 +697,20 @@ function ClaimRequestsTab({
     } finally { setBusy(null) }
   }
 
-  if (loading) return <p style={{ color: 'var(--text-muted)', padding: '1rem' }}>Loading claim requests…</p>
-  if (error)   return <p style={{ color: 'var(--danger)', padding: '1rem' }}>{error}</p>
+  if (loading) return <p className="text-text-muted p-4">Loading claim requests…</p>
+  if (error)   return <p className="text-danger p-4">{error}</p>
   if (!claims) return null
 
   if (claims.length === 0) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+      <div className="p-8 text-center text-text-muted">
         No pending claim requests for this guild.
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '0.75rem 1rem' }}>
+    <div className="px-4 py-3">
       {claims.map(c => {
         const isOwn    = c.discord_id === currentDiscordId
         const isBusy   = busy === c.id
@@ -763,46 +719,40 @@ function ClaimRequestsTab({
         const ageStr = age < 1 ? 'just now' : age < 24 ? `${age}h ago` : `${Math.floor(age / 24)}d ago`
 
         return (
-          <div key={c.id} style={{
-            display: 'flex', alignItems: 'flex-start', gap: '0.85rem',
-            padding: '0.85rem 0',
-            borderBottom: '1px solid var(--border)',
-          }}>
+          <div key={c.id} className="flex items-start gap-[0.85rem] py-[0.85rem] border-b border-border">
             {/* Discord avatar */}
             <img
               src={discordAvatarUrl(c.discord_id, c.avatar)}
               alt=""
-              style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, marginTop: 2 }}
+              className="w-[38px] h-[38px] rounded-full shrink-0 mt-0.5"
             />
 
             {/* Info */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text)' }}>{c.discord_name}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>is claiming</span>
-                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{c.character_name}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="font-semibold text-text">{c.discord_name}</span>
+                <span className="text-text-muted text-[0.8rem]">is claiming</span>
+                <span className="text-gold font-semibold">{c.character_name}</span>
                 {isOwn && (
-                  <span style={{
-                    fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem',
-                    borderRadius: 4, background: 'rgba(200,169,110,0.15)',
-                    color: 'var(--gold)', border: '1px solid rgba(200,169,110,0.3)',
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
-                  }}>Your claim</span>
+                  <span
+                    className="text-[0.68rem] font-bold px-[0.4rem] py-[0.1rem] rounded-sm text-gold uppercase tracking-[0.05em]"
+                    style={{ background: 'rgba(200,169,110,0.15)', border: '1px solid rgba(200,169,110,0.3)' }}
+                  >Your claim</span>
                 )}
               </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+              <div className="text-[0.78rem] text-text-muted mt-[0.15rem]">
                 Submitted {ageStr}
               </div>
 
               {/* Reject note input */}
               {rejecting && (
-                <div style={{ marginTop: '0.6rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <div className="mt-[0.6rem] flex gap-[0.4rem] flex-wrap">
                   <input
                     type="text"
                     placeholder="Reason (optional)…"
                     value={rejectNote}
                     onChange={e => setRejectNote(e.target.value)}
-                    style={{ flex: 1, minWidth: 160, fontSize: '0.85rem' }}
+                    className="flex-1 min-w-[160px] text-[0.85rem]"
                     autoFocus
                   />
                   <Button
@@ -826,14 +776,14 @@ function ClaimRequestsTab({
 
             {/* Action buttons — hidden for own claims and while reject form is open */}
             {!isOwn && !rejecting && (
-              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+              <div className="flex gap-[0.4rem] shrink-0">
                 <button
                   onClick={() => handleApprove(c.id)}
                   disabled={isBusy}
+                  className="px-[0.85rem] py-[0.3rem] rounded-[5px] cursor-pointer text-[0.85rem] font-semibold"
                   style={{
-                    padding: '0.3rem 0.85rem', borderRadius: 5, cursor: 'pointer',
                     background: 'rgba(34,197,94,0.15)', color: '#22c55e',
-                    border: '1px solid rgba(34,197,94,0.35)', fontSize: '0.85rem', fontWeight: 600,
+                    border: '1px solid rgba(34,197,94,0.35)',
                   }}
                 >
                   {isBusy ? '…' : 'Approve'}
@@ -940,52 +890,46 @@ function ItemWatchTab({ guildName }: { guildName: string }) {
     }
   }
 
-  if (loading) return <p style={{ color: 'var(--text-muted)', padding: '1rem' }}>Loading item watches…</p>
-  if (error)   return <p style={{ color: 'var(--danger)', padding: '1rem' }}>{error}</p>
+  if (loading) return <p className="text-text-muted p-4">Loading item watches…</p>
+  if (error)   return <p className="text-danger p-4">{error}</p>
 
   return (
-    <div style={{ padding: '0.85rem 1rem' }}>
+    <div className="px-4 py-[0.85rem]">
 
       {/* Add form */}
-      <div style={{
-        display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start',
-        marginBottom: '1.1rem',
-        paddingBottom: '1rem',
-        borderBottom: '1px solid var(--border)',
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Character</label>
+      <div className="flex gap-2 flex-wrap items-start mb-[1.1rem] pb-4 border-b border-border">
+        <div className="flex flex-col gap-[0.2rem]">
+          <label className="text-[0.7rem] text-text-muted uppercase tracking-[0.06em]">Character</label>
           <input
             type="text"
             placeholder="e.g. Sihtric"
             value={charInput}
             onChange={e => setCharInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            style={{ width: 160, fontSize: '0.88rem' }}
+            className="w-[160px] text-[0.88rem]"
           />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Item name</label>
+        <div className="flex flex-col gap-[0.2rem]">
+          <label className="text-[0.7rem] text-text-muted uppercase tracking-[0.06em]">Item name</label>
           <input
             type="text"
             placeholder="e.g. Faded Black Hood"
             value={itemInput}
             onChange={e => setItemInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            style={{ width: 240, fontSize: '0.88rem' }}
+            className="w-[240px] text-[0.88rem]"
           />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          <label style={{ fontSize: '0.7rem', color: 'transparent', userSelect: 'none' }}>_</label>
+        <div className="flex flex-col gap-[0.2rem]">
+          <label className="text-[0.7rem] text-transparent select-none">_</label>
           <button
             onClick={handleAdd}
             disabled={adding || !charInput.trim() || !itemInput.trim()}
+            className="px-4 py-[0.42rem] rounded-[6px] cursor-pointer text-[0.88rem] font-semibold"
             style={{
-              padding: '0.42rem 1rem', borderRadius: 6, cursor: 'pointer',
               background: 'rgba(var(--accent-rgb,99,210,130),0.15)',
               color: 'var(--accent)',
               border: '1px solid rgba(var(--accent-rgb,99,210,130),0.35)',
-              fontSize: '0.88rem', fontWeight: 600,
               opacity: adding || !charInput.trim() || !itemInput.trim() ? 0.5 : 1,
             }}
           >
@@ -993,7 +937,7 @@ function ItemWatchTab({ guildName }: { guildName: string }) {
           </button>
         </div>
         {addError && (
-          <div style={{ width: '100%', color: 'var(--danger)', fontSize: '0.83rem', marginTop: '0.2rem' }}>
+          <div className="w-full text-danger text-[0.83rem] mt-[0.2rem]">
             {addError}
           </div>
         )}
@@ -1001,34 +945,34 @@ function ItemWatchTab({ guildName }: { guildName: string }) {
 
       {/* Watch list */}
       {watches && watches.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1.5rem 0' }}>
+        <div className="text-center text-text-muted py-6">
           No items being watched for this guild yet.
         </div>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="w-full border-collapse">
           <thead>
-            <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised)' }}>
-              <th style={TH}>Item</th>
-              <th style={TH}>Character</th>
-              <th style={TH}>Added by</th>
-              <th style={TH}>Added</th>
-              <th style={TH}>Status</th>
-              <th style={{ ...TH, width: 48 }}></th>
+            <tr className="border-b-2 border-border bg-surface-raised">
+              <th className={`${TH_CLS} text-text-muted text-left`}>Item</th>
+              <th className={`${TH_CLS} text-text-muted text-left`}>Character</th>
+              <th className={`${TH_CLS} text-text-muted text-left`}>Added by</th>
+              <th className={`${TH_CLS} text-text-muted text-left`}>Added</th>
+              <th className={`${TH_CLS} text-text-muted text-left`}>Status</th>
+              <th className={`${TH_CLS} text-text-muted text-left w-12`}></th>
             </tr>
           </thead>
           <tbody>
             {(watches ?? []).map(w => {
               const { icon, label, colour } = watchStatus(w)
               return (
-                <tr key={w.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ ...TD, fontWeight: 500, color: 'var(--text)' }}>{w.item_name}</td>
-                  <td style={{ ...TD, color: 'var(--accent)' }}>{w.character_name}</td>
-                  <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.82rem' }}>{w.added_by_name}</td>
-                  <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.82rem' }}>{relativeTime(w.added_at)}</td>
-                  <td style={{ ...TD, color: colour, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                <tr key={w.id} className="border-b border-border">
+                  <td className={`${TD_CLS} font-medium text-text`}>{w.item_name}</td>
+                  <td className={`${TD_CLS} text-gold`}>{w.character_name}</td>
+                  <td className={`${TD_CLS} text-text-muted text-[0.82rem]`}>{w.added_by_name}</td>
+                  <td className={`${TD_CLS} text-text-muted text-[0.82rem]`}>{relativeTime(w.added_at)}</td>
+                  <td className={`${TD_CLS} text-[0.85rem] whitespace-nowrap`} style={{ color: colour }}>
                     {icon} {label}
                   </td>
-                  <td style={{ ...TD, textAlign: 'right', padding: '0.3rem 0.5rem' }}>
+                  <td className={`${TD_CLS} text-right px-2 py-[0.3rem]`}>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1183,38 +1127,31 @@ export default function GuildPage() {
     : null
 
   return (
-    <main style={{ maxWidth: 1000, margin: '3rem auto', padding: '0 1rem' }}>
+    <main className="max-w-[1000px] mx-auto my-12 px-4">
       <Breadcrumb items={[{ label: 'Guilds', to: '/guilds' }, { label: guildName ?? '…' }]} />
 
       {/* Header */}
-      <div style={{ margin: '1rem 0 1.5rem' }}>
-        <h1 style={{
-          fontFamily: "var(--font-heading)",
-          fontSize: '2.2rem',
-          fontWeight: 700,
-          letterSpacing: '0.06em',
-          lineHeight: 1.1,
-          marginBottom: '0.25rem',
-          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          display: 'inline-block',
-        }}>
+      <div className="mt-4 mb-6">
+        <h1
+          className="font-heading text-[2.2rem] font-bold tracking-[0.06em] leading-[1.1] mb-1 inline-block"
+          style={{
+            background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
           {guildDisplayName}
         </h1>
         {guildWorld && (
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '1rem' }}>
+          <div className="text-text-muted text-[0.88rem] mb-4">
             {guildWorld}{memberCount != null ? ` · ${memberCount} members` : ''}
           </div>
         )}
 
         {/* Guild info panel */}
         {info && (
-          <Card style={{
-            display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem',
-            padding: '0.85rem 1.1rem',
-          }}>
+          <Card className="flex flex-wrap gap-x-6 gap-y-2 px-[1.1rem] py-[0.85rem]">
             {info.level    != null && <InfoStat label="Guild Level"  value={String(info.level)} />}
             {info.members  != null && <InfoStat label="Characters"   value={String(info.members)} />}
             {info.accounts != null && <InfoStat label="Accounts"     value={String(info.accounts)} />}
@@ -1225,9 +1162,9 @@ export default function GuildPage() {
               <InfoStat label="Founded" value={new Date(info.dateformed * 1000).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })} />
             )}
             {info.description && (
-              <div style={{ width: '100%', paddingTop: '0.4rem', borderTop: '1px solid var(--border)', marginTop: '0.2rem' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description</span>
-                <p style={{ fontSize: '0.88rem', color: 'var(--text)', marginTop: '0.2rem', lineHeight: 1.5 }}>{info.description}</p>
+              <div className="w-full pt-[0.4rem] border-t border-border mt-[0.2rem]">
+                <span className="text-[0.75rem] text-text-muted uppercase tracking-[0.06em]">Description</span>
+                <p className="text-[0.88rem] text-text mt-[0.2rem] leading-normal">{info.description}</p>
               </div>
             )}
           </Card>
@@ -1235,7 +1172,7 @@ export default function GuildPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+      <div className="flex gap-[0.4rem] mb-4 flex-wrap">
         <TabBtn label="Roster"       active={tab === 'roster'} onClick={() => switchTab('roster')} />
         <TabBtn label="Spell Check"  active={tab === 'spells'} onClick={() => switchTab('spells')} />
         <TabBtn label="Adorn Check"  active={tab === 'adorns'} onClick={() => switchTab('adorns')} />
@@ -1249,17 +1186,17 @@ export default function GuildPage() {
 
       {/* Filters — hidden on claims and watch tabs */}
       {tab !== 'claims' && tab !== 'watch' && !isLoading && !error && (
-        <div style={{ marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+        <div className="mb-3 flex flex-col gap-[0.55rem]">
           <input
             type="text"
             placeholder="Filter by name, class or rank…"
             value={filter}
             onChange={e => setFilter(e.target.value)}
-            style={{ maxWidth: 300, boxSizing: 'border-box' }}
+            className="max-w-[300px] box-border"
           />
           {ranksOrdered.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: '0.2rem' }}>
+            <div className="flex items-center gap-[0.4rem] flex-wrap">
+              <span className="text-[0.72rem] text-text-muted uppercase tracking-[0.06em] mr-[0.2rem]">
                 Ranks
               </span>
               {ranksOrdered.map(rank => {
@@ -1268,17 +1205,13 @@ export default function GuildPage() {
                   <button
                     key={rank}
                     onClick={() => toggleRank(rank)}
+                    className="px-[0.65rem] py-[0.2rem] rounded-[20px] border text-[0.78rem] cursor-pointer transition-all duration-150"
                     style={{
-                      padding: '0.2rem 0.65rem',
-                      borderRadius: 20,
-                      border: `1px solid ${hidden ? 'var(--border)' : 'rgba(200,169,110,0.45)'}`,
+                      borderColor: hidden ? 'var(--border)' : 'rgba(200,169,110,0.45)',
                       background: hidden ? 'transparent' : 'rgba(200,169,110,0.1)',
                       color: hidden ? 'var(--text-muted)' : 'rgba(232,213,163,0.9)',
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
                       textDecoration: hidden ? 'line-through' : 'none',
                       opacity: hidden ? 0.5 : 1,
-                      transition: 'all 0.15s',
                     }}
                   >
                     {rank}
@@ -1301,7 +1234,7 @@ export default function GuildPage() {
 
       {/* Loading */}
       {isLoading && (
-        <div style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+        <div className="text-text-muted mt-2">
           <p>
             {tab === 'spells'
               ? 'Loading spell data for all members… this takes a minute for large guilds.'
@@ -1312,12 +1245,12 @@ export default function GuildPage() {
 
       {/* Error */}
       {!isLoading && error && (
-        <p style={{ color: 'var(--danger)' }}>{error}</p>
+        <p className="text-danger">{error}</p>
       )}
 
       {/* Tables */}
       {tab !== 'claims' && tab !== 'watch' && !isLoading && !error && (
-        <Card style={{ padding: 0, overflowX: 'auto' }}>
+        <Card className="p-0 overflow-x-auto">
           {tab === 'roster' && roster && (
             <RosterTable members={roster.members} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
@@ -1332,14 +1265,14 @@ export default function GuildPage() {
 
       {/* Claim requests — officers only, self-contained loading */}
       {tab === 'claims' && isOfficer && guildName && (
-        <Card style={{ padding: 0 }}>
+        <Card className="p-0">
           <ClaimRequestsTab guildName={guildName} currentDiscordId={currentDiscordId} />
         </Card>
       )}
 
       {/* Item watch — officers only, self-contained loading */}
       {tab === 'watch' && isOfficer && guildName && (
-        <Card style={{ padding: 0 }}>
+        <Card className="p-0">
           <ItemWatchTab guildName={guildName} />
         </Card>
       )}

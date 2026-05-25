@@ -10,17 +10,8 @@ import { Card } from '../components/ui'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
-const CTRL: React.CSSProperties = {
-  padding:      '0.52rem 0.75rem',
-  borderRadius: 6,
-  border:       '1px solid var(--border)',
-  background:   'var(--surface-raised)',
-  color:        'var(--text)',
-  fontSize:     '1rem',
-  lineHeight:   '1.4',
-  colorScheme:  'dark',
-  flex:         1,
-}
+const CTRL_CLASS =
+  'py-[0.52rem] px-3 rounded-[6px] border border-border bg-surface-raised text-text text-base leading-[1.4] [color-scheme:dark] flex-1'
 
 // ── Generic live-search shell ─────────────────────────────────────────────────
 
@@ -105,48 +96,48 @@ function NameSearchPage({ config }: { config: SearchConfig }) {
   }, [query, config.apiUrl])
 
   return (
-    <main style={{ maxWidth: 640, margin: '4rem auto', padding: '0 1.5rem' }}>
+    <main className="max-w-[640px] my-16 mx-auto px-6">
       {/* Header */}
-      <div style={{ margin: '1.25rem 0 1.75rem' }}>
-        <h1 style={{
-          fontFamily: "var(--font-heading)",
-          fontSize: '1.9rem', fontWeight: 700, letterSpacing: '0.06em',
-          margin: '0 0 0.3rem',
-          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text', display: 'inline-block',
-        }}>
+      <div className="mt-5 mb-7">
+        <h1
+          className="font-heading text-[1.9rem] font-bold tracking-[0.06em] mt-0 mx-0 mb-[0.3rem] inline-block"
+          style={{
+            background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
           {config.title}
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>
+        <p className="text-text-muted text-[0.9rem] leading-relaxed m-0">
           {config.subtitle}
         </p>
       </div>
 
       {/* Input */}
-      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginBottom: '0.4rem' }}>
+      <div className="flex gap-[0.6rem] items-center mb-[0.4rem]">
         <input
           type="text"
           placeholder={config.placeholder}
           value={query}
           onChange={e => setQuery(e.target.value)}
           autoFocus
-          style={CTRL}
+          className={CTRL_CLASS}
         />
         {loading && (
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+          <span className="text-text-muted text-[0.85rem] whitespace-nowrap">
             Searching…
           </span>
         )}
       </div>
 
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', margin: '0 0 1.25rem' }}>
+      <p className="text-text-muted text-[0.78rem] mt-0 mx-0 mb-5">
         {config.sourceNote}
       </p>
 
       {/* Results */}
       {searched && !loading && results.length === 0 && (
-        <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>
+        <p className="text-text-muted italic text-[0.9rem]">
           No results for "{query.trim()}".
         </p>
       )}
@@ -159,32 +150,22 @@ function NameSearchPage({ config }: { config: SearchConfig }) {
               <Link
                 key={r.name}
                 to={`${config.linkPrefix}${encodeURIComponent(r.name)}`}
+                className="flex items-center gap-[0.6rem] py-[0.6rem] px-4 no-underline transition-colors"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.6rem',
-                  padding: '0.6rem 1rem',
                   borderBottom: i < results.length - 1 ? '1px solid var(--border)' : 'none',
-                  textDecoration: 'none',
-                  transition: 'background 0.1s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-raised)')}
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
               >
-                <span style={{ color: config.linkColor, fontWeight: 500, fontSize: '0.95rem' }}>
+                <span className="font-medium text-[0.95rem]" style={{ color: config.linkColor }}>
                   {r.name}
                 </span>
                 {sub && (
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 400 }}>
+                  <span className="text-text-muted text-[0.8rem] font-normal">
                     {sub}
                   </span>
                 )}
-                <span style={{
-                  marginLeft: 'auto',
-                  fontSize: '0.75rem',
-                  color: 'var(--text-muted)',
-                  fontWeight: 400,
-                }}>
+                <span className="ml-auto text-[0.75rem] text-text-muted font-normal">
                   →
                 </span>
               </Link>
@@ -194,7 +175,7 @@ function NameSearchPage({ config }: { config: SearchConfig }) {
       )}
 
       {!searched && query.trim().length > 0 && query.trim().length < 2 && (
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+        <p className="text-text-muted text-[0.85rem]">
           Type at least 2 characters to search.
         </p>
       )}

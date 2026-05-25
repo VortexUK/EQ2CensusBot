@@ -6,10 +6,8 @@ import { Button, Card } from '../components/ui'
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const cardStyle: React.CSSProperties = {
-  padding: '1.25rem 1.5rem',
-  marginTop: '1rem',
-}
+// Shared Card layout: matches `padding: 1.25rem 1.5rem; margin-top: 1rem`.
+const CARD_CLS = 'px-6 py-5 mt-4'
 
 // The Discord sign-in button keeps its bespoke brand styling.
 function discordBtn(): React.CSSProperties {
@@ -64,22 +62,22 @@ function ClaimForm({ onSubmitted, label = 'Request claim' }: {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: '0.75rem' }}>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+    <form onSubmit={handleSubmit} className="mt-3">
+      <div className="flex gap-2">
         <input
           type="text"
           placeholder="Character name…"
           value={name}
           onChange={e => setName(e.target.value)}
           disabled={busy}
-          style={{ flex: 1 }}
+          className="flex-1"
         />
         <Button type="submit" variant="primary" disabled={busy || !name.trim()}>
           {busy ? 'Checking…' : label}
         </Button>
       </div>
       {error && (
-        <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>{error}</p>
+        <p className="text-danger text-[0.85rem] mt-[0.4rem]">{error}</p>
       )}
     </form>
   )
@@ -115,20 +113,16 @@ function ApprovedRow({ claim, onUpdate }: { claim: Claim; onUpdate: () => void }
   const isPrimary = claim.is_primary === 1
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '0.6rem',
-      padding: '0.55rem 0', borderBottom: '1px solid var(--border)',
-    }}>
+    <div className="flex items-center gap-[0.6rem] py-[0.55rem] border-b border-border">
       {/* Primary / Alt badge */}
-      <span style={{
-        fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em',
-        padding: '0.15rem 0.45rem', borderRadius: 4,
-        background: isPrimary ? 'rgba(99,210,130,0.18)' : 'var(--surface-raised)',
-        color: isPrimary ? '#4ade80' : 'var(--text-muted)',
-        border: `1px solid ${isPrimary ? 'rgba(99,210,130,0.35)' : 'var(--border)'}`,
-        flexShrink: 0,
-        textTransform: 'uppercase',
-      }}>
+      <span
+        className="text-[0.68rem] font-bold tracking-[0.05em] py-[0.15rem] px-[0.45rem] rounded-sm border shrink-0 uppercase"
+        style={{
+          background: isPrimary ? 'rgba(99,210,130,0.18)' : 'var(--surface-raised)',
+          color: isPrimary ? '#4ade80' : 'var(--text-muted)',
+          borderColor: isPrimary ? 'rgba(99,210,130,0.35)' : 'var(--border)',
+        }}
+      >
         {isPrimary ? 'Primary' : 'Alt'}
       </span>
 
@@ -136,13 +130,13 @@ function ApprovedRow({ claim, onUpdate }: { claim: Claim; onUpdate: () => void }
       <Button
         variant="ghost"
         onClick={() => navigate(`/character/${encodeURIComponent(claim.character_name)}`)}
-        style={{ padding: 0, color: 'var(--accent)', fontWeight: 600, fontSize: '0.95rem' }}
+        className="p-0 text-gold font-semibold text-[0.95rem]"
       >
         {claim.character_name}
       </Button>
 
       {/* Actions */}
-      <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+      <div className="ml-auto flex gap-[0.4rem] items-center">
         {!isPrimary && (
           <Button
             variant="secondary"
@@ -190,47 +184,40 @@ export default function ClaimPage() {
   const isLoading = auth.status === 'loading' || claimState.status === 'loading'
 
   return (
-    <main style={{ maxWidth: 560, margin: '3rem auto', padding: '0 1rem' }}>
-      <h1 style={{ margin: '0.75rem 0 0.5rem' }}>My Characters</h1>
-      <Card style={{
-        borderLeft: '3px solid rgba(200,169,110,0.5)',
-        padding: '0.9rem 1.1rem',
-        marginBottom: '1.5rem',
-        fontSize: '0.88rem',
-        color: 'var(--text-muted)',
-        lineHeight: 1.65,
-      }}>
-        <p style={{ margin: '0 0 0.5rem', color: 'var(--text)', fontWeight: 600 }}>
+    <main className="max-w-[560px] mx-auto my-12 px-4">
+      <h1 className="mt-3 mb-2">My Characters</h1>
+      <Card className="border-l-[3px] border-l-gold/50 py-[0.9rem] px-[1.1rem] mb-6 text-[0.88rem] text-text-muted leading-[1.65]">
+        <p className="mt-0 mx-0 mb-2 text-text font-semibold">
           What is character claiming?
         </p>
-        <p style={{ margin: '0 0 0.5rem' }}>
+        <p className="mt-0 mx-0 mb-2">
           Linking your Discord account to your in-game characters unlocks
           personalised features — your character sheet, spell upgrade tracker,
           and gear overview are all tied to your claim.
         </p>
-        <p style={{ margin: '0 0 0.5rem' }}>
-          After submitting a claim, a <strong style={{ color: 'var(--text)' }}>guild officer or admin</strong> will
+        <p className="mt-0 mx-0 mb-2">
+          After submitting a claim, a <strong className="text-text">guild officer or admin</strong> will
           verify that the character belongs to you and approve the request.
           You'll be notified once it's approved.
         </p>
-        <p style={{ margin: 0 }}>
+        <p className="m-0">
           You can have multiple characters linked — mark one as your{' '}
-          <strong style={{ color: 'var(--text)' }}>primary</strong> to set it as
+          <strong className="text-text">primary</strong> to set it as
           your default on the home page.
         </p>
       </Card>
 
       {isUnauth && (
-        <Card style={cardStyle}>
-          <p style={{ marginBottom: '1rem' }}>You need to sign in with Discord first.</p>
+        <Card className={CARD_CLS}>
+          <p className="mb-4">You need to sign in with Discord first.</p>
           <a href="/api/auth/login" style={discordBtn()}>Sign in with Discord</a>
         </Card>
       )}
 
-      {isLoading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
+      {isLoading && <p className="text-text-muted">Loading…</p>}
 
       {claimState.status === 'error' && (
-        <p style={{ color: 'var(--danger)' }}>Failed to load. Try refreshing.</p>
+        <p className="text-danger">Failed to load. Try refreshing.</p>
       )}
 
       {auth.status === 'authenticated' && claimState.status === 'ready' && (() => {
@@ -242,8 +229,8 @@ export default function ClaimPage() {
           <>
             {/* Approved characters */}
             {approved.length > 0 && (
-              <Card style={cardStyle}>
-                <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+              <Card className={CARD_CLS}>
+                <div className="text-[0.72rem] uppercase tracking-[0.06em] text-text-muted mb-2">
                   Approved Characters
                 </div>
                 {approved.map(c => (
@@ -254,20 +241,20 @@ export default function ClaimPage() {
 
             {/* Pending claim */}
             {pending && (
-              <Card style={{ ...cardStyle, borderColor: 'rgba(234,179,8,0.4)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '1.2rem' }}>⏳</span>
+              <Card className={CARD_CLS} style={{ borderColor: 'rgba(234,179,8,0.4)' }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-[1.2rem]">⏳</span>
                   <div>
-                    <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                    <div className="text-[0.72rem] uppercase tracking-[0.06em] text-text-muted">
                       Pending approval
                     </div>
-                    <div style={{ color: 'var(--accent)', fontWeight: 600 }}>{pending.character_name}</div>
+                    <div className="text-gold font-semibold">{pending.character_name}</div>
                   </div>
                   <Button
                     variant="secondary"
                     onClick={() => handleCancelPending(pending.id)}
                     disabled={cancelBusy}
-                    style={{ marginLeft: 'auto' }}
+                    className="ml-auto"
                   >
                     {cancelBusy ? 'Cancelling…' : 'Cancel'}
                   </Button>
@@ -276,11 +263,11 @@ export default function ClaimPage() {
             )}
 
             {/* Add another character */}
-            <Card style={cardStyle}>
+            <Card className={CARD_CLS}>
               {!hasAny ? (
                 <>
-                  <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Claim your character</div>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 0 }}>
+                  <div className="font-semibold mb-[0.4rem]">Claim your character</div>
+                  <p className="text-text-muted text-[0.88rem] mb-0">
                     Enter your character's name exactly as it appears in-game.
                   </p>
                   <ClaimForm onSubmitted={claimState.refetch} />
@@ -290,14 +277,14 @@ export default function ClaimPage() {
                   <Button
                     variant="ghost"
                     onClick={() => setShowChangeForm(v => !v)}
-                    style={{ padding: 0, fontSize: '0.88rem' }}
+                    className="p-0 text-[0.88rem]"
                   >
                     {showChangeForm ? '▾ Hide' : '＋ Add another character'}
                   </Button>
                   {showChangeForm && (
-                    <div style={{ marginTop: '0.5rem' }}>
+                    <div className="mt-2">
                       {pending && (
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 0 }}>
+                        <p className="text-text-muted text-[0.85rem] mb-0">
                           This will replace your current pending claim.
                         </p>
                       )}

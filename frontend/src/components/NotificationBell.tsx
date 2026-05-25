@@ -49,49 +49,35 @@ function NotifRow({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="flex items-center gap-[0.65rem] w-full py-[0.65rem] px-4 border-none text-text cursor-pointer text-left text-[0.88rem] transition-colors"
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.65rem',
-        width: '100%',
-        padding: '0.65rem 1rem',
         background: hovered ? 'var(--surface)' : 'transparent',
-        border: 'none',
         borderBottom: hasBorder ? '1px solid var(--border)' : 'none',
-        color: 'var(--text)',
-        cursor: 'pointer',
-        textAlign: 'left',
-        fontSize: '0.88rem',
-        transition: 'background 0.1s',
       }}
     >
       {/* Count pill */}
-      <span style={{
-        background:   accentBg,
-        color:        accentColor,
-        border:       `1px solid ${accentBorder}`,
-        borderRadius: 4,
-        fontSize:     '0.68rem',
-        fontWeight:   700,
-        padding:      '0.15rem 0.45rem',
-        minWidth:     22,
-        textAlign:    'center',
-        flexShrink:   0,
-      }}>
+      <span
+        className="rounded-sm text-[0.68rem] font-bold py-[0.15rem] px-[0.45rem] min-w-[22px] text-center shrink-0"
+        style={{
+          background: accentBg,
+          color:      accentColor,
+          border:     `1px solid ${accentBorder}`,
+        }}
+      >
         {count}
       </span>
 
       {/* Text */}
-      <span style={{ flex: 1, lineHeight: 1.3 }}>
+      <span className="flex-1 leading-[1.3]">
         {label}
         {sublabel && (
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', display: 'block' }}>
+          <span className="text-text-muted text-[0.78rem] block">
             {sublabel}
           </span>
         )}
       </span>
 
-      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>→</span>
+      <span className="text-text-muted text-[0.75rem]">→</span>
     </button>
   )
 }
@@ -129,26 +115,14 @@ export default function NotificationBell() {
   const bothRows = data.pending_claims > 0 && data.pending_users > 0
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} className="relative">
 
       {/* Trigger button */}
       <button
         onClick={() => setOpen(v => !v)}
         title="Pending notifications"
-        style={{
-          display:      'flex',
-          alignItems:   'center',
-          gap:          '0.35rem',
-          background:   'none',
-          border:       '1px solid rgba(200,169,110,0.35)',
-          borderRadius: 6,
-          padding:      '0.3rem 0.55rem',
-          cursor:       'pointer',
-          color:        'var(--gold)',
-          fontSize:     '0.82rem',
-          lineHeight:   1,
-          transition:   'border-color 0.15s, color 0.15s',
-        }}
+        className="flex items-center gap-[0.35rem] bg-none rounded-[6px] py-[0.3rem] px-[0.55rem] cursor-pointer text-gold text-[0.82rem] leading-none transition-colors"
+        style={{ border: '1px solid rgba(200,169,110,0.35)' }}
         onMouseEnter={e => {
           e.currentTarget.style.borderColor = 'rgba(200,169,110,0.7)'
           e.currentTarget.style.color = '#e8d5a3'
@@ -159,46 +133,23 @@ export default function NotificationBell() {
         }}
       >
         <BellIcon />
-        <span style={{
-          background:   '#ef4444',
-          color:        '#fff',
-          fontSize:     '0.65rem',
-          fontWeight:   700,
-          lineHeight:   1,
-          padding:      '0.12rem 0.32rem',
-          borderRadius: 10,
-          minWidth:     16,
-          textAlign:    'center',
-        }}>
+        <span
+          className="text-[0.65rem] font-bold leading-none py-[0.12rem] px-[0.32rem] rounded-[10px] min-w-[16px] text-center"
+          style={{ background: '#ef4444', color: '#fff' }}
+        >
           {total}
         </span>
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div style={{
-          position:   'absolute',
-          right:      0,
-          top:        'calc(100% + 6px)',
-          background: 'var(--surface-raised)',
-          border:     '1px solid var(--border)',
-          borderRadius: 8,
-          minWidth:   240,
-          zIndex:     300,
-          boxShadow:  '0 8px 28px rgba(0,0,0,0.5)',
-          overflow:   'hidden',
-        }}>
+        <div
+          className="absolute right-0 bg-surface-raised border border-border rounded-md min-w-[240px] z-[300] overflow-hidden"
+          style={{ top: 'calc(100% + 6px)', boxShadow: '0 8px 28px rgba(0,0,0,0.5)' }}
+        >
 
           {/* Header */}
-          <div style={{
-            padding:       '0.45rem 1rem',
-            fontSize:      '0.66rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            color:         'var(--text-muted)',
-            borderBottom:  '1px solid var(--border)',
-            fontFamily:    "var(--font-heading)",
-          }}>
+          <div className="py-[0.45rem] px-4 text-[0.66rem] uppercase tracking-[0.08em] text-text-muted border-b border-border font-heading">
             Needs Attention
           </div>
 

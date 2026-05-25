@@ -47,56 +47,40 @@ export default function UserWidget() {
   const { user } = auth
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(v => !v)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: '0.35rem 0.7rem 0.35rem 0.45rem',
-          cursor: 'pointer', color: 'var(--text)',
-        }}
+        className="flex items-center gap-2 bg-surface border border-border rounded-md py-[0.35rem] pr-[0.7rem] pl-[0.45rem] cursor-pointer text-text"
       >
         <img
           src={avatarUrl(user)}
           alt="avatar"
-          style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }}
+          className="w-7 h-7 rounded-full shrink-0"
         />
-        <span style={{ fontSize: '0.9rem', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span className="text-[0.9rem] max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap">
           {user.global_name ?? user.username}
         </span>
-        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginLeft: 2 }}>
+        <span className="text-[0.65rem] text-text-muted ml-0.5">
           {open ? '▴' : '▾'}
         </span>
       </button>
 
       {open && (
-        <div style={{
-          position: 'absolute', left: 0, top: 'calc(100% + 6px)',
-          background: 'var(--surface-raised)', border: '1px solid var(--border)',
-          borderRadius: 8, minWidth: 160, zIndex: 100,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-          overflow: 'hidden',
-        }}>
+        <div
+          className="absolute left-0 bg-surface-raised border border-border rounded-md min-w-[160px] z-[100] overflow-hidden"
+          style={{ top: 'calc(100% + 6px)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}
+        >
           <Link
             to="/claim"
             onClick={() => setOpen(false)}
-            style={{
-              display: 'block', padding: '0.6rem 1rem',
-              color: 'var(--text-muted)', fontSize: '0.88rem',
-              textDecoration: 'none', borderBottom: '1px solid var(--border)',
-            }}
+            className="block py-[0.6rem] px-4 text-text-muted text-[0.88rem] no-underline border-b border-border"
           >
             ★ My Characters
           </Link>
           <Link
             to="/settings/tokens"
             onClick={() => setOpen(false)}
-            style={{
-              display: 'block', padding: '0.6rem 1rem',
-              color: 'var(--text-muted)', fontSize: '0.88rem',
-              textDecoration: 'none', borderBottom: '1px solid var(--border)',
-            }}
+            className="block py-[0.6rem] px-4 text-text-muted text-[0.88rem] no-underline border-b border-border"
           >
             ⚿ API Tokens
           </Link>
@@ -104,22 +88,14 @@ export default function UserWidget() {
             <Link
               to="/admin"
               onClick={() => setOpen(false)}
-              style={{
-                display: 'block', padding: '0.6rem 1rem',
-                color: 'var(--text-muted)', fontSize: '0.88rem',
-                textDecoration: 'none', borderBottom: '1px solid var(--border)',
-              }}
+              className="block py-[0.6rem] px-4 text-text-muted text-[0.88rem] no-underline border-b border-border"
             >
               ⚙ Admin panel
             </Link>
           )}
           <button
             onClick={doLogout}
-            style={{
-              display: 'block', width: '100%', textAlign: 'left',
-              padding: '0.6rem 1rem', background: 'transparent',
-              border: 'none', color: 'var(--danger)', fontSize: '0.88rem', cursor: 'pointer',
-            }}
+            className="block w-full text-left py-[0.6rem] px-4 bg-transparent border-none text-danger text-[0.88rem] cursor-pointer"
           >
             Sign out
           </button>

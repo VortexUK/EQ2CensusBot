@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 
@@ -195,24 +194,24 @@ export default function ParsePage() {
 
   if (loading) {
     return (
-      <main style={pageStyle}>
+      <main className={PAGE_CLS}>
         <Breadcrumb items={[{ label: 'Parses', to: '/parses' }, { label: '…' }]} />
-        <p style={{ color: 'var(--text-muted)' }}>Loading…</p>
+        <p className="text-text-muted">Loading…</p>
       </main>
     )
   }
 
   if (error || !data) {
     return (
-      <main style={pageStyle}>
+      <main className={PAGE_CLS}>
         <Breadcrumb items={[{ label: 'Parses', to: '/parses' }, { label: '…' }]} />
-        <p style={{ color: 'var(--danger)' }}>{error ?? 'Parse not found.'}</p>
+        <p className="text-danger">{error ?? 'Parse not found.'}</p>
       </main>
     )
   }
 
   return (
-    <main style={pageStyle}>
+    <main className={PAGE_CLS}>
       <Breadcrumb items={[{ label: 'Parses', to: '/parses' }, { label: data.title }]} />
       <Header data={data} />
       {allies.length > 0 && (
@@ -239,38 +238,26 @@ function Header({ data }: { data: ParseDetail }) {
     : data.success_level === 3 ? 'var(--warning, #d8a657)'
     : 'var(--gold)'
   return (
-    <section style={{ marginBottom: '1.4rem' }}>
-      <h1 style={{
-        fontFamily: 'var(--font-heading)',
-        fontSize: '1.7rem',
-        color: titleColor,
-        margin: '0 0 0.25rem',
-      }}>
+    <section className="mb-[1.4rem]">
+      <h1
+        className="font-heading text-[1.7rem] mb-1"
+        style={{ color: titleColor }}
+      >
         {data.title}
       </h1>
-      <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem',
-        color: 'var(--text-muted)', fontSize: '0.85rem',
-      }}>
-        {data.zone && <span><span style={hdrKey}>Zone:</span> {data.zone}</span>}
-        <span><span style={hdrKey}>Started:</span> {fmtLocalDateTime(data.started_at)}</span>
-        <span><span style={hdrKey}>Duration:</span> {fmtDuration(data.duration_s)}</span>
-        <span><span style={hdrKey}>Damage:</span> {fmtNum(data.total_damage)}</span>
-        <span><span style={hdrKey}>encDPS:</span> <span style={{ color: 'var(--gold)' }}>{fmtNum(data.encdps)}</span></span>
-        <span><span style={hdrKey}>K/D:</span> {data.kills} / {data.deaths}</span>
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-text-muted text-[0.85rem]">
+        {data.zone && <span><span className={HDR_KEY_CLS}>Zone:</span> {data.zone}</span>}
+        <span><span className={HDR_KEY_CLS}>Started:</span> {fmtLocalDateTime(data.started_at)}</span>
+        <span><span className={HDR_KEY_CLS}>Duration:</span> {fmtDuration(data.duration_s)}</span>
+        <span><span className={HDR_KEY_CLS}>Damage:</span> {fmtNum(data.total_damage)}</span>
+        <span><span className={HDR_KEY_CLS}>encDPS:</span> <span className="text-gold">{fmtNum(data.encdps)}</span></span>
+        <span><span className={HDR_KEY_CLS}>K/D:</span> {data.kills} / {data.deaths}</span>
       </div>
     </section>
   )
 }
 
-const hdrKey: CSSProperties = {
-  textTransform: 'uppercase',
-  fontSize: '0.7rem',
-  letterSpacing: '0.06em',
-  color: 'var(--text-muted)',
-  opacity: 0.7,
-  marginRight: '0.25rem',
-}
+const HDR_KEY_CLS = 'uppercase text-[0.7rem] tracking-[0.06em] text-text-muted opacity-70 mr-1'
 
 // ── Combatant section ────────────────────────────────────────────────────────
 
@@ -283,37 +270,28 @@ function CombatantSection({
   dimmed?: boolean
 }) {
   return (
-    <section style={{ marginBottom: '1.4rem', opacity: dimmed ? 0.85 : 1 }}>
-      <h2 style={{
-        fontFamily: 'var(--font-heading)',
-        fontSize: '1.05rem',
-        color: 'var(--gold)',
-        margin: '0 0 0.5rem',
-      }}>
-        {title} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 400 }}>
+    <section className="mb-[1.4rem]" style={{ opacity: dimmed ? 0.85 : 1 }}>
+      <h2 className="font-heading text-[1.05rem] text-gold mb-2">
+        {title} <span className="text-text-muted text-[0.75rem] font-normal">
           · {combatants.length}
         </span>
       </h2>
-      <Card style={{
-        display: 'grid',
-        gridTemplateColumns:
-          'minmax(160px,1.6fr) 90px 80px 50px 90px 70px 90px 60px 40px',
-        columnGap: '0.5rem',
-        rowGap: 0,
-        alignItems: 'center',
-        fontSize: '0.82rem',
-        borderRadius: 6,
-        padding: '0.4rem 0.6rem',
-      }}>
-        <div style={hdrCellStyle}>Name</div>
-        <div style={{ ...hdrCellStyle, textAlign: 'right' }}>DMG</div>
-        <div style={{ ...hdrCellStyle, textAlign: 'right' }}>encDPS</div>
-        <div style={{ ...hdrCellStyle, textAlign: 'right' }}>%</div>
-        <div style={{ ...hdrCellStyle, textAlign: 'right' }}>Healed</div>
-        <div style={{ ...hdrCellStyle, textAlign: 'right' }}>HPS</div>
-        <div style={{ ...hdrCellStyle, textAlign: 'right' }}>Taken</div>
-        <div style={{ ...hdrCellStyle, textAlign: 'right' }}>Crit%</div>
-        <div style={{ ...hdrCellStyle, textAlign: 'right' }}>D</div>
+      <Card
+        className="grid items-center text-[0.82rem] rounded-[6px] px-[0.6rem] py-[0.4rem] gap-x-2 gap-y-0"
+        style={{
+          gridTemplateColumns:
+            'minmax(160px,1.6fr) 90px 80px 50px 90px 70px 90px 60px 40px',
+        }}
+      >
+        <div className={HDR_CELL_CLS}>Name</div>
+        <div className={`${HDR_CELL_CLS} text-right`}>DMG</div>
+        <div className={`${HDR_CELL_CLS} text-right`}>encDPS</div>
+        <div className={`${HDR_CELL_CLS} text-right`}>%</div>
+        <div className={`${HDR_CELL_CLS} text-right`}>Healed</div>
+        <div className={`${HDR_CELL_CLS} text-right`}>HPS</div>
+        <div className={`${HDR_CELL_CLS} text-right`}>Taken</div>
+        <div className={`${HDR_CELL_CLS} text-right`}>Crit%</div>
+        <div className={`${HDR_CELL_CLS} text-right`}>D</div>
 
         {combatants.map(c => (
           <CombatantRow key={c.id} combatant={c} lookupEntry={lookup[c.name]} />
@@ -340,35 +318,25 @@ function CombatantRow({
     <>
       <div
         onClick={() => setOpen(v => !v)}
-        style={{
-          gridColumn: '1 / -1',
-          display: 'grid',
-          gridTemplateColumns: 'subgrid',
-          alignItems: 'center',
-          padding: '0.35rem 0.5rem',
-          marginLeft: '-0.5rem',
-          marginRight: '-0.5rem',
-          borderTop: '1px solid var(--border)',
-          cursor: 'pointer',
-          background: tint ?? 'transparent',
-        }}
+        className="col-[1/-1] grid grid-cols-subgrid items-center px-2 py-[0.35rem] -mx-2 border-t border-border cursor-pointer"
+        style={{ background: tint ?? 'transparent' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+        <div className="flex items-center gap-[0.35rem] min-w-0">
           <Caret open={open} />
           <NameCell combatant={c} player={player} guildName={guildName} cls={cls} />
         </div>
-        <div style={cellRight}>{fmtNum(c.damage)}</div>
-        <div style={{ ...cellRight, color: 'var(--gold)' }}>{fmtNum(c.encdps)}</div>
-        <div style={cellRight}>{c.damage_perc > 0 ? `${Math.round(c.damage_perc)}%` : '—'}</div>
-        <div style={cellRight}>{c.healed > 0 ? fmtNum(c.healed) : '—'}</div>
-        <div style={cellRight}>{c.enchps > 0 ? fmtNum(c.enchps) : '—'}</div>
-        <div style={cellRight}>{c.damage_taken > 0 ? fmtNum(c.damage_taken) : '—'}</div>
-        <div style={cellRight}>{c.crit_dam_perc > 0 ? `${Math.round(c.crit_dam_perc)}%` : '—'}</div>
-        <div style={cellRight}>{c.deaths > 0 ? c.deaths : ''}</div>
+        <div className={CELL_RIGHT_CLS}>{fmtNum(c.damage)}</div>
+        <div className={`${CELL_RIGHT_CLS} text-gold`}>{fmtNum(c.encdps)}</div>
+        <div className={CELL_RIGHT_CLS}>{c.damage_perc > 0 ? `${Math.round(c.damage_perc)}%` : '—'}</div>
+        <div className={CELL_RIGHT_CLS}>{c.healed > 0 ? fmtNum(c.healed) : '—'}</div>
+        <div className={CELL_RIGHT_CLS}>{c.enchps > 0 ? fmtNum(c.enchps) : '—'}</div>
+        <div className={CELL_RIGHT_CLS}>{c.damage_taken > 0 ? fmtNum(c.damage_taken) : '—'}</div>
+        <div className={CELL_RIGHT_CLS}>{c.crit_dam_perc > 0 ? `${Math.round(c.crit_dam_perc)}%` : '—'}</div>
+        <div className={CELL_RIGHT_CLS}>{c.deaths > 0 ? c.deaths : ''}</div>
       </div>
 
       {open && (
-        <div style={{ gridColumn: '1 / -1', padding: '0.4rem 0 0.6rem 1.5rem' }}>
+        <div className="col-[1/-1] pt-[0.4rem] pb-[0.6rem] pl-6">
           <CombatantTabs combatant={c} />
         </div>
       )}
@@ -388,10 +356,10 @@ function NameCell({
 
   if (!player) {
     return (
-      <span style={{
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        color: baseColor,
-      }}>
+      <span
+        className="overflow-hidden text-ellipsis whitespace-nowrap"
+        style={{ color: baseColor }}
+      >
         {c.name}
       </span>
     )
@@ -402,31 +370,18 @@ function NameCell({
   return (
     <span
       onClick={e => e.stopPropagation()}
-      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}
+      className="flex items-center gap-[0.4rem] min-w-0"
     >
       <Link
         to={`/character/${encodeURIComponent(c.name)}`}
-        style={{
-          color: 'var(--text)',
-          textDecoration: 'none',
-          borderBottom: '1px dotted var(--text-muted)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
+        className="text-text no-underline border-b border-dotted border-text-muted overflow-hidden text-ellipsis whitespace-nowrap"
       >
         {c.name}
       </Link>
       {guildName && (
         <Link
           to={`/guild/${encodeURIComponent(guildName)}`}
-          style={{
-            fontSize: '0.7rem',
-            color: 'var(--text-muted)',
-            textDecoration: 'none',
-            borderBottom: '1px dotted transparent',
-            whiteSpace: 'nowrap',
-          }}
+          className="text-[0.7rem] text-text-muted no-underline border-b border-dotted border-transparent whitespace-nowrap"
           onMouseEnter={e => (e.currentTarget.style.borderBottomColor = 'var(--text-muted)')}
           onMouseLeave={e => (e.currentTarget.style.borderBottomColor = 'transparent')}
         >
@@ -434,12 +389,10 @@ function NameCell({
         </Link>
       )}
       {cls && (
-        <span style={{
-          fontSize: '0.7rem',
-          color: classColor ?? 'var(--text-muted)',
-          whiteSpace: 'nowrap',
-          opacity: 0.85,
-        }}>
+        <span
+          className="text-[0.7rem] whitespace-nowrap opacity-85"
+          style={{ color: classColor ?? 'var(--text-muted)' }}
+        >
           ‹{cls}›
         </span>
       )}
@@ -470,7 +423,7 @@ function CombatantTabs({ combatant: c }: { combatant: CombatantSummary }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.4rem' }}>
+      <div className="flex flex-wrap gap-[0.3rem] mb-[0.4rem]">
         <TabBtn id="damage"  current={effectiveTab} disabled={!hasDamage} onClick={setTab}>Damage</TabBtn>
         <TabBtn id="types"   current={effectiveTab} disabled={!hasTypes}  onClick={setTab}>By Type</TabBtn>
         <TabBtn id="heals"   current={effectiveTab} disabled={!hasHeals}  onClick={setTab}>Healed</TabBtn>
@@ -502,15 +455,12 @@ function TabBtn({
     <button
       disabled={disabled}
       onClick={() => onClick(id)}
+      className="border border-solid rounded-sm px-[0.65rem] py-[0.2rem] text-[0.74rem]"
       style={{
         background: active ? 'var(--surface)' : 'transparent',
-        border: '1px solid',
         borderColor: active ? 'var(--gold)' : 'var(--border)',
         color: active ? 'var(--gold)' : disabled ? 'var(--text-muted)' : 'var(--text)',
         opacity: disabled ? 0.45 : 1,
-        borderRadius: 4,
-        padding: '0.2rem 0.65rem',
-        fontSize: '0.74rem',
         fontWeight: active ? 700 : 500,
         cursor: disabled ? 'not-allowed' : 'pointer',
       }}
@@ -524,33 +474,29 @@ function TabBtn({
 
 function AttacksTable({ attacks, combatantDamage }: { attacks: AttackSummary[]; combatantDamage: number }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'minmax(150px,1.4fr) 80px 50px 60px 60px 70px 1fr',
-      columnGap: '0.5rem',
-      rowGap: '1px',
-      alignItems: 'center',
-      fontSize: '0.78rem',
-    }}>
-      <div style={hdrSubCellStyle}>Attack</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>DMG</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Hits</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Swings</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Crit%</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Max</div>
-      <div style={hdrSubCellStyle}>Share</div>
+    <div
+      className="grid items-center gap-x-2 gap-y-px text-[0.78rem]"
+      style={{ gridTemplateColumns: 'minmax(150px,1.4fr) 80px 50px 60px 60px 70px 1fr' }}
+    >
+      <div className={HDR_SUB_CELL_CLS}>Attack</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>DMG</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Hits</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Swings</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Crit%</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Max</div>
+      <div className={HDR_SUB_CELL_CLS}>Share</div>
 
       {attacks.map((a, i) => {
         const share = combatantDamage > 0 ? a.damage / combatantDamage : 0
         return (
-          <div key={i} style={subRow}>
-            <div style={{ color: 'var(--text)' }}>{a.attack_name}</div>
-            <div style={cellRight}>{fmtNum(a.damage)}</div>
-            <div style={cellRight}>{a.hits}</div>
-            <div style={cellRight}>{a.swings}</div>
-            <div style={cellRight}>{Math.round(a.crit_perc)}%</div>
-            <div style={cellRight}>{fmtNum(a.max_hit)}</div>
-            <div style={{ paddingRight: '0.5rem' }}><DamageBar share={share} /></div>
+          <div key={i} className={SUB_ROW_CLS}>
+            <div className="text-text">{a.attack_name}</div>
+            <div className={CELL_RIGHT_CLS}>{fmtNum(a.damage)}</div>
+            <div className={CELL_RIGHT_CLS}>{a.hits}</div>
+            <div className={CELL_RIGHT_CLS}>{a.swings}</div>
+            <div className={CELL_RIGHT_CLS}>{Math.round(a.crit_perc)}%</div>
+            <div className={CELL_RIGHT_CLS}>{fmtNum(a.max_hit)}</div>
+            <div className="pr-2"><DamageBar share={share} /></div>
           </div>
         )
       })}
@@ -560,33 +506,29 @@ function AttacksTable({ attacks, combatantDamage }: { attacks: AttackSummary[]; 
 
 function DamageTypesTable({ types, combatantDamage }: { types: DamageTypeBreakdown[]; combatantDamage: number }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'minmax(140px,1.2fr) 80px 70px 50px 60px 70px 1fr',
-      columnGap: '0.5rem',
-      rowGap: '1px',
-      alignItems: 'center',
-      fontSize: '0.78rem',
-    }}>
-      <div style={hdrSubCellStyle}>Damage Type</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>DMG</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>DPS</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Hits</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Crit%</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Max</div>
-      <div style={hdrSubCellStyle}>Share</div>
+    <div
+      className="grid items-center gap-x-2 gap-y-px text-[0.78rem]"
+      style={{ gridTemplateColumns: 'minmax(140px,1.2fr) 80px 70px 50px 60px 70px 1fr' }}
+    >
+      <div className={HDR_SUB_CELL_CLS}>Damage Type</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>DMG</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>DPS</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Hits</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Crit%</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Max</div>
+      <div className={HDR_SUB_CELL_CLS}>Share</div>
 
       {types.map((t, i) => {
         const share = combatantDamage > 0 ? t.damage / combatantDamage : 0
         return (
-          <div key={i} style={subRow}>
-            <div style={{ color: 'var(--text)' }}>{t.damage_type || '—'}</div>
-            <div style={cellRight}>{fmtNum(t.damage)}</div>
-            <div style={cellRight}>{fmtNum(t.dps)}</div>
-            <div style={cellRight}>{t.hits}</div>
-            <div style={cellRight}>{Math.round(t.crit_perc)}%</div>
-            <div style={cellRight}>{fmtNum(t.max_hit)}</div>
-            <div style={{ paddingRight: '0.5rem' }}><DamageBar share={share} /></div>
+          <div key={i} className={SUB_ROW_CLS}>
+            <div className="text-text">{t.damage_type || '—'}</div>
+            <div className={CELL_RIGHT_CLS}>{fmtNum(t.damage)}</div>
+            <div className={CELL_RIGHT_CLS}>{fmtNum(t.dps)}</div>
+            <div className={CELL_RIGHT_CLS}>{t.hits}</div>
+            <div className={CELL_RIGHT_CLS}>{Math.round(t.crit_perc)}%</div>
+            <div className={CELL_RIGHT_CLS}>{fmtNum(t.max_hit)}</div>
+            <div className="pr-2"><DamageBar share={share} /></div>
           </div>
         )
       })}
@@ -596,39 +538,35 @@ function DamageTypesTable({ types, combatantDamage }: { types: DamageTypeBreakdo
 
 function HealsTable({ heals, totalHealed }: { heals: HealSummary[]; totalHealed: number }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'minmax(150px,1.4fr) 80px 50px 60px 70px 90px 1fr',
-      columnGap: '0.5rem',
-      rowGap: '1px',
-      alignItems: 'center',
-      fontSize: '0.78rem',
-    }}>
-      <div style={hdrSubCellStyle}>Ability</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Healed</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Hits</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Crit%</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Max</div>
-      <div style={hdrSubCellStyle}>Type</div>
-      <div style={hdrSubCellStyle}>Share</div>
+    <div
+      className="grid items-center gap-x-2 gap-y-px text-[0.78rem]"
+      style={{ gridTemplateColumns: 'minmax(150px,1.4fr) 80px 50px 60px 70px 90px 1fr' }}
+    >
+      <div className={HDR_SUB_CELL_CLS}>Ability</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Healed</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Hits</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Crit%</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Max</div>
+      <div className={HDR_SUB_CELL_CLS}>Type</div>
+      <div className={HDR_SUB_CELL_CLS}>Share</div>
 
       {heals.map((h, i) => {
         const share = totalHealed > 0 ? h.healed / totalHealed : 0
         const isWard = h.heal_type === 'Absorption'
         return (
-          <div key={i} style={subRow}>
-            <div style={{ color: 'var(--text)' }}>{h.heal_name}</div>
-            <div style={cellRight}>{fmtNum(h.healed)}</div>
-            <div style={cellRight}>{h.hits}</div>
-            <div style={cellRight}>{Math.round(h.crit_perc)}%</div>
-            <div style={cellRight}>{fmtNum(h.max_hit)}</div>
-            <div style={{
-              fontSize: '0.7rem',
-              color: isWard ? '#93d9ff' : 'var(--text-muted)',
-            }}>
+          <div key={i} className={SUB_ROW_CLS}>
+            <div className="text-text">{h.heal_name}</div>
+            <div className={CELL_RIGHT_CLS}>{fmtNum(h.healed)}</div>
+            <div className={CELL_RIGHT_CLS}>{h.hits}</div>
+            <div className={CELL_RIGHT_CLS}>{Math.round(h.crit_perc)}%</div>
+            <div className={CELL_RIGHT_CLS}>{fmtNum(h.max_hit)}</div>
+            <div
+              className="text-[0.7rem]"
+              style={{ color: isWard ? '#93d9ff' : 'var(--text-muted)' }}
+            >
               {h.heal_type ?? '—'}
             </div>
-            <div style={{ paddingRight: '0.5rem' }}><DamageBar share={share} /></div>
+            <div className="pr-2"><DamageBar share={share} /></div>
           </div>
         )
       })}
@@ -638,24 +576,20 @@ function HealsTable({ heals, totalHealed }: { heals: HealSummary[]; totalHealed:
 
 function CuresTable({ cures }: { cures: CureSummary[] }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'minmax(160px,1.4fr) 100px 100px 80px',
-      columnGap: '0.6rem',
-      rowGap: '1px',
-      alignItems: 'center',
-      fontSize: '0.78rem',
-    }}>
-      <div style={hdrSubCellStyle}>Cure ability</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Effects removed</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Times cast</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Max</div>
+    <div
+      className="grid items-center gap-x-[0.6rem] gap-y-px text-[0.78rem]"
+      style={{ gridTemplateColumns: 'minmax(160px,1.4fr) 100px 100px 80px' }}
+    >
+      <div className={HDR_SUB_CELL_CLS}>Cure ability</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Effects removed</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Times cast</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Max</div>
       {cures.map((cu, i) => (
-        <div key={i} style={subRow}>
-          <div style={{ color: 'var(--text)' }}>{cu.cure_name}</div>
-          <div style={cellRight}>{fmtNum(cu.effects_removed)}</div>
-          <div style={cellRight}>{cu.times_cast}</div>
-          <div style={cellRight}>{cu.max_at_once}</div>
+        <div key={i} className={SUB_ROW_CLS}>
+          <div className="text-text">{cu.cure_name}</div>
+          <div className={CELL_RIGHT_CLS}>{fmtNum(cu.effects_removed)}</div>
+          <div className={CELL_RIGHT_CLS}>{cu.times_cast}</div>
+          <div className={CELL_RIGHT_CLS}>{cu.max_at_once}</div>
         </div>
       ))}
     </div>
@@ -664,26 +598,22 @@ function CuresTable({ cures }: { cures: CureSummary[] }) {
 
 function ThreatTable({ threats }: { threats: ThreatSummary[] }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'minmax(160px,1.4fr) 100px 70px 80px 90px',
-      columnGap: '0.6rem',
-      rowGap: '1px',
-      alignItems: 'center',
-      fontSize: '0.78rem',
-    }}>
-      <div style={hdrSubCellStyle}>Ability</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Value</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Procs</div>
-      <div style={{ ...hdrSubCellStyle, textAlign: 'right' }}>Max proc</div>
-      <div style={hdrSubCellStyle}>Kind</div>
+    <div
+      className="grid items-center gap-x-[0.6rem] gap-y-px text-[0.78rem]"
+      style={{ gridTemplateColumns: 'minmax(160px,1.4fr) 100px 70px 80px 90px' }}
+    >
+      <div className={HDR_SUB_CELL_CLS}>Ability</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Value</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Procs</div>
+      <div className={`${HDR_SUB_CELL_CLS} text-right`}>Max proc</div>
+      <div className={HDR_SUB_CELL_CLS}>Kind</div>
       {threats.map((t, i) => (
-        <div key={i} style={subRow}>
-          <div style={{ color: 'var(--text)' }}>{t.ability_name}</div>
-          <div style={cellRight}>{fmtNum(t.value)}</div>
-          <div style={cellRight}>{t.procs}</div>
-          <div style={cellRight}>{fmtNum(t.max_proc)}</div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.kind ?? '—'}</div>
+        <div key={i} className={SUB_ROW_CLS}>
+          <div className="text-text">{t.ability_name}</div>
+          <div className={CELL_RIGHT_CLS}>{fmtNum(t.value)}</div>
+          <div className={CELL_RIGHT_CLS}>{t.procs}</div>
+          <div className={CELL_RIGHT_CLS}>{fmtNum(t.max_proc)}</div>
+          <div className="text-[0.7rem] text-text-muted">{t.kind ?? '—'}</div>
         </div>
       ))}
     </div>
@@ -731,26 +661,25 @@ function SummaryCard({ combatant: c }: { combatant: CombatantSummary }) {
     },
   ]
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+    <div
+      className="grid gap-3"
+      style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}
+    >
       {groups.map(g => (
-        <div key={g.label} style={{
-          background: 'rgba(0,0,0,0.18)',
-          border: '1px solid var(--border)',
-          borderRadius: 5,
-          padding: '0.55rem 0.7rem',
-        }}>
-          <h4 style={{
-            margin: '0 0 0.35rem',
-            fontSize: '0.7rem',
-            color: 'var(--text-muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-          }}>{g.label}</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', columnGap: '0.5rem', rowGap: '2px', fontSize: '0.8rem' }}>
+        <div
+          key={g.label}
+          className="border border-border rounded-[5px] px-[0.7rem] py-[0.55rem]"
+          style={{ background: 'rgba(0,0,0,0.18)' }}
+        >
+          <h4 className="mb-[0.35rem] text-[0.7rem] text-text-muted uppercase tracking-[0.06em]">{g.label}</h4>
+          <div
+            className="grid gap-x-2 gap-y-[2px] text-[0.8rem]"
+            style={{ gridTemplateColumns: '1fr auto' }}
+          >
             {g.stats.map(([k, v]) => (
               <Fragment key={`${g.label}-${k}`}>
-                <span style={{ color: 'var(--text-muted)' }}>{k}</span>
-                <span style={{ color: 'var(--text)', textAlign: 'right' }}>{v}</span>
+                <span className="text-text-muted">{k}</span>
+                <span className="text-text text-right">{v}</span>
               </Fragment>
             ))}
           </div>
@@ -763,19 +692,11 @@ function SummaryCard({ combatant: c }: { combatant: CombatantSummary }) {
 function DamageBar({ share }: { share: number }) {
   const pct = Math.max(0, Math.min(1, share)) * 100
   return (
-    <div style={{
-      width: '100%',
-      height: 6,
-      background: 'rgba(255,255,255,0.06)',
-      borderRadius: 3,
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        width: `${pct}%`,
-        height: '100%',
-        background: 'var(--gold)',
-        opacity: 0.7,
-      }} />
+    <div className="w-full h-[6px] bg-white/6 rounded-[3px] overflow-hidden">
+      <div
+        className="h-full bg-gold opacity-70"
+        style={{ width: `${pct}%` }}
+      />
     </div>
   )
 }
@@ -784,32 +705,12 @@ function DamageBar({ share }: { share: number }) {
 
 // ── Style constants ──────────────────────────────────────────────────────────
 
-const pageStyle: CSSProperties = { maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' }
+const PAGE_CLS = 'max-w-[1100px] mx-auto px-4 py-6'
 
-const cellRight: CSSProperties = { textAlign: 'right', color: 'var(--text)' }
+const CELL_RIGHT_CLS = 'text-right text-text'
 
-const hdrCellStyle: CSSProperties = {
-  color: 'var(--text-muted)',
-  fontSize: '0.7rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-  padding: '0.15rem 0',
-}
+const HDR_CELL_CLS = 'text-text-muted text-[0.7rem] uppercase tracking-[0.06em] py-[0.15rem]'
 
-const hdrSubCellStyle: CSSProperties = {
-  color: 'var(--text-muted)',
-  fontSize: '0.66rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  padding: '0.1rem 0',
-  borderBottom: '1px solid var(--border)',
-  marginBottom: '0.15rem',
-}
+const HDR_SUB_CELL_CLS = 'text-text-muted text-[0.66rem] uppercase tracking-[0.05em] py-[0.1rem] border-b border-border mb-[0.15rem]'
 
-const subRow: CSSProperties = {
-  gridColumn: '1 / -1',
-  display: 'grid',
-  gridTemplateColumns: 'subgrid',
-  alignItems: 'center',
-  padding: '2px 0',
-}
+const SUB_ROW_CLS = 'col-[1/-1] grid grid-cols-subgrid items-center py-[2px]'

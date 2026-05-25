@@ -64,33 +64,21 @@ const CLAIM_BADGE: Record<string, React.CSSProperties> = {
 
 function Badge({ label, style }: { label: string; style?: React.CSSProperties }) {
   return (
-    <span style={{
-      borderRadius: 4, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 600,
-      whiteSpace: 'nowrap',
-      ...style,
-    }}>
+    <span
+      className="rounded-sm px-2 py-[2px] text-[0.72rem] font-semibold whitespace-nowrap"
+      style={style}
+    >
       {label}
     </span>
   )
 }
 
-// ── Shared table styles ───────────────────────────────────────────────────────
+// ── Shared table classes ──────────────────────────────────────────────────────
 
-const TABLE: React.CSSProperties = {
-  width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem',
-}
-const TH: React.CSSProperties = {
-  textAlign: 'left', padding: '0.45rem 0.75rem',
-  color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600,
-  textTransform: 'uppercase', letterSpacing: '0.05em',
-  borderBottom: '1px solid var(--border)',
-  whiteSpace: 'nowrap',
-}
-const TD: React.CSSProperties = {
-  padding: '0.5rem 0.75rem',
-  borderBottom: '1px solid rgba(255,255,255,0.05)',
-  verticalAlign: 'middle',
-}
+const TABLE_CLS = 'w-full border-collapse text-[0.875rem]'
+const TH_CLS = 'text-left px-3 py-[0.45rem] text-text-muted text-[0.72rem] font-semibold uppercase tracking-[0.05em] border-b border-border whitespace-nowrap'
+const TD_CLS = 'px-3 py-2 border-b border-white/5 align-middle'
+// Filter-pill base (border/background/colour applied conditionally inline).
 const BTN_BASE: React.CSSProperties = {
   padding: '0.22rem 0.65rem', borderRadius: 4, cursor: 'pointer',
   fontSize: '0.78rem', fontWeight: 600, border: 'none', whiteSpace: 'nowrap',
@@ -122,20 +110,20 @@ function UserRow({ user, onAction }: { user: UserItem; onAction: () => void }) {
   return (
     <tr>
       {/* User */}
-      <td style={TD}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <td className={TD_CLS}>
+        <div className="flex items-center gap-2">
           <img
             src={discordAvatar(user.discord_id, user.avatar)}
             alt=""
             width={28} height={28}
-            style={{ borderRadius: '50%', flexShrink: 0 }}
+            className="rounded-full shrink-0"
           />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: '0.88rem', lineHeight: 1.2 }}>
+          <div className="min-w-0">
+            <div className="font-semibold text-[0.88rem] leading-[1.2]">
               {displayName}
             </div>
             {user.discord_username && user.discord_username !== user.discord_name && (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+              <div className="text-text-muted text-[0.72rem]">
                 {user.discord_username}
               </div>
             )}
@@ -144,32 +132,32 @@ function UserRow({ user, onAction }: { user: UserItem; onAction: () => void }) {
       </td>
 
       {/* Joined */}
-      <td style={{ ...TD, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+      <td className={`${TD_CLS} text-text-muted whitespace-nowrap`}>
         <span title={fmt(user.first_seen)}>{relativeTime(user.first_seen)}</span>
       </td>
 
       {/* Status */}
-      <td style={TD}>
+      <td className={TD_CLS}>
         <Badge label={user.access_status} style={badgeStyle} />
       </td>
 
       {/* Claims */}
-      <td style={{ ...TD, textAlign: 'center', color: user.claim_count ? 'var(--text)' : 'var(--text-muted)' }}>
+      <td className={`${TD_CLS} text-center ${user.claim_count ? 'text-text' : 'text-text-muted'}`}>
         {user.claim_count}
       </td>
 
       {/* Actions */}
-      <td style={{ ...TD, whiteSpace: 'nowrap' }}>
+      <td className={`${TD_CLS} whitespace-nowrap`}>
         {kickConfirm ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>Kick + delete all claims?</span>
+          <div className="flex items-center gap-[0.35rem] flex-wrap">
+            <span className="text-[0.75rem] text-danger">Kick + delete all claims?</span>
             <Button variant="danger" size="sm" onClick={() => doAccess('kick')} disabled={busy}>
               {busy ? '…' : 'Confirm'}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setKickConfirm(false)}>Cancel</Button>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+          <div className="flex gap-[0.35rem] flex-wrap">
             {user.access_status !== 'approved' && (
               <Button variant="primary" size="sm" onClick={() => doAccess('approve')} disabled={busy}>
                 Approve
@@ -211,7 +199,7 @@ function UsersTable({ users, onAction }: { users: UserItem[]; onAction: () => vo
   return (
     <div>
       {/* Filter pills */}
-      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+      <div className="flex gap-[0.4rem] mb-3 flex-wrap">
         {(['all', 'pending', 'approved', 'denied'] as const).map(f => (
           <button
             key={f}
@@ -224,26 +212,26 @@ function UsersTable({ users, onAction }: { users: UserItem[]; onAction: () => vo
             }}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}{' '}
-            <span style={{ opacity: 0.7, fontSize: '0.7rem' }}>({counts[f]})</span>
+            <span className="opacity-70 text-[0.7rem]">({counts[f]})</span>
           </button>
         ))}
       </div>
 
-      <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
-        <table style={TABLE}>
+      <div className="overflow-x-auto border border-border rounded-md">
+        <table className={TABLE_CLS}>
           <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-              <th style={TH}>User</th>
-              <th style={TH}>Joined</th>
-              <th style={TH}>Status</th>
-              <th style={{ ...TH, textAlign: 'center' }}>Claims</th>
-              <th style={TH}>Actions</th>
+            <tr className="bg-white/2">
+              <th className={TH_CLS}>User</th>
+              <th className={TH_CLS}>Joined</th>
+              <th className={TH_CLS}>Status</th>
+              <th className={`${TH_CLS} text-center`}>Claims</th>
+              <th className={TH_CLS}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ ...TD, color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem' }}>
+                <td colSpan={5} className={`${TD_CLS} text-text-muted text-center p-6`}>
                   No users.
                 </td>
               </tr>
@@ -288,63 +276,63 @@ function ClaimRow({ claim, onDelete }: { claim: ClaimDetail; onDelete: () => voi
   return (
     <tr>
       {/* Character */}
-      <td style={{ ...TD, color: 'var(--accent)', fontWeight: 600 }}>
+      <td className={`${TD_CLS} text-gold font-semibold`}>
         {claim.character_name}
       </td>
 
       {/* User */}
-      <td style={TD}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      <td className={TD_CLS}>
+        <div className="flex items-center gap-[0.4rem]">
           <img
             src={discordAvatar(claim.discord_id, claim.avatar)}
             alt=""
             width={22} height={22}
-            style={{ borderRadius: '50%', flexShrink: 0 }}
+            className="rounded-full shrink-0"
           />
-          <span style={{ fontSize: '0.85rem' }}>{displayName}</span>
+          <span className="text-[0.85rem]">{displayName}</span>
         </div>
       </td>
 
       {/* Status */}
-      <td style={TD}>
+      <td className={TD_CLS}>
         <Badge label={claim.status} style={badgeStyle} />
       </td>
 
       {/* Submitted */}
-      <td style={{ ...TD, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+      <td className={`${TD_CLS} text-text-muted whitespace-nowrap`}>
         <span title={fmt(claim.requested_at)}>{relativeTime(claim.requested_at)}</span>
       </td>
 
       {/* Reviewed */}
-      <td style={{ ...TD, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+      <td className={`${TD_CLS} text-text-muted whitespace-nowrap`}>
         {claim.reviewed_at ? (
           <span title={fmt(claim.reviewed_at)}>{relativeTime(claim.reviewed_at)}</span>
         ) : (
-          <span style={{ opacity: 0.4 }}>—</span>
+          <span className="opacity-40">—</span>
         )}
       </td>
 
       {/* Note */}
-      <td style={{ ...TD, color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem', maxWidth: 180 }}>
+      <td className={`${TD_CLS} text-text-muted italic text-[0.8rem] max-w-[180px]`}>
         {claim.note
-          ? <span title={claim.note} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{claim.note}"</span>
-          : <span style={{ opacity: 0.4 }}>—</span>
+          ? <span title={claim.note} className="block overflow-hidden text-ellipsis whitespace-nowrap">"{claim.note}"</span>
+          : <span className="opacity-40">—</span>
         }
       </td>
 
       {/* Actions */}
-      <td style={{ ...TD, whiteSpace: 'nowrap' }}>
+      <td className={`${TD_CLS} whitespace-nowrap`}>
         {claim.status === 'pending' ? (
           rejectOpen ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 200 }}>
+            <div className="flex flex-col gap-[0.3rem] min-w-[200px]">
               <textarea
                 placeholder="Optional rejection reason…"
                 value={note}
                 onChange={e => setNote(e.target.value)}
                 rows={2}
-                style={{ fontSize: '0.78rem', resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
+                className="text-[0.78rem] resize-y w-full box-border"
               />
-              <div style={{ display: 'flex', gap: '0.3rem' }}>
+              <div className="flex gap-[0.3rem]">
                 <Button
                   variant="danger"
                   size="sm"
@@ -359,7 +347,7 @@ function ClaimRow({ claim, onDelete }: { claim: ClaimDetail; onDelete: () => voi
               </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: '0.35rem' }}>
+            <div className="flex gap-[0.35rem]">
               <Button
                 variant="primary"
                 size="sm"
@@ -409,7 +397,7 @@ function ClaimsTable({ claims, onAction }: { claims: ClaimDetail[]; onAction: ()
   return (
     <div>
       {/* Filter pills */}
-      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem' }}>
+      <div className="flex gap-[0.4rem] mb-3">
         {(['pending', 'all'] as const).map(f => {
           const count = f === 'pending' ? pendingCount : claims.length
           return (
@@ -424,29 +412,29 @@ function ClaimsTable({ claims, onAction }: { claims: ClaimDetail[]; onAction: ()
               }}
             >
               {f === 'pending' ? 'Pending' : 'All'}{' '}
-              <span style={{ opacity: 0.7, fontSize: '0.7rem' }}>({count})</span>
+              <span className="opacity-70 text-[0.7rem]">({count})</span>
             </button>
           )
         })}
       </div>
 
-      <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
-        <table style={TABLE}>
+      <div className="overflow-x-auto border border-border rounded-md">
+        <table className={TABLE_CLS}>
           <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-              <th style={TH}>Character</th>
-              <th style={TH}>Discord user</th>
-              <th style={TH}>Status</th>
-              <th style={TH}>Submitted</th>
-              <th style={TH}>Reviewed</th>
-              <th style={TH}>Note</th>
-              <th style={TH}></th>
+            <tr className="bg-white/2">
+              <th className={TH_CLS}>Character</th>
+              <th className={TH_CLS}>Discord user</th>
+              <th className={TH_CLS}>Status</th>
+              <th className={TH_CLS}>Submitted</th>
+              <th className={TH_CLS}>Reviewed</th>
+              <th className={TH_CLS}>Note</th>
+              <th className={TH_CLS}></th>
             </tr>
           </thead>
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ ...TD, color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem' }}>
+                <td colSpan={7} className={`${TD_CLS} text-text-muted text-center p-6`}>
                   {filter === 'pending' ? 'No pending claims.' : 'No claims yet.'}
                 </td>
               </tr>
@@ -502,50 +490,47 @@ export default function AdminPage() {
 
   if (auth.status === 'loading') {
     return (
-      <main style={{ maxWidth: 960, margin: '3rem auto', padding: '0 1rem' }}>
-        <p style={{ color: 'var(--text-muted)' }}>Loading…</p>
+      <main className="max-w-[960px] mx-auto my-12 px-4">
+        <p className="text-text-muted">Loading…</p>
       </main>
     )
   }
 
   if (auth.status === 'unauthenticated' || !auth.user.is_admin) {
     return (
-      <main style={{ maxWidth: 960, margin: '3rem auto', padding: '0 1rem' }}>
-        <p style={{ marginTop: '2rem', color: 'var(--danger)' }}>Access denied.</p>
+      <main className="max-w-[960px] mx-auto my-12 px-4">
+        <p className="mt-8 text-danger">Access denied.</p>
       </main>
     )
   }
 
-  const section: React.CSSProperties = { marginBottom: '2.5rem' }
-  const sectionTitle: React.CSSProperties = {
-    fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.07em',
-    color: 'var(--text-muted)', marginBottom: '0.75rem', fontWeight: 600,
-  }
+  const SECTION_CLS = 'mb-10'
+  const SECTION_TITLE_CLS = 'text-[0.8rem] uppercase tracking-[0.07em] text-text-muted mb-3 font-semibold'
 
   return (
-    <main style={{ maxWidth: 1100, margin: '2rem auto', padding: '0 1rem' }}>
-      <Link to="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Back</Link>
-      <h1 style={{ margin: '0.6rem 0 0.2rem', fontFamily: "var(--font-heading)" }}>Admin Panel</h1>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.75rem' }}>
+    <main className="max-w-[1100px] mx-auto my-8 px-4">
+      <Link to="/" className="text-text-muted text-[0.9rem]">← Back</Link>
+      <h1 className="mt-[0.6rem] mb-[0.2rem] font-heading">Admin Panel</h1>
+      <p className="text-text-muted text-[0.9rem] mb-7">
         Manage users and character claims.
       </p>
 
-      {loading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
-      {error   && <p style={{ color: 'var(--danger)' }}>{error}</p>}
+      {loading && <p className="text-text-muted">Loading…</p>}
+      {error   && <p className="text-danger">{error}</p>}
 
       {!loading && !error && (
         <>
           {/* Users */}
-          <div style={section}>
-            <p style={sectionTitle}>
+          <div className={SECTION_CLS}>
+            <p className={SECTION_TITLE_CLS}>
               Users ({users.length})
             </p>
             <UsersTable users={users} onAction={fetchAll} />
           </div>
 
           {/* Claims */}
-          <div style={section}>
-            <p style={sectionTitle}>
+          <div className={SECTION_CLS}>
+            <p className={SECTION_TITLE_CLS}>
               Character claims ({claims.length})
             </p>
             <ClaimsTable claims={claims} onAction={fetchAll} />

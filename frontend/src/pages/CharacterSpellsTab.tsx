@@ -45,21 +45,8 @@ interface _UpgradeRecipe {
 
 // ── Spell table styles ────────────────────────────────────────────────────────
 
-const _SPELL_TH: React.CSSProperties = {
-  padding: '0.4rem 0.6rem',
-  fontSize: '0.7rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  color: 'var(--text-muted)',
-  fontWeight: 600,
-  whiteSpace: 'nowrap',
-  textAlign: 'left',
-}
-const _SPELL_TD: React.CSSProperties = {
-  padding: '0.35rem 0.6rem',
-  fontSize: '0.88rem',
-  whiteSpace: 'nowrap',
-}
+const _SPELL_TH_CLS = 'py-[0.4rem] px-[0.6rem] text-[0.7rem] uppercase tracking-[0.05em] text-text-muted font-semibold whitespace-nowrap text-left'
+const _SPELL_TD_CLS = 'py-[0.35rem] px-[0.6rem] text-[0.88rem] whitespace-nowrap'
 
 // ── Spell Raid Ready card ─────────────────────────────────────────────────────
 
@@ -70,40 +57,36 @@ function SpellRaidReady({ expertOrBetter, totalSpells }: { expertOrBetter: numbe
   const color     = raidReady ? 'var(--success)' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
 
   return (
-    <div style={{ marginBottom: '0.75rem' }}>
+    <div className="mb-3">
       <SectionLabel>Raid Ready</SectionLabel>
-      <div style={{
-        background: 'var(--surface)',
-        border: `1px solid ${raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
-        borderRadius: 5,
-        padding: '8px 10px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <div style={{
-            fontFamily: "var(--font-heading)",
-            fontSize: '2rem', fontWeight: 700, lineHeight: 1,
-            color, textShadow: `0 0 20px ${color}55`,
-            flexShrink: 0, minWidth: '3ch', textAlign: 'center',
-          }}>
+      <div
+        className="bg-surface border rounded-[5px] py-2 px-[10px]"
+        style={{ borderColor: raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)' }}
+      >
+        <div className="flex items-center gap-[0.6rem]">
+          <div
+            className="font-heading text-[2rem] font-bold leading-none shrink-0 min-w-[3ch] text-center"
+            style={{ color, textShadow: `0 0 20px ${color}55` }}
+          >
             {pct}%
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? 'var(--success)' : 'var(--danger)', marginBottom: '0.2rem' }}>
+          <div className="flex-1">
+            <div className="text-[0.78rem] font-semibold mb-[0.2rem]" style={{ color: raidReady ? 'var(--success)' : 'var(--danger)' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <div className="text-[0.68rem] text-text-muted leading-[1.5]">
               {expertOrBetter} / {totalSpells} at Expert+
             </div>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+            <div className="text-[0.65rem] text-text-muted opacity-70">
               (90% required)
             </div>
           </div>
         </div>
-        <div style={{ marginTop: 7, height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', width: `${pct}%`, borderRadius: 2,
-            background: color, transition: 'width 0.3s ease',
-          }} />
+        <div className="mt-[7px] h-1 rounded-[2px] bg-border overflow-hidden">
+          <div
+            className="h-full rounded-[2px] [transition:width_0.3s_ease]"
+            style={{ width: `${pct}%`, background: color }}
+          />
         </div>
       </div>
     </div>
@@ -123,17 +106,17 @@ function SpellProgressBar({ label, subtitle, value, total, pct, color }: {
   const clamped = Math.min(100, pct)
   const done    = clamped >= 100
   return (
-    <div style={{ padding: '5px 0 7px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
-        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: done ? color : 'var(--text)' }}>{label}</span>
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{value}/{total}</span>
+    <div className="pt-[5px] pb-[7px]">
+      <div className="flex justify-between items-baseline mb-[2px]">
+        <span className="text-[0.78rem] font-semibold" style={{ color: done ? color : 'var(--text)' }}>{label}</span>
+        <span className="text-[0.78rem] text-text-muted">{value}/{total}</span>
       </div>
-      <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden', marginBottom: 2 }}>
-        <div style={{ height: '100%', width: `${clamped}%`, borderRadius: 3, background: color, transition: 'width 0.3s' }} />
+      <div className="h-[6px] rounded-[3px] bg-border overflow-hidden mb-[2px]">
+        <div className="h-full rounded-[3px] [transition:width_0.3s]" style={{ width: `${clamped}%`, background: color }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{subtitle}</span>
-        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: done ? color : 'var(--text-muted)' }}>
+      <div className="flex justify-between items-baseline">
+        <span className="text-[0.68rem] text-text-muted">{subtitle}</span>
+        <span className="text-[0.75rem] font-bold" style={{ color: done ? color : 'var(--text-muted)' }}>
           {Math.round(pct)}%
         </span>
       </div>
@@ -152,46 +135,36 @@ const _CAT_COLOUR: Record<string, string> = {
 function IngredientTooltip({ ing }: { ing: Ingredient }) {
   const tierColour = itemRarityColor(ing.tier, 'var(--text)')
   return (
-    <div style={{
-      position: 'absolute', zIndex: 9999,
-      left: '100%', top: 0, marginLeft: 8,
-      width: 220,
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 6,
-      boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-      padding: '0.6rem 0.75rem',
-      pointerEvents: 'none',
-    }}>
+    <div
+      className="absolute z-[9999] left-full top-0 ml-2 w-[220px] bg-surface border border-border rounded-md py-[0.6rem] px-3 pointer-events-none"
+      style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
+    >
       {/* Header: icon + name */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div className="flex items-center gap-2 mb-[6px]">
         {ing.icon_id ? (
           <img
             src={`/icons/${ing.icon_id}.png`}
             alt=""
             width={32} height={32}
-            style={{ borderRadius: 3, border: '1px solid var(--border)', flexShrink: 0 }}
+            className="rounded-[3px] border border-border shrink-0"
             onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
         ) : (
-          <div style={{ width: 32, height: 32, borderRadius: 3, background: 'var(--border)', flexShrink: 0 }} />
+          <div className="w-8 h-8 rounded-[3px] bg-border shrink-0" />
         )}
-        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: tierColour, lineHeight: 1.3 }}>
+        <span className="text-[0.85rem] font-semibold leading-[1.3]" style={{ color: tierColour }}>
           {ing.name}
         </span>
       </div>
       {/* Tier badge */}
       {ing.tier && (
-        <div style={{ fontSize: '0.7rem', color: tierColour, marginBottom: ing.description ? 4 : 0 }}>
+        <div className="text-[0.7rem]" style={{ color: tierColour, marginBottom: ing.description ? 4 : 0 }}>
           {ing.tier}
         </div>
       )}
       {/* Description */}
       {ing.description && (
-        <div style={{
-          fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.4,
-          maxHeight: 80, overflow: 'hidden',
-        }}>
+        <div className="text-[0.72rem] text-text-muted leading-[1.4] max-h-20 overflow-hidden">
           {ing.description}
         </div>
       )}
@@ -205,39 +178,34 @@ function IngredientRow({ ing }: { ing: Ingredient }) {
 
   return (
     <div
-      style={{ position: 'relative' }}
+      className="relative"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 5,
-        padding: '3px 0',
-        borderBottom: '1px solid var(--border)',
-        cursor: ing.item_id ? 'default' : undefined,
-      }}>
+      <div
+        className="flex items-center gap-[5px] py-[3px] border-b border-border"
+        style={{ cursor: ing.item_id ? 'default' : undefined }}
+      >
         {/* Icon */}
-        <div style={{ width: 20, height: 20, flexShrink: 0 }}>
+        <div className="w-5 h-5 shrink-0">
           {ing.icon_id ? (
             <img
               src={`/icons/${ing.icon_id}.png`}
               alt=""
               width={20} height={20}
-              style={{ borderRadius: 2, display: 'block' }}
+              className="rounded-[2px] block"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
             />
           ) : (
-            <div style={{ width: 20, height: 20, borderRadius: 2, background: 'var(--border)' }} />
+            <div className="w-5 h-5 rounded-[2px] bg-border" />
           )}
         </div>
         {/* Name */}
-        <span style={{
-          fontSize: '0.76rem', color: catColour, flex: 1,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
+        <span className="text-[0.76rem] flex-1 overflow-hidden text-ellipsis whitespace-nowrap" style={{ color: catColour }}>
           {ing.name}
         </span>
         {/* Quantity */}
-        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: catColour, flexShrink: 0 }}>
+        <span className="text-[0.82rem] font-semibold shrink-0" style={{ color: catColour }}>
           {ing.quantity.toLocaleString()}
         </span>
       </div>
@@ -283,13 +251,13 @@ function MaterialsSection({ charName }: { charName: string }) {
 
   if (loading) return (
     <StatGroup title="Upgrade Materials">
-      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '4px 0' }}>Loading…</p>
+      <p className="text-[0.78rem] text-text-muted my-1">Loading…</p>
     </StatGroup>
   )
   if (error || !data) return null
   if (data.spells_needing_upgrade === 0) return (
     <StatGroup title="Upgrade Materials">
-      <p style={{ fontSize: '0.78rem', color: '#22c55e', margin: '4px 0' }}>
+      <p className="text-[0.78rem] my-1" style={{ color: '#22c55e' }}>
         All spells at Expert or better ✓
       </p>
     </StatGroup>
@@ -325,11 +293,11 @@ function MaterialsSection({ charName }: { charName: string }) {
 
   return (
     <StatGroup title="Upgrade Materials">
-      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 6, lineHeight: 1.4 }}>
+      <div className="text-[0.72rem] text-text-muted mb-[6px] leading-[1.4]">
         Expert recipes for{' '}
-        <span style={{ color: 'var(--text)', fontWeight: 600 }}>{data.spells_with_recipe}</span>
+        <span className="text-text font-semibold">{data.spells_with_recipe}</span>
         {' '}of{' '}
-        <span style={{ color: 'var(--text)', fontWeight: 600 }}>{data.spells_needing_upgrade}</span>
+        <span className="text-text font-semibold">{data.spells_needing_upgrade}</span>
         {' '}upgradeable spells
         {missing > 0 && <span style={{ color: '#f97316' }}> ({missing} no recipe)</span>}
       </div>
@@ -353,14 +321,8 @@ function MaterialsSection({ charName }: { charName: string }) {
         )
 
         return sortedTiers.map(t => (
-          <div key={t} style={{ marginBottom: 6 }}>
-            <div style={{
-              fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.07em',
-              textTransform: 'uppercase', color: 'var(--text-muted)',
-              padding: '3px 0 2px',
-              borderBottom: '1px solid var(--border)',
-              marginBottom: 1,
-            }}>
+          <div key={t} className="mb-[6px]">
+            <div className="text-[0.65rem] font-bold tracking-[0.07em] uppercase text-text-muted pt-[3px] pb-[2px] border-b border-border mb-[1px]">
               {t === 0 ? 'Unknown' : `T${t}`}
             </div>
             {groups.get(t)!.map(ing => (
@@ -372,18 +334,18 @@ function MaterialsSection({ charName }: { charName: string }) {
 
       {/* Add-to-shopping-list button */}
       {data.spells_with_recipe > 0 && (
-        <div style={{ marginTop: 8 }}>
+        <div className="mt-2">
           <Button
             variant="secondary"
             size="sm"
             onClick={handleAddToList}
             disabled={addingToList}
-            style={{ width: '100%' }}
+            className="w-full"
           >
             {addingToList ? '⏳ Adding…' : '🛒 Add upgrades to shopping list'}
           </Button>
           {addError && (
-            <div style={{ fontSize: '0.68rem', color: 'var(--danger)', marginTop: 3 }}>
+            <div className="text-[0.68rem] text-danger mt-[3px]">
               Error: {addError}
             </div>
           )}
@@ -428,10 +390,10 @@ export function SpellsTab({ charName }: { charName: string }) {
   }, [charName, cacheKey])
 
   if (state.status === 'loading') {
-    return <p style={{ marginTop: '1.5rem', color: 'var(--text-muted)' }}>Loading spell data…</p>
+    return <p className="mt-6 text-text-muted">Loading spell data…</p>
   }
   if (state.status === 'error') {
-    return <p style={{ marginTop: '1.5rem', color: 'var(--danger)' }}>Error: {state.message}</p>
+    return <p className="mt-6 text-danger">Error: {state.message}</p>
   }
 
   const { data } = state
@@ -457,10 +419,10 @@ export function SpellsTab({ charName }: { charName: string }) {
   }
 
   return (
-    <div style={{ marginTop: '1rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+    <div className="mt-4 flex gap-6 items-start">
 
       {/* ── Left sidebar ── */}
-      <div style={{ width: 240, flexShrink: 0 }}>
+      <div className="w-[240px] shrink-0">
         <SpellRaidReady expertOrBetter={expertOrBetter} totalSpells={totalSpells} />
 
         <StatGroup title="By Tier">
@@ -473,32 +435,28 @@ export function SpellsTab({ charName }: { charName: string }) {
               <div
                 key={tier}
                 onClick={() => toggleTier(tier)}
-                style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-                  padding: '3px 0', borderBottom: '1px solid var(--border)',
-                  cursor: 'pointer',
-                  opacity: tierFilter.size > 0 && !isActive ? 0.35 : 1,
-                  transition: 'opacity 0.12s',
-                }}
+                className="flex justify-between items-baseline py-[3px] border-b border-border cursor-pointer [transition:opacity_0.12s]"
+                style={{ opacity: tierFilter.size > 0 && !isActive ? 0.35 : 1 }}
               >
-                <span style={{ fontSize: '0.78rem', color: tc?.text ?? 'var(--text)', fontWeight: isActive ? 700 : 400 }}>
+                <span className="text-[0.78rem]" style={{ color: tc?.text ?? 'var(--text)', fontWeight: isActive ? 700 : 400 }}>
                   {tier}
                 </span>
-                <span style={{
-                  fontSize: '0.85rem', fontWeight: 600,
-                  color: tc?.text ?? 'var(--text)',
-                  background: isActive ? (tc?.bg ?? 'transparent') : 'transparent',
-                  borderRadius: 3, padding: '0 4px',
-                }}>
+                <span
+                  className="text-[0.85rem] font-semibold rounded-[3px] px-1"
+                  style={{
+                    color: tc?.text ?? 'var(--text)',
+                    background: isActive ? (tc?.bg ?? 'transparent') : 'transparent',
+                  }}
+                >
                   {count}
                 </span>
               </div>
             )
           })}
           {/* Total row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0 1px', marginTop: 2 }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</span>
-            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{totalSpells}</span>
+          <div className="flex justify-between pt-[5px] pb-[1px] mt-[2px]">
+            <span className="text-[0.75rem] text-text-muted uppercase tracking-[0.04em]">Total</span>
+            <span className="text-[0.9rem] font-semibold">{totalSpells}</span>
           </div>
         </StatGroup>
 
@@ -521,7 +479,7 @@ export function SpellsTab({ charName }: { charName: string }) {
             variant="secondary"
             size="sm"
             onClick={() => setTierFilter(new Set())}
-            style={{ width: '100%', marginTop: 4 }}
+            className="w-full mt-1"
           >
             Clear tier filter
           </Button>
@@ -529,20 +487,17 @@ export function SpellsTab({ charName }: { charName: string }) {
       </div>
 
       {/* ── Right: spell list (2 columns) ── */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex-1 min-w-0">
         <input
           type="text"
           placeholder="Search spells…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ marginBottom: '0.75rem', width: 260, boxSizing: 'border-box' }}
+          className="mb-3 w-[260px] box-border"
         />
 
         {filtered.length === 0 ? (
-          <Card style={{
-            borderRadius: 6,
-            padding: '1.5rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.88rem',
-          }}>
+          <Card className="rounded-md p-6 text-text-muted text-center text-[0.88rem]">
             No spells match your filter.
           </Card>
         ) : (() => {
@@ -550,33 +505,30 @@ export function SpellsTab({ charName }: { charName: string }) {
           const cols = [filtered.slice(0, mid), filtered.slice(mid)]
 
           const renderTable = (rows: SpellEntry[]) => (
-            <Card style={{
-              borderRadius: 6, padding: 0,
-              overflow: 'hidden', flex: 1, minWidth: 0,
-            }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <Card className="rounded-md p-0 overflow-hidden flex-1 min-w-0">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--surface-raised, var(--surface))' }}>
-                    <th style={{ ..._SPELL_TH, width: 36, textAlign: 'right' }}>Lvl</th>
-                    <th style={_SPELL_TH}>Name</th>
-                    <th style={{ ..._SPELL_TH, textAlign: 'right', paddingRight: '0.5rem' }}>Tier</th>
+                  <tr className="border-b-2 border-border bg-surface-raised">
+                    <th className={`${_SPELL_TH_CLS} w-9 text-right`}>Lvl</th>
+                    <th className={_SPELL_TH_CLS}>Name</th>
+                    <th className={`${_SPELL_TH_CLS} text-right pr-2`}>Tier</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((s, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ ..._SPELL_TD, textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.8rem', width: 36 }}>
+                    <tr key={i} className="border-b border-border">
+                      <td className={`${_SPELL_TD_CLS} text-right text-text-muted text-[0.8rem] w-9`}>
                         {s.level}
                       </td>
-                      <td style={{ ..._SPELL_TD, fontWeight: 500 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <td className={`${_SPELL_TD_CLS} font-medium`}>
+                        <div className="flex items-center gap-[5px]">
                           {(s.icon_id != null || s.icon_backdrop != null) && (
-                            <div style={{ position: 'relative', width: 18, height: 18, flexShrink: 0 }}>
+                            <div className="relative w-[18px] h-[18px] shrink-0">
                               {s.icon_backdrop != null && s.icon_backdrop > 0 && (
                                 <img
                                   src={`/spell-icons/${s.icon_backdrop}.png`}
                                   alt=""
-                                  style={{ position: 'absolute', inset: 0, width: 18, height: 18 }}
+                                  className="absolute inset-0 w-[18px] h-[18px]"
                                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                                 />
                               )}
@@ -584,17 +536,17 @@ export function SpellsTab({ charName }: { charName: string }) {
                                 <img
                                   src={`/spell-icons/${s.icon_id}.png`}
                                   alt=""
-                                  style={{ position: 'absolute', inset: 0, width: 18, height: 18 }}
+                                  className="absolute inset-0 w-[18px] h-[18px]"
                                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                                 />
                               )}
                             </div>
                           )}
-                          <span style={{ fontSize: '0.82rem' }}>{s.name}</span>
+                          <span className="text-[0.82rem]">{s.name}</span>
                         </div>
                       </td>
-                      <td style={{ ..._SPELL_TD, textAlign: 'right', paddingRight: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                      <td className={`${_SPELL_TD_CLS} text-right pr-2`}>
+                        <div className="flex items-center justify-end gap-px">
                           {SPELL_TIER_ORDER.map(t => {
                             const base = SPELL_TIER_ICON[t]
                             const filename = t === s.tier ? `${base}-lit.png` : `${base}.png`
@@ -617,7 +569,7 @@ export function SpellsTab({ charName }: { charName: string }) {
           )
 
           return (
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+            <div className="flex gap-3 items-start">
               {cols.map((col, ci) => <React.Fragment key={ci}>{renderTable(col)}</React.Fragment>)}
             </div>
           )

@@ -12,29 +12,28 @@ interface CrumbItem {
  */
 export default function Breadcrumb({ items }: { items: CrumbItem[] }) {
   return (
-    <nav aria-label="Breadcrumb" style={{
-      display: 'flex', alignItems: 'center', gap: '0.35rem',
-      marginBottom: '0.75rem', fontSize: '0.88rem', color: 'var(--text-muted)',
-      flexWrap: 'wrap',
-    }}>
+    <nav
+      aria-label="Breadcrumb"
+      className="flex items-center gap-[0.35rem] mb-3 text-[0.88rem] text-text-muted flex-wrap"
+    >
       {items.map((item, i) => {
         const isLast = i === items.length - 1
         return (
-          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <span key={i} className="flex items-center gap-[0.35rem]">
             {i > 0 && (
-              <span style={{ opacity: 0.45, userSelect: 'none' }}>›</span>
+              <span className="opacity-45 select-none">›</span>
             )}
             {item.to && !isLast ? (
               <Link
                 to={item.to}
-                style={{ color: 'var(--text-muted)', textDecoration: 'none' }}
+                className="text-text-muted no-underline"
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
               >
                 {item.label}
               </Link>
             ) : (
-              <span style={{ color: isLast ? 'var(--text)' : 'var(--text-muted)' }}>
+              <span className={isLast ? 'text-text' : 'text-text-muted'}>
                 {item.label}
               </span>
             )}

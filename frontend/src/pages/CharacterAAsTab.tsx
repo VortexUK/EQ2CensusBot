@@ -67,48 +67,39 @@ function AARaidReady({ spent, cap }: { spent: number; cap: number }) {
   const color     = raidReady ? 'var(--success)' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
 
   return (
-    <div style={{ marginBottom: '0.75rem' }}>
+    <div className="mb-3">
       <SectionLabel>Raid Ready</SectionLabel>
-      <div style={{
-        background: 'var(--surface)',
-        border: `1px solid ${raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
-        borderRadius: 5,
-        padding: '8px 10px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+      <div
+        className="bg-surface border rounded-[5px] py-2 px-[10px]"
+        style={{ borderColor: raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)' }}
+      >
+        <div className="flex items-center gap-[0.6rem]">
           {/* Percentage */}
-          <div style={{
-            fontFamily: "var(--font-heading)",
-            fontSize: '2rem',
-            fontWeight: 700,
-            lineHeight: 1,
-            color,
-            textShadow: `0 0 20px ${color}55`,
-            flexShrink: 0,
-            minWidth: '3ch',
-            textAlign: 'center',
-          }}>
+          <div
+            className="font-heading text-[2rem] font-bold leading-none shrink-0 min-w-[3ch] text-center"
+            style={{ color, textShadow: `0 0 20px ${color}55` }}
+          >
             {pct}%
           </div>
           {/* Status + detail */}
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? 'var(--success)' : 'var(--danger)', marginBottom: '0.2rem' }}>
+          <div className="flex-1">
+            <div className="text-[0.78rem] font-semibold mb-[0.2rem]" style={{ color: raidReady ? 'var(--success)' : 'var(--danger)' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <div className="text-[0.68rem] text-text-muted leading-[1.5]">
               {spent.toLocaleString()} / {cap.toLocaleString()} spent
             </div>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+            <div className="text-[0.65rem] text-text-muted opacity-70">
               (90% required)
             </div>
           </div>
         </div>
         {/* Progress bar */}
-        <div style={{ marginTop: 7, height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', width: `${pct}%`, borderRadius: 2,
-            background: color, transition: 'width 0.3s ease',
-          }} />
+        <div className="mt-[7px] h-1 rounded-[2px] bg-border overflow-hidden">
+          <div
+            className="h-full rounded-[2px] [transition:width_0.3s_ease]"
+            style={{ width: `${pct}%`, background: color }}
+          />
         </div>
       </div>
     </div>
@@ -126,24 +117,24 @@ function AAProgressBar({ label, value, max, pct }: {
   const filled  = pct !== null && pct >= 100
   const barColor = filled ? '#22cc22' : 'var(--accent)'
   return (
-    <div style={{ padding: '4px 0 6px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+    <div className="pt-1 pb-[6px]">
+      <div className="flex justify-between items-baseline mb-[3px]">
+        <span className="text-[0.75rem] text-text-muted uppercase tracking-[0.05em]">
           {label}
         </span>
-        <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+        <span className="text-[0.82rem] font-semibold">
           {value.toLocaleString()}{max !== null ? ` / ${max.toLocaleString()}` : ''}
         </span>
       </div>
       {pct !== null && (
         <>
-          <div style={{ height: 5, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', width: `${pct}%`, borderRadius: 3,
-              background: barColor, transition: 'width 0.3s ease',
-            }} />
+          <div className="h-[5px] rounded-[3px] bg-border overflow-hidden">
+            <div
+              className="h-full rounded-[3px] [transition:width_0.3s_ease]"
+              style={{ width: `${pct}%`, background: barColor }}
+            />
           </div>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'right', marginTop: 2 }}>
+          <div className="text-[0.68rem] text-text-muted text-right mt-[2px]">
             {pct}%
           </div>
         </>
@@ -228,10 +219,10 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
   }, [charName, cacheKey])
 
   if (state.status === 'loading') {
-    return <p style={{ marginTop: '1.5rem', color: 'var(--text-muted)' }}>Loading AA data…</p>
+    return <p className="mt-6 text-text-muted">Loading AA data…</p>
   }
   if (state.status === 'error') {
-    return <p style={{ marginTop: '1.5rem', color: 'var(--danger)' }}>Error: {state.message}</p>
+    return <p className="mt-6 text-danger">Error: {state.message}</p>
   }
 
   const { charAAs, config, treeData } = state
@@ -262,19 +253,19 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
     : null
 
   return (
-    <div style={{ marginTop: '1rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+    <div className="mt-4 flex gap-6 items-start">
 
       {/* ── Left sidebar ── */}
-      <div style={{ width: 240, flexShrink: 0 }}>
+      <div className="w-[240px] shrink-0">
 
         {/* Raid Ready */}
         <AARaidReady spent={spentInView} cap={config.aa_cap} />
 
         {/* Profile selector */}
         {charAAs.profiles.length > 0 && (
-          <div style={{ marginBottom: '0.75rem' }}>
-            <SectionLabel style={{ marginBottom: 4 }}>Profile</SectionLabel>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div className="mb-3">
+            <SectionLabel className="mb-1">Profile</SectionLabel>
+            <div className="flex flex-col gap-[2px]">
               {(['current', ...charAAs.profiles.map((_, i) => i)] as ActiveProfile[]).map(pid => {
                 const isActive = activeProfile === pid
                 const label    = pid === 'current' ? 'Current' : charAAs.profiles[pid as number].name
@@ -282,20 +273,12 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
                   <button
                     key={String(pid)}
                     onClick={() => setActiveProfile(pid)}
+                    className="text-left border rounded-sm cursor-pointer text-[0.78rem] py-1 px-2 overflow-hidden text-ellipsis whitespace-nowrap [transition:background_0.12s,border-color_0.12s]"
                     style={{
-                      textAlign: 'left',
                       background: isActive ? 'var(--accent)' : 'var(--surface)',
-                      border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
-                      borderRadius: 4,
+                      borderColor: isActive ? 'var(--accent)' : 'var(--border)',
                       color: isActive ? '#000' : 'var(--text)',
-                      cursor: 'pointer',
-                      fontSize: '0.78rem',
                       fontWeight: isActive ? 600 : 400,
-                      padding: '4px 8px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      transition: 'background 0.12s, border-color 0.12s',
                     }}
                     title={label}
                   >
@@ -310,11 +293,11 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
         {/* Expansion */}
         {config.xpac && (
           <StatGroup title="Expansion">
-            <div style={{ padding: '3px 0', fontSize: '0.83rem', color: 'var(--text)' }}>
+            <div className="py-[3px] text-[0.83rem] text-text">
               {config.xpac}
             </div>
             {config.aa_cap > 0 && (
-              <div style={{ padding: '1px 0 3px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <div className="pt-[1px] pb-[3px] text-[0.75rem] text-text-muted">
                 {config.aa_cap.toLocaleString()} AA cap
               </div>
             )}
@@ -353,20 +336,16 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
       </div>
 
       {/* ── Right: sub-tabs + tree ── */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex-1 min-w-0">
 
         {visibleTrees.length === 0 && (
-          <p style={{ color: 'var(--text-muted)' }}>No AA data available.</p>
+          <p className="text-text-muted">No AA data available.</p>
         )}
 
         {visibleTrees.length > 0 && (
           <>
             {/* Tree sub-tabs */}
-            <div style={{
-              display: 'flex', flexWrap: 'wrap', gap: '2px',
-              borderBottom: '1px solid var(--border)',
-              marginBottom: '0.75rem',
-            }}>
+            <div className="flex flex-wrap gap-[2px] border-b border-border mb-3">
               {visibleTrees.map(ct => {
                 const active    = ct.tree_id === (activeCt?.tree_id)
                 const typeLabel = _TREE_TYPE_LABEL[ct.tree_type] ?? ct.tree_type
@@ -374,18 +353,12 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
                   <button
                     key={ct.tree_id}
                     onClick={() => setSelectedTreeId(ct.tree_id)}
+                    className="border-none cursor-pointer py-[5px] px-3 -mb-[1px] text-[0.8rem] whitespace-nowrap [transition:color_0.12s,border-color_0.12s]"
                     style={{
                       background: active ? 'var(--surface)' : 'transparent',
-                      border: 'none',
                       borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
                       color: active ? 'var(--text)' : 'var(--text-muted)',
-                      cursor: 'pointer',
-                      padding: '5px 12px',
-                      marginBottom: '-1px',
-                      fontSize: '0.8rem',
                       fontWeight: active ? 600 : 400,
-                      transition: 'color 0.12s, border-color 0.12s',
-                      whiteSpace: 'nowrap',
                     }}
                     title={`${typeLabel} · ${ct.total_spent} pts`}
                   >
@@ -399,19 +372,16 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
             {activeCt && (
               <div>
                 {/* Type label */}
-                <div style={{ marginBottom: '0.4rem', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)' }}>
+                <div className="mb-[0.4rem] text-[0.72rem] uppercase tracking-[0.06em] text-gold">
                   {_TREE_TYPE_LABEL[activeCt.tree_type] ?? activeCt.tree_type}
                 </div>
 
                 {/* Tree at 60% of the right column */}
-                <div style={{ width: '60%' }}>
+                <div className="w-[60%]">
                   {activeTd ? (
                     <AATree tree={activeTd} spent={activeCt.spent} />
                   ) : (
-                    <Card style={{
-                      borderRadius: 4, padding: '1rem',
-                      color: 'var(--text-muted)', fontSize: '0.82rem',
-                    }}>
+                    <Card className="rounded-sm p-4 text-text-muted text-[0.82rem]">
                       Tree data unavailable (tree #{activeCt.tree_id})
                     </Card>
                   )}

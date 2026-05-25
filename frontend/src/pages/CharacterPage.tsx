@@ -197,9 +197,9 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
 
   if (scored.length === 0) {
     return (
-      <div style={{ marginBottom: '1rem' }}>
+      <div className="mb-4">
         <SectionLabel>Raid Ready</SectionLabel>
-        <Card style={{ borderRadius: 5, padding: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
+        <Card className="rounded-[5px] p-2 text-center text-text-muted text-[0.78rem] italic">
           {ready ? 'No gear data' : 'Loading item data…'}
         </Card>
       </div>
@@ -210,40 +210,36 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
   const { grade, color, raidReady } = gradeLabel(avg, ratingConfig)
 
   return (
-    <div style={{ marginBottom: '1rem' }}>
+    <div className="mb-4">
       <SectionLabel>Raid Ready</SectionLabel>
-      <div style={{
-        background: 'var(--surface)',
-        border: `1px solid ${raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
-        borderRadius: 5,
-        padding: '8px 10px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+      <div
+        className="bg-surface border rounded-[5px] px-[10px] py-2"
+        style={{
+          borderColor: raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)',
+        }}
+      >
+        <div className="flex items-center gap-[0.6rem]">
           {/* Grade letter */}
-          <div style={{
-            fontFamily: "var(--font-heading)",
-            fontSize: '2.6rem',
-            fontWeight: 700,
-            lineHeight: 1,
-            color,
-            textShadow: `0 0 20px ${color}55`,
-            flexShrink: 0,
-            minWidth: '2ch',
-            textAlign: 'center',
-          }}>
+          <div
+            className="font-heading text-[2.6rem] font-bold leading-none shrink-0 min-w-[2ch] text-center"
+            style={{
+              color,
+              textShadow: `0 0 20px ${color}55`,
+            }}
+          >
             {grade}
           </div>
 
           {/* Status + detail */}
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? 'var(--success)' : 'var(--danger)', marginBottom: '0.2rem' }}>
+          <div className="flex-1">
+            <div className="text-[0.78rem] font-semibold mb-[0.2rem]" style={{ color: raidReady ? 'var(--success)' : 'var(--danger)' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <div className="text-[0.68rem] text-text-muted leading-[1.5]">
               {scored.length} item{scored.length !== 1 ? 's' : ''} rated
-              {pending > 0 && <span style={{ opacity: 0.6 }}> · {pending} loading</span>}
+              {pending > 0 && <span className="opacity-60"> · {pending} loading</span>}
             </div>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+            <div className="text-[0.65rem] text-text-muted opacity-70">
               (C+ or above = raid ready)
             </div>
           </div>
@@ -503,11 +499,11 @@ export default function CharacterPage() {
   }, [name])
 
   return (
-    <main style={{ maxWidth: 1280, margin: '2rem auto', padding: '0 1rem' }}>
+    <main className="max-w-[1280px] my-8 mx-auto px-4">
       <Breadcrumb items={[{ label: 'Characters', to: '/characters' }, { label: name ?? '…' }]} />
-      {state.status === 'loading' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Loading…</p>}
-      {state.status === 'not_found' && <p style={{ marginTop: '2rem', color: 'var(--text-muted)' }}>Character <strong>{state.name}</strong> not found.</p>}
-      {state.status === 'error' && <p style={{ marginTop: '2rem', color: 'var(--danger)' }}>Error: {state.message}</p>}
+      {state.status === 'loading' && <p className="mt-8 text-text-muted">Loading…</p>}
+      {state.status === 'not_found' && <p className="mt-8 text-text-muted">Character <strong>{state.name}</strong> not found.</p>}
+      {state.status === 'error' && <p className="mt-8 text-danger">Error: {state.message}</p>}
       {state.status === 'ok' && <CharacterView char={state.char} maxLevel={maxLevel} ratingConfig={ratingConfig} />}
     </main>
   )
@@ -571,16 +567,12 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
   }, [tooltip])
 
   return (
-    <div style={{ marginTop: '1.5rem' }} onMouseMove={moveTip}>
+    <div className="mt-6" onMouseMove={moveTip}>
       {/* Full-width general banner */}
       <GeneralBanner char={char} />
 
       {/* Tab bar */}
-      <div style={{
-        display: 'flex', gap: 0,
-        borderBottom: '1px solid var(--border)',
-        marginTop: '1rem',
-      }}>
+      <div className="flex gap-0 border-b border-border mt-4">
         {(['equipment', 'aas', 'spells'] as ActiveTab[]).map(tab => {
           const label = tab === 'equipment' ? 'Equipment & Stats'
                       : tab === 'aas'       ? 'Alternate Advancements'
@@ -590,18 +582,12 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
+              className="border-none cursor-pointer text-[0.82rem] tracking-[0.04em] px-4 py-[7px] mb-[-1px] transition-[color,border-color] duration-150"
               style={{
                 background: active ? 'var(--surface)' : 'transparent',
-                border: 'none',
                 borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
                 color: active ? 'var(--text)' : 'var(--text-muted)',
-                cursor: 'pointer',
-                fontSize: '0.82rem',
                 fontWeight: active ? 600 : 400,
-                letterSpacing: '0.04em',
-                padding: '7px 16px',
-                marginBottom: '-1px',
-                transition: 'color 0.15s, border-color 0.15s',
               }}
             >
               {label}
@@ -612,9 +598,9 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
 
       {/* Equipment & Stats tab */}
       {activeTab === 'equipment' && (
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', marginTop: '1rem' }}>
+        <div className="flex gap-6 items-start mt-4">
           {/* Left: gear rating + detailed stats */}
-          <div style={{ width: 260, flexShrink: 0 }}>
+          <div className="w-[260px] shrink-0">
             <GearRating equipment={char.equipment} ready={itemsReady} maxLevel={maxLevel} ratingConfig={ratingConfig} />
             <StatsPanel char={char}
               onStatHover={setHoveredStat}
@@ -622,16 +608,16 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
           </div>
 
           {/* Right: paperdoll */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={sectionHeading}>Equipment</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div className="flex-1 min-w-0">
+            <h2 className={sectionHeadingClass}>Equipment</h2>
+            <div className="grid grid-cols-2 gap-y-[4px] gap-x-3">
+              <div className="flex flex-col gap-1">
                 {LEFT_SLOTS.map(([label, key]) => {
                   const item = bySlot.get(key) ?? null
                   return <SlotRow key={key} label={label} item={item} iconSide="left" onShow={showTip} onHide={hideTip} highlight={getHighlight(item)} />
                 })}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div className="flex flex-col gap-1">
                 {RIGHT_SLOTS.map(([label, key]) => {
                   const item = bySlot.get(key) ?? null
                   return <SlotRow key={key} label={label} item={item} iconSide="right" onShow={showTip} onHide={hideTip} highlight={getHighlight(item)} />
@@ -639,8 +625,8 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
               </div>
             </div>
 
-            <h2 style={{ ...sectionHeading, marginTop: '1rem' }}>Consumables</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+            <h2 className={`${sectionHeadingClass} mt-4`}>Consumables</h2>
+            <div className="grid grid-cols-2 gap-y-[4px] gap-x-3">
               {CONSUMABLE_SLOTS.map(([label, key]) => {
                 const item = bySlot.get(key) ?? null
                 return <SlotRow key={key} label={label} item={item} iconSide="left" onShow={showTip} onHide={hideTip} highlight={getHighlight(item)} />
@@ -689,43 +675,26 @@ function GeneralBanner({ char }: { char: Character }) {
   ]
 
   return (
-    <Card style={{
-      borderRadius: 6, padding: '0.5rem 1rem',
-      display: 'flex', alignItems: 'stretch',
-    }}>
+    <Card className="rounded-[6px] px-4 py-2 flex items-stretch">
       {/* Identity: name + subtitle, separated by a divider */}
-      <div style={{
-        paddingRight: '1.25rem', marginRight: '1.25rem',
-        borderRight: '1px solid var(--border)',
-        display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          fontFamily: "var(--font-heading)",
-          fontSize: '1.6rem',
-          fontWeight: 700,
-          lineHeight: 1.2,
-          letterSpacing: '0.04em',
-          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          display: 'inline-block',
-        }}>{char.name}</div>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.15rem' }}>
+      <div className="pr-5 mr-5 border-r border-border flex flex-col justify-center shrink-0">
+        <div
+          className="font-heading text-[1.6rem] font-bold leading-[1.2] tracking-[0.04em] inline-block"
+          style={{
+            background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >{char.name}</div>
+        <div className="text-text-muted text-[0.82rem] mt-[0.15rem]">
           {[char.world, char.race, char.gender].filter(Boolean).join(' · ')}
         </div>
         {char.guild_name && (
           <Link
             to={`/guild/${encodeURIComponent(char.guild_name)}`}
-            style={{
-              display: 'inline-block',
-              marginTop: '0.2rem',
-              fontSize: '0.82rem',
-              color: 'var(--accent)',
-              textDecoration: 'none',
-              fontWeight: 500,
-            }}
+            className="inline-block mt-[0.2rem] text-[0.82rem] no-underline font-medium"
+            style={{ color: 'var(--accent)' }}
           >
             ⚔ {char.guild_name}
           </Link>
@@ -734,12 +703,14 @@ function GeneralBanner({ char }: { char: Character }) {
 
       {/* Stat columns, each divided */}
       {columns.map(([top, bottom], i) => (
-        <div key={i} style={{
-          flex: 1,
-          paddingLeft: '1rem', paddingRight: i < columns.length - 1 ? '1rem' : 0,
-          borderRight: i < columns.length - 1 ? '1px solid var(--border)' : undefined,
-          display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.2rem',
-        }}>
+        <div
+          key={i}
+          className="flex-1 pl-4 flex flex-col justify-center gap-[0.2rem]"
+          style={{
+            paddingRight: i < columns.length - 1 ? '1rem' : 0,
+            borderRight: i < columns.length - 1 ? '1px solid var(--border)' : undefined,
+          }}
+        >
           <BannerStat label={top[0]} value={top[1]} />
           {bottom && <BannerStat label={bottom[0]} value={bottom[1]} />}
         </div>
@@ -750,9 +721,9 @@ function GeneralBanner({ char }: { char: Character }) {
 
 function BannerStat({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
-      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{label}</span>
-      <span style={{ fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{value}</span>
+    <div className="flex justify-between items-baseline gap-2">
+      <span className="text-[0.72rem] uppercase tracking-[0.06em] text-text-muted whitespace-nowrap">{label}</span>
+      <span className="text-[0.9rem] font-semibold whitespace-nowrap">{value}</span>
     </div>
   )
 }
@@ -850,21 +821,22 @@ export function StatRow({ label, value, fmt: format, onHover, onLeave }: {
   const display = typeof value === 'number' ? fmt(value, format) : value
   return (
     <div
-      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '2px 0', borderBottom: '1px solid var(--border)', cursor: onHover ? 'default' : undefined }}
+      className="flex justify-between items-baseline py-[2px] border-b border-border"
+      style={{ cursor: onHover ? 'default' : undefined }}
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
     >
-      <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', paddingRight: '0.5rem' }}>{label}</span>
-      <span style={{ fontSize: '0.85rem', fontWeight: 500, textAlign: 'right' }}>{display}</span>
+      <span className="text-text-muted text-[0.78rem] pr-2">{label}</span>
+      <span className="text-[0.85rem] font-medium text-right">{display}</span>
     </div>
   )
 }
 
 export function StatGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: '1rem' }}>
+    <div className="mb-4">
       <SectionLabel>{title}</SectionLabel>
-      <Card style={{ borderRadius: 5, padding: '4px 8px' }}>
+      <Card className="rounded-[5px] px-2 py-1">
         {children}
       </Card>
     </div>
@@ -885,35 +857,35 @@ function SlotRow({ label, item, iconSide, onShow, onHide, highlight }: {
   const hasAdorns = (item?.adorn_slots.length ?? 0) > 0
 
   const iconEl = (
-    <div style={{ ...iconBox, backgroundImage: `url('/slot-empty-blue.png')`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-      {url && <img src={url} alt={item?.name ?? ''} style={{ width: 40, height: 40, display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
+    <div
+      className={iconBoxClass}
+      style={{ backgroundImage: `url('/slot-empty-blue.png')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+    >
+      {url && <img src={url} alt={item?.name ?? ''} className="w-10 h-10 block" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
     </div>
   )
   const textEl = (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
-      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>{label} – </span>
+    <div className="flex-1 min-w-0 flex flex-col justify-center gap-[2px]">
+      <div className="overflow-hidden text-ellipsis whitespace-nowrap leading-[1.2]">
+        <span className="text-[0.78rem] text-text-muted font-medium">{label} – </span>
         {item
-          ? <span style={{ ...tierStyle(item.tier), fontWeight: 500, fontSize: '0.88rem' }}>{item.name}</span>
-          : <span style={{ color: 'var(--border)', fontSize: '0.82rem', fontStyle: 'italic' }}>Empty</span>}
+          ? <span className="font-medium text-[0.88rem]" style={tierStyle(item.tier)}>{item.name}</span>
+          : <span className="text-border text-[0.82rem] italic">Empty</span>}
       </div>
       {hasAdorns && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 3px', marginTop: 1 }}>
+        <div className="flex flex-wrap gap-y-[2px] gap-x-[3px] mt-px">
           {item!.adorn_slots.map((a, i) => {
             const parsed = a.adorn_name ? parseAdornName(a.adorn_name) : null
             return (
               <span
                 key={i}
                 data-adorn-id={a.adorn_id ?? undefined}
+                className="text-[0.62rem] leading-none px-1 py-px rounded-[2px] border whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]"
                 style={{
-                  fontSize: '0.62rem', lineHeight: 1, padding: '1px 4px',
-                  borderRadius: 2,
-                  border: `1px solid ${adornColour(a.color)}`,
+                  borderColor: adornColour(a.color),
                   color: a.adorn_name ? adornColour(a.color) : 'var(--text-muted)',
                   fontStyle: a.adorn_name ? 'normal' : 'italic',
                   opacity: a.adorn_name ? 1 : 0.6,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  maxWidth: 150,
                   cursor: a.adorn_id ? 'default' : undefined,
                 }}
               >
@@ -938,13 +910,11 @@ function SlotRow({ label, item, iconSide, onShow, onHide, highlight }: {
 
   return (
     <div
+      className="flex items-center gap-2 border rounded-sm px-[6px] py-1 min-w-0 h-auto min-h-[50px] transition-[background,border-color] duration-[120ms] ease"
       style={{
-        ...slotRow,
         flexDirection: iconSide === 'left' ? 'row' : 'row-reverse',
-        height: 'auto', minHeight: 50, alignItems: 'center',
         background:   hlBg     ?? 'var(--surface)',
         borderColor:  hlBorder ?? 'var(--border)',
-        transition: 'background 0.12s ease, border-color 0.12s ease',
       }}
       onMouseOver={item?.item_id ? e => {
         const adornEl = (e.target as HTMLElement).closest('[data-adorn-id]')
@@ -963,16 +933,5 @@ function SlotRow({ label, item, iconSide, onShow, onHide, highlight }: {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const sectionHeading: React.CSSProperties = {
-  fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.07em',
-  color: 'var(--text-muted)', marginBottom: '0.5rem',
-}
-const slotRow: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: '0.5rem',
-  background: 'var(--surface)', border: '1px solid var(--border)',
-  borderRadius: 4, padding: '4px 6px', minWidth: 0, minHeight: 50,
-}
-const iconBox: React.CSSProperties = {
-  width: 40, height: 40, flexShrink: 0, borderRadius: 3,
-  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-}
+const sectionHeadingClass = 'text-[0.78rem] uppercase tracking-[0.07em] text-text-muted mb-2'
+const iconBoxClass = 'w-10 h-10 shrink-0 rounded-[3px] flex items-center justify-center overflow-hidden'

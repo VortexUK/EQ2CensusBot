@@ -119,11 +119,11 @@ export default function TokensPage() {
   }, [])
 
   return (
-    <main style={pageStyle}>
+    <main className="max-w-[900px] mx-auto px-4 py-6">
       <Breadcrumb items={[{ label: 'Settings', to: '/settings/tokens' }, { label: 'API Tokens' }]} />
 
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1rem' }}>
-        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.7rem', color: 'var(--gold)', margin: 0 }}>
+      <div className="flex items-baseline justify-between mb-4">
+        <h1 className="font-heading text-[1.7rem] text-gold m-0">
           API Tokens
         </h1>
         <Button variant="primary" onClick={() => setMintOpen(true)}>
@@ -131,22 +131,22 @@ export default function TokensPage() {
         </Button>
       </div>
 
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: 0, marginBottom: '1.4rem' }}>
+      <p className="text-text-muted text-[0.88rem] mt-0 mb-[1.4rem]">
         Tokens authenticate external integrations (the ACT plugin) to upload parses on your behalf.
         Treat them like passwords — anyone with the raw token can post parses under your account.
       </p>
 
-      {loading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
-      {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
+      {loading && <p className="text-text-muted">Loading…</p>}
+      {error && <p className="text-danger">{error}</p>}
 
       {!loading && tokens && tokens.length === 0 && (
-        <p style={{ color: 'var(--text-muted)' }}>
+        <p className="text-text-muted">
           You haven't generated any tokens yet. Click <em>+ New token</em> to create one for your ACT plugin.
         </p>
       )}
 
       {!loading && tokens && tokens.length > 0 && (
-        <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <Card className="p-0 overflow-hidden">
           <div style={tableHeaderRow}>
             <div>Name</div>
             <div>Token</div>
@@ -160,14 +160,14 @@ export default function TokensPage() {
               opacity: t.revoked_at ? 0.55 : 1,
             }}>
               <div>{t.name}</div>
-              <div style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              <div className="font-mono text-[0.82rem] text-text-muted">
                 {t.token_prefix}…
               </div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{fmtTs(t.created_at)}</div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                {t.revoked_at ? <span style={{ color: 'var(--danger)' }}>revoked {fmtTs(t.revoked_at)}</span> : fmtTs(t.last_used_at)}
+              <div className="text-text-muted text-[0.82rem]">{fmtTs(t.created_at)}</div>
+              <div className="text-text-muted text-[0.82rem]">
+                {t.revoked_at ? <span className="text-danger">revoked {fmtTs(t.revoked_at)}</span> : fmtTs(t.last_used_at)}
               </div>
-              <div style={{ textAlign: 'right' }}>
+              <div className="text-right">
                 {!t.revoked_at && (
                   <Button variant="danger" size="sm" onClick={() => onRevoke(t.id, t.name)}>
                     Revoke
@@ -215,25 +215,17 @@ function MintModal({
         {mintedToken ? (
           <>
             <h2 style={modalTitle}>Token created</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            <p className="text-text-muted text-[0.85rem]">
               Copy this token now and paste it into your ACT plugin. You won't be able to see it again —
               if you lose it, revoke it and create a new one.
             </p>
-            <div style={{
-              background: 'rgba(0,0,0,0.4)',
-              border: '1px solid var(--gold)',
-              borderRadius: 6,
-              padding: '0.7rem 0.9rem',
-              fontFamily: 'monospace',
-              fontSize: '0.88rem',
-              wordBreak: 'break-all',
-              color: 'var(--gold)',
-              margin: '1rem 0',
-              userSelect: 'all',
-            }}>
+            <div
+              className="border border-gold rounded-md py-[0.7rem] px-[0.9rem] font-mono text-[0.88rem] break-all text-gold my-4 select-all"
+              style={{ background: 'rgba(0,0,0,0.4)' }}
+            >
               {mintedToken}
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <div className="flex gap-2 justify-end">
               <Button variant="primary" onClick={onCopy}>
                 {copyState === 'copied' ? 'Copied ✓' : 'Copy token'}
               </Button>
@@ -245,7 +237,7 @@ function MintModal({
         ) : (
           <>
             <h2 style={modalTitle}>New API token</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            <p className="text-text-muted text-[0.85rem]">
               Give the token a name so you can recognise it later (e.g. "Desktop ACT" or "Laptop").
             </p>
             <input
@@ -256,19 +248,9 @@ function MintModal({
               onChange={e => setName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && name.trim() && !minting) onMint() }}
               maxLength={64}
-              style={{
-                width: '100%',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 6,
-                color: 'var(--text)',
-                fontSize: '0.92rem',
-                padding: '0.5rem 0.7rem',
-                margin: '0.6rem 0 1rem',
-                boxSizing: 'border-box',
-              }}
+              className="w-full bg-surface border border-border rounded-md text-text text-[0.92rem] py-2 px-[0.7rem] mt-[0.6rem] mb-4 box-border"
             />
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <div className="flex gap-2 justify-end">
               <Button variant="secondary" onClick={onClose}>Cancel</Button>
               <Button variant="primary" onClick={onMint} disabled={!name.trim() || minting}>
                 {minting ? 'Generating…' : 'Generate token'}
@@ -282,8 +264,6 @@ function MintModal({
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
-
-const pageStyle: CSSProperties = { maxWidth: 900, margin: '0 auto', padding: '1.5rem 1rem' }
 
 const tableHeaderRow: CSSProperties = {
   display: 'grid',

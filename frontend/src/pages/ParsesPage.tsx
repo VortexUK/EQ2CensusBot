@@ -237,20 +237,20 @@ export default function ParsesPage() {
   const setFilter = useCallback((v: SizeFilter) => setSize(v), [])
 
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '1rem' }}>
-        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.7rem', color: 'var(--gold)', margin: 0 }}>
+    <main className="max-w-[1100px] mx-auto px-4 py-6">
+      <div className="flex items-baseline gap-4 mb-4">
+        <h1 className="font-heading text-[1.7rem] text-gold m-0">
           Parses
         </h1>
         {data && (
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+          <span className="text-[0.82rem] text-text-muted">
             {data.total.toLocaleString()} encounter{data.total !== 1 ? 's' : ''}{size && ' (filtered)'}
           </span>
         )}
       </div>
 
       {/* Filter pills */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '1.2rem' }}>
+      <div className="flex flex-wrap gap-[0.4rem] mb-[1.2rem]">
         {SIZE_OPTIONS.map(opt => (
           <button
             key={opt.value || 'all'}
@@ -259,11 +259,11 @@ export default function ParsesPage() {
           >
             {opt.label}
             {opt.range && (
-              <span style={{ marginLeft: '0.35rem', opacity: 0.6, fontSize: '0.72rem' }}>{opt.range}</span>
+              <span className="ml-[0.35rem] opacity-60 text-[0.72rem]">{opt.range}</span>
             )}
           </button>
         ))}
-        <span style={{ width: 1, background: 'var(--border)', margin: '0 0.2rem' }} />
+        <span className="w-px bg-border mx-[0.2rem]" />
         <button
           onClick={() => setBossesOnly(v => !v)}
           style={pillStyle(bossesOnly)}
@@ -273,17 +273,17 @@ export default function ParsesPage() {
         </button>
       </div>
 
-      {loading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
-      {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
+      {loading && <p className="text-text-muted">Loading…</p>}
+      {error && <p className="text-danger">{error}</p>}
 
       {!loading && !error && data && data.results.length === 0 && (
-        <p style={{ color: 'var(--text-muted)' }}>
+        <p className="text-text-muted">
           No parses {size ? `match the ${size} filter` : 'yet'}.
         </p>
       )}
 
       {!loading && grouped.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        <div className="flex flex-col gap-[0.4rem]">
           {grouped.map(g => (
             <GuildSection
               key={g.guild}
@@ -361,14 +361,14 @@ function GuildSection({
   }
 
   return (
-    <Card style={{ padding: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+    <Card className="p-0">
+      <div className="flex items-center">
         <button onClick={() => setOpen(v => !v)} style={headerBtnStyle}>
           <Caret open={open} />
-          <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.98rem', color: 'var(--gold)' }}>
+          <span className="font-heading text-[0.98rem] text-gold">
             {bucket.guild}
           </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginLeft: 'auto' }}>
+          <span className="text-text-muted text-[0.78rem] ml-auto">
             {bucket.zoneBuckets.length} zone-{bucket.zoneBuckets.length === 1 ? 'day' : 'days'} · {totalFights} fight{totalFights !== 1 ? 's' : ''}{totalEncs !== totalFights ? ` (${totalEncs} uploads)` : ''}
           </span>
         </button>
@@ -377,7 +377,7 @@ function GuildSection({
         )}
       </div>
       {open && (
-        <div style={{ padding: '0 0.5rem 0.6rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        <div className="flex flex-col gap-[0.35rem] px-2 pb-[0.6rem]">
           {bucket.zoneBuckets.map(z => (
             <ZoneSection
               key={z.key}
@@ -423,15 +423,15 @@ function ZoneSection({
   }
 
   return (
-    <div style={{ background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 6 }}>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+    <div className="border border-border rounded-[6px]" style={{ background: 'rgba(0,0,0,0.15)' }}>
+      <div className="flex items-center">
         <button onClick={() => setOpen(v => !v)} style={{ ...headerBtnStyle, padding: '0.4rem 0.6rem' }}>
           <Caret open={open} />
-          <span style={{ fontSize: '0.88rem', color: 'var(--text)' }}>
-            <span style={{ color: 'var(--text-muted)', marginRight: '0.5rem' }}>{bucket.date}</span>
+          <span className="text-[0.88rem] text-text">
+            <span className="text-text-muted mr-2">{bucket.date}</span>
             {bucket.zone}
           </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem', marginLeft: 'auto' }}>
+          <span className="text-text-muted text-[0.76rem] ml-auto">
             {bucket.fights.length} fight{bucket.fights.length !== 1 ? 's' : ''}{totalUploads !== bucket.fights.length ? ` (${totalUploads} uploads)` : ''}
           </span>
         </button>
@@ -440,7 +440,7 @@ function ZoneSection({
         )}
       </div>
       {open && (
-        <div style={{ padding: '0 0.4rem 0.4rem' }}>
+        <div className="px-[0.4rem] pb-[0.4rem]">
           <EncounterTable fights={bucket.fights} onDeleted={onDeleted} />
         </div>
       )}
@@ -455,14 +455,17 @@ function EncounterTable({
   onDeleted: (pred: (e: ParseEncounterSummary) => boolean) => void
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 70px 110px 90px 90px 28px', columnGap: '0.5rem', rowGap: '2px', alignItems: 'center', fontSize: '0.82rem' }}>
-      <div style={hdrCellStyle}>Encounter</div>
-      <div style={{ ...hdrCellStyle, textAlign: 'right' }}>Time</div>
-      <div style={{ ...hdrCellStyle, textAlign: 'right' }}>Dur</div>
-      <div style={{ ...hdrCellStyle, textAlign: 'right' }}>Damage</div>
-      <div style={{ ...hdrCellStyle, textAlign: 'right' }}>DPS</div>
-      <div style={{ ...hdrCellStyle, textAlign: 'right' }}>Players</div>
-      <div style={hdrCellStyle} />
+    <div
+      className="grid items-center gap-x-2 gap-y-[2px] text-[0.82rem]"
+      style={{ gridTemplateColumns: '1fr 70px 70px 110px 90px 90px 28px' }}
+    >
+      <div className={HDR_CELL_CLS}>Encounter</div>
+      <div className={`${HDR_CELL_CLS} text-right`}>Time</div>
+      <div className={`${HDR_CELL_CLS} text-right`}>Dur</div>
+      <div className={`${HDR_CELL_CLS} text-right`}>Damage</div>
+      <div className={`${HDR_CELL_CLS} text-right`}>DPS</div>
+      <div className={`${HDR_CELL_CLS} text-right`}>Players</div>
+      <div className={HDR_CELL_CLS} />
       {fights.map(f => (
         <MirrorRowGroup key={f.id} fight={f} onDeleted={onDeleted} />
       ))}
@@ -526,77 +529,67 @@ function MirrorRowGroup({
       {isMirror ? (
         <button
           onClick={() => setExpanded(v => !v)}
+          className="flex items-center gap-[0.4rem] border-none text-left cursor-pointer py-1 no-underline"
           style={{
-            ...cellBase, color: titleColor, textDecoration: 'none',
-            background: rowBg ?? 'none', border: 'none', textAlign: 'left',
-            cursor: 'pointer', font: 'inherit', padding: '4px 0',
-            display: 'flex', alignItems: 'center', gap: '0.4rem',
+            ...cellBase, color: titleColor,
+            background: rowBg ?? 'none', font: 'inherit',
           }}
         >
           <Caret open={expanded} />
           {e.title}
-          <span style={{
-            fontSize: '0.7rem',
-            color: 'var(--text-muted)',
-            fontWeight: 400,
-          }}>
+          <span className="text-[0.7rem] text-text-muted font-normal">
             {fight.uploads.length} uploads
           </span>
         </button>
       ) : (
         <Link
           to={`/parse/${e.id}`}
-          style={{ ...cellBase, color: titleColor, textDecoration: 'none' }}
+          className="no-underline"
+          style={{ ...cellBase, color: titleColor }}
         >
           {e.title}
         </Link>
       )}
-      <div style={{ ...cellBase, textAlign: 'right', color: 'var(--text-muted)' }}>{fmtLocalTime(e.started_at)}</div>
-      <div style={{ ...cellBase, textAlign: 'right', color: 'var(--text-muted)' }}>{fmtDuration(e.duration_s)}</div>
-      <div style={{ ...cellBase, textAlign: 'right' }}>{fmtNum(e.total_damage)}</div>
-      <div style={{ ...cellBase, textAlign: 'right', color: 'var(--gold)' }}>{fmtNum(Math.round(e.encdps))}</div>
-      <div style={{ ...cellBase, textAlign: 'right', color: 'var(--text-muted)' }}>
-        {e.player_count} <span style={{ opacity: 0.55, fontSize: '0.7rem' }}>({sizeLabel(e.player_count)})</span>
+      <div className="text-right text-text-muted" style={cellBase}>{fmtLocalTime(e.started_at)}</div>
+      <div className="text-right text-text-muted" style={cellBase}>{fmtDuration(e.duration_s)}</div>
+      <div className="text-right" style={cellBase}>{fmtNum(e.total_damage)}</div>
+      <div className="text-right text-gold" style={cellBase}>{fmtNum(Math.round(e.encdps))}</div>
+      <div className="text-right text-text-muted" style={cellBase}>
+        {e.player_count} <span className="opacity-55 text-[0.7rem]">({sizeLabel(e.player_count)})</span>
       </div>
-      <div style={{ ...cellBase, textAlign: 'center' }}>
+      <div className="text-center" style={cellBase}>
         {!isMirror && e.permissions.can_delete && (
           <TrashButton onClick={handleDeletePrimary} title="Delete this encounter" small />
         )}
       </div>
 
       {isMirror && expanded && (
-        <div style={{
-          gridColumn: '1 / -1',
-          padding: '0.25rem 0 0.5rem 1.5rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.15rem',
-          fontSize: '0.78rem',
-          background: rowBg ?? undefined,
-        }}>
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginBottom: '0.15rem' }}>
+        <div
+          className="col-[1/-1] flex flex-col gap-[0.15rem] text-[0.78rem] pt-[0.25rem] pb-2 pl-6"
+          style={{ background: rowBg ?? undefined }}
+        >
+          <div className="text-text-muted text-[0.7rem] mb-[0.15rem]">
             Pick a raider's view:
           </div>
           {fight.uploads.map(u => (
-            <div key={u.id} style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 70px 110px 90px 28px',
-              columnGap: '0.5rem',
-              alignItems: 'center',
-            }}>
+            <div
+              key={u.id}
+              className="grid items-center gap-x-2"
+              style={{ gridTemplateColumns: '1fr 70px 110px 90px 28px' }}
+            >
               <Link
                 to={`/parse/${u.id}`}
-                style={{ color: 'var(--text)', textDecoration: 'none' }}
+                className="text-text no-underline"
               >
-                <span style={{ color: 'var(--gold)' }}>{u.uploaded_by}</span>
+                <span className="text-gold">{u.uploaded_by}</span>
                 {u.id === fight.id && (
-                  <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: 'var(--text-muted)' }}>(primary)</span>
+                  <span className="ml-[0.4rem] text-[0.65rem] text-text-muted">(primary)</span>
                 )}
               </Link>
-              <span style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{fmtDuration(u.duration_s)}</span>
-              <span style={{ textAlign: 'right' }}>{fmtNum(u.total_damage)}</span>
-              <span style={{ textAlign: 'right', color: 'var(--gold)' }}>{fmtNum(Math.round(u.encdps))}</span>
-              <span style={{ textAlign: 'center' }}>
+              <span className="text-right text-text-muted">{fmtDuration(u.duration_s)}</span>
+              <span className="text-right">{fmtNum(u.total_damage)}</span>
+              <span className="text-right text-gold">{fmtNum(Math.round(u.encdps))}</span>
+              <span className="text-center">
                 {u.permissions.can_delete && (
                   <TrashButton onClick={ev => handleDeleteUpload(u, ev)} title={`Delete ${u.uploaded_by}'s upload`} small />
                 )}
@@ -618,16 +611,10 @@ function TrashButton({ onClick, title, small = false }: {
     <button
       onClick={onClick}
       title={title}
+      className="bg-transparent border-none text-text-muted cursor-pointer leading-none opacity-55 transition-[opacity,color] duration-100"
       style={{
-        background: 'none',
-        border: 'none',
-        color: 'var(--text-muted)',
-        cursor: 'pointer',
         padding: small ? '0 4px' : '0 8px',
         fontSize: small ? '0.95rem' : '1.05rem',
-        lineHeight: 1,
-        opacity: 0.55,
-        transition: 'opacity 0.1s, color 0.1s',
       }}
       onMouseEnter={ev => {
         ev.currentTarget.style.opacity = '1'
@@ -659,15 +646,7 @@ const headerBtnStyle: CSSProperties = {
   font: 'inherit',
 }
 
-const hdrCellStyle: CSSProperties = {
-  color: 'var(--text-muted)',
-  fontSize: '0.7rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
-  padding: '0.25rem 0',
-  borderBottom: '1px solid var(--border)',
-  marginBottom: '0.2rem',
-}
+const HDR_CELL_CLS = 'text-text-muted text-[0.7rem] uppercase tracking-[0.06em] py-1 border-b border-border mb-[0.2rem]'
 
 function pillStyle(active: boolean): CSSProperties {
   return {

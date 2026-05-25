@@ -180,16 +180,7 @@ interface FilterOptions {
 
 // ── Shared control style ──────────────────────────────────────────────────────
 
-const CTRL: React.CSSProperties = {
-  padding:      '0.42rem 0.6rem',
-  borderRadius: 6,
-  border:       '1px solid var(--border)',
-  background:   'var(--surface-raised)',
-  color:        'var(--text)',
-  fontSize:     '0.88rem',
-  lineHeight:   '1.4',
-  colorScheme:  'dark',
-}
+const CTRL_CLS = 'py-[0.42rem] px-[0.6rem] rounded-[6px] border border-border bg-surface-raised text-text text-[0.88rem] leading-[1.4] [color-scheme:dark]'
 
 // ── Table header / cell styles ────────────────────────────────────────────────
 
@@ -425,27 +416,27 @@ export default function ItemSearchPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
-      <h1 style={{
-        fontFamily: "var(--font-heading)",
-        fontSize: '1.9rem', fontWeight: 700, letterSpacing: '0.06em',
-        margin: '1rem 0 0.25rem',
-        background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
-        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        backgroundClip: 'text', display: 'inline-block',
-      }}>
+    <main className="max-w-[1100px] mx-auto pt-8 px-6 pb-16">
+      <h1
+        className="font-heading text-[1.9rem] font-bold tracking-[0.06em] mt-4 mx-0 mb-1 inline-block"
+        style={{
+          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+        }}
+      >
         Item Search
       </h1>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '1.5rem' }}>
+      <p className="text-text-muted text-[0.88rem] mb-6">
         Search the local item database by name, quality, slot, class, level and stats.
       </p>
 
       {/* ── Filter form ───────────────────────────────────────────────────── */}
       <form onSubmit={handleSubmit}>
-        <Card style={{ padding: '1rem 1.1rem', marginBottom: '1.25rem' }}>
+        <Card className="py-4 px-[1.1rem] mb-5">
 
           {/* Row 1: name + tier + type + slot + class */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end', marginBottom: '0.75rem' }}>
+          <div className="flex flex-wrap gap-3 items-end mb-3">
 
             <Field label="Name">
               <input
@@ -453,12 +444,12 @@ export default function ItemSearchPage() {
                 placeholder="Search name…"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                style={{ ...CTRL, width: 180 }}
+                className={`${CTRL_CLS} w-[180px]`}
               />
             </Field>
 
             <Field label="Quality">
-              <select value={tier} onChange={e => setTier(e.target.value)} style={{ ...CTRL, minWidth: 130 }}>
+              <select value={tier} onChange={e => setTier(e.target.value)} className={`${CTRL_CLS} min-w-[130px]`}>
                 <option value="">Any</option>
                 {TIER_OPTIONS.map(t => (
                   <option key={t} value={t}>{t}</option>
@@ -467,7 +458,7 @@ export default function ItemSearchPage() {
             </Field>
 
             <Field label="Item Type">
-              <select value={itemType} onChange={e => setItemType(e.target.value)} style={{ ...CTRL, minWidth: 140 }}>
+              <select value={itemType} onChange={e => setItemType(e.target.value)} className={`${CTRL_CLS} min-w-[140px]`}>
                 <option value="">Any</option>
                 {ITEM_TYPE_OPTIONS.map(t => (
                   <option key={t} value={t}>{t}</option>
@@ -476,7 +467,7 @@ export default function ItemSearchPage() {
             </Field>
 
             <Field label="Slot">
-              <select value={slot} onChange={e => setSlot(e.target.value)} style={{ ...CTRL, minWidth: 130 }}>
+              <select value={slot} onChange={e => setSlot(e.target.value)} className={`${CTRL_CLS} min-w-[130px]`}>
                 <option value="">Any</option>
                 {SLOT_OPTIONS.map(s => (
                   <option key={s} value={s}>{s}</option>
@@ -490,7 +481,7 @@ export default function ItemSearchPage() {
                 onChange={e => {
                   if (e.target.value !== '__hdr') setClassVal(e.target.value)
                 }}
-                style={{ ...CTRL, minWidth: 160 }}
+                className={`${CTRL_CLS} min-w-[160px]`}
               >
                 {CLASS_OPTIONS.map((opt, i) => (
                   <option
@@ -508,13 +499,13 @@ export default function ItemSearchPage() {
           </div>
 
           {/* Row 2: levels + search */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end', marginBottom: '0.75rem' }}>
+          <div className="flex flex-wrap gap-3 items-end mb-3">
 
             <Field label="Min Level">
               <input
                 type="number" min={0} max={135} placeholder="e.g. 70"
                 value={minLevel} onChange={e => setMinLevel(e.target.value)}
-                style={{ ...CTRL, width: 90 }}
+                className={`${CTRL_CLS} w-[90px]`}
               />
             </Field>
 
@@ -522,7 +513,7 @@ export default function ItemSearchPage() {
               <input
                 type="number" min={0} max={135} placeholder="e.g. 70"
                 value={maxLevel} onChange={e => setMaxLevel(e.target.value)}
-                style={{ ...CTRL, width: 90 }}
+                className={`${CTRL_CLS} w-[90px]`}
               />
             </Field>
 
@@ -540,22 +531,18 @@ export default function ItemSearchPage() {
 
           {/* Row 3: stat filters */}
           {statFilters.length > 0 && (
-            <div style={{ marginBottom: '0.5rem' }}>
-              <div style={{
-                fontSize: '0.68rem', textTransform: 'uppercase',
-                letterSpacing: '0.07em', color: 'var(--text-muted)',
-                marginBottom: '0.4rem',
-              }}>
+            <div className="mb-2">
+              <div className="text-[0.68rem] uppercase tracking-[0.07em] text-text-muted mb-[0.4rem]">
                 Has Stats
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div className="flex flex-col gap-[0.4rem]">
                 {statFilters.map(f => (
-                  <div key={f.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <div key={f.id} className="flex gap-2 items-center">
                     {/* Stat name */}
                     <select
                       value={f.stat}
                       onChange={e => updateStatFilter(f.id, 'stat', e.target.value)}
-                      style={{ ...CTRL, minWidth: 180 }}
+                      className={`${CTRL_CLS} min-w-[180px]`}
                     >
                       <optgroup label="Primary">
                         {STAT_OPTIONS_PRIMARY.map(s => (
@@ -572,7 +559,7 @@ export default function ItemSearchPage() {
                     <select
                       value={f.op}
                       onChange={e => updateStatFilter(f.id, 'op', e.target.value)}
-                      style={{ ...CTRL, width: 60, paddingLeft: '0.4rem', paddingRight: '0.2rem' }}
+                      className={`${CTRL_CLS} w-[60px] pl-[0.4rem] pr-[0.2rem]`}
                       title="Comparison operator"
                     >
                       <option value="gte">≥</option>
@@ -586,7 +573,7 @@ export default function ItemSearchPage() {
                       placeholder="any"
                       value={f.value}
                       onChange={e => updateStatFilter(f.id, 'value', e.target.value)}
-                      style={{ ...CTRL, width: 90 }}
+                      className={`${CTRL_CLS} w-[90px]`}
                     />
                     {/* Remove */}
                     <Button
@@ -594,7 +581,7 @@ export default function ItemSearchPage() {
                       variant="danger"
                       size="sm"
                       onClick={() => removeStatFilter(f.id)}
-                      style={{ border: 'none', fontSize: '1rem', lineHeight: 1 }}
+                      className="border-none text-base leading-none"
                       title="Remove"
                     >
                       ×
@@ -610,10 +597,8 @@ export default function ItemSearchPage() {
             variant="ghost"
             size="sm"
             onClick={addStatFilter}
-            style={{
-              border: '1px dashed var(--border)',
-              marginTop: statFilters.length ? '0.3rem' : 0,
-            }}
+            className="border border-dashed border-border"
+            style={{ marginTop: statFilters.length ? '0.3rem' : 0 }}
           >
             + Add stat filter
           </Button>
@@ -622,11 +607,11 @@ export default function ItemSearchPage() {
       </form>
 
       {/* ── Error ──────────────────────────────────────────────────────────── */}
-      {error && <p style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{error}</p>}
+      {error && <p className="text-danger mb-4">{error}</p>}
 
       {/* ── Prompt ─────────────────────────────────────────────────────────── */}
       {!searched && !loading && (
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+        <p className="text-text-muted text-[0.9rem]">
           Set at least one filter to search.
         </p>
       )}
@@ -657,7 +642,7 @@ export default function ItemSearchPage() {
           />}
 
           {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '0.75rem' }}>
+            <div className="flex justify-end gap-[0.4rem] mt-3">
               <Button variant="secondary" size="sm" onClick={() => runSearch(page - 1)} disabled={page <= 1}>← Prev</Button>
               <Button variant="secondary" size="sm" onClick={() => runSearch(page + 1)} disabled={page >= totalPages}>Next →</Button>
             </div>
@@ -676,13 +661,11 @@ function Field({
   label, children, transparent,
 }: { label: string; children: React.ReactNode; transparent?: boolean }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-      <label style={{
-        fontSize: '0.68rem', textTransform: 'uppercase',
-        letterSpacing: '0.07em',
-        color: transparent ? 'transparent' : 'var(--text-muted)',
-        userSelect: 'none',
-      }}>
+    <div className="flex flex-col gap-1">
+      <label
+        className="text-[0.68rem] uppercase tracking-[0.07em] select-none"
+        style={{ color: transparent ? 'transparent' : 'var(--text-muted)' }}
+      >
         {label}
       </label>
       {children}
@@ -694,18 +677,15 @@ function ResultsHeader({
   total, page, totalPages, onPrev, onNext,
 }: { total: number; page: number; totalPages: number; onPrev: () => void; onNext: () => void }) {
   return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem',
-    }}>
-      <span style={{ fontSize: '0.83rem', color: 'var(--text-muted)' }}>
+    <div className="flex justify-between items-center mb-[0.6rem] flex-wrap gap-2">
+      <span className="text-[0.83rem] text-text-muted">
         {total === 0
           ? 'No items found.'
           : `${total.toLocaleString()} item${total === 1 ? '' : 's'} found`}
         {totalPages > 1 && ` · page ${page} of ${totalPages}`}
       </span>
       {totalPages > 1 && (
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <div className="flex gap-[0.4rem]">
           <Button variant="secondary" size="sm" onClick={onPrev} disabled={page <= 1}>← Prev</Button>
           <Button variant="secondary" size="sm" onClick={onNext} disabled={page >= totalPages}>Next →</Button>
         </div>
@@ -715,27 +695,24 @@ function ResultsHeader({
 }
 
 function StatPills({ stats, highlight }: { stats: string[]; highlight: string[] }) {
-  if (!stats.length) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+  if (!stats.length) return <span className="text-text-muted">—</span>
   const highlightSet = new Set(highlight)
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem' }}>
+    <div className="flex flex-wrap gap-[0.2rem]">
       {stats.map(s => (
         <span
           key={s}
+          className="inline-block px-[0.35rem] py-[0.1rem] rounded-[3px] text-[0.72rem] border"
           style={{
-            display:      'inline-block',
-            padding:      '0.1rem 0.35rem',
-            borderRadius: 3,
-            fontSize:     '0.72rem',
             background:   highlightSet.has(s)
               ? 'rgba(var(--accent-rgb,99,210,130),0.18)'
               : 'var(--surface-raised)',
             color: highlightSet.has(s)
               ? 'var(--accent)'
               : 'var(--text-muted)',
-            border: highlightSet.has(s)
-              ? '1px solid rgba(var(--accent-rgb,99,210,130),0.35)'
-              : '1px solid var(--border)',
+            borderColor: highlightSet.has(s)
+              ? 'rgba(var(--accent-rgb,99,210,130),0.35)'
+              : 'var(--border)',
           }}
         >
           {s}
@@ -760,8 +737,8 @@ function ItemTable({
   const statCols = statFilters.filter(f => f.stat).slice(0, 3)
 
   return (
-    <Card style={{ overflowX: 'auto', padding: 0 }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <Card className="overflow-x-auto p-0">
+      <table className="w-full border-collapse">
         <thead>
           <tr>
             <th style={TH}>Name</th>
@@ -796,7 +773,7 @@ function ItemTable({
           {items.map(item => (
             <tr
               key={item.id}
-              style={{ transition: 'background 0.1s', cursor: 'default' }}
+              className="transition-[background] duration-100 cursor-default"
               onMouseEnter={e => {
                 e.currentTarget.style.background = 'var(--surface-raised)'
                 onShowTip(String(item.id), e)
@@ -807,22 +784,23 @@ function ItemTable({
               }}
             >
               <td style={TD}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <div className="flex items-center gap-[0.45rem]">
                   {item.icon_id ? (
                     <img
                       src={`/icons/${item.icon_id}.png`}
                       alt=""
                       width={28}
                       height={28}
-                      style={{ borderRadius: 3, border: '1px solid var(--border)', flexShrink: 0, display: 'block' }}
+                      className="rounded-[3px] border border-border shrink-0 block"
                       onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }}
                     />
                   ) : (
-                    <div style={{ width: 28, height: 28, flexShrink: 0 }} />
+                    <div className="w-7 h-7 shrink-0" />
                   )}
                   <Link
                     to={`/item/${item.id}`}
-                    style={{ color: itemRarityColor(item.tier, 'var(--accent)'), textDecoration: 'none', fontWeight: 500 }}
+                    className="no-underline font-medium"
+                    style={{ color: itemRarityColor(item.tier, 'var(--accent)') }}
                   >
                     {item.name}
                   </Link>
@@ -852,14 +830,14 @@ function ItemTable({
                   >
                     {val != null
                       ? val
-                      : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>—</span>}
+                      : <span className="text-text-muted font-normal">—</span>}
                   </td>
                 )
               })}
               <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.8rem', maxWidth: 160, whiteSpace: 'normal', lineHeight: '1.45' }}>
                 {item.class_label
                   ? item.class_label.split(' / ').map((part, i) => (
-                      <span key={i} style={{ display: 'block' }}>{part}</span>
+                      <span key={i} className="block">{part}</span>
                     ))
                   : '—'}
               </td>

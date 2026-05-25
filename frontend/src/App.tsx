@@ -22,27 +22,17 @@ import ServerLaunchTimer from './components/ServerLaunchTimer'
 
 function LoginGate() {
   return (
-    <main style={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '1.5rem',
-      padding: '2rem',
-      textAlign: 'center',
-    }}>
+    <main className="min-h-screen flex flex-col items-center justify-center gap-6 p-8 text-center">
       <img
         src={logo}
         alt="EQ2 Lexicon"
+        className="w-full max-w-[420px]"
         style={{
-          width: '100%',
-          maxWidth: 420,
           WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
           maskImage:        'linear-gradient(to bottom, black 60%, transparent 100%)',
         }}
       />
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: 340 }}>
+      <p className="text-text-muted text-[0.95rem] max-w-[340px]">
         Sign in with Discord to access your EQ2 Lexicon.
       </p>
       <ServerLaunchTimer />
@@ -92,7 +82,7 @@ function NavItem({ to, label, also }: { to: string; label: string; also?: string
 
 function NavLinks() {
   return (
-    <nav style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+    <nav className="flex items-center gap-5">
       <NavItem to="/"           label="Home" />
       <NavItem to="/characters" label="Characters" also="/character/" />
       <NavItem to="/guilds"     label="Guilds"      also="/guild/" />
@@ -105,18 +95,14 @@ function NavLinks() {
 
 function AccessPendingGate() {
   return (
-    <main style={{
-      minHeight: '100vh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      gap: '1rem', padding: '2rem', textAlign: 'center',
-    }}>
-      <h2 style={{ fontFamily: "var(--font-heading)", fontSize: '1.8rem', color: 'var(--gold)' }}>
+    <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <h2 className="font-heading text-[1.8rem] text-gold">
         Access Pending
       </h2>
-      <p style={{ color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.6 }}>
+      <p className="text-text-muted max-w-[360px] leading-relaxed">
         Your account is awaiting approval. An officer will review your request shortly.
       </p>
-      <a href="/api/auth/logout" style={{ color: 'var(--gold-dim)', fontSize: '0.85rem' }}
+      <a href="/api/auth/logout" className="text-gold-dim text-[0.85rem]"
         onClick={async e => { e.preventDefault(); await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); location.href = '/' }}>
         Sign out
       </a>
@@ -126,18 +112,14 @@ function AccessPendingGate() {
 
 function AccessDeniedGate() {
   return (
-    <main style={{
-      minHeight: '100vh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      gap: '1rem', padding: '2rem', textAlign: 'center',
-    }}>
-      <h2 style={{ fontFamily: "var(--font-heading)", fontSize: '1.8rem', color: 'var(--danger)' }}>
+    <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <h2 className="font-heading text-[1.8rem] text-danger">
         Access Denied
       </h2>
-      <p style={{ color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.6 }}>
+      <p className="text-text-muted max-w-[360px] leading-relaxed">
         Your access request was not approved. Contact an officer if you think this is a mistake.
       </p>
-      <a href="#" style={{ color: 'var(--gold-dim)', fontSize: '0.85rem' }}
+      <a href="#" className="text-gold-dim text-[0.85rem]"
         onClick={async e => { e.preventDefault(); await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); location.href = '/' }}>
         Sign out
       </a>
@@ -158,49 +140,30 @@ function Layout() {
 
   return (
     <>
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0.4rem 1.25rem',
-        background: 'rgba(15,17,23,0.75)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        borderBottom: '1px solid var(--border)',
-      }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', lineHeight: 0 }}>
-          <img src={logo} alt="EQ2 Lexicon" style={{ height: 40, width: 'auto' }} />
+      <div className="fixed top-0 left-0 right-0 z-[200] flex items-center justify-between py-[0.4rem] px-5 bg-bg/75 backdrop-blur-md border-b border-border">
+        <Link to="/" className="flex items-center leading-none">
+          <img src={logo} alt="EQ2 Lexicon" className="h-10 w-auto" />
         </Link>
         <NavLinks />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <div className="flex items-center gap-[0.6rem]">
           <NotificationBell />
           <UserWidget />
         </div>
       </div>
       {/* Push content below fixed header (~52px) */}
-      <div style={{ paddingTop: '3.5rem', minHeight: 'calc(100vh - 3.5rem)', display: 'flex', flexDirection: 'column' }}>
+      <div className="pt-14 flex flex-col min-h-[calc(100vh-3.5rem)]">
         {/* key by pathname so the fade-up entrance replays on each navigation */}
-        <div className="page-enter" key={pathname} style={{ flex: 1 }}>
+        <div className="page-enter flex-1" key={pathname}>
           <Outlet />
         </div>
-        <footer style={{
-          borderTop: '1px solid var(--border)',
-          padding: '1.1rem 1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          fontSize: '0.72rem',
-          color: 'var(--text-muted)',
-          opacity: 0.7,
-        }}>
+        <footer className="border-t border-border py-[1.1rem] px-6 flex items-center justify-between flex-wrap gap-2 text-[0.72rem] text-text-muted opacity-70">
           <span>
             © {new Date().getFullYear()}{' '}
             <a
               href="https://github.com/VortexUK"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+              className="text-[color:inherit] underline underline-offset-[3px]"
             >
               VortexUK
             </a>
@@ -211,7 +174,7 @@ function Layout() {
               href="https://census.daybreakgames.com"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+              className="text-[color:inherit] underline underline-offset-[3px]"
             >
               Daybreak Games Census API
             </a>

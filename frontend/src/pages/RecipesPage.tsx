@@ -1,4 +1,4 @@
-﻿import type { CSSProperties, ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button, Card } from '../components/ui'
@@ -106,17 +106,7 @@ const CLASS_OPTIONS: { label: string; value: string }[] = [
   { label: '  Beastlord',    value: 'beastlord' },
 ]
 
-const CTRL: CSSProperties = {
-  background: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: 6,
-  color: 'var(--text)',
-  fontSize: '0.88rem',
-  padding: '0.35rem 0.6rem',
-  outline: 'none',
-  width: '100%',
-  boxSizing: 'border-box',
-}
+const CTRL_CLS = 'bg-surface border border-border rounded-[6px] text-text text-[0.88rem] py-[0.35rem] px-[0.6rem] outline-none w-full box-border'
 
 const STORAGE_KEY = 'eq2-shopping-list'
 
@@ -217,16 +207,10 @@ function TierBadge({ tier }: { tier: string | null }) {
   if (!tier) return null
   const colour = recipeTierColor(tier)
   return (
-    <span style={{
-      fontSize: '0.72rem',
-      fontWeight: 600,
-      color: colour,
-      border: `1px solid ${colour}`,
-      borderRadius: 4,
-      padding: '1px 5px',
-      lineHeight: 1,
-      whiteSpace: 'nowrap',
-    }}>
+    <span
+      className="text-[0.72rem] font-semibold border rounded-sm px-[5px] py-px leading-none whitespace-nowrap"
+      style={{ color: colour, borderColor: colour }}
+    >
       {tier}
     </span>
   )
@@ -235,9 +219,9 @@ function TierBadge({ tier }: { tier: string | null }) {
 function IngredientList({ comps, compact }: { comps: Ingredient[]; compact?: boolean }) {
   if (!comps.length) return null
   return (
-    <ul style={{ margin: 0, padding: '0 0 0 1.1rem', listStyle: 'disc' }}>
+    <ul className="m-0 pl-[1.1rem] list-disc">
       {comps.map((c, i) => (
-        <li key={i} style={{ fontSize: compact ? '0.78rem' : '0.83rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        <li key={i} className="text-text-muted leading-[1.5]" style={{ fontSize: compact ? '0.78rem' : '0.83rem' }}>
           {c.description} ×{c.quantity}
         </li>
       ))}
@@ -393,9 +377,9 @@ export default function RecipesPage() {
   const totalPages = Math.ceil(total / perPage)
 
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '1.2rem' }}>
-        <h1 style={{ fontFamily: "var(--font-heading)", fontSize: '1.7rem', color: 'var(--gold)', margin: 0 }}>
+    <main className="max-w-[1100px] mx-auto px-4 py-6">
+      <div className="flex items-baseline gap-4 mb-[1.2rem]">
+        <h1 className="font-heading text-[1.7rem] text-gold m-0">
           Recipes
         </h1>
         {list.length > 0 && (
@@ -403,47 +387,29 @@ export default function RecipesPage() {
             variant="secondary"
             size="sm"
             onClick={() => setListOpen(v => !v)}
-            style={{ marginLeft: 'auto' }}
+            className="ml-auto"
           >
             🛒 Shopping List
-            <span style={{
-              background: 'var(--gold)',
-              color: 'var(--bg)',
-              borderRadius: '50%',
-              width: 18,
-              height: 18,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              lineHeight: 1,
-            }}>
+            <span className="bg-gold text-bg rounded-[50%] w-[18px] h-[18px] inline-flex items-center justify-center text-[0.72rem] font-bold leading-none">
               {totalItems}
             </span>
           </Button>
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: listOpen ? '1fr 340px' : '1fr', gap: '1.25rem' }}>
+      <div className="grid gap-5" style={{ gridTemplateColumns: listOpen ? '1fr 340px' : '1fr' }}>
 
         {/* ── Left column: filters + results ─────────────────────────────────── */}
         <div>
           {/* Filter row */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
-            gap: '0.6rem',
-            alignItems: 'end',
-            marginBottom: '1rem',
-          }}>
+          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-[0.6rem] items-end mb-4">
             {/* Name */}
             <div>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>
+              <label className="text-xs text-text-muted block mb-[3px]">
                 Recipe name
               </label>
               <input
-                style={CTRL}
+                className={CTRL_CLS}
                 placeholder="Search…"
                 value={q}
                 onChange={e => setQ(e.target.value)}
@@ -453,10 +419,10 @@ export default function RecipesPage() {
 
             {/* Tier */}
             <div>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>
+              <label className="text-xs text-text-muted block mb-[3px]">
                 Crafting tier
               </label>
-              <select style={CTRL} value={tier} onChange={e => setTier(e.target.value)}>
+              <select className={CTRL_CLS} value={tier} onChange={e => setTier(e.target.value)}>
                 <option value="">All tiers</option>
                 {CRAFT_TIERS.map(t => (
                   <option key={t} value={t}>{CRAFT_TIER_LABELS[t] ?? t}</option>
@@ -466,10 +432,10 @@ export default function RecipesPage() {
 
             {/* Bench */}
             <div>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>
+              <label className="text-xs text-text-muted block mb-[3px]">
                 Artisan class
               </label>
-              <select style={CTRL} value={bench} onChange={e => setBench(e.target.value)}>
+              <select className={CTRL_CLS} value={bench} onChange={e => setBench(e.target.value)}>
                 {BENCH_OPTIONS.map(b => (
                   <option key={b.key} value={b.key}>{b.label}</option>
                 ))}
@@ -478,17 +444,17 @@ export default function RecipesPage() {
 
             {/* Adventure class */}
             <div>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>
+              <label className="text-xs text-text-muted block mb-[3px]">
                 Adventure class
               </label>
               <select
-                style={CTRL}
+                className={CTRL_CLS}
                 value={className}
                 onChange={e => setClassName(e.target.value)}
               >
                 {CLASS_OPTIONS.map((opt, i) =>
                   opt.value === '__hdr'
-                    ? <option key={i} disabled style={{ color: 'var(--text-muted)' }}>{opt.label}</option>
+                    ? <option key={i} disabled className="text-text-muted">{opt.label}</option>
                     : <option key={i} value={opt.value}>{opt.label}</option>
                 )}
               </select>
@@ -506,19 +472,19 @@ export default function RecipesPage() {
 
           {/* Error */}
           {error && (
-            <p style={{ color: 'var(--danger)', fontSize: '0.9rem', margin: '0 0 0.75rem' }}>{error}</p>
+            <p className="text-danger text-[0.9rem] mt-0 mx-0 mb-3">{error}</p>
           )}
 
           {/* Results */}
           {searched && !loading && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.6rem' }}>
+            <p className="text-[0.8rem] text-text-muted mt-0 mx-0 mb-[0.6rem]">
               {total === 0 ? 'No results.' : `${total.toLocaleString()} recipe${total !== 1 ? 's' : ''} found`}
             </p>
           )}
 
           {results.length > 0 && (
             <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div className="flex flex-col gap-2">
                 {results.map(recipe => (
                   <RecipeCard
                     key={recipe.id}
@@ -532,14 +498,14 @@ export default function RecipesPage() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap' }}>
+                <div className="flex gap-[0.4rem] items-center mt-4 flex-wrap">
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => handlePage(page - 1)}
                     disabled={page <= 1}
                   >← Prev</Button>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', padding: '0 0.3rem' }}>
+                  <span className="text-[0.82rem] text-text-muted px-[0.3rem]">
                     Page {page} / {totalPages}
                   </span>
                   <Button
@@ -556,25 +522,18 @@ export default function RecipesPage() {
 
         {/* ── Right column: shopping list ─────────────────────────────────────── */}
         {listOpen && (
-          <Card style={{
-            padding: '1rem',
-            alignSelf: 'start',
-            position: 'sticky',
-            top: '4rem',
-            maxHeight: 'calc(100vh - 5rem)',
-            overflowY: 'auto',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1rem', fontFamily: "var(--font-heading)", color: 'var(--gold)' }}>
+          <Card className="p-4 self-start sticky top-16 max-h-[calc(100vh-5rem)] overflow-y-auto">
+            <div className="flex justify-between items-center mb-[0.8rem]">
+              <h2 className="m-0 text-base font-heading text-gold">
                 Shopping List
               </h2>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <div className="flex gap-2 items-center">
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => downloadShoppingListXml(list, summary)}
                   title="Download as XML"
-                  style={{ background: 'none', color: 'var(--gold)' }}
+                  className="bg-none text-gold"
                 >
                   ⬇ XML
                 </Button>
@@ -583,7 +542,7 @@ export default function RecipesPage() {
                   size="sm"
                   onClick={clearList}
                   title="Clear list"
-                  style={{ border: 'none' }}
+                  className="border-none"
                 >
                   Clear
                 </Button>
@@ -591,7 +550,7 @@ export default function RecipesPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setListOpen(false)}
-                  style={{ fontSize: '1rem', lineHeight: 1 }}
+                  className="text-base leading-none"
                 >
                   ×
                 </Button>
@@ -600,21 +559,12 @@ export default function RecipesPage() {
 
             {/* View options */}
             {list.length > 0 && (
-              <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                fontSize: '0.76rem',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-                marginBottom: '0.6rem',
-                userSelect: 'none',
-              }}>
+              <label className="flex items-center gap-[0.4rem] text-[0.76rem] text-text-muted cursor-pointer mb-[0.6rem] select-none">
                 <input
                   type="checkbox"
                   checked={showMats}
                   onChange={e => setShowMats(e.target.checked)}
-                  style={{ cursor: 'pointer', accentColor: 'var(--gold)' }}
+                  className="cursor-pointer accent-gold"
                 />
                 Show materials per spell
               </label>
@@ -622,16 +572,12 @@ export default function RecipesPage() {
 
             {/* List entries */}
             {list.map(entry => (
-              <div key={entry.recipeId} style={{
-                borderBottom: '1px solid var(--border)',
-                paddingBottom: '0.55rem',
-                marginBottom: '0.55rem',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: showMats ? '0.2rem' : 0 }}>
-                  <span style={{ fontSize: '0.85rem', flex: 1, lineHeight: 1.3 }}>{entry.recipeName}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+              <div key={entry.recipeId} className="border-b border-border pb-[0.55rem] mb-[0.55rem]">
+                <div className="flex items-center gap-2" style={{ marginBottom: showMats ? '0.2rem' : 0 }}>
+                  <span className="text-[0.85rem] flex-1 leading-[1.3]">{entry.recipeName}</span>
+                  <div className="flex items-center gap-1 shrink-0">
                     <QtyBtn onClick={() => changeQty(entry.recipeId, -1)}>−</QtyBtn>
-                    <span style={{ fontSize: '0.82rem', minWidth: 20, textAlign: 'center', color: 'var(--gold)', fontWeight: 600 }}>
+                    <span className="text-[0.82rem] min-w-[20px] text-center text-gold font-semibold">
                       {entry.qty}
                     </span>
                     <QtyBtn onClick={() => changeQty(entry.recipeId, +1)}>+</QtyBtn>
@@ -643,18 +589,18 @@ export default function RecipesPage() {
 
             {/* Ingredient Summary */}
             {list.length > 0 && (
-              <div style={{ marginTop: '0.5rem' }}>
-                <h3 style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 0.4rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <div className="mt-2">
+                <h3 className="text-[0.82rem] text-text-muted mt-0 mx-0 mb-[0.4rem] uppercase tracking-[0.06em]">
                   Ingredient Summary
                 </h3>
 
                 {summary.regular.length > 0 && (
                   <>
-                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0.4rem 0 0.2rem', fontWeight: 600 }}>Materials</p>
+                    <p className="text-[0.72rem] text-text-muted mt-[0.4rem] mx-0 mb-[0.2rem] font-semibold">Materials</p>
                     {summary.regular.map(row => (
-                      <div key={row.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '1px 0' }}>
-                        <span style={{ color: 'var(--text)' }}>{row.name}</span>
-                        <span style={{ color: 'var(--gold)', fontWeight: 600, marginLeft: '0.5rem' }}>×{row.total}</span>
+                      <div key={row.name} className="flex justify-between text-[0.8rem] py-px px-0">
+                        <span className="text-text">{row.name}</span>
+                        <span className="text-gold font-semibold ml-2">×{row.total}</span>
                       </div>
                     ))}
                   </>
@@ -662,13 +608,13 @@ export default function RecipesPage() {
 
                 {summary.fuel.length > 0 && (
                   <>
-                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0.7rem 0 0.2rem', fontWeight: 600 }}>
+                    <p className="text-[0.72rem] text-text-muted mt-[0.7rem] mx-0 mb-[0.2rem] font-semibold">
                       Fuel
                     </p>
                     {summary.fuel.map(row => (
-                      <div key={row.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '1px 0' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>{row.name}</span>
-                        <span style={{ color: 'var(--gold-dim)', fontWeight: 600, marginLeft: '0.5rem' }}>×{row.total}</span>
+                      <div key={row.name} className="flex justify-between text-[0.8rem] py-px px-0">
+                        <span className="text-text-muted">{row.name}</span>
+                        <span className="text-gold-dim font-semibold ml-2">×{row.total}</span>
                       </div>
                     ))}
                   </>
@@ -677,7 +623,7 @@ export default function RecipesPage() {
             )}
 
             {list.length === 0 && (
-              <p style={{ fontSize: '0.83rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '1rem' }}>
+              <p className="text-[0.83rem] text-text-muted text-center mt-4">
                 Use + on a recipe to add it.
               </p>
             )}
@@ -691,34 +637,10 @@ export default function RecipesPage() {
           variant="primary"
           onClick={() => setListOpen(true)}
           title="Open Shopping List"
-          style={{
-            position: 'fixed',
-            bottom: '1.5rem',
-            right: '1.5rem',
-            borderRadius: '50%',
-            width: 52,
-            height: 52,
-            fontSize: '1.4rem',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-            zIndex: 100,
-          }}
+          className="fixed bottom-6 right-6 rounded-[50%] w-[52px] h-[52px] text-[1.4rem] shadow-[0_4px_16px_rgba(0,0,0,0.5)] z-[100]"
         >
           🛒
-          <span style={{
-            position: 'absolute',
-            top: -4,
-            right: -4,
-            background: 'var(--danger)',
-            color: '#fff',
-            borderRadius: '50%',
-            width: 20,
-            height: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.65rem',
-            fontWeight: 700,
-          }}>
+          <span className="absolute -top-1 -right-1 bg-danger text-white rounded-[50%] w-5 h-5 flex items-center justify-center text-[0.65rem] font-bold">
             {totalItems}
           </span>
         </Button>
@@ -743,47 +665,44 @@ function RecipeCard({
   const [open, setOpen] = useState(false)
 
   return (
-    <Card style={{ padding: 0, overflow: 'hidden' }}>
+    <Card className="p-0 overflow-hidden">
       {/* Header row */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.6rem',
-        padding: '0.55rem 0.75rem',
-        cursor: 'pointer',
-        userSelect: 'none',
-      }}
+      <div
+        className="flex items-center gap-[0.6rem] px-3 py-[0.55rem] cursor-pointer select-none"
         onClick={() => setOpen(v => !v)}
       >
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', transform: `rotate(${open ? 90 : 0}deg)`, display: 'inline-block', transition: 'transform 0.15s' }}>
+        <span
+          className="text-[0.7rem] text-text-muted inline-block transition-transform duration-150"
+          style={{ transform: `rotate(${open ? 90 : 0}deg)` }}
+        >
           ▶
         </span>
-        <span style={{ flex: 1, fontSize: '0.92rem', fontWeight: 500 }}>{recipe.name}</span>
+        <span className="flex-1 text-[0.92rem] font-medium">{recipe.name}</span>
         {recipe.craft_tier && (
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+          <span className="text-[0.72rem] text-text-muted whitespace-nowrap">
             {recipe.craft_tier}
           </span>
         )}
         {recipe.crafted_tier && <TierBadge tier={recipe.crafted_tier} />}
         {recipe.bench_label && (
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+          <span className="text-[0.72rem] text-text-muted whitespace-nowrap">
             {recipe.bench_label}
           </span>
         )}
         {recipe.class_label && (
-          <span style={{ fontSize: '0.72rem', color: '#93d9ff', whiteSpace: 'nowrap' }}>
+          <span className="text-[0.72rem] text-rarity-treasured whitespace-nowrap">
             {recipe.class_label}
           </span>
         )}
         {/* +/- controls */}
         <div
           onClick={e => e.stopPropagation()}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}
+          className="flex items-center gap-1 shrink-0"
         >
           {inList > 0 && (
             <>
               <QtyBtn onClick={onDec}>−</QtyBtn>
-              <span style={{ fontSize: '0.82rem', minWidth: 20, textAlign: 'center', color: 'var(--gold)', fontWeight: 600 }}>
+              <span className="text-[0.82rem] min-w-[20px] text-center text-gold font-semibold">
                 {inList}
               </span>
             </>
@@ -793,10 +712,7 @@ function RecipeCard({
             size="sm"
             onClick={onAdd}
             title="Add to shopping list"
-            style={{
-              border: '1px solid var(--gold)',
-              color: 'var(--gold)',
-            }}
+            className="border border-gold text-gold"
           >
             +
           </Button>
@@ -805,44 +721,38 @@ function RecipeCard({
 
       {/* Expandable ingredient detail */}
       {open && (
-        <div style={{
-          borderTop: '1px solid var(--border)',
-          padding: '0.6rem 0.75rem 0.75rem',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '0.5rem 1rem',
-        }}>
+        <div className="border-t border-border pt-[0.6rem] px-3 pb-3 grid grid-cols-2 gap-x-4 gap-y-2">
           {/* Materials */}
           <div>
-            <p style={{ margin: '0 0 0.25rem', fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <p className="mt-0 mx-0 mb-1 text-[0.72rem] text-text-muted font-semibold uppercase tracking-[0.05em]">
               Materials
             </p>
             {recipe.primary_comp && (
-              <div style={{ fontSize: '0.83rem', color: 'var(--text)' }}>
+              <div className="text-[0.83rem] text-text">
                 {recipe.primary_comp} ×{recipe.primary_qty ?? 1}
               </div>
             )}
             {recipe.secondary_comps.map((sc, i) => (
-              <div key={i} style={{ fontSize: '0.83rem', color: 'var(--text)' }}>
+              <div key={i} className="text-[0.83rem] text-text">
                 {sc.description} ×{sc.quantity}
               </div>
             ))}
             {!recipe.primary_comp && !recipe.secondary_comps.length && (
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>—</span>
+              <span className="text-[0.8rem] text-text-muted">—</span>
             )}
           </div>
 
           {/* Fuel */}
           <div>
-            <p style={{ margin: '0 0 0.25rem', fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <p className="mt-0 mx-0 mb-1 text-[0.72rem] text-text-muted font-semibold uppercase tracking-[0.05em]">
               Fuel
             </p>
             {recipe.fuel_comp ? (
-              <div style={{ fontSize: '0.83rem', color: 'var(--text-muted)' }}>
+              <div className="text-[0.83rem] text-text-muted">
                 {recipe.fuel_comp} ×{recipe.fuel_qty ?? 1}
               </div>
             ) : (
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>—</span>
+              <span className="text-[0.8rem] text-text-muted">—</span>
             )}
           </div>
         </div>
