@@ -32,11 +32,11 @@ A Discord bot and web companion site (FastAPI + React/TypeScript) that queries t
 
 The [EQ2LexiconACTPlugin](https://github.com/VortexUK/EQ2LexiconACTPlugin) sends each finished encounter here as an ACT-shaped JSON payload (`web/routes/parses.py:ingest_parse`). Bearer-token auth via `require_user_session_or_token`.
 
-**HMAC payload signing (v0.1.8+ plugin, server-side validator added 2026-05-25)**:
+**HMAC payload signing (v0.1.8+ plugin, server-side validator added 2026-05-25, strict mode same day)**:
 
 Plugin computes `HMAC-SHA256(body_bytes, api_token)` and ships it as `X-Lexicon-Signature` (lowercase hex). Server reads the bearer token from the Authorization header, recomputes the HMAC over `await request.body()`, and `hmac.compare_digest`s against the header. Mismatch → 401.
 
-Currently runs in **opportunistic** mode (`_validate_payload_signature_opportunistic`): header absent → accepted, header present → must verify. This is so v0.1.7 and older plugin installs keep working through the rollout window. Flip to strict mode (require the header on token-auth requests) once `User-Agent: EQ2LexiconACTPlugin/<version>` telemetry shows ≥98% of uploads from 0.1.8+. The flip is one line in `_validate_payload_signature_opportunistic` plus updating `test_signature_absent_is_accepted_in_opportunistic_mode`.
+Runs in **strict** mode (`_validate_payload_signature`): on token auth the header is required — absence is a 401 whose `detail` includes the releases URL so the user knows to update. Browsers (session-cookie auth) skip validation since they have no token-style key, but sending the header from a session client is a 400 (confused client > silent accept). The rollout went straight to strict because the user base is small and all pre-alpha; if you ever need an opportunistic-mode reintroduction, restore the `if not sig_header: return` early-out under a feature flag.
 
 Threat model: the legitimate token holder can sign anything — this doesn't stop a user forging their own parse. What it does stop is (a) casual payload tampering by editing JSON in a debugging proxy, (b) MITM mutation of the body in flight, (c) replay using only a stolen token without the protocol knowledge to sign. Real integrity has to come from server-side sanity checks (DPS-vs-level caps, plausible encounter duration, cross-validation) layered on top.
 

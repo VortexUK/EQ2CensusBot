@@ -142,6 +142,30 @@ async def _fake_require_user(request):
     return {"id": "discord-123", "username": "alice", "auth_source": "token"}
 
 
+def _sign(body_bytes: bytes, token: str) -> str:
+    """Match what PayloadSigner.Sign does on the plugin side — lowercase
+    hex HMAC-SHA256, key = utf-8 bytes of the bearer token."""
+    return hmac.new(token.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
+
+
+def _signed_post_kwargs(payload: dict, token: str = "eq2c_test_token") -> dict:
+    """Build the AsyncClient.post(**kwargs) dict that a real v0.1.8+
+    plugin upload would produce — raw `content` bytes so we control the
+    exact bytes we hash, matching headers (Authorization + Content-Type
+    + X-Lexicon-Signature). Use this for any test where the signature
+    SHOULD validate; tests that probe the absent/wrong cases build the
+    headers by hand instead."""
+    body_bytes = json.dumps(payload).encode("utf-8")
+    return {
+        "content": body_bytes,
+        "headers": {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-Lexicon-Signature": _sign(body_bytes, token),
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Auth gate
 # ---------------------------------------------------------------------------
@@ -183,11 +207,7 @@ async def test_ingest_inserts_encounter(app):
         ),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            r = await client.post(
-                "/api/parses/ingest",
-                json=_minimal_payload(),
-                headers={"Authorization": "Bearer eq2c_anything"},
-            )
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(_minimal_payload()))
 
     assert r.status_code == 201
     data = r.json()
@@ -213,11 +233,7 @@ async def test_ingest_returns_skipped_on_duplicate(app):
         ),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            r = await client.post(
-                "/api/parses/ingest",
-                json=_minimal_payload(),
-                headers={"Authorization": "Bearer eq2c_anything"},
-            )
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(_minimal_payload()))
 
     assert r.status_code == 201
     data = r.json()
@@ -236,11 +252,7 @@ async def test_ingest_rejects_empty_logger_name(app):
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            r = await client.post(
-                "/api/parses/ingest",
-                json=payload,
-                headers={"Authorization": "Bearer eq2c_anything"},
-            )
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
     # Pydantic min_length=1 may catch this (non-empty before strip), but our
     # explicit empty-after-strip check should give 400.
     assert r.status_code in (400, 422)
@@ -253,11 +265,7 @@ async def test_ingest_validates_payload_shape(app):
 
     with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            r = await client.post(
-                "/api/parses/ingest",
-                json=payload,
-                headers={"Authorization": "Bearer eq2c_anything"},
-            )
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
     assert r.status_code == 422
 
 
@@ -300,10 +308,11 @@ async def test_bearer_token_path_resolves_to_user(app):
         ),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Real auth + signature gate both run here — sign with the
+            # same token that's in the Authorization header.
             r = await client.post(
                 "/api/parses/ingest",
-                json=_minimal_payload(),
-                headers={"Authorization": "Bearer eq2c_anything"},
+                **_signed_post_kwargs(_minimal_payload(), token="eq2c_anything"),
             )
     assert r.status_code == 201
     assert r.json()["status"] == "inserted"
@@ -354,20 +363,19 @@ async def test_bearer_token_unapproved_user_returns_403(app):
 
 
 # ---------------------------------------------------------------------------
-# X-Lexicon-Signature (HMAC) — opportunistic validation
+# X-Lexicon-Signature (HMAC) — strict validation
 # ---------------------------------------------------------------------------
 # Plugin v0.1.8+ ships X-Lexicon-Signature = HMAC-SHA256(body, api_token).
-# Server-side validation is currently OPPORTUNISTIC:
-#   * header absent  → accepted (v0.1.7 and earlier kept working)
-#   * header present → MUST verify; mismatch is 401
-# Tests pin both branches so a future flip to strict mode is a single
-# tweak in the route + matching test update, not a hunt across the suite.
-
-
-def _sign(body_bytes: bytes, token: str) -> str:
-    """Match what PayloadSigner.Sign does on the plugin side — lowercase
-    hex HMAC-SHA256, key = utf-8 bytes of the bearer token."""
-    return hmac.new(token.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
+# Server-side validation is STRICT (flipped from opportunistic 2026-05-25):
+#   * token-auth + header missing  → 401 (force plugin update)
+#   * token-auth + header present  → must verify; mismatch is 401
+#   * session-auth + header present → 400 (confused client)
+#   * session-auth + header absent → allowed (no key to validate against)
+#
+# Most other tests in this file use _signed_post_kwargs() which already
+# signs correctly. The tests below build the request by hand because
+# they probe the EDGE cases (wrong signature, wrong key, missing header,
+# session-auth-with-header) where the helper would obscure the intent.
 
 
 @pytest.mark.asyncio
@@ -460,13 +468,40 @@ async def test_signature_rejected_when_wrong_key(app):
 
 
 @pytest.mark.asyncio
-async def test_signature_absent_is_accepted_in_opportunistic_mode(app):
-    """v0.1.7 and earlier don't send the header. They MUST keep working
-    during the rollout window. This test pins the opportunistic-mode
-    contract — flip this expectation when we move to strict mode."""
+async def test_signature_required_on_token_auth(app):
+    """v0.1.7 and earlier plugins don't send X-Lexicon-Signature. In
+    STRICT mode they must be rejected with a 401 that names the update
+    path, so the user knows what to do."""
+    with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.post(
+                "/api/parses/ingest",
+                json=_minimal_payload(),
+                headers={"Authorization": "Bearer eq2c_v017_plugin"},
+                # NB: no X-Lexicon-Signature header
+            )
+    assert r.status_code == 401
+    # The 401 detail must point at the update — otherwise a v0.1.7 user
+    # sees a generic auth error and thinks their token is broken.
+    detail = r.json().get("detail", "")
+    assert "v0.1.8" in detail
+    assert "releases" in detail
+
+
+@pytest.mark.asyncio
+async def test_signature_absent_with_session_auth_is_allowed(app):
+    """Browsers (session-cookie auth) don't have a token-style HMAC key,
+    so the strict gate doesn't apply to them. This isn't a realistic
+    code path — there's no browser flow that POSTs to /parses/ingest
+    today — but pinning the contract prevents an accidental future
+    session-cookie regression."""
+
+    async def _fake_session_user(request):
+        return {"id": "discord-123", "username": "alice", "auth_source": "session"}
+
     sync_result = ("inserted", 42, 2, 1, 2)
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.require_user_session_or_token", _fake_session_user),
         patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
         patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
@@ -474,8 +509,8 @@ async def test_signature_absent_is_accepted_in_opportunistic_mode(app):
             r = await client.post(
                 "/api/parses/ingest",
                 json=_minimal_payload(),
-                headers={"Authorization": "Bearer eq2c_anything"},
-                # NB: no X-Lexicon-Signature header
+                # No Authorization header → session-cookie path
+                # No X-Lexicon-Signature → permitted on session auth
             )
     assert r.status_code == 201
 

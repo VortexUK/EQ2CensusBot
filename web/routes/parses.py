@@ -940,24 +940,26 @@ def _ingest_payload_sync(
 
 # Header name shipped by the plugin (v0.1.8+). MUST match
 # PayloadSigner.SignatureHeaderName in the EQ2LexiconACTPlugin repo —
-# changing one side without the other silently breaks HMAC validation
-# (server falls back to opportunistic mode and accepts unsigned uploads,
-# the worst kind of regression).
+# changing one side without the other breaks HMAC validation.
 PLUGIN_SIGNATURE_HEADER = "X-Lexicon-Signature"
 
 
-async def _validate_payload_signature_opportunistic(
+async def _validate_payload_signature(
     request: Request,
     user: dict,
 ) -> None:
     """HMAC-SHA256 validation of the upload body, keyed by the bearer
     token. Plugin v0.1.8+ ships this header on every upload.
 
-    Currently OPPORTUNISTIC: header absent → accepted (so existing
-    v0.1.7 installs keep uploading during the rollout window). Flip
-    to strict (raise 400 when header missing on token-auth requests)
-    once the User-Agent telemetry shows ≥98% of uploads from
-    EQ2LexiconACTPlugin/0.1.8+ .
+    STRICT mode (flipped from opportunistic on 2026-05-25):
+      * token-auth + header missing  → 401 (force plugin update)
+      * token-auth + header present  → must verify; mismatch is 401
+      * session-auth + header present → 400 (confused client)
+      * session-auth + header absent → allowed (browser uploads, if any)
+
+    The strict flip means v0.1.7 and older plugins now hit a clear 401
+    telling them to update. The plugin's update-awareness banner (also
+    introduced in v0.1.8) makes the upgrade path obvious in the UI.
 
     Threat model: see PayloadSigner.cs in the plugin repo. Short version
     — this stops payload tampering in flight; it does NOT prevent the
@@ -966,16 +968,28 @@ async def _validate_payload_signature_opportunistic(
     on top of this.
     """
     sig_header = request.headers.get(PLUGIN_SIGNATURE_HEADER)
-    if not sig_header:
-        return  # opportunistic mode — header absent is allowed
 
-    # Session-cookie auth doesn't have a token-style HMAC key. A browser
-    # sending this header would be confused — reject clearly rather than
-    # silently accept.
+    # Session-cookie auth doesn't have a token-style HMAC key. Skip the
+    # whole validation path for browsers, but reject explicitly if a
+    # session client somehow sends the header (confused client > silent
+    # accept).
     if user.get("auth_source") != "token":
+        if sig_header:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{PLUGIN_SIGNATURE_HEADER} is only valid for token-authenticated requests.",
+            )
+        return
+
+    # Token auth from here on — header is required.
+    if not sig_header:
         raise HTTPException(
-            status_code=400,
-            detail=f"{PLUGIN_SIGNATURE_HEADER} is only valid for token-authenticated requests.",
+            status_code=401,
+            detail=(
+                f"{PLUGIN_SIGNATURE_HEADER} is required for plugin uploads. "
+                "Update the EQ2 Lexicon ACT plugin to v0.1.8 or later: "
+                "https://github.com/VortexUK/EQ2LexiconACTPlugin/releases/latest"
+            ),
         )
 
     auth_header = request.headers.get("authorization") or ""
@@ -1012,7 +1026,7 @@ async def ingest_parse(
     body: IngestRequest,
 ) -> IngestResponse:
     user = await require_user_session_or_token(request)
-    await _validate_payload_signature_opportunistic(request, user)
+    await _validate_payload_signature(request, user)
 
     # Trust the plugin's logger_name (it reads ActGlobals.charName) and
     # use it as the uploader identifier on the encounter row. The session/
