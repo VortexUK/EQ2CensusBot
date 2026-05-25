@@ -65,7 +65,10 @@ def _uploader_discord_id(source_dsn: str | None) -> str | None:
     return source_dsn[len("plugin:") :] or None
 
 
-async def _resolve_uploader_guild_async(uploader: str) -> str | None:
+async def _resolve_uploader_guild_async(
+    uploader: str,
+    world: str | None = None,
+) -> str | None:
     """Cache-aware guild lookup for the upload path. Order of attempts:
 
       1. character_cache hit on the uploader's character → return its
@@ -77,6 +80,11 @@ async def _resolve_uploader_guild_async(uploader: str) -> str | None:
          raid hits step 1. Thundering-herd guard inside the helper
          dedupes concurrent prewarms for the same guild.
 
+    ``world`` overrides the EQ2_WORLD env-var default — the plugin
+    (v0.1.10+) detects the server from its log file path and stamps it
+    on each upload. Empty/None → fall back to the configured default
+    so older plugin versions and the local-ingest path keep working.
+
     Returns None for: uploader='local', Census error, character not found,
     or character is unguilded — callers store guild_name as NULL in all
     those cases.
@@ -84,7 +92,8 @@ async def _resolve_uploader_guild_async(uploader: str) -> str | None:
     if not uploader or uploader == "local":
         return None
 
-    world_lower = _WORLD.lower()
+    effective_world = (world or "").strip() or _WORLD
+    world_lower = effective_world.lower()
     cache_key = f"{uploader.lower()}:{world_lower}"
     cached, _ = character_cache.get_stale(cache_key)
     if cached is not None:
@@ -92,7 +101,7 @@ async def _resolve_uploader_guild_async(uploader: str) -> str | None:
 
     client = CensusClient(service_id=_SERVICE_ID)
     try:
-        guild_name = await client.get_character_guild_name(uploader, _WORLD)
+        guild_name = await client.get_character_guild_name(uploader, effective_world)
     except Exception as exc:
         _log.warning("Census guild lookup failed for %r: %s", uploader, exc)
         return None
@@ -716,6 +725,12 @@ class IngestRequest(BaseModel):
     are documented in parses/act_reader.py."""
 
     logger_name: str = Field(min_length=1, max_length=64)
+    # EQ2 server the upload came from (Varsoon, Kaladim, Butcherblock,
+    # …). Plugin v0.1.10+ detects this from the log file's parent
+    # directory and stamps it on every upload; older versions and the
+    # local-ingest path omit it and the route falls back to EQ2_WORLD.
+    # Optional so older plugins keep working through the rollout.
+    logger_server: str | None = Field(default=None, max_length=64)
     encounter: IngestEncounter
     combatants: list[dict[str, Any]] = []
     damage_types: list[dict[str, Any]] = []
@@ -1039,7 +1054,10 @@ async def ingest_parse(
     # Cache-aware guild resolve: hits character_cache first; on miss does a
     # one-character Census call and pre-warms the full roster in the
     # background so the rest of the raid's uploads are zero-Census.
-    guild_name = await _resolve_uploader_guild_async(uploader)
+    # logger_server (plugin v0.1.10+) overrides EQ2_WORLD when present —
+    # enables a Varsoon-configured deployment to correctly resolve a
+    # Kaladim upload, for instance.
+    guild_name = await _resolve_uploader_guild_async(uploader, body.logger_server)
     loop = asyncio.get_event_loop()
 
     status, encounter_id, n_c, n_dt, n_at = await loop.run_in_executor(

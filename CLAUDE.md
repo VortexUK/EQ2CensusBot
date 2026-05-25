@@ -32,6 +32,12 @@ A Discord bot and web companion site (FastAPI + React/TypeScript) that queries t
 
 The [EQ2LexiconACTPlugin](https://github.com/VortexUK/EQ2LexiconACTPlugin) sends each finished encounter here as an ACT-shaped JSON payload (`web/routes/parses.py:ingest_parse`). Bearer-token auth via `require_user_session_or_token`.
 
+**`logger_server` field (plugin v0.1.10+ , server-side override added 2026-05-25)**:
+
+Plugin auto-detects the EQ2 server from its log file path (`<install>/logs/<server>/eq2log_<character>.txt`) and stamps it as `logger_server` on every upload. The server uses it to override `EQ2_WORLD` for the Census guild lookup — so a Varsoon-configured deployment correctly resolves a Kaladim character's guild without needing per-deployment world config.
+
+Backward compat: absent / null / empty `logger_server` → falls back to `EQ2_WORLD` env var as before. Older plugin versions and the local-ingest path keep working unchanged. The override path lives in `_resolve_uploader_guild_async(uploader, world=None)`.
+
 **HMAC payload signing (v0.1.8+ plugin, server-side validator added 2026-05-25, strict mode same day)**:
 
 Plugin computes `HMAC-SHA256(body_bytes, api_token)` and ships it as `X-Lexicon-Signature` (lowercase hex). Server reads the bearer token from the Authorization header, recomputes the HMAC over `await request.body()`, and `hmac.compare_digest`s against the header. Mismatch → 401.

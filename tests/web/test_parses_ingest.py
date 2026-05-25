@@ -488,6 +488,95 @@ async def test_signature_required_on_token_auth(app):
     assert "releases" in detail
 
 
+# ---------------------------------------------------------------------------
+# logger_server (plugin v0.1.10+)
+# ---------------------------------------------------------------------------
+# Plugin reads the EQ2 server name from its log file's parent directory
+# and stamps it on every upload. Server uses it to override EQ2_WORLD
+# for the Census guild lookup. Backward compat is preserved by treating
+# missing/empty as "fall back to configured default".
+
+
+@pytest.mark.asyncio
+async def test_logger_server_overrides_world_for_census(app):
+    """When the plugin stamps logger_server, the Census call must use
+    THAT world, not the EQ2_WORLD env-var default. Caught by inspecting
+    what _resolve_uploader_guild_async was called with."""
+    captured_worlds: list[str | None] = []
+
+    async def _spy(uploader, world=None):
+        captured_worlds.append(world)
+        return "Exordium"
+
+    payload = _minimal_payload()
+    payload["logger_server"] = "Kaladim"
+
+    sync_result = ("inserted", 1, 1, 0, 0)
+    with (
+        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses._resolve_uploader_guild_async", new=_spy),
+        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
+
+    assert r.status_code == 201
+    assert captured_worlds == ["Kaladim"]
+
+
+@pytest.mark.asyncio
+async def test_logger_server_absent_falls_back_to_world_env(app):
+    """Older plugins (v0.1.9 and earlier) don't send logger_server.
+    Server must fall back to its EQ2_WORLD configuration — passing None
+    or empty into the resolver, which then uses _WORLD internally."""
+    captured_worlds: list[str | None] = []
+
+    async def _spy(uploader, world=None):
+        captured_worlds.append(world)
+        return None
+
+    sync_result = ("inserted", 1, 1, 0, 0)
+    with (
+        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses._resolve_uploader_guild_async", new=_spy),
+        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # NB: no logger_server field — the v0.1.9 wire shape.
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(_minimal_payload()))
+
+    assert r.status_code == 201
+    # None or empty — either is acceptable here; the resolver knows how
+    # to map both onto the env-var fallback.
+    assert captured_worlds[0] in (None, "")
+
+
+@pytest.mark.asyncio
+async def test_logger_server_empty_string_falls_back_to_world_env(app):
+    """Plugin sends "" when log path is the legacy generic logs/eq2log.txt
+    (no server subdirectory). Treat the same as absent."""
+    captured_worlds: list[str | None] = []
+
+    async def _spy(uploader, world=None):
+        captured_worlds.append(world)
+        return None
+
+    payload = _minimal_payload()
+    payload["logger_server"] = ""  # explicit "unknown" from plugin
+
+    sync_result = ("inserted", 1, 1, 0, 0)
+    with (
+        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses._resolve_uploader_guild_async", new=_spy),
+        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
+
+    assert r.status_code == 201
+    assert captured_worlds[0] in (None, "")
+
+
 @pytest.mark.asyncio
 async def test_signature_absent_with_session_auth_is_allowed(app):
     """Browsers (session-cookie auth) don't have a token-style HMAC key,
