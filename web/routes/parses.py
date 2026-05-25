@@ -900,7 +900,7 @@ class IngestRequest(BaseModel):
 
 
 class IngestResponse(BaseModel):
-    status: str  # 'inserted' or 'skipped'
+    status: str  # 'inserted', 'revived', or 'skipped'
     encounter_id: int | None  # our internal id (None for skipped)
     act_encid: str
     combatants: int
@@ -1070,8 +1070,10 @@ def _ingest_payload_sync(
     """Write the payload into parses.db. Returns (status, encounter_id,
     n_combatants, n_damage_types, n_attack_types).
 
-    status: 'inserted' on success, 'skipped' if (act_encid, uploaded_by)
-    already ingested by this user — the upload is idempotent on retries."""
+    status: 'inserted' on success, 'revived' if the encid was already
+    ingested but soft-deleted (re-upload un-hides it), 'skipped' if the
+    encid was already ingested and still visible — the upload is
+    idempotent on retries."""
     enc = _encounter_from_payload(payload.encounter)
     if enc is None:
         raise HTTPException(status_code=400, detail="Encounter starttime/endtime unparseable")
@@ -1081,7 +1083,7 @@ def _ingest_payload_sync(
     damage_types = _damage_types_from_payload(payload.damage_types, enc.encid)
     attack_types = _attack_types_from_payload(payload.attack_types, enc.encid)
 
-    conn = parses_db.init_db()
+    conn = parses_db.init_db(parses_db.DB_PATH)
     try:
         # Idempotency: skip if this uploader has already ingested this encid.
         # NOTE: the current UNIQUE constraint is on act_encid alone, so a
@@ -1089,6 +1091,11 @@ def _ingest_payload_sync(
         # insert time. Phase 3+ will switch to UNIQUE(act_encid, uploaded_by).
         if parses_db.is_ingested(conn, enc.encid):
             existing = parses_db.find_encounter_by_act_encid(conn, enc.encid)
+            # A re-upload of a soft-deleted (hidden) parse should bring it back,
+            # not silently skip — un-hide it so it returns to the list.
+            if existing and existing.get("hidden_at") is not None:
+                parses_db.unhide_encounter(conn, existing["id"])
+                return ("revived", existing["id"], 0, 0, 0)
             return ("skipped", existing["id"] if existing else None, 0, 0, 0)
 
         ingested_at = int(time.time())
@@ -1262,10 +1269,11 @@ async def ingest_parse(
         snapshots,
     )
 
-    # Schedule the full (Census-backed) resolution off the response path. Only
-    # for freshly-inserted parses with player names to resolve — skipped rows
+    # Schedule the full (Census-backed) resolution off the response path. For
+    # freshly-inserted parses, and for revived ones (so the brought-back parse
+    # re-resolves its players against the now-warmer cache). Skipped rows
     # already have their snapshots, and an empty name list has nothing to do.
-    if status == "inserted" and encounter_id is not None and player_names:
+    if status in ("inserted", "revived") and encounter_id is not None and player_names:
         background.add_task(_resolve_and_update_snapshots, encounter_id, player_names, body.logger_server)
 
     return IngestResponse(

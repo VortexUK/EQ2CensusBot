@@ -268,6 +268,62 @@ async def test_ingest_returns_skipped_on_duplicate(app):
 
 
 @pytest.mark.asyncio
+async def test_ingest_revived_status_schedules_background(app):
+    # A 'revived' status (re-upload of a soft-deleted parse) must also
+    # schedule the background snapshot resolution, same as 'inserted'.
+    sync_result = ("revived", 7, 0, 0, 0)
+    resolve_mock = AsyncMock(return_value={})  # background resolver
+    cached_mock = MagicMock(return_value={})  # cache-only sync path
+    with (
+        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses._cached_snapshots", cached_mock),
+        patch("web.routes.parses._resolve_combatant_snapshots", resolve_mock),
+        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses._update_snapshots_sync", new=MagicMock()),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(_minimal_payload()))
+    assert r.status_code == 201
+    assert r.json()["status"] == "revived"
+    resolve_mock.assert_awaited()  # background full resolution ran on revive too
+
+
+@pytest.mark.asyncio
+async def test_reupload_of_soft_deleted_parse_revives_it(tmp_path, monkeypatch):
+    from parses import db as pdb
+    from web.routes.parses import IngestRequest, _ingest_payload_sync
+
+    db_file = tmp_path / "parses.db"
+    monkeypatch.setattr(pdb, "DB_PATH", db_file)
+    # init the schema
+    pdb.init_db(db_file).close()
+
+    payload = IngestRequest(**_minimal_payload())
+
+    # First ingest → inserted.
+    status, eid, *_ = _ingest_payload_sync(payload, "Menludiir", "Exordium", "plugin:123", {})
+    assert status == "inserted" and eid is not None
+
+    # Soft-delete it (as the delete route does for a boss kill).
+    conn = pdb.init_db(db_file)
+    try:
+        pdb.soft_delete_encounter(conn, eid, hidden_at=1700000000)
+        assert pdb.find_encounter_by_act_encid(conn, payload.encounter.encid)["hidden_at"] is not None
+    finally:
+        conn.close()
+
+    # Re-upload the same encounter → revived + un-hidden.
+    status2, eid2, *_ = _ingest_payload_sync(payload, "Menludiir", "Exordium", "plugin:123", {})
+    assert status2 == "revived" and eid2 == eid
+    conn = pdb.init_db(db_file)
+    try:
+        assert pdb.find_encounter_by_act_encid(conn, payload.encounter.encid)["hidden_at"] is None
+    finally:
+        conn.close()
+
+
+@pytest.mark.asyncio
 async def test_ingest_rejects_empty_logger_name(app):
     payload = _minimal_payload()
     payload["logger_name"] = "   "

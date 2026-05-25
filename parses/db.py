@@ -633,6 +633,18 @@ def soft_delete_encounter(conn: sqlite3.Connection, encounter_id: int, hidden_at
     return cur.rowcount > 0
 
 
+def unhide_encounter(conn: sqlite3.Connection, encounter_id: int) -> bool:
+    """Clear a soft-delete marker so a previously-hidden parse becomes visible
+    again (used when its encounter is re-uploaded). Returns True if a hidden
+    row was un-hidden."""
+    with conn:
+        cur = conn.execute(
+            "UPDATE encounters SET hidden_at = NULL WHERE id = ? AND hidden_at IS NOT NULL",
+            (encounter_id,),
+        )
+    return cur.rowcount > 0
+
+
 def delete_encounters_by_filter(
     conn: sqlite3.Connection,
     *,

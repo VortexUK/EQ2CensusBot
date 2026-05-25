@@ -290,6 +290,16 @@ class TestInsertHelpers:
         # Idempotent: re-soft-deleting an already-hidden row is a no-op (returns False).
         assert parses_db.soft_delete_encounter(parses_db_conn, eid, hidden_at=1700002222) is False
 
+    def test_unhide_encounter_clears_marker(self, parses_db_conn):
+        enc = _sample_encounter()
+        eid = parses_db.insert_encounter(parses_db_conn, enc, source_dsn="eq2act", ingested_at=1700000000)
+        parses_db.soft_delete_encounter(parses_db_conn, eid, hidden_at=1700001111)
+        assert parses_db.unhide_encounter(parses_db_conn, eid) is True
+        row = parses_db.find_encounter_by_act_encid(parses_db_conn, enc.encid)
+        assert row["hidden_at"] is None
+        # Already-visible row → no-op, returns False.
+        assert parses_db.unhide_encounter(parses_db_conn, eid) is False
+
     def test_full_ingest_chain(self, parses_db_conn):
         enc = _sample_encounter()
         eid = parses_db.insert_encounter(
