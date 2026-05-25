@@ -32,6 +32,13 @@ os.environ["PARSES_DB_PATH"] = str(_TEST_DB_DIR / "parses.db")
 # local SESSION_SECRET untouched). Must be >= 32 chars to pass the check.
 os.environ.setdefault("SESSION_SECRET", "pytest-session-secret-not-real-0123456789")
 
+# Force non-Secure session cookies for the test suite. HTTPS_ONLY defaults
+# to "true" (Secure flag), but the test client always talks http://, so a
+# Secure cookie would never be sent back — the OAuth-callback test would
+# lose its CSRF state and 400. Forced (not setdefault) so a contributor
+# with HTTPS_ONLY=true in their env still gets a working test run.
+os.environ["HTTPS_ONLY"] = "false"
+
 # Imports below this line read the env vars above when they evaluate their
 # module-level constants (DB_PATH, SESSION_SECRET, ...).
 
