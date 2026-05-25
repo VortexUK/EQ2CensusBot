@@ -17,7 +17,8 @@
 ## File structure
 
 **Create:** `census/classes_db.py`, `scripts/build_classes_db.py`, `scripts/download_class_icons.py`, `web/routes/classes.py`, `frontend/src/useClasses.ts`, `tests/census/test_classes_db.py`, `tests/web/test_classes.py`, `data/classes/icons/*.png` (committed).
-**Modify:** `census/constants.py` (derive archetype sets), `web/app.py` (mount `/class-icons`, register router), `.gitignore` (ignore `classes.db`).
+**Modify:** `census/constants.py` (derive archetype sets), `web/app.py` (mount `/class-icons`, register router), `.gitignore` (ignore `classes.db`), `frontend/src/pages/{HomePage,GuildPage,ParsePage}.tsx` (consume `useClasses`).
+**Delete:** `frontend/src/classConstants.ts` (after migrating its 3 consumers).
 
 ---
 
@@ -715,8 +716,8 @@ export function useClasses() {
   }, [])
 
   const byName = new Map(classes.map(c => [c.name, c]))
-  const colourFor = (name: string | null | undefined): string =>
-    (name ? byName.get(name)?.colour : undefined) ?? FALLBACK_COLOUR
+  const colourFor = (name: string | null | undefined, fallback: string = FALLBACK_COLOUR): string =>
+    (name ? byName.get(name)?.colour : undefined) ?? fallback
   const iconUrlFor = (name: string | null | undefined): string | null =>
     (name ? byName.get(name)?.icon_url : undefined) ?? null
 
@@ -738,7 +739,104 @@ git commit -m "feat(classes): useClasses hook (single source from /api/classes)"
 
 ---
 
-## Task 8: Final gate
+## Task 8: Migrate colour consumers to `useClasses`; remove `classConstants.ts`
+
+**Files:**
+- Modify: `frontend/src/pages/HomePage.tsx`, `frontend/src/pages/GuildPage.tsx`, `frontend/src/pages/ParsePage.tsx`
+- Delete: `frontend/src/classConstants.ts`
+
+These three pages currently read the hardcoded `CLASS_COLOURS` map. Move them onto `useClasses` (the single source from `/api/classes`), then delete the map. Colours become async — pre-fetch, `colourFor` returns the per-site fallback; this is the accepted brief-flash behaviour. `ItemSearchPage` does **not** use `CLASS_COLOURS` (do not touch it).
+
+- [ ] **Step 1: HomePage.tsx**
+
+Replace the import `import { CLASS_COLOURS } from '../classConstants'` with `import { useClasses } from '../useClasses'`.
+
+In the `CharacterCard` component body, add near the top (before `accentColour`):
+```tsx
+  const { colourFor } = useClasses()
+```
+Replace:
+```tsx
+  const accentColour = detail?.cls ? (CLASS_COLOURS[detail.cls] ?? 'var(--gold)') : 'var(--gold)'
+```
+with:
+```tsx
+  const accentColour = colourFor(detail?.cls, 'var(--gold)')
+```
+And replace the `color:` expression:
+```tsx
+                  color: detail.cls ? (CLASS_COLOURS[detail.cls] ?? 'var(--text)') : 'var(--text-muted)',
+```
+with:
+```tsx
+                  color: detail.cls ? colourFor(detail.cls, 'var(--text)') : 'var(--text-muted)',
+```
+
+- [ ] **Step 2: GuildPage.tsx**
+
+Replace the import `import { CLASS_COLOURS } from '../classConstants'` with `import { useClasses } from '../useClasses'`.
+
+Add `const { colourFor } = useClasses()` to the component that renders the roster rows (the one containing the `<td className={TD_CLS} style={{ color: ... }}>` line). Replace:
+```tsx
+              <td className={TD_CLS} style={{ color: m.cls ? (CLASS_COLOURS[m.cls] ?? 'var(--text)') : 'var(--text-muted)' }}>{clsLabel}</td>
+```
+with:
+```tsx
+              <td className={TD_CLS} style={{ color: m.cls ? colourFor(m.cls, 'var(--text)') : 'var(--text-muted)' }}>{clsLabel}</td>
+```
+
+- [ ] **Step 3: ParsePage.tsx**
+
+Replace the import `import { CLASS_COLOURS } from '../classConstants'` with `import { useClasses } from '../useClasses'`.
+
+Change `rowTintFor` to take a colour (raw hex) instead of a class name (it can't call the hook — it's module-level):
+```tsx
+// Subtle row tint derived from the class colour (alpha ~10%) — 8-digit hex.
+// Takes the resolved hex colour (or null/undefined) and returns null when
+// there's no colour, so the row stays untinted.
+function rowTintFor(colour: string | null | undefined): string | null {
+  return colour ? `${colour}1A` : null  // 0x1A = ~10% alpha
+}
+```
+In `CombatantRow` (where `const cls = c.cls ?? lookupEntry?.cls ?? null` and `const tint = rowTintFor(cls)` are), add the hook and feed the resolved hex:
+```tsx
+  const { byName } = useClasses()
+```
+and replace `const tint = rowTintFor(cls)` with:
+```tsx
+  const tint = rowTintFor(cls ? byName.get(cls)?.colour : null)
+```
+In `NameCell`, add `const { colourFor } = useClasses()` near the top of its body, and replace:
+```tsx
+  const classColor = cls ? (CLASS_COLOURS[cls] ?? 'var(--text-muted)') : null
+```
+with:
+```tsx
+  const classColor = cls ? colourFor(cls) : null
+```
+
+- [ ] **Step 4: Delete `classConstants.ts` and confirm no references remain**
+
+Run: `grep -rn "classConstants\|CLASS_COLOURS" frontend/src` → expect **no matches**. Then:
+```bash
+git rm frontend/src/classConstants.ts
+```
+
+- [ ] **Step 5: Type-check**
+
+Run: `cd frontend && npx tsc --noEmit`
+Expected: exit 0.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add frontend/src/pages/HomePage.tsx frontend/src/pages/GuildPage.tsx frontend/src/pages/ParsePage.tsx
+git commit -m "refactor(classes): consume class colours from useClasses; remove classConstants.ts"
+```
+
+---
+
+## Task 9: Final gate
 
 - [ ] **Step 1: Backend**
 
@@ -760,14 +858,8 @@ Note for the user: `classes.db` is gitignored — build it locally (`uv run pyth
 
 ---
 
-## Deferred follow-up (NOT in this plan)
-
-The spec mentioned removing `frontend/src/classConstants.ts`'s hardcoded `CLASS_COLOURS` and migrating its consumers (`HomePage`, `GuildPage`, `ItemSearchPage`, `ParsePage`) onto `useClasses`. That is **deferred** to a small separate plan because: those pages work correctly today, the rankings features that actually motivate the unified source are themselves deferred, and the migration is mechanical per-file editing best done when each page is next touched. `useClasses` (Task 7) already provides the single source; `classConstants.ts` remains as the current consumers' colour source until then. Flag this to the user.
-
----
-
 ## Self-review notes (addressed)
 
-- **Spec coverage:** SQLite catalogue + `classes_db.py` + `CLASS_SEED` (T1), build script + gitignore (T2), constants de-dup (T3 — archetype sets derived; `CLASS_GROUPS` left literal-but-consistent, flagged), icons download + commit (T4) + serving (T5), `GET /api/classes` (T6), `useClasses` hook (T7). The class-id-spaces caveat is encoded by keying on name. **Gap intentionally deferred:** removing `classConstants.ts` / migrating its 4 consumers (flagged above).
+- **Spec coverage:** SQLite catalogue + `classes_db.py` + `CLASS_SEED` (T1), build script + gitignore (T2), constants de-dup (T3 — archetype sets derived; `CLASS_GROUPS` left literal-but-consistent, flagged), icons download + commit (T4) + serving (T5), `GET /api/classes` (T6), `useClasses` hook (T7), and migrating the colour consumers (HomePage/GuildPage/ParsePage) off `classConstants.ts` + deleting it (T8). The class-id-spaces caveat is encoded by keying on name. (`ItemSearchPage` was listed in the spec but doesn't actually use `CLASS_COLOURS` — verified, so it's correctly untouched.)
 - **No placeholders:** every step has runnable code/commands.
 - **Type consistency:** `ClassInfo` fields (name/archetype/subclass/role/colour/icon_id) consistent across `classes_db.py`, the seed rows (+ derived display_order), the `/api/classes` `ClassResponse` (adds display_order + icon_url), and the TS `ClassInfo` (mirrors the API response).
