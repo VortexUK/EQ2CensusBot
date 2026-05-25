@@ -53,7 +53,9 @@ def _build_character_board(
 ) -> tuple[list[dict], list[str]]:
     """Per-character best for Damage/Healing. Returns (rows sorted by score
     desc, sorted class list). Percentile is computed within each class."""
-    field = _METRIC_FIELD[metric]
+    field = _METRIC_FIELD.get(metric)
+    if field is None:
+        raise ValueError(f"Unsupported metric for character board: {metric!r}")
     best: dict[str, dict] = {}  # name.lower() -> entry
     for k in kills:
         if k["scope"] != size or k["zone"] != zone or k["title"] != boss:

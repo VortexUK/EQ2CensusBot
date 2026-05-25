@@ -102,3 +102,18 @@ class TestCharacterBoard:
         ]
         rows, _ = _build_character_board(kills, size="raid", zone="Z", boss="Tarinax", metric="dps")
         assert [r["name"] for r in rows] == ["Menludiir"]
+
+    def test_dedupes_case_insensitively(self):
+        kills = [
+            _kill(1, zone="Z", title="Tarinax", pcount=24, combatants=[_c("Menludiir", "Wizard", 500.0)]),
+            _kill(2, zone="Z", title="Tarinax", pcount=24, combatants=[_c("menludiir", "Wizard", 900.0)]),
+        ]
+        rows, _ = _build_character_board(kills, size="raid", zone="Z", boss="Tarinax", metric="dps")
+        assert len(rows) == 1
+        assert rows[0]["score"] == 900.0  # same character, higher score kept
+
+    def test_unsupported_metric_raises(self):
+        import pytest as _pytest
+
+        with _pytest.raises(ValueError):
+            _build_character_board([], size="raid", zone="Z", boss="Tarinax", metric="speed")
