@@ -22,6 +22,18 @@ updates:
     commit-message:
       prefix: "deps(frontend)"
       include: "scope"
+    # vite, its plugins, and vitest share peer-dependency constraints —
+    # e.g. @vitejs/plugin-react@6 requires a newer vite, and vite@8 is
+    # rejected as a peer by plugin-react@4. Bumping them in separate PRs
+    # produces unmergeable ERESOLVE failures, so group the whole vite
+    # ecosystem into a single coordinated PR.
+    groups:
+      vite:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "vitest"
+          - "@vitest/*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
