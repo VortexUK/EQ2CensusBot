@@ -9,6 +9,7 @@ import ItemPage from './pages/ItemPage'
 import ItemSearchPage from './pages/ItemSearchPage'
 import ParsePage from './pages/ParsePage'
 import ParsesPage from './pages/ParsesPage'
+import RankingsPage from './pages/RankingsPage'
 import RecipesPage from './pages/RecipesPage'
 import TokensPage from './pages/TokensPage'
 import { CharacterSearchPage, GuildSearchPage } from './pages/SearchPage'
@@ -89,6 +90,7 @@ function NavLinks() {
       <NavItem to="/items"      label="Items"       also="/item/" />
       <NavItem to="/recipes"    label="Recipes" />
       <NavItem to="/parses"     label="Parses"      also="/parse/" />
+      <NavItem to="/rankings"   label="Rankings" />
     </nav>
   )
 }
@@ -200,6 +202,7 @@ function App() {
         <Route path="/admin"   element={<AdminPage />} />
         <Route path="/recipes" element={<RecipesPage />} />
         <Route path="/parses"      element={<ParsesPage />} />
+        <Route path="/rankings"    element={<RankingsPage />} />
         <Route path="/parse/:id"   element={<ParsePage />} />
         <Route path="/settings/tokens" element={<TokensPage />} />
         <Route path="*" element={<NotFoundPage />} />
