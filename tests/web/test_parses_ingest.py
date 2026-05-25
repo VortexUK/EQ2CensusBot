@@ -497,6 +497,95 @@ async def test_signature_required_on_token_auth(app):
 
 
 # ---------------------------------------------------------------------------
+# Defensive validation (v0.1.13 audit follow-ups)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad_name",
+    [
+        "alice:varsoon",  # ":" was the cache-collision injection vector
+        "alice/etc",  # path char
+        "alice bob",  # space (EQ2 names are single words)
+        "alice123",  # digits not allowed in EQ2 names
+        "alice'sworld",  # punctuation
+        "aliceiswaytoolong16",  # > 15 chars
+    ],
+)
+async def test_ingest_rejects_malformed_logger_name(app, bad_name):
+    """logger_name must match the EQ2 character-name shape (1-15
+    letters). Defence-in-depth against character_cache key collisions
+    and against weird payloads in Census URLs / parses-DB rows."""
+    payload = _minimal_payload()
+    payload["logger_name"] = bad_name
+    with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
+    # Either Pydantic-level (422) or our explicit shape check (400).
+    assert r.status_code in (400, 422), r.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "good_name",
+    [
+        "Alice",
+        "Menludiir",
+        "Kayleigh",
+        "A",  # 1-char edge
+        "Aaaaaaaaaaaaaaa",  # 15-char edge
+        "menludiir",  # all lowercase
+        "MENLUDIIR",  # all uppercase
+    ],
+)
+async def test_ingest_accepts_valid_logger_name_shape(app, good_name):
+    """The shape regex must not exclude legitimate EQ2 names."""
+    payload = _minimal_payload()
+    payload["logger_name"] = good_name
+    sync_result = ("inserted", 1, 1, 0, 0)
+    with (
+        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
+    assert r.status_code == 201
+
+
+def test_sanitize_world_predicate():
+    """Unit test for _sanitize_world. Plugin-supplied world strings
+    must be passed through unchanged when they look like a real EQ2
+    server name, or collapsed to None for the caller to fall back to
+    EQ2_WORLD. Covers the v0.1.13 audit L2 defence."""
+    from web.routes.parses import _sanitize_world
+
+    # Legit EQ2 server names — all pass through unchanged.
+    for ok in ("Varsoon", "Kaladim", "Antonia Bayle", "Lucan D'Lere", "Maj'Dul"):
+        assert _sanitize_world(ok) == ok, ok
+
+    # Garbage shapes — all collapsed to None.
+    for bad in (
+        "varsoon:other",  # ":" was the cache-collision vector
+        "../etc/passwd",  # path traversal
+        "varsoon?c=1",  # URL meta
+        "9Varsoon",  # leading digit
+        "Varsoon" + "x" * 30,  # > 30 chars
+        "",
+        None,
+        "   ",
+        "Varsoon\nKaladim",  # embedded control char (strip is end-only)
+    ):
+        assert _sanitize_world(bad) is None, repr(bad)
+
+    # Leading/trailing whitespace IS stripped before the regex check —
+    # tolerates a typo without breaking the upload. " Varsoon " → "Varsoon".
+    assert _sanitize_world(" Varsoon ") == "Varsoon"
+
+
+# ---------------------------------------------------------------------------
 # logger_server (plugin v0.1.10+)
 # ---------------------------------------------------------------------------
 # Plugin reads the EQ2 server name from its log file's parent directory

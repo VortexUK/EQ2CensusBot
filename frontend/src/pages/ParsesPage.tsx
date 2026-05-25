@@ -310,6 +310,17 @@ async function deleteOne(id: number): Promise<number> {
   return j.deleted ?? 0
 }
 
+// Delete an explicit set of encounter ids in one request (every upload of a
+// multi-uploader fight). Server authorises each id independently.
+async function deleteBatch(ids: number[]): Promise<number> {
+  const url = new URL('/api/parses/batch', window.location.origin)
+  url.searchParams.set('ids', ids.join(','))
+  const r = await fetch(url.toString(), { method: 'DELETE', credentials: 'include' })
+  if (!r.ok) throw new Error(`Delete failed: ${r.status}`)
+  const j = await r.json()
+  return j.deleted ?? 0
+}
+
 async function deleteByFilter(params: {
   guild: string
   zone?: string
@@ -483,6 +494,12 @@ function MirrorRowGroup({
   const isMirror = fight.uploads.length > 1
   const [expanded, setExpanded] = useState(false)
 
+  // "Delete the whole encounter" is only offered when the caller can delete
+  // every upload in the group — i.e. an admin or an officer of the fight's
+  // guild. A plain uploader can only delete their own among several, so this
+  // is false for them (they still get their per-upload trash in the expansion).
+  const canDeleteAll = isMirror && fight.uploads.length > 0 && fight.uploads.every(u => u.permissions.can_delete)
+
   // ACT outcome: 1 = win (green), 2 = loss (red), 3 = mixed (gold), 0 = unknown.
   const titleColor =
     e.success_level === 1 ? 'var(--success, #4caf50)'
@@ -507,6 +524,19 @@ function MirrorRowGroup({
     }
   }
 
+  async function handleDeleteFight(ev: React.MouseEvent) {
+    ev.preventDefault()
+    ev.stopPropagation()
+    const n = fight.uploads.length
+    if (!confirm(`Delete this entire encounter — all ${n} uploads of "${e.title}"? This cannot be undone.`)) return
+    try {
+      await deleteBatch(fight.uploads.map(u => u.id))
+      onDeleted(other => other.id === e.id)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Delete failed')
+    }
+  }
+
   async function handleDeleteUpload(upload: ParseUploadSummary, ev: React.MouseEvent) {
     ev.preventDefault()
     ev.stopPropagation()
@@ -522,8 +552,9 @@ function MirrorRowGroup({
   // For a non-mirror row, the title links straight to the parse and the
   // trash deletes that single encounter — same UX as before. For a mirror
   // group, the title click toggles expansion (no direct /parse navigation
-  // since there are multiple options); the trash is hidden because
-  // "delete this fight" is ambiguous across uploaders.
+  // since there are multiple options); the top-level trash deletes the whole
+  // encounter (all uploads) and is shown only to those allowed to remove
+  // every upload — admins and officers of the fight's guild.
   return (
     <>
       {isMirror ? (
@@ -560,6 +591,15 @@ function MirrorRowGroup({
       <div className="text-center" style={cellBase}>
         {!isMirror && e.permissions.can_delete && (
           <TrashButton onClick={handleDeletePrimary} title="Delete this encounter" small />
+        )}
+        {/* Mirror group: officers/admins (who can delete every upload) get a
+            single button that removes the whole encounter at once. */}
+        {canDeleteAll && (
+          <TrashButton
+            onClick={handleDeleteFight}
+            title={`Delete entire encounter (all ${fight.uploads.length} uploads)`}
+            small
+          />
         )}
       </div>
 

@@ -16,6 +16,7 @@ import asyncio
 import hashlib
 import hmac
 import logging
+import re
 import sqlite3
 import time
 from typing import Any
@@ -66,6 +67,36 @@ def _uploader_discord_id(source_dsn: str | None) -> str | None:
     return source_dsn[len("plugin:") :] or None
 
 
+# EQ2 server names are a small known set with a predictable shape —
+# letters, digits, spaces, apostrophes, hyphens. Match conservatively
+# and fall back to EQ2_WORLD when the plugin sends garbage. Caps at
+# 30 chars to match the Pydantic max_length on logger_server.
+_VALID_WORLD_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 '_-]{0,30}$")
+
+# EQ2 character names are letters only, max 15 characters per
+# Daybreak's naming rules. Validate on ingest as defence-in-depth
+# on top of the Pydantic max_length=64 cap — a hostile logger_name
+# containing ':' would otherwise collide character_cache entries
+# (the keys are shaped `name.lower():world.lower()` throughout the
+# app). Constraining to the real EQ2 shape also keeps weird
+# payloads out of Census API URLs and the parses DB.
+_VALID_CHARACTER_NAME_RE = re.compile(r"^[A-Za-z]{1,15}$")
+
+
+def _sanitize_world(world: str | None) -> str | None:
+    """Return the world name if it matches the conservative shape we
+    expect for an EQ2 server, else None so the caller falls back to
+    the EQ2_WORLD env-var default. Defence-in-depth on top of the
+    Pydantic max_length=64 cap — keeps obvious injection shapes
+    (paths, query strings, control chars) out of Census API calls."""
+    if not world:
+        return None
+    candidate = world.strip()
+    if not candidate:
+        return None
+    return candidate if _VALID_WORLD_RE.match(candidate) else None
+
+
 async def _resolve_uploader_guild_async(
     uploader: str,
     world: str | None = None,
@@ -85,6 +116,9 @@ async def _resolve_uploader_guild_async(
     (v0.1.10+) detects the server from its log file path and stamps it
     on each upload. Empty/None → fall back to the configured default
     so older plugin versions and the local-ingest path keep working.
+    Sanitised via _sanitize_world; anything that doesn't match the
+    expected shape also falls back rather than feeding garbage into
+    a Census API URL.
 
     Returns None for: uploader='local', Census error, character not found,
     or character is unguilded — callers store guild_name as NULL in all
@@ -93,8 +127,13 @@ async def _resolve_uploader_guild_async(
     if not uploader or uploader == "local":
         return None
 
-    effective_world = (world or "").strip() or _WORLD
+    effective_world = _sanitize_world(world) or _WORLD
     world_lower = effective_world.lower()
+    # Delimiter stays as ":" to keep cache keys compatible with the
+    # rest of the app (characters.py, character.py, guild.py prewarm,
+    # etc.). Collision-via-world is blocked by _sanitize_world above;
+    # collision-via-name is blocked by the EQ2-name regex applied to
+    # logger_name on the way in to the ingest route.
     cache_key = f"{uploader.lower()}:{world_lower}"
     cached, _ = character_cache.get_stale(cache_key)
     if cached is not None:
@@ -154,7 +193,9 @@ async def _resolve_combatant_snapshots(
     Never raises — snapshot resolution is best-effort and must not block a
     valid upload.
     """
-    effective_world = (world or "").strip() or _WORLD
+    # Same sanitisation as _resolve_uploader_guild_async — a malformed
+    # logger_server can't end up in a Census URL.
+    effective_world = _sanitize_world(world) or _WORLD
     world_lower = effective_world.lower()
     out: dict[str, CombatantSnapshot] = {}
     client: CensusClient | None = None
@@ -1127,6 +1168,15 @@ async def ingest_parse(
     uploader = body.logger_name.strip()
     if not uploader:
         raise HTTPException(status_code=400, detail="logger_name must not be empty")
+    # EQ2 character names are letters only, 1-15 chars. Reject
+    # anything else — keeps malformed payloads out of Census API
+    # URLs, parses-DB rows, and prevents the ":"-injection cache-
+    # collision path called out in the v0.1.13 audit (M4).
+    if not _VALID_CHARACTER_NAME_RE.match(uploader):
+        raise HTTPException(
+            status_code=400,
+            detail="logger_name must be 1-15 letters (the EQ2 character-name shape).",
+        )
 
     # Cache-aware guild resolve: hits character_cache first; on miss does a
     # one-character Census call and pre-warms the full roster in the
@@ -1191,6 +1241,97 @@ class DeleteParsesResponse(BaseModel):
     deleted: int
 
 
+async def _can_delete_encounter(user: dict, enc: dict) -> bool:
+    """Authorise deletion of one encounter row (must carry `guild_name` and
+    `source_dsn`). Any of: admin, the original uploader, or an officer of the
+    encounter's guild. Never trusts the caller for guild/uploader — both come
+    from the stored row."""
+    if _is_admin(user) or _uploader_discord_id(enc.get("source_dsn")) == user["id"]:
+        return True
+    gname = enc.get("guild_name")
+    if gname:
+        from web.routes.guild import _officer_chars
+
+        if await _officer_chars(user["id"], gname):
+            return True
+    return False
+
+
+def _fetch_encounter_auth_rows(ids: list[int]) -> list[dict]:
+    """Fetch the (id, guild_name, source_dsn) rows needed to authorise a
+    delete. Runs in an executor."""
+    conn = parses_db.init_db()
+    try:
+        conn.row_factory = sqlite3.Row
+        placeholders = ",".join("?" * len(ids))
+        rows = conn.execute(
+            f"SELECT id, guild_name, source_dsn FROM encounters WHERE id IN ({placeholders})",
+            ids,
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+@router.delete("/parses/batch", response_model=DeleteParsesResponse)
+@limiter.limit("30/minute")
+async def delete_parses_batch(
+    request: Request,
+    ids: str,
+) -> DeleteParsesResponse:
+    """Delete an explicit set of encounter ids — the uploads that make up one
+    multi-uploader fight on /parses. `ids` is comma-separated.
+
+    Each id is authorised independently with the same rule as single-delete,
+    so an officer of the fight's guild (or an admin) can remove EVERY raider's
+    upload of the encounter in one action, while a non-privileged caller only
+    removes the ids they're entitled to. Ids the caller can't delete are
+    skipped rather than failing the whole request; a 403 is returned only when
+    none are permitted.
+
+    Defined before /parses/{encounter_id} so the literal path wins the route
+    match.
+    """
+    user = _require_user(request)
+
+    id_list: list[int] = []
+    for tok in ids.split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        try:
+            id_list.append(int(tok))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid encounter id: {tok!r}") from None
+    id_list = list(dict.fromkeys(id_list))[:64]  # dedupe, cap fan-out
+    if not id_list:
+        raise HTTPException(status_code=400, detail="ids must not be empty")
+
+    loop = asyncio.get_event_loop()
+    rows = await loop.run_in_executor(None, _fetch_encounter_auth_rows, id_list)
+    if not rows:
+        raise HTTPException(status_code=404, detail="No matching parses")
+
+    allowed = [enc["id"] for enc in rows if await _can_delete_encounter(user, enc)]
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Not authorised to delete these parses")
+
+    def _delete_many() -> int:
+        conn = parses_db.init_db()
+        try:
+            n = 0
+            with conn:
+                for eid in allowed:
+                    if parses_db.delete_encounter(conn, eid):
+                        n += 1
+            return n
+        finally:
+            conn.close()
+
+    n = await loop.run_in_executor(None, _delete_many)
+    return DeleteParsesResponse(deleted=n)
+
+
 @router.delete("/parses/{encounter_id}", response_model=DeleteParsesResponse)
 @limiter.limit("30/minute")
 async def delete_parse(
@@ -1202,30 +1343,11 @@ async def delete_parse(
     # Look up the row so we can authorise against its real guild_name and
     # source_dsn — never trust the caller for either.
     loop = asyncio.get_event_loop()
-
-    def _fetch_sync() -> dict | None:
-        conn = parses_db.init_db()
-        try:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(
-                "SELECT id, guild_name, source_dsn FROM encounters WHERE id = ?",
-                (encounter_id,),
-            ).fetchone()
-            return dict(row) if row else None
-        finally:
-            conn.close()
-
-    enc = await loop.run_in_executor(None, _fetch_sync)
-    if enc is None:
+    rows = await loop.run_in_executor(None, _fetch_encounter_auth_rows, [encounter_id])
+    if not rows:
         raise HTTPException(status_code=404, detail="Parse not found")
 
-    allowed = _is_admin(user) or _uploader_discord_id(enc.get("source_dsn")) == user["id"]
-    if not allowed and enc.get("guild_name"):
-        from web.routes.guild import _officer_chars
-
-        if await _officer_chars(user["id"], enc["guild_name"]):
-            allowed = True
-    if not allowed:
+    if not await _can_delete_encounter(user, rows[0]):
         raise HTTPException(status_code=403, detail="Not authorised to delete this parse")
 
     def _delete_sync() -> bool:

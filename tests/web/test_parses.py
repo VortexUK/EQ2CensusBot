@@ -568,11 +568,24 @@ class TestUploaderDiscordId:
 
 
 def _fake_conn_for_fetch(row: dict | None) -> MagicMock:
-    """Build a MagicMock connection whose `execute().fetchone()` returns the
-    given row. Used to fake the per-id encounter lookup inside delete_parse."""
+    """Build a MagicMock connection whose `execute()` returns the given row via
+    both fetchone and fetchall (the delete auth path uses an `IN (...)` query
+    → fetchall). Used to fake the per-id encounter lookup inside delete_parse."""
     conn = MagicMock()
     cur = MagicMock()
     cur.fetchone.return_value = row
+    cur.fetchall.return_value = [row] if row else []
+    conn.execute.return_value = cur
+    return conn
+
+
+def _fake_conn_multi(rows: list[dict]) -> MagicMock:
+    """Like _fake_conn_for_fetch but for the batch path — fetchall returns the
+    full row list."""
+    conn = MagicMock()
+    cur = MagicMock()
+    cur.fetchall.return_value = rows
+    cur.fetchone.return_value = rows[0] if rows else None
     conn.execute.return_value = cur
     return conn
 
@@ -666,6 +679,130 @@ async def test_delete_parse_random_user_403(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1")
     assert r.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/parses/batch (whole multi-uploader encounter)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_requires_auth(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.delete("/api/parses/batch?ids=1,2")
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_officer_deletes_all_uploads(app):
+    # Two uploads of one fight, both by *other* people; caller is an officer of
+    # the guild → may delete the whole encounter.
+    rows = [
+        {"id": 1, "guild_name": "Exordium", "source_dsn": "plugin:OTHER1"},
+        {"id": 2, "guild_name": "Exordium", "source_dsn": "plugin:OTHER2"},
+    ]
+    delete_mock = MagicMock(return_value=True)
+
+    async def fake_officer_chars(discord_id, guild):
+        return {"menludiir"} if guild == "Exordium" else set()
+
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.guild._officer_chars", fake_officer_chars),
+        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.parses_db.delete_encounter", delete_mock),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.delete("/api/parses/batch?ids=1,2")
+    assert r.status_code == 200
+    assert r.json() == {"deleted": 2}
+    assert sorted(c.args[1] for c in delete_mock.call_args_list) == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_admin_deletes_all_uploads(app):
+    rows = [
+        {"id": 5, "guild_name": None, "source_dsn": "plugin:OTHER1"},
+        {"id": 6, "guild_name": "Exordium", "source_dsn": "plugin:OTHER2"},
+    ]
+    delete_mock = MagicMock(return_value=True)
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._is_admin", return_value=True),
+        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.parses_db.delete_encounter", delete_mock),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.delete("/api/parses/batch?ids=5,6")
+    assert r.status_code == 200
+    assert r.json() == {"deleted": 2}
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_skips_unauthorised_ids(app):
+    # Caller (_fake_user id=123456789) uploaded id 1 only; not officer/admin.
+    # The batch deletes the one they own and skips the other.
+    rows = [
+        {"id": 1, "guild_name": "Exordium", "source_dsn": "plugin:123456789"},
+        {"id": 2, "guild_name": "Exordium", "source_dsn": "plugin:SOMEONE_ELSE"},
+    ]
+    delete_mock = MagicMock(return_value=True)
+
+    async def fake_officer_chars(discord_id, guild):
+        return set()
+
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.guild._officer_chars", fake_officer_chars),
+        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.parses_db.delete_encounter", delete_mock),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.delete("/api/parses/batch?ids=1,2")
+    assert r.status_code == 200
+    assert r.json() == {"deleted": 1}
+    assert [c.args[1] for c in delete_mock.call_args_list] == [1]
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_none_allowed_403(app):
+    rows = [{"id": 1, "guild_name": "Exordium", "source_dsn": "plugin:OTHER"}]
+
+    async def fake_officer_chars(discord_id, guild):
+        return set()
+
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.guild._officer_chars", fake_officer_chars),
+        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.delete("/api/parses/batch?ids=1")
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_404_when_no_rows(app):
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi([])),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.delete("/api/parses/batch?ids=999")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_batch_rejects_bad_ids(app):
+    with patch("web.routes.parses._require_user", _fake_user):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            empty = await client.delete("/api/parses/batch?ids=")
+            bad = await client.delete("/api/parses/batch?ids=abc")
+    assert empty.status_code == 400
+    assert bad.status_code == 400
 
 
 # ---------------------------------------------------------------------------
