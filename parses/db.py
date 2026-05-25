@@ -612,6 +612,42 @@ def recent_encounters(
     return [dict(r) for r in rows]
 
 
+def list_encounters_for_admin(
+    conn: sqlite3.Connection,
+    *,
+    search: str | None = None,
+    limit: int = 200,
+) -> list[dict]:
+    """All encounters INCLUDING hidden (soft-deleted) ones, newest first, for
+    the admin sanitize view. Optional case-insensitive search over
+    title / uploaded_by / guild_name. Includes a player_count and the hidden_at
+    marker so an admin can spot a bogus parse even when it's hidden but still
+    polluting the leaderboards."""
+    conn.row_factory = sqlite3.Row
+    clauses: list[str] = []
+    params: list = []
+    if search:
+        like = f"%{search.lower()}%"
+        clauses.append(
+            "(LOWER(title) LIKE ? OR LOWER(IFNULL(uploaded_by, '')) LIKE ? OR LOWER(IFNULL(guild_name, '')) LIKE ?)"
+        )
+        params += [like, like, like]
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+    sql = f"""
+        SELECT e.id, e.title, e.zone, e.guild_name, e.uploaded_by, e.started_at,
+               e.duration_s, e.success_level, e.hidden_at,
+               (SELECT COUNT(*) FROM combatants c
+                  WHERE c.encounter_id = e.id AND c.ally = 1
+                    AND c.name != '' AND c.name != 'Unknown'
+                    AND instr(c.name, ' ') = 0) AS player_count
+        FROM encounters e
+        {where}
+        ORDER BY e.started_at DESC
+        LIMIT ?
+    """
+    return [dict(r) for r in conn.execute(sql, [*params, limit]).fetchall()]
+
+
 def delete_encounter(conn: sqlite3.Connection, encounter_id: int) -> bool:
     """Delete one encounter. Returns True if a row was removed, False if not
     found. ON DELETE CASCADE handles combatants / damage_types / attack_types

@@ -389,6 +389,26 @@ class TestInsertHelpers:
         assert parses_db.is_ingested(parses_db_conn, enc.encid)
         assert not parses_db.is_ingested(parses_db_conn, "NOTREAL")
 
+    def test_list_encounters_for_admin_includes_hidden_and_search(self, parses_db_conn):
+        from dataclasses import replace
+
+        a = _sample_encounter()  # title "a krait patriarch", encid "18cf3eb9"
+        b = replace(a, encid="boss01", title="Wuoshi")
+        aid = parses_db.insert_encounter(parses_db_conn, a, source_dsn="eq2act", ingested_at=1, guild_name="Exordium")
+        bid = parses_db.insert_encounter(parses_db_conn, b, source_dsn="eq2act", ingested_at=2, guild_name="Exordium")
+        parses_db.soft_delete_encounter(parses_db_conn, bid, hidden_at=99)  # hide the boss one
+
+        rows = parses_db.list_encounters_for_admin(parses_db_conn)
+        ids = {r["id"] for r in rows}
+        assert aid in ids and bid in ids  # hidden row still listed for admin
+        by_id = {r["id"]: r for r in rows}
+        assert by_id[bid]["hidden_at"] == 99 and by_id[aid]["hidden_at"] is None
+        assert "player_count" in by_id[aid]
+
+        # Search narrows by title.
+        hits = parses_db.list_encounters_for_admin(parses_db_conn, search="wuoshi")
+        assert [r["id"] for r in hits] == [bid]
+
 
 class TestUniqueConstraints:
     def test_duplicate_act_encid_rejected(self, parses_db_conn):

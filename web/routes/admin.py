@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from parses import db as parses_db
 from web.auth_deps import require_admin as _require_admin
 from web.cache import claim_cache
 from web.db import (
@@ -57,6 +58,19 @@ class UserItem(BaseModel):
     last_seen: int
     access_status: str
     claim_count: int = 0
+
+
+class AdminParseItem(BaseModel):
+    id: int
+    title: str
+    zone: str | None = None
+    guild_name: str | None = None
+    uploaded_by: str | None = None
+    started_at: int
+    duration_s: int
+    success_level: int
+    player_count: int
+    hidden: bool
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +149,45 @@ async def list_users(request: Request) -> list[UserItem]:
     _require_admin(request)
     rows = await list_all_users()
     return [UserItem(**r) for r in rows]
+
+
+@router.get("/admin/parses", response_model=list[AdminParseItem])
+async def list_parses_admin(
+    request: Request,
+    search: str | None = None,
+    limit: int = 200,
+) -> list[AdminParseItem]:
+    """All parse encounters (including hidden/soft-deleted) for the sanitize
+    view. Admin only. Hard-purge uses the existing
+    DELETE /api/parses/{id}?purge=1 and /api/parses/batch?ids=...&purge=1."""
+    _require_admin(request)
+    limit = max(1, min(limit, 1000))
+
+    def _query() -> list[dict]:
+        if not parses_db.DB_PATH.exists():
+            return []
+        conn = parses_db.init_db(parses_db.DB_PATH)
+        try:
+            return parses_db.list_encounters_for_admin(conn, search=search, limit=limit)
+        finally:
+            conn.close()
+
+    rows = await asyncio.get_event_loop().run_in_executor(None, _query)
+    return [
+        AdminParseItem(
+            id=r["id"],
+            title=r["title"],
+            zone=r["zone"],
+            guild_name=r["guild_name"],
+            uploaded_by=r["uploaded_by"],
+            started_at=r["started_at"],
+            duration_s=r["duration_s"],
+            success_level=r["success_level"],
+            player_count=r["player_count"],
+            hidden=bool(r["hidden_at"]),
+        )
+        for r in rows
+    ]
 
 
 @router.post("/admin/users/{discord_id}/kick", status_code=200)
