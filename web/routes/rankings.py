@@ -11,11 +11,15 @@ docs/superpowers/specs/2026-05-25-eq2logs-rankings-design.md.
 
 from __future__ import annotations
 
+import sqlite3
 from collections import defaultdict
 
 from fastapi import APIRouter
 
+from parses import db as parses_db
+from parses.boss import is_boss
 from web.cache import TTLCache
+from web.routes.parses import _PLAYER_COUNT_SQL, _group_into_fights
 
 router = APIRouter(tags=["rankings"])
 
@@ -136,3 +140,55 @@ def _build_filters(kills: list[dict]) -> dict:
             if zones
         ]
     }
+
+
+def _load_primary_boss_kills() -> list[dict]:
+    """Load winning boss-kill encounters, mirror-group them, and return one
+    'primary' (longest) upload per fight with its combatants attached. Ignores
+    hidden_at so soft-deleted parses still rank. Runs in an executor."""
+    if not parses_db.DB_PATH.exists():
+        return []
+    conn = parses_db.init_db(parses_db.DB_PATH)
+    try:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"""
+            SELECT e.id, e.title, e.zone, e.guild_name, e.uploaded_by,
+                   e.started_at, e.duration_s, e.success_level,
+                   ({_PLAYER_COUNT_SQL}) AS player_count
+            FROM encounters e
+            WHERE e.success_level = 1
+            ORDER BY e.started_at DESC
+            """
+        ).fetchall()
+        encs = [dict(r) for r in rows if is_boss(r["title"])]
+        kills: list[dict] = []
+        for g in _group_into_fights(encs):
+            scope = _scope_for(g.get("player_count") or 0)
+            if scope is None:
+                continue
+            kills.append(
+                {
+                    "id": g["id"],
+                    "title": g["title"],
+                    "zone": g["zone"],
+                    "guild_name": g.get("guild_name"),
+                    "started_at": g["started_at"],
+                    "duration_s": g["duration_s"],
+                    "player_count": g.get("player_count") or 0,
+                    "scope": scope,
+                    "combatants": parses_db.get_combatants_for_encounter(conn, g["id"]),
+                }
+            )
+        return kills
+    finally:
+        conn.close()
+
+
+def _cached_kills() -> list[dict]:
+    cached = rankings_cache.get(_KILLS_KEY)
+    if cached is not None:
+        return cached
+    kills = _load_primary_boss_kills()
+    rankings_cache.set(_KILLS_KEY, kills)
+    return kills

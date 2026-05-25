@@ -193,3 +193,95 @@ class TestFilters:
         zone = raid["zones"][0]
         assert zone["zone"] == "Vetrovia" and zone["bosses"] == ["Cazel", "Tarinax"]
         assert {s["key"] for s in tree["scopes"]} == {"raid", "group"}
+
+
+import time as _time
+
+import pytest
+
+from parses import db as pdb
+from parses.models import Combatant, CombatantSnapshot, Encounter
+
+
+def _ins(conn, encid, title, *, success, players, guild, duration):
+    enc = Encounter(
+        encid=encid,
+        title=title,
+        zone="Vetrovia",
+        started_at=None,
+        ended_at=None,
+        duration_s=duration,
+        total_damage=1,
+        encdps=1.0,
+        kills=1,
+        deaths=0,
+        success_level=success,
+    )
+    eid = pdb.insert_encounter(
+        conn, enc, source_dsn="eq2act", ingested_at=int(_time.time()), uploaded_by="Up", guild_name=guild
+    )
+    combs = [
+        Combatant(
+            encid=encid,
+            name=f"P{i}",
+            ally=True,
+            started_at=None,
+            ended_at=None,
+            duration_s=duration,
+            damage=1,
+            damage_perc=0.0,
+            kills=0,
+            healed=0,
+            healed_perc=0.0,
+            crit_heals=0,
+            heals=0,
+            cure_dispels=0,
+            power_drain=0,
+            power_replenish=0,
+            dps=0.0,
+            encdps=float(100 - i),
+            enchps=0.0,
+            hits=0,
+            crit_hits=0,
+            blocked=0,
+            misses=0,
+            swings=0,
+            heals_taken=0,
+            damage_taken=0,
+            deaths=0,
+            to_hit=0.0,
+            crit_dam_perc=0.0,
+            crit_heal_perc=0.0,
+            crit_types=None,
+            threat_str=None,
+            threat_delta=0,
+        )
+        for i in range(players)
+    ]
+    snaps = {f"P{i}": CombatantSnapshot(level=95, guild_name=guild, cls="Wizard") for i in range(players)}
+    pdb.insert_combatants_bulk(conn, eid, combs, snaps)
+    conn.commit()
+
+
+@pytest.fixture()
+def rankings_db(tmp_path, monkeypatch):
+    db_file = tmp_path / "parses.db"
+    monkeypatch.setattr(pdb, "DB_PATH", db_file)
+    conn = pdb.init_db(db_file)
+    _ins(conn, "WIN", "Tarinax", success=1, players=8, guild="Exordium", duration=60)  # boss, raid
+    _ins(conn, "TRASH", "a krait", success=1, players=8, guild="Exordium", duration=30)  # not boss
+    _ins(conn, "LOSS", "Cazel", success=2, players=8, guild="Exordium", duration=90)  # not a win
+    conn.close()
+    from web.routes import rankings as rk
+
+    rk.rankings_cache.delete(rk._KILLS_KEY)
+    return db_file
+
+
+def test_loader_keeps_only_winning_boss_kills(rankings_db):
+    from web.routes.rankings import _load_primary_boss_kills
+
+    kills = _load_primary_boss_kills()
+    assert [k["title"] for k in kills] == ["Tarinax"]
+    assert kills[0]["scope"] == "raid" and kills[0]["player_count"] == 8
+    assert len(kills[0]["combatants"]) == 8
