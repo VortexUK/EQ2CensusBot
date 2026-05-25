@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
+import { Card, SectionLabel } from '../components/ui'
 import { ItemTooltip, TooltipState, getCachedItem, prefetchItem } from '../components/ItemTooltip'
 import { AAsTab } from './CharacterAAsTab'
 import { SpellsTab } from './CharacterSpellsTab'
@@ -197,10 +198,10 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
   if (scored.length === 0) {
     return (
       <div style={{ marginBottom: '1rem' }}>
-        <div style={ratingHeading}>Raid Ready</div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 5, padding: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
+        <SectionLabel>Raid Ready</SectionLabel>
+        <Card style={{ borderRadius: 5, padding: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
           {ready ? 'No gear data' : 'Loading item data…'}
-        </div>
+        </Card>
       </div>
     )
   }
@@ -210,7 +211,7 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
 
   return (
     <div style={{ marginBottom: '1rem' }}>
-      <div style={ratingHeading}>Raid Ready</div>
+      <SectionLabel>Raid Ready</SectionLabel>
       <div style={{
         background: 'var(--surface)',
         border: `1px solid ${raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
@@ -235,7 +236,7 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
 
           {/* Status + detail */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : 'var(--danger)', marginBottom: '0.2rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? 'var(--success)' : 'var(--danger)', marginBottom: '0.2rem' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -250,11 +251,6 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
       </div>
     </div>
   )
-}
-
-const ratingHeading: React.CSSProperties = {
-  fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em',
-  color: 'var(--accent)', fontWeight: 600, marginBottom: '3px',
 }
 
 // ── Paperdoll slot config ────────────────────────────────────────────────────
@@ -689,8 +685,7 @@ function GeneralBanner({ char }: { char: Character }) {
   ]
 
   return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
+    <Card style={{
       borderRadius: 6, padding: '0.5rem 1rem',
       display: 'flex', alignItems: 'stretch',
     }}>
@@ -707,7 +702,7 @@ function GeneralBanner({ char }: { char: Character }) {
           fontWeight: 700,
           lineHeight: 1.2,
           letterSpacing: '0.04em',
-          background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 40%, #c8a96e 70%, #a07840 100%)',
+          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
@@ -745,7 +740,7 @@ function GeneralBanner({ char }: { char: Character }) {
           {bottom && <BannerStat label={bottom[0]} value={bottom[1]} />}
         </div>
       ))}
-    </div>
+    </Card>
   )
 }
 
@@ -864,12 +859,10 @@ export function StatRow({ label, value, fmt: format, onHover, onLeave }: {
 export function StatGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: '1rem' }}>
-      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent)', fontWeight: 600, marginBottom: '3px' }}>
-        {title}
-      </div>
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 5, padding: '4px 8px' }}>
+      <SectionLabel>{title}</SectionLabel>
+      <Card style={{ borderRadius: 5, padding: '4px 8px' }}>
         {children}
-      </div>
+      </Card>
     </div>
   )
 }

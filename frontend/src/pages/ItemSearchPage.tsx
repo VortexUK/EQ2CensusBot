@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ItemTooltip, TooltipState } from '../components/ItemTooltip'
+import { Button, Card } from '../components/ui'
 
 // ── Stat options (canonical display names from STAT_MAP) ──────────────────────
 
@@ -446,7 +447,7 @@ export default function ItemSearchPage() {
         fontFamily: "var(--font-heading)",
         fontSize: '1.9rem', fontWeight: 700, letterSpacing: '0.06em',
         margin: '1rem 0 0.25rem',
-        background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 40%, #c8a96e 70%, #a07840 100%)',
+        background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
         backgroundClip: 'text', display: 'inline-block',
       }}>
@@ -458,10 +459,7 @@ export default function ItemSearchPage() {
 
       {/* ── Filter form ───────────────────────────────────────────────────── */}
       <form onSubmit={handleSubmit}>
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: '1rem 1.1rem', marginBottom: '1.25rem',
-        }}>
+        <Card style={{ padding: '1rem 1.1rem', marginBottom: '1.25rem' }}>
 
           {/* Row 1: name + tier + type + slot + class */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end', marginBottom: '0.75rem' }}>
@@ -546,22 +544,13 @@ export default function ItemSearchPage() {
             </Field>
 
             <Field label=" " transparent>
-              <button
+              <Button
                 type="submit"
+                variant="primary"
                 disabled={loading || !hasAnyFilter}
-                style={{
-                  ...CTRL,
-                  cursor:     loading || !hasAnyFilter ? 'not-allowed' : 'pointer',
-                  opacity:    loading || !hasAnyFilter ? 0.45 : 1,
-                  padding:    '0.42rem 1.4rem',
-                  border:     '1px solid rgba(var(--accent-rgb,99,210,130),0.4)',
-                  background: 'rgba(var(--accent-rgb,99,210,130),0.12)',
-                  color:      'var(--accent)',
-                  fontWeight: 600,
-                }}
               >
                 {loading ? 'Searching…' : 'Search'}
-              </button>
+              </Button>
             </Field>
 
           </div>
@@ -617,37 +606,36 @@ export default function ItemSearchPage() {
                       style={{ ...CTRL, width: 90 }}
                     />
                     {/* Remove */}
-                    <button
+                    <Button
                       type="button"
+                      variant="danger"
+                      size="sm"
                       onClick={() => removeStatFilter(f.id)}
-                      style={{
-                        background: 'none', border: 'none',
-                        color: 'var(--danger)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1,
-                      }}
+                      style={{ border: 'none', fontSize: '1rem', lineHeight: 1 }}
                       title="Remove"
                     >
                       ×
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={addStatFilter}
             style={{
-              background: 'none', border: '1px dashed var(--border)',
-              borderRadius: 5, color: 'var(--text-muted)', cursor: 'pointer',
-              fontSize: '0.8rem', padding: '0.25rem 0.75rem',
+              border: '1px dashed var(--border)',
               marginTop: statFilters.length ? '0.3rem' : 0,
             }}
           >
             + Add stat filter
-          </button>
+          </Button>
 
-        </div>
+        </Card>
       </form>
 
       {/* ── Error ──────────────────────────────────────────────────────────── */}
@@ -687,8 +675,8 @@ export default function ItemSearchPage() {
 
           {totalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '0.75rem' }}>
-              <button onClick={() => runSearch(page - 1)} disabled={page <= 1}         style={PAGIN_BTN}>← Prev</button>
-              <button onClick={() => runSearch(page + 1)} disabled={page >= totalPages} style={PAGIN_BTN}>Next →</button>
+              <Button variant="secondary" size="sm" onClick={() => runSearch(page - 1)} disabled={page <= 1}>← Prev</Button>
+              <Button variant="secondary" size="sm" onClick={() => runSearch(page + 1)} disabled={page >= totalPages}>Next →</Button>
             </div>
           )}
         </div>
@@ -735,8 +723,8 @@ function ResultsHeader({
       </span>
       {totalPages > 1 && (
         <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <button onClick={onPrev} disabled={page <= 1}         style={PAGIN_BTN}>← Prev</button>
-          <button onClick={onNext} disabled={page >= totalPages} style={PAGIN_BTN}>Next →</button>
+          <Button variant="secondary" size="sm" onClick={onPrev} disabled={page <= 1}>← Prev</Button>
+          <Button variant="secondary" size="sm" onClick={onNext} disabled={page >= totalPages}>Next →</Button>
         </div>
       )}
     </div>
@@ -789,7 +777,7 @@ function ItemTable({
   const statCols = statFilters.filter(f => f.stat).slice(0, 3)
 
   return (
-    <div style={{ overflowX: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
+    <Card style={{ overflowX: 'auto', padding: 0 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
@@ -899,12 +887,6 @@ function ItemTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </Card>
   )
-}
-
-const PAGIN_BTN: React.CSSProperties = {
-  padding: '0.3rem 0.8rem', borderRadius: 5,
-  border: '1px solid var(--border)', background: 'var(--surface)',
-  color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.82rem',
 }

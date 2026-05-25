@@ -17,7 +17,7 @@ export default function NotFoundPage() {
         fontSize: '5rem',
         fontWeight: 700,
         lineHeight: 1,
-        background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 50%, #a07840 100%)',
+        background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 50%, var(--gold-dim) 100%)',
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
         backgroundClip: 'text',

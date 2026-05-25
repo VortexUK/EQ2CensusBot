@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 
 import Breadcrumb from '../components/Breadcrumb'
+import { Button, Card } from '../components/ui'
 import { fmtLocalDateTime } from '../formatters'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -125,9 +126,9 @@ export default function TokensPage() {
         <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.7rem', color: 'var(--gold)', margin: 0 }}>
           API Tokens
         </h1>
-        <button onClick={() => setMintOpen(true)} style={btnPrimary}>
+        <Button variant="primary" onClick={() => setMintOpen(true)}>
           + New token
-        </button>
+        </Button>
       </div>
 
       <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: 0, marginBottom: '1.4rem' }}>
@@ -145,12 +146,7 @@ export default function TokensPage() {
       )}
 
       {!loading && tokens && tokens.length > 0 && (
-        <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          overflow: 'hidden',
-        }}>
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
           <div style={tableHeaderRow}>
             <div>Name</div>
             <div>Token</div>
@@ -173,14 +169,14 @@ export default function TokensPage() {
               </div>
               <div style={{ textAlign: 'right' }}>
                 {!t.revoked_at && (
-                  <button onClick={() => onRevoke(t.id, t.name)} style={btnDanger}>
+                  <Button variant="danger" size="sm" onClick={() => onRevoke(t.id, t.name)}>
                     Revoke
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
           ))}
-        </div>
+        </Card>
       )}
 
       {mintOpen && (
@@ -238,12 +234,12 @@ function MintModal({
               {mintedToken}
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-              <button onClick={onCopy} style={btnPrimary}>
+              <Button variant="primary" onClick={onCopy}>
                 {copyState === 'copied' ? 'Copied ✓' : 'Copy token'}
-              </button>
-              <button onClick={onClose} style={btnSecondary}>
+              </Button>
+              <Button variant="secondary" onClick={onClose}>
                 Done
-              </button>
+              </Button>
             </div>
           </>
         ) : (
@@ -273,14 +269,10 @@ function MintModal({
               }}
             />
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-              <button onClick={onClose} style={btnSecondary}>Cancel</button>
-              <button
-                onClick={onMint}
-                disabled={!name.trim() || minting}
-                style={{ ...btnPrimary, opacity: !name.trim() || minting ? 0.5 : 1 }}
-              >
+              <Button variant="secondary" onClick={onClose}>Cancel</Button>
+              <Button variant="primary" onClick={onMint} disabled={!name.trim() || minting}>
                 {minting ? 'Generating…' : 'Generate token'}
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -313,37 +305,6 @@ const tableRow: CSSProperties = {
   borderBottom: '1px solid var(--border)',
   alignItems: 'center',
   fontSize: '0.88rem',
-}
-
-const btnPrimary: CSSProperties = {
-  background: 'var(--gold)',
-  color: '#0f1117',
-  border: 'none',
-  borderRadius: 6,
-  fontWeight: 700,
-  fontSize: '0.85rem',
-  padding: '0.4rem 0.95rem',
-  cursor: 'pointer',
-}
-
-const btnSecondary: CSSProperties = {
-  background: 'var(--surface)',
-  color: 'var(--text)',
-  border: '1px solid var(--border)',
-  borderRadius: 6,
-  fontSize: '0.85rem',
-  padding: '0.4rem 0.95rem',
-  cursor: 'pointer',
-}
-
-const btnDanger: CSSProperties = {
-  background: 'none',
-  color: 'var(--danger)',
-  border: '1px solid var(--border)',
-  borderRadius: 4,
-  fontSize: '0.78rem',
-  padding: '0.25rem 0.65rem',
-  cursor: 'pointer',
 }
 
 const modalOverlay: CSSProperties = {

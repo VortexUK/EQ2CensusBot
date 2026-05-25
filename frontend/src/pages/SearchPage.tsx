@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { Card } from '../components/ui'
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
@@ -111,7 +112,7 @@ function NameSearchPage({ config }: { config: SearchConfig }) {
           fontFamily: "var(--font-heading)",
           fontSize: '1.9rem', fontWeight: 700, letterSpacing: '0.06em',
           margin: '0 0 0.3rem',
-          background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 40%, #c8a96e 70%, #a07840 100%)',
+          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           backgroundClip: 'text', display: 'inline-block',
         }}>
@@ -151,12 +152,7 @@ function NameSearchPage({ config }: { config: SearchConfig }) {
       )}
 
       {results.length > 0 && (
-        <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          overflow: 'hidden',
-        }}>
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
           {results.map((r, i) => {
             const sub = config.renderSub ? config.renderSub(r) : null
             return (
@@ -194,7 +190,7 @@ function NameSearchPage({ config }: { config: SearchConfig }) {
               </Link>
             )
           })}
-        </div>
+        </Card>
       )}
 
       {!searched && query.trim().length > 0 && query.trim().length < 2 && (

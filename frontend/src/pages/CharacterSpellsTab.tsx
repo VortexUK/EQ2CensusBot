@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StatGroup } from './CharacterPage'
+import { Button, Card, SectionLabel } from '../components/ui'
 import { SpellTierPip } from '../components/SpellScrollTooltip'
 import {
   type SpellEntry,
@@ -65,16 +66,11 @@ function SpellRaidReady({ expertOrBetter, totalSpells }: { expertOrBetter: numbe
   if (totalSpells === 0) return null
   const pct       = Math.min(100, Math.round(expertOrBetter / totalSpells * 100))
   const raidReady = pct >= 90
-  const color     = raidReady ? '#4ade80' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
+  const color     = raidReady ? 'var(--success)' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
 
   return (
     <div style={{ marginBottom: '0.75rem' }}>
-      <div style={{
-        fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em',
-        color: 'var(--accent)', fontWeight: 600, marginBottom: 3,
-      }}>
-        Raid Ready
-      </div>
+      <SectionLabel>Raid Ready</SectionLabel>
       <div style={{
         background: 'var(--surface)',
         border: `1px solid ${raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
@@ -91,7 +87,7 @@ function SpellRaidReady({ expertOrBetter, totalSpells }: { expertOrBetter: numbe
             {pct}%
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : 'var(--danger)', marginBottom: '0.2rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? 'var(--success)' : 'var(--danger)', marginBottom: '0.2rem' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -386,28 +382,15 @@ function MaterialsSection({ charName }: { charName: string }) {
       {/* Add-to-shopping-list button */}
       {data.spells_with_recipe > 0 && (
         <div style={{ marginTop: 8 }}>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleAddToList}
             disabled={addingToList}
-            style={{
-              width: '100%',
-              padding: '5px 0',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              color: addingToList ? 'var(--text-muted)' : 'var(--gold)',
-              background: 'none',
-              border: '1px solid ' + (addingToList ? 'var(--border)' : '#c8a96e55'),
-              borderRadius: 4,
-              cursor: addingToList ? 'default' : 'pointer',
-              transition: 'border-color 0.15s, color 0.15s',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.4rem',
-            }}
+            style={{ width: '100%' }}
           >
             {addingToList ? '⏳ Adding…' : '🛒 Add upgrades to shopping list'}
-          </button>
+          </Button>
           {addError && (
             <div style={{ fontSize: '0.68rem', color: 'var(--danger)', marginTop: 3 }}>
               Error: {addError}
@@ -543,17 +526,14 @@ export function SpellsTab({ charName }: { charName: string }) {
         <MaterialsSection charName={charName} />
 
         {tierFilter.size > 0 && (
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setTierFilter(new Set())}
-            style={{
-              width: '100%', padding: '4px 0', fontSize: '0.75rem',
-              color: 'var(--text-muted)', background: 'none',
-              border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer',
-              marginTop: 4,
-            }}
+            style={{ width: '100%', marginTop: 4 }}
           >
             Clear tier filter
-          </button>
+          </Button>
         )}
       </div>
 
@@ -568,19 +548,19 @@ export function SpellsTab({ charName }: { charName: string }) {
         />
 
         {filtered.length === 0 ? (
-          <div style={{
-            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6,
+          <Card style={{
+            borderRadius: 6,
             padding: '1.5rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.88rem',
           }}>
             No spells match your filter.
-          </div>
+          </Card>
         ) : (() => {
           const mid = Math.ceil(filtered.length / 2)
           const cols = [filtered.slice(0, mid), filtered.slice(mid)]
 
           const renderTable = (rows: SpellEntry[]) => (
-            <div style={{
-              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6,
+            <Card style={{
+              borderRadius: 6, padding: 0,
               overflow: 'hidden', flex: 1, minWidth: 0,
             }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -642,7 +622,7 @@ export function SpellsTab({ charName }: { charName: string }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Card>
           )
 
           return (

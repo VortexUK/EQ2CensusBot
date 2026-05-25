@@ -1,6 +1,7 @@
 ﻿import type { CSSProperties, ReactNode } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Button, Card } from '../components/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -407,26 +408,16 @@ export default function RecipesPage() {
           Recipes
         </h1>
         {list.length > 0 && (
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setListOpen(v => !v)}
-            style={{
-              marginLeft: 'auto',
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              color: 'var(--gold)',
-              fontSize: '0.85rem',
-              padding: '0.3rem 0.8rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
+            style={{ marginLeft: 'auto' }}
           >
             🛒 Shopping List
             <span style={{
               background: 'var(--gold)',
-              color: '#0f1117',
+              color: 'var(--bg)',
               borderRadius: '50%',
               width: 18,
               height: 18,
@@ -439,7 +430,7 @@ export default function RecipesPage() {
             }}>
               {totalItems}
             </span>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -513,23 +504,13 @@ export default function RecipesPage() {
             </div>
 
             {/* Search button */}
-            <button
+            <Button
+              variant="primary"
               onClick={handleSearch}
               disabled={loading}
-              style={{
-                background: 'var(--gold)',
-                color: '#0f1117',
-                border: 'none',
-                borderRadius: 6,
-                fontWeight: 700,
-                fontSize: '0.88rem',
-                padding: '0.38rem 1.1rem',
-                cursor: loading ? 'wait' : 'pointer',
-                whiteSpace: 'nowrap',
-              }}
             >
               {loading ? '…' : 'Search'}
-            </button>
+            </Button>
           </div>
 
           {/* Error */}
@@ -561,19 +542,21 @@ export default function RecipesPage() {
               {/* Pagination */}
               {totalPages > 1 && (
                 <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap' }}>
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => handlePage(page - 1)}
                     disabled={page <= 1}
-                    style={pagerBtn(page <= 1)}
-                  >← Prev</button>
+                  >← Prev</Button>
                   <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', padding: '0 0.3rem' }}>
                     Page {page} / {totalPages}
                   </span>
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => handlePage(page + 1)}
                     disabled={page >= totalPages}
-                    style={pagerBtn(page >= totalPages)}
-                  >Next →</button>
+                  >Next →</Button>
                 </div>
               )}
             </>
@@ -582,10 +565,7 @@ export default function RecipesPage() {
 
         {/* ── Right column: shopping list ─────────────────────────────────────── */}
         {listOpen && (
-          <div style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
+          <Card style={{
             padding: '1rem',
             alignSelf: 'start',
             position: 'sticky',
@@ -598,26 +578,32 @@ export default function RecipesPage() {
                 Shopping List
               </h2>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => downloadShoppingListXml(list, summary)}
                   title="Download as XML"
-                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--gold)', cursor: 'pointer', fontSize: '0.75rem', padding: '2px 7px', lineHeight: 1.5 }}
+                  style={{ background: 'none', color: 'var(--gold)' }}
                 >
                   ⬇ XML
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
                   onClick={clearList}
                   title="Clear list"
-                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.2rem' }}
+                  style={{ border: 'none' }}
                 >
                   Clear
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setListOpen(false)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}
+                  style={{ fontSize: '1rem', lineHeight: 1 }}
                 >
                   ×
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -691,7 +677,7 @@ export default function RecipesPage() {
                     {summary.fuel.map(row => (
                       <div key={row.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '1px 0' }}>
                         <span style={{ color: 'var(--text-muted)' }}>{row.name}</span>
-                        <span style={{ color: '#9a7d4a', fontWeight: 600, marginLeft: '0.5rem' }}>×{row.total}</span>
+                        <span style={{ color: 'var(--gold-dim)', fontWeight: 600, marginLeft: '0.5rem' }}>×{row.total}</span>
                       </div>
                     ))}
                   </>
@@ -704,30 +690,24 @@ export default function RecipesPage() {
                 Use + on a recipe to add it.
               </p>
             )}
-          </div>
+          </Card>
         )}
       </div>
 
       {/* Floating cart button when panel is closed */}
       {!listOpen && list.length > 0 && (
-        <button
+        <Button
+          variant="primary"
           onClick={() => setListOpen(true)}
           title="Open Shopping List"
           style={{
             position: 'fixed',
             bottom: '1.5rem',
             right: '1.5rem',
-            background: 'var(--gold)',
-            color: '#0f1117',
-            border: 'none',
             borderRadius: '50%',
             width: 52,
             height: 52,
             fontSize: '1.4rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
             zIndex: 100,
           }}
@@ -750,7 +730,7 @@ export default function RecipesPage() {
           }}>
             {totalItems}
           </span>
-        </button>
+        </Button>
       )}
     </main>
   )
@@ -772,12 +752,7 @@ function RecipeCard({
   const [open, setOpen] = useState(false)
 
   return (
-    <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 8,
-      overflow: 'hidden',
-    }}>
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
       {/* Header row */}
       <div style={{
         display: 'flex',
@@ -822,22 +797,18 @@ function RecipeCard({
               </span>
             </>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onAdd}
             title="Add to shopping list"
             style={{
-              background: 'none',
-              border: '1px solid #c8a96e',
-              borderRadius: 4,
+              border: '1px solid var(--gold)',
               color: 'var(--gold)',
-              fontSize: '0.78rem',
-              padding: '1px 7px',
-              cursor: 'pointer',
-              lineHeight: 1.5,
             }}
           >
             +
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -885,7 +856,7 @@ function RecipeCard({
           </div>
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -930,17 +901,4 @@ function buildIngredientList(entry: ShoppingEntry): Ingredient[] {
     }
   }
   return result
-}
-
-function pagerBtn(disabled: boolean): CSSProperties {
-  return {
-    background: disabled ? 'var(--surface)' : 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: 5,
-    color: disabled ? 'var(--text-muted)' : 'var(--text)',
-    padding: '0.3rem 0.75rem',
-    fontSize: '0.82rem',
-    cursor: disabled ? 'default' : 'pointer',
-    opacity: disabled ? 0.45 : 1,
-  }
 }

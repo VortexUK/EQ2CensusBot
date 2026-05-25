@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
+import { Button } from '../components/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,13 +50,13 @@ function relativeTime(unix: number): string {
 
 const ACCESS_BADGE: Record<string, React.CSSProperties> = {
   pending:  { background: 'rgba(234,179,8,0.18)',   color: '#fbbf24', border: '1px solid rgba(234,179,8,0.4)'  },
-  approved: { background: 'rgba(34,197,94,0.13)',   color: '#4ade80', border: '1px solid rgba(34,197,94,0.35)' },
+  approved: { background: 'rgba(34,197,94,0.13)',   color: 'var(--success)', border: '1px solid rgba(34,197,94,0.35)' },
   denied:   { background: 'rgba(239,68,68,0.13)',   color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.35)' },
 }
 
 const CLAIM_BADGE: Record<string, React.CSSProperties> = {
   pending:    { background: 'rgba(234,179,8,0.18)',    color: '#fbbf24', border: '1px solid rgba(234,179,8,0.4)'    },
-  approved:   { background: 'rgba(34,197,94,0.13)',    color: '#4ade80', border: '1px solid rgba(34,197,94,0.35)'   },
+  approved:   { background: 'rgba(34,197,94,0.13)',    color: 'var(--success)', border: '1px solid rgba(34,197,94,0.35)'   },
   rejected:   { background: 'rgba(239,68,68,0.13)',    color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.35)'   },
   withdrawn:  { background: 'rgba(100,116,139,0.13)',  color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)'  },
   superseded: { background: 'rgba(100,116,139,0.13)',  color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)'  },
@@ -93,26 +94,6 @@ const TD: React.CSSProperties = {
 const BTN_BASE: React.CSSProperties = {
   padding: '0.22rem 0.65rem', borderRadius: 4, cursor: 'pointer',
   fontSize: '0.78rem', fontWeight: 600, border: 'none', whiteSpace: 'nowrap',
-}
-const BTN_GREEN: React.CSSProperties = {
-  ...BTN_BASE,
-  background: 'rgba(34,197,94,0.15)', color: '#4ade80',
-  border: '1px solid rgba(34,197,94,0.4)',
-}
-const BTN_RED: React.CSSProperties = {
-  ...BTN_BASE,
-  background: 'rgba(239,68,68,0.12)', color: 'var(--danger)',
-  border: '1px solid rgba(239,68,68,0.35)',
-}
-const BTN_GHOST: React.CSSProperties = {
-  ...BTN_BASE,
-  background: 'transparent', color: 'var(--text-muted)',
-  border: '1px solid var(--border)',
-}
-const BTN_AMBER: React.CSSProperties = {
-  ...BTN_BASE,
-  background: 'rgba(234,179,8,0.12)', color: '#fbbf24',
-  border: '1px solid rgba(234,179,8,0.35)',
 }
 
 // ── Users table ───────────────────────────────────────────────────────────────
@@ -182,31 +163,32 @@ function UserRow({ user, onAction }: { user: UserItem; onAction: () => void }) {
         {kickConfirm ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>Kick + delete all claims?</span>
-            <button onClick={() => doAccess('kick')} disabled={busy} style={BTN_RED}>
+            <Button variant="danger" size="sm" onClick={() => doAccess('kick')} disabled={busy}>
               {busy ? '…' : 'Confirm'}
-            </button>
-            <button onClick={() => setKickConfirm(false)} style={BTN_GHOST}>Cancel</button>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setKickConfirm(false)}>Cancel</Button>
           </div>
         ) : (
           <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
             {user.access_status !== 'approved' && (
-              <button onClick={() => doAccess('approve')} disabled={busy} style={BTN_GREEN}>
+              <Button variant="primary" size="sm" onClick={() => doAccess('approve')} disabled={busy}>
                 Approve
-              </button>
+              </Button>
             )}
             {user.access_status !== 'denied' && (
-              <button onClick={() => doAccess('deny')} disabled={busy} style={BTN_RED}>
+              <Button variant="danger" size="sm" onClick={() => doAccess('deny')} disabled={busy}>
                 Deny
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="danger"
+              size="sm"
               onClick={() => setKickConfirm(true)}
               disabled={busy}
-              style={BTN_AMBER}
               title="Revoke access and delete all claims"
             >
               Kick
-            </button>
+            </Button>
           </div>
         )}
       </td>
@@ -363,49 +345,55 @@ function ClaimRow({ claim, onDelete }: { claim: ClaimDetail; onDelete: () => voi
                 style={{ fontSize: '0.78rem', resize: 'vertical', width: '100%', boxSizing: 'border-box' }}
               />
               <div style={{ display: 'flex', gap: '0.3rem' }}>
-                <button
+                <Button
+                  variant="danger"
+                  size="sm"
                   onClick={() => doAction(`/api/admin/claims/${claim.id}/reject`, { note: note || null })}
                   disabled={busy}
-                  style={BTN_RED}
                 >
                   {busy ? '…' : 'Confirm'}
-                </button>
-                <button onClick={() => { setRejectOpen(false); setNote('') }} style={BTN_GHOST}>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => { setRejectOpen(false); setNote('') }}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '0.35rem' }}>
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => doAction(`/api/admin/claims/${claim.id}/approve`)}
                 disabled={busy}
-                style={BTN_GREEN}
               >
                 Approve
-              </button>
-              <button onClick={() => setRejectOpen(true)} disabled={busy} style={BTN_RED}>
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => setRejectOpen(true)} disabled={busy}>
                 Reject
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => doAction(`/api/admin/claims/${claim.id}`, null, 'DELETE')}
                 disabled={busy}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', padding: '0 0.1rem' }}
+                style={{ fontSize: '1rem', padding: '0 0.1rem' }}
                 title="Delete permanently"
               >
                 🗑
-              </button>
+              </Button>
             </div>
           )
         ) : (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => doAction(`/api/admin/claims/${claim.id}`, null, 'DELETE')}
             disabled={busy}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', padding: '0 0.1rem' }}
+            style={{ fontSize: '1rem', padding: '0 0.1rem' }}
             title="Delete permanently"
           >
             🗑
-          </button>
+          </Button>
         )}
       </td>
     </tr>

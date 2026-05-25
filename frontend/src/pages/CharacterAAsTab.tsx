@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { AATree, AATreeData } from '../components/AATree'
+import { Card, SectionLabel } from '../components/ui'
 import { StatGroup, StatRow } from './CharacterPage'
 
 // ── AA types ─────────────────────────────────────────────────────────────────
@@ -63,16 +64,11 @@ function AARaidReady({ spent, cap }: { spent: number; cap: number }) {
   if (cap <= 0) return null
   const pct       = Math.min(100, Math.round(spent / cap * 100))
   const raidReady = pct >= 90
-  const color     = raidReady ? '#4ade80' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
+  const color     = raidReady ? 'var(--success)' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
 
   return (
     <div style={{ marginBottom: '0.75rem' }}>
-      <div style={{
-        fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em',
-        color: 'var(--accent)', fontWeight: 600, marginBottom: 3,
-      }}>
-        Raid Ready
-      </div>
+      <SectionLabel>Raid Ready</SectionLabel>
       <div style={{
         background: 'var(--surface)',
         border: `1px solid ${raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
@@ -96,7 +92,7 @@ function AARaidReady({ spent, cap }: { spent: number; cap: number }) {
           </div>
           {/* Status + detail */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? '#4ade80' : 'var(--danger)', marginBottom: '0.2rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: raidReady ? 'var(--success)' : 'var(--danger)', marginBottom: '0.2rem' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -277,9 +273,7 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
         {/* Profile selector */}
         {charAAs.profiles.length > 0 && (
           <div style={{ marginBottom: '0.75rem' }}>
-            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent)', fontWeight: 600, marginBottom: 4 }}>
-              Profile
-            </div>
+            <SectionLabel style={{ marginBottom: 4 }}>Profile</SectionLabel>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {(['current', ...charAAs.profiles.map((_, i) => i)] as ActiveProfile[]).map(pid => {
                 const isActive = activeProfile === pid
@@ -414,13 +408,12 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
                   {activeTd ? (
                     <AATree tree={activeTd} spent={activeCt.spent} />
                   ) : (
-                    <div style={{
-                      background: 'var(--surface)', border: '1px solid var(--border)',
+                    <Card style={{
                       borderRadius: 4, padding: '1rem',
                       color: 'var(--text-muted)', fontSize: '0.82rem',
                     }}>
                       Tree data unavailable (tree #{activeCt.tree_id})
-                    </div>
+                    </Card>
                   )}
                 </div>
               </div>

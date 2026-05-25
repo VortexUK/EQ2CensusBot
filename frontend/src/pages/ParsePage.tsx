@@ -6,6 +6,7 @@ import Breadcrumb from '../components/Breadcrumb'
 import Caret from '../components/Caret'
 import { CLASS_COLOURS } from '../classConstants'
 import { fmtDuration, fmtLocalDateTime, fmtNum } from '../formatters'
+import { Card } from '../components/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -293,7 +294,7 @@ function CombatantSection({
           · {combatants.length}
         </span>
       </h2>
-      <div style={{
+      <Card style={{
         display: 'grid',
         gridTemplateColumns:
           'minmax(160px,1.6fr) 90px 80px 50px 90px 70px 90px 60px 40px',
@@ -301,8 +302,6 @@ function CombatantSection({
         rowGap: 0,
         alignItems: 'center',
         fontSize: '0.82rem',
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
         borderRadius: 6,
         padding: '0.4rem 0.6rem',
       }}>
@@ -319,7 +318,7 @@ function CombatantSection({
         {combatants.map(c => (
           <CombatantRow key={c.id} combatant={c} lookupEntry={lookup[c.name]} />
         ))}
-      </div>
+      </Card>
     </section>
   )
 }

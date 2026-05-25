@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { Card } from '../components/ui'
 
 interface ItemStat   { display_name: string; value: number; stat_group: string }
 interface EffectLine { indentation: number; text: string }
@@ -114,10 +115,7 @@ export default function ItemPage() {
         </div>
       </div>
 
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 8, padding: '1.1rem 1.25rem',
-      }}>
+      <Card style={{ padding: '1.1rem 1.25rem' }}>
 
         {/* Description */}
         {item.description && (
@@ -192,7 +190,7 @@ export default function ItemPage() {
           </div>
         )}
 
-      </div>
+      </Card>
 
       <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right' }}>
         ID: {item.id}

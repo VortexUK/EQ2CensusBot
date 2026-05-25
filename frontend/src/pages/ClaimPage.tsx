@@ -2,23 +2,22 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { Claim, useClaim } from '../hooks/useClaim'
+import { Button, Card } from '../components/ui'
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const card: React.CSSProperties = {
-  background: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: 8,
+const cardStyle: React.CSSProperties = {
   padding: '1.25rem 1.5rem',
   marginTop: '1rem',
 }
 
-function btn(bg: string, fg = 'var(--text)'): React.CSSProperties {
+// The Discord sign-in button keeps its bespoke brand styling.
+function discordBtn(): React.CSSProperties {
   return {
     display: 'inline-block',
     padding: '0.4rem 1rem',
-    background: bg,
-    color: fg,
+    background: 'var(--discord-brand)',
+    color: '#fff',
     borderRadius: 6,
     border: '1px solid var(--border)',
     cursor: 'pointer',
@@ -75,9 +74,9 @@ function ClaimForm({ onSubmitted, label = 'Request claim' }: {
           disabled={busy}
           style={{ flex: 1 }}
         />
-        <button type="submit" disabled={busy || !name.trim()} style={btn('var(--accent)', 'var(--bg)')}>
+        <Button type="submit" variant="primary" disabled={busy || !name.trim()}>
           {busy ? 'Checking…' : label}
-        </button>
+        </Button>
       </div>
       {error && (
         <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>{error}</p>
@@ -134,33 +133,36 @@ function ApprovedRow({ claim, onUpdate }: { claim: Claim; onUpdate: () => void }
       </span>
 
       {/* Character name */}
-      <button
+      <Button
+        variant="ghost"
         onClick={() => navigate(`/character/${encodeURIComponent(claim.character_name)}`)}
-        style={{ ...btn('transparent'), border: 'none', padding: 0, color: 'var(--accent)', fontWeight: 600, fontSize: '0.95rem' }}
+        style={{ padding: 0, color: 'var(--accent)', fontWeight: 600, fontSize: '0.95rem' }}
       >
         {claim.character_name}
-      </button>
+      </Button>
 
       {/* Actions */}
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
         {!isPrimary && (
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleSetPrimary}
             disabled={busy}
-            style={{ ...btn('var(--surface-raised)'), fontSize: '0.78rem', padding: '0.2rem 0.55rem' }}
             title="Set as primary character"
           >
             {busy ? '…' : 'Set Primary'}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={handleRemove}
           disabled={busy}
-          style={{ ...btn('transparent'), border: 'none', color: 'var(--text-muted)', fontSize: '0.82rem', padding: '0.2rem 0.4rem' }}
           title="Remove this character"
         >
           {busy ? '…' : 'Remove'}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -190,11 +192,8 @@ export default function ClaimPage() {
   return (
     <main style={{ maxWidth: 560, margin: '3rem auto', padding: '0 1rem' }}>
       <h1 style={{ margin: '0.75rem 0 0.5rem' }}>My Characters</h1>
-      <div style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
+      <Card style={{
         borderLeft: '3px solid rgba(200,169,110,0.5)',
-        borderRadius: 8,
         padding: '0.9rem 1.1rem',
         marginBottom: '1.5rem',
         fontSize: '0.88rem',
@@ -219,13 +218,13 @@ export default function ClaimPage() {
           <strong style={{ color: 'var(--text)' }}>primary</strong> to set it as
           your default on the home page.
         </p>
-      </div>
+      </Card>
 
       {isUnauth && (
-        <div style={card}>
+        <Card style={cardStyle}>
           <p style={{ marginBottom: '1rem' }}>You need to sign in with Discord first.</p>
-          <a href="/api/auth/login" style={btn('var(--discord-brand)', '#fff')}>Sign in with Discord</a>
-        </div>
+          <a href="/api/auth/login" style={discordBtn()}>Sign in with Discord</a>
+        </Card>
       )}
 
       {isLoading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
@@ -243,19 +242,19 @@ export default function ClaimPage() {
           <>
             {/* Approved characters */}
             {approved.length > 0 && (
-              <div style={card}>
+              <Card style={cardStyle}>
                 <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                   Approved Characters
                 </div>
                 {approved.map(c => (
                   <ApprovedRow key={c.id} claim={c} onUpdate={claimState.refetch} />
                 ))}
-              </div>
+              </Card>
             )}
 
             {/* Pending claim */}
             {pending && (
-              <div style={{ ...card, borderColor: 'rgba(234,179,8,0.4)' }}>
+              <Card style={{ ...cardStyle, borderColor: 'rgba(234,179,8,0.4)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontSize: '1.2rem' }}>⏳</span>
                   <div>
@@ -264,19 +263,20 @@ export default function ClaimPage() {
                     </div>
                     <div style={{ color: 'var(--accent)', fontWeight: 600 }}>{pending.character_name}</div>
                   </div>
-                  <button
+                  <Button
+                    variant="secondary"
                     onClick={() => handleCancelPending(pending.id)}
                     disabled={cancelBusy}
-                    style={{ ...btn('var(--surface-raised)'), marginLeft: 'auto', fontSize: '0.82rem' }}
+                    style={{ marginLeft: 'auto' }}
                   >
                     {cancelBusy ? 'Cancelling…' : 'Cancel'}
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Card>
             )}
 
             {/* Add another character */}
-            <div style={card}>
+            <Card style={cardStyle}>
               {!hasAny ? (
                 <>
                   <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Claim your character</div>
@@ -287,12 +287,13 @@ export default function ClaimPage() {
                 </>
               ) : (
                 <>
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={() => setShowChangeForm(v => !v)}
-                    style={{ ...btn('transparent'), border: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '0.88rem' }}
+                    style={{ padding: 0, fontSize: '0.88rem' }}
                   >
                     {showChangeForm ? '▾ Hide' : '＋ Add another character'}
-                  </button>
+                  </Button>
                   {showChangeForm && (
                     <div style={{ marginTop: '0.5rem' }}>
                       {pending && (
@@ -308,7 +309,7 @@ export default function ClaimPage() {
                   )}
                 </>
               )}
-            </div>
+            </Card>
           </>
         )
       })()}

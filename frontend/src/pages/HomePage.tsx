@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useClaim } from '../hooks/useClaim'
 import type { Claim } from '../hooks/useClaim'
 import ServerLaunchTimer from '../components/ServerLaunchTimer'
+import { Card } from '../components/ui'
 // logo.png lives in frontend/public/ → served at site root by Vite
 const logo = '/logo.png'
 import { CLASS_COLOURS } from '../classConstants'
@@ -196,12 +197,7 @@ function GuildsSidebar({ approved }: { approved: Claim[] }) {
         My Guilds
       </h2>
 
-      <div style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 8,
-        overflow: 'hidden',
-      }}>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
         {guilds.map(([name, count], i) => (
           <Link
             key={name}
@@ -245,7 +241,7 @@ function GuildsSidebar({ approved }: { approved: Claim[] }) {
             </span>
           </Link>
         ))}
-      </div>
+      </Card>
     </aside>
   )
 }

@@ -5,6 +5,7 @@ import { useClaim } from '../hooks/useClaim'
 import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
 import { CLASS_COLOURS } from '../classConstants'
 import { SPELL_TIER_COLOURS as TIER_COLOURS } from '../spellConstants'
+import { Button, Card } from '../components/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -804,27 +805,21 @@ function ClaimRequestsTab({
                     style={{ flex: 1, minWidth: 160, fontSize: '0.85rem' }}
                     autoFocus
                   />
-                  <button
+                  <Button
+                    variant="danger"
+                    size="sm"
                     onClick={() => handleReject(c.id, rejectNote)}
                     disabled={isBusy}
-                    style={{
-                      padding: '0.3rem 0.8rem', borderRadius: 5, cursor: 'pointer',
-                      background: 'rgba(239,68,68,0.15)', color: 'var(--danger)',
-                      border: '1px solid rgba(239,68,68,0.35)', fontSize: '0.85rem',
-                    }}
                   >
                     {isBusy ? '…' : 'Confirm reject'}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => { setRejectId(null); setRejectNote('') }}
-                    style={{
-                      padding: '0.3rem 0.7rem', borderRadius: 5, cursor: 'pointer',
-                      background: 'transparent', color: 'var(--text-muted)',
-                      border: '1px solid var(--border)', fontSize: '0.85rem',
-                    }}
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -843,17 +838,14 @@ function ClaimRequestsTab({
                 >
                   {isBusy ? '…' : 'Approve'}
                 </button>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => { setRejectId(c.id); setRejectNote('') }}
                   disabled={isBusy}
-                  style={{
-                    padding: '0.3rem 0.75rem', borderRadius: 5, cursor: 'pointer',
-                    background: 'transparent', color: 'var(--text-muted)',
-                    border: '1px solid var(--border)', fontSize: '0.85rem',
-                  }}
                 >
                   Reject
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -1037,23 +1029,15 @@ function ItemWatchTab({ guildName }: { guildName: string }) {
                     {icon} {label}
                   </td>
                   <td style={{ ...TD, textAlign: 'right', padding: '0.3rem 0.5rem' }}>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleRemove(w.id)}
                       disabled={removing === w.id}
                       title="Remove watch"
-                      style={{
-                        background: 'transparent',
-                        border: '1px solid var(--border)',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                        color: 'var(--text-muted)',
-                        fontSize: '0.78rem',
-                        padding: '0.2rem 0.45rem',
-                        lineHeight: 1,
-                      }}
                     >
                       {removing === w.id ? '…' : '✕'}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               )
@@ -1211,7 +1195,7 @@ export default function GuildPage() {
           letterSpacing: '0.06em',
           lineHeight: 1.1,
           marginBottom: '0.25rem',
-          background: 'linear-gradient(135deg, #c8a96e 0%, #e8d5a3 40%, #c8a96e 70%, #a07840 100%)',
+          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 40%, var(--gold) 70%, var(--gold-dim) 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
@@ -1227,10 +1211,9 @@ export default function GuildPage() {
 
         {/* Guild info panel */}
         {info && (
-          <div style={{
+          <Card style={{
             display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem',
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 8, padding: '0.85rem 1.1rem',
+            padding: '0.85rem 1.1rem',
           }}>
             {info.level    != null && <InfoStat label="Guild Level"  value={String(info.level)} />}
             {info.members  != null && <InfoStat label="Characters"   value={String(info.members)} />}
@@ -1247,7 +1230,7 @@ export default function GuildPage() {
                 <p style={{ fontSize: '0.88rem', color: 'var(--text)', marginTop: '0.2rem', lineHeight: 1.5 }}>{info.description}</p>
               </div>
             )}
-          </div>
+          </Card>
         )}
       </div>
 
@@ -1303,12 +1286,13 @@ export default function GuildPage() {
                 )
               })}
               {hiddenRanks.size > 0 && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setHiddenRanks(new Set())}
-                  style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem 0.3rem' }}
                 >
                   reset
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -1333,12 +1317,7 @@ export default function GuildPage() {
 
       {/* Tables */}
       {tab !== 'claims' && tab !== 'watch' && !isLoading && !error && (
-        <div style={{
-          overflowX: 'auto',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-        }}>
+        <Card style={{ padding: 0, overflowX: 'auto' }}>
           {tab === 'roster' && roster && (
             <RosterTable members={roster.members} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
@@ -1348,29 +1327,21 @@ export default function GuildPage() {
           {tab === 'adorns' && adorns && (
             <AdornCheckTable data={adorns} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
-        </div>
+        </Card>
       )}
 
       {/* Claim requests — officers only, self-contained loading */}
       {tab === 'claims' && isOfficer && guildName && (
-        <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-        }}>
+        <Card style={{ padding: 0 }}>
           <ClaimRequestsTab guildName={guildName} currentDiscordId={currentDiscordId} />
-        </div>
+        </Card>
       )}
 
       {/* Item watch — officers only, self-contained loading */}
       {tab === 'watch' && isOfficer && guildName && (
-        <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-        }}>
+        <Card style={{ padding: 0 }}>
           <ItemWatchTab guildName={guildName} />
-        </div>
+        </Card>
       )}
     </main>
   )

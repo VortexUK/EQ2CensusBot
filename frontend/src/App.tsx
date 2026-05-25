@@ -73,8 +73,8 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
   fontWeight: 600,
   letterSpacing: '0.07em',
   textDecoration: 'none',
-  color: isActive ? '#e8d5a3' : '#9a7d4a',
-  borderBottom: isActive ? '1px solid #c8a96e' : '1px solid transparent',
+  color: isActive ? 'var(--gold-bright)' : 'var(--gold-dim)',
+  borderBottom: isActive ? '1px solid var(--gold)' : '1px solid transparent',
   paddingBottom: '2px',
   transition: 'color 0.15s, border-color 0.15s',
   whiteSpace: 'nowrap',
@@ -116,7 +116,7 @@ function AccessPendingGate() {
       <p style={{ color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.6 }}>
         Your account is awaiting approval. An officer will review your request shortly.
       </p>
-      <a href="/api/auth/logout" style={{ color: '#9a7d4a', fontSize: '0.85rem' }}
+      <a href="/api/auth/logout" style={{ color: 'var(--gold-dim)', fontSize: '0.85rem' }}
         onClick={async e => { e.preventDefault(); await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); location.href = '/' }}>
         Sign out
       </a>
@@ -137,7 +137,7 @@ function AccessDeniedGate() {
       <p style={{ color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.6 }}>
         Your access request was not approved. Contact an officer if you think this is a mistake.
       </p>
-      <a href="#" style={{ color: '#9a7d4a', fontSize: '0.85rem' }}
+      <a href="#" style={{ color: 'var(--gold-dim)', fontSize: '0.85rem' }}
         onClick={async e => { e.preventDefault(); await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); location.href = '/' }}>
         Sign out
       </a>
