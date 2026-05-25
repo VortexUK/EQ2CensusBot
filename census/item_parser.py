@@ -279,6 +279,17 @@ def parse_set_name(item: dict) -> str | None:
 # raw stat shorthand (e.g. {"sta": 120, "blockchance": 10.0}).
 _SETBONUS_RESERVED_KEYS = frozenset({"requireditems", "effect"})
 
+# STAT_MAP collapses str/agi/wis/int into the "Primary Attributes" group label
+# (the main stat block bundles all four). A set bonus names individual
+# attributes, so resolve them to their real names here instead.
+_SETBONUS_ATTR_NAMES = {
+    "str": "Strength",
+    "sta": "Stamina",
+    "agi": "Agility",
+    "wis": "Wisdom",
+    "int": "Intelligence",
+}
+
 
 def _format_setbonus_stat_value(value: Any) -> str:
     """Format a setbonus stat value: ints stay as ints, floats keep their
@@ -305,9 +316,13 @@ def _build_setbonus_effect_from_stats(bonus: dict) -> str:
             continue
         if value is None or value == "" or value == 0:
             continue
-        # Look up the canonical display name; fall back to a titlised key.
-        mapped = STAT_MAP.get(kl)
-        display_name = mapped[0] if mapped else kl.replace("_", " ").title()
+        # Prefer the individual attribute name, then STAT_MAP, then a titlised key.
+        if kl in _SETBONUS_ATTR_NAMES:
+            display_name = _SETBONUS_ATTR_NAMES[kl]
+        elif mapped := STAT_MAP.get(kl):
+            display_name = mapped[0]
+        else:
+            display_name = kl.replace("_", " ").title()
         val_str = _format_setbonus_stat_value(value)
         sign = "" if val_str.startswith("-") else "+"
         parts.append(f"{sign}{val_str} {display_name}")
@@ -340,9 +355,15 @@ def parse_set_bonuses(item: dict) -> list[SetBonusEntry]:
             if str(tag).strip():
                 lines.append(str(tag).strip())
             i += 1
-        # Fall back to building an effect string from raw stat fields.
-        if not effect:
-            effect = _build_setbonus_effect_from_stats(bonus)
+        # A tier can carry raw stat fields (sta/int/...) *and* an effect string
+        # at the same time (e.g. adornment sets: "+135 Stamina ... Applies
+        # Enhance: Void Bane."). The stats are the headline in-game, so promote
+        # them to the header and drop any applies-effect into the lines below.
+        stat_str = _build_setbonus_effect_from_stats(bonus)
+        if stat_str:
+            if effect:
+                lines.insert(0, effect)
+            effect = stat_str
         if not effect and not lines:
             continue  # truly empty placeholder tier — skip
         entries.append(

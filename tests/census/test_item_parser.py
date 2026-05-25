@@ -221,6 +221,34 @@ class TestParseSetBonuses:
         result = parse_set_bonuses(item)
         assert result[0].lines == ["Line one", "Line two", "Line three"]
 
+    def test_stats_and_effect_combined(self):
+        # A tier with raw stat fields AND an effect string (e.g. adornment sets):
+        # stats become the headline, the applies-effect drops into the lines.
+        item = {
+            "setbonus_list": [
+                {
+                    "int": 120,
+                    "sta": 135,
+                    "requireditems": 2,
+                    "effect": "Applies Enhance: Void Bane.",
+                    "descriptiontag_1": "Enhances the base damage of Void Bane.",
+                }
+            ]
+        }
+        result = parse_set_bonuses(item)
+        assert result[0].effect == "+120 Intelligence, +135 Stamina"
+        assert result[0].lines == [
+            "Applies Enhance: Void Bane.",
+            "Enhances the base damage of Void Bane.",
+        ]
+
+    def test_individual_attributes_named(self):
+        # str/agi/wis/int are named individually in a set bonus, not collapsed
+        # into the "Primary Attributes" group label used by the main stat block.
+        item = {"setbonus_list": [{"requireditems": 2, "int": 50, "wis": 30}]}
+        result = parse_set_bonuses(item)
+        assert result[0].effect == "+50 Intelligence, +30 Wisdom"
+
     def test_empty_description_tags_skipped(self):
         item = {
             "setbonus_list": [
