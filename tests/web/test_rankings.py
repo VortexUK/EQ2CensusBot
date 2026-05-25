@@ -21,8 +21,14 @@ class TestScopeFor:
     def test_raid(self):
         assert _scope_for(7) == "raid" and _scope_for(24) == "raid"
 
-    def test_individual_and_oversize_excluded(self):
+    def test_solo_and_zero_excluded(self):
         assert _scope_for(1) is None and _scope_for(0) is None
+
+    def test_large_raid_not_capped(self):
+        # EQ2 ACT counts mercs/pets/swap-ins, so a 24-player raid often tallies
+        # higher. Anything above the group max is a raid — never dropped.
+        assert _scope_for(25) == "raid"
+        assert _scope_for(30) == "raid"  # the real Wuoshi kill counted 30
 
 
 from web.routes.rankings import _build_character_board

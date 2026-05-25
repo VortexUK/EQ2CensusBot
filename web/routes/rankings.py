@@ -27,7 +27,11 @@ from web.routes.parses import _PLAYER_COUNT_SQL, _group_into_fights
 
 router = APIRouter(tags=["rankings"])
 
-# Raid spans 12 and 24; the table's Size column shows the real count.
+# Valid ?size= keys + the GROUP player-count range. Raid is deliberately
+# open-ended (anything above the group max) — EQ2 ACT tallies mercs, pets and
+# swap-ins as "players", so a 24-player raid routinely counts higher (a real
+# Wuoshi kill counted 30). The raid tuple's upper bound is nominal/display
+# only; _scope_for never caps raid. The table's Size column shows the real count.
 _SCOPES: dict[str, tuple[int, int]] = {"group": (2, 6), "raid": (7, 24)}
 _SCOPE_LABELS = {"group": "Group", "raid": "Raid"}
 _METRIC_FIELD = {"dps": "encdps", "hps": "enchps"}  # speed handled separately
@@ -45,9 +49,12 @@ def _percentile(rank: int, n: int) -> int:
 
 
 def _scope_for(player_count: int) -> str | None:
-    for scope, (lo, hi) in _SCOPES.items():
-        if lo <= player_count <= hi:
-            return scope
+    # 1 = solo (excluded), 2-6 = group, 7+ = raid (no upper cap — see _SCOPES).
+    group_lo, group_hi = _SCOPES["group"]
+    if player_count > group_hi:
+        return "raid"
+    if player_count >= group_lo:
+        return "group"
     return None
 
 
