@@ -111,14 +111,8 @@ function CharacterCard({ claim, detail, isPrimary }: {
 
         {/* Stats row */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.28rem' }}>
-          {/* Adventure */}
+          {/* Adventure class */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-            <span style={{
-              fontSize: '0.67rem', textTransform: 'uppercase', letterSpacing: '0.07em',
-              color: 'var(--text-muted)', width: 68, flexShrink: 0,
-            }}>
-              Adventure
-            </span>
             {detail ? (
               <span style={{
                 fontSize: '0.92rem', fontWeight: 600,
@@ -136,14 +130,8 @@ function CharacterCard({ claim, detail, isPrimary }: {
             )}
           </div>
 
-          {/* Tradeskill */}
+          {/* Tradeskill class */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-            <span style={{
-              fontSize: '0.67rem', textTransform: 'uppercase', letterSpacing: '0.07em',
-              color: 'var(--text-muted)', width: 68, flexShrink: 0,
-            }}>
-              Tradeskill
-            </span>
             {detail ? (
               <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                 {detail.ts_class
