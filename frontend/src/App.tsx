@@ -147,6 +147,7 @@ function AccessDeniedGate() {
 
 function Layout() {
   const auth = useAuth()
+  const { pathname } = useLocation()
 
   if (auth.status === 'loading') return null
 
@@ -177,7 +178,8 @@ function Layout() {
       </div>
       {/* Push content below fixed header (~52px) */}
       <div style={{ paddingTop: '3.5rem', minHeight: 'calc(100vh - 3.5rem)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1 }}>
+        {/* key by pathname so the fade-up entrance replays on each navigation */}
+        <div className="page-enter" key={pathname} style={{ flex: 1 }}>
           <Outlet />
         </div>
         <footer style={{

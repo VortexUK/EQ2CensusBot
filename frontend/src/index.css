@@ -83,6 +83,20 @@ body {
   min-height: 100vh;
 }
 
+/* Atmospheric depth over the background image: a warm gold glow from the
+   top (as if light falls from above) and an edge vignette that pulls focus
+   to the centre. Fixed + behind content, non-interactive. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(125% 70% at 50% -10%, rgba(var(--gold-rgb), 0.07), transparent 55%),
+    radial-gradient(150% 120% at 50% 45%, transparent 50%, rgba(6, 8, 16, 0.72));
+}
+
 a {
   color: var(--accent);
   text-decoration: none;
@@ -165,12 +179,30 @@ input:focus {
 
 .btn--sm { padding: 0.25rem 0.6rem; font-size: 0.78rem; }
 
-/* Cards */
+/* Cards — gilded panels: a faint gold-tinted edge catches the light, a soft
+   drop shadow lifts them off the textured background, and a hairline gold
+   gradient sits along the top edge like leaf on a tome cover. */
 .card {
+  position: relative;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(var(--gold-rgb), 0.16);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(var(--gold-rgb), 0.5) 50%,
+    transparent
+  );
+  pointer-events: none;
 }
 .card--raised { background: var(--surface-raised); }
 
@@ -182,4 +214,18 @@ input:focus {
   color: var(--gold);
   font-weight: 600;
   margin-bottom: var(--space-1);
+}
+
+/* Page entrance: one orchestrated fade-up per route navigation (App.tsx keys
+   the content wrapper by pathname so this replays on each page). Kept to a
+   single content reveal rather than scattered per-element motion. */
+@keyframes pageReveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: pageReveal 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
 }
