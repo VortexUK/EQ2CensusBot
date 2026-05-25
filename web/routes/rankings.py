@@ -89,3 +89,50 @@ def _build_character_board(
             e["percentile"] = _percentile(i + 1, n)
     entries.sort(key=lambda e: e["score"], reverse=True)
     return entries, sorted(by_cls.keys())
+
+
+def _build_speed_board(kills: list[dict], *, size: str, zone: str, boss: str) -> list[dict]:
+    """Per-guild fastest clear. Returns rows sorted by time asc with percentile."""
+    best: dict[str, dict] = {}  # guild.lower() -> entry
+    for k in kills:
+        if k["scope"] != size or k["zone"] != zone or k["title"] != boss:
+            continue
+        guild = (k.get("guild_name") or "").strip()
+        if not guild:
+            continue
+        cur = best.get(guild.lower())
+        if cur is None or k["duration_s"] < cur["duration_s"]:
+            best[guild.lower()] = {
+                "kind": "guild",
+                "guild_name": guild,
+                "duration_s": k["duration_s"],
+                "encounter_id": k["id"],
+                "size": k["player_count"],
+                "started_at": k["started_at"],
+            }
+    rows = sorted(best.values(), key=lambda e: e["duration_s"])
+    n = len(rows)
+    for i, e in enumerate(rows):
+        e["percentile"] = _percentile(i + 1, n)
+    return rows
+
+
+def _build_filters(kills: list[dict]) -> dict:
+    """Scope -> zone -> boss tree for the dropdowns, populated from the data."""
+    tree: dict[str, dict[str, set]] = {"raid": defaultdict(set), "group": defaultdict(set)}
+    for k in kills:
+        scope = k.get("scope")
+        if scope not in tree:
+            continue
+        tree[scope][k.get("zone") or "(unknown zone)"].add(k["title"])
+    return {
+        "scopes": [
+            {
+                "key": scope,
+                "label": _SCOPE_LABELS[scope],
+                "zones": [{"zone": z, "bosses": sorted(bosses)} for z, bosses in sorted(zones.items())],
+            }
+            for scope, zones in tree.items()
+            if zones
+        ]
+    }

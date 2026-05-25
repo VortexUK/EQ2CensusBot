@@ -117,3 +117,79 @@ class TestCharacterBoard:
 
         with _pytest.raises(ValueError):
             _build_character_board([], size="raid", zone="Z", boss="Tarinax", metric="speed")
+
+
+from web.routes.rankings import _build_filters, _build_speed_board
+
+
+class TestSpeedBoard:
+    def test_best_time_per_guild(self):
+        kills = [
+            {
+                "id": 1,
+                "title": "Tarinax",
+                "zone": "Z",
+                "guild_name": "Exordium",
+                "started_at": 1,
+                "duration_s": 200,
+                "player_count": 24,
+                "scope": "raid",
+                "combatants": [],
+            },
+            {
+                "id": 2,
+                "title": "Tarinax",
+                "zone": "Z",
+                "guild_name": "Exordium",
+                "started_at": 2,
+                "duration_s": 168,
+                "player_count": 24,
+                "scope": "raid",
+                "combatants": [],
+            },
+            {
+                "id": 3,
+                "title": "Tarinax",
+                "zone": "Z",
+                "guild_name": "Misfits",
+                "started_at": 3,
+                "duration_s": 211,
+                "player_count": 24,
+                "scope": "raid",
+                "combatants": [],
+            },
+        ]
+        rows = _build_speed_board(kills, size="raid", zone="Z", boss="Tarinax")
+        assert [r["guild_name"] for r in rows] == ["Exordium", "Misfits"]
+        assert rows[0]["duration_s"] == 168 and rows[0]["encounter_id"] == 2
+        assert rows[0]["percentile"] == 100 and rows[1]["percentile"] == 50
+
+    def test_excludes_unresolved_guild(self):
+        kills = [
+            {
+                "id": 1,
+                "title": "Tarinax",
+                "zone": "Z",
+                "guild_name": None,
+                "started_at": 1,
+                "duration_s": 100,
+                "player_count": 24,
+                "scope": "raid",
+                "combatants": [],
+            }
+        ]
+        assert _build_speed_board(kills, size="raid", zone="Z", boss="Tarinax") == []
+
+
+class TestFilters:
+    def test_tree_groups_by_scope_zone_boss(self):
+        kills = [
+            {"scope": "raid", "zone": "Vetrovia", "title": "Tarinax"},
+            {"scope": "raid", "zone": "Vetrovia", "title": "Cazel"},
+            {"scope": "group", "zone": "Crypt", "title": "Bonebreaker"},
+        ]
+        tree = _build_filters(kills)
+        raid = next(s for s in tree["scopes"] if s["key"] == "raid")
+        zone = raid["zones"][0]
+        assert zone["zone"] == "Vetrovia" and zone["bosses"] == ["Cazel", "Tarinax"]
+        assert {s["key"] for s in tree["scopes"]} == {"raid", "group"}
