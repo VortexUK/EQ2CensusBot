@@ -11,6 +11,8 @@ docs/superpowers/specs/2026-05-25-eq2logs-rankings-design.md.
 
 from __future__ import annotations
 
+from collections import defaultdict
+
 from fastapi import APIRouter
 
 from web.cache import TTLCache
@@ -39,3 +41,49 @@ def _scope_for(player_count: int) -> str | None:
         if lo <= player_count <= hi:
             return scope
     return None
+
+
+def _is_player_combatant(c: dict) -> bool:
+    name = (c.get("name") or "").strip()
+    return bool(c.get("ally")) and bool(name) and " " not in name and name != "Unknown"
+
+
+def _build_character_board(
+    kills: list[dict], *, size: str, zone: str, boss: str, metric: str
+) -> tuple[list[dict], list[str]]:
+    """Per-character best for Damage/Healing. Returns (rows sorted by score
+    desc, sorted class list). Percentile is computed within each class."""
+    field = _METRIC_FIELD[metric]
+    best: dict[str, dict] = {}  # name.lower() -> entry
+    for k in kills:
+        if k["scope"] != size or k["zone"] != zone or k["title"] != boss:
+            continue
+        for c in k["combatants"]:
+            if not _is_player_combatant(c) or not c.get("cls"):
+                continue
+            score = c.get(field) or 0.0
+            key = c["name"].strip().lower()
+            cur = best.get(key)
+            if cur is None or score > cur["score"]:
+                best[key] = {
+                    "kind": "character",
+                    "name": c["name"].strip(),
+                    "guild_name": c.get("guild_name"),
+                    "level": c.get("level"),
+                    "cls": c["cls"],
+                    "score": score,
+                    "encounter_id": k["id"],
+                    "size": k["player_count"],
+                    "started_at": k["started_at"],
+                }
+    entries = list(best.values())
+    by_cls: dict[str, list[dict]] = defaultdict(list)
+    for e in entries:
+        by_cls[e["cls"]].append(e)
+    for cls_rows in by_cls.values():
+        cls_rows.sort(key=lambda e: e["score"], reverse=True)
+        n = len(cls_rows)
+        for i, e in enumerate(cls_rows):
+            e["percentile"] = _percentile(i + 1, n)
+    entries.sort(key=lambda e: e["score"], reverse=True)
+    return entries, sorted(by_cls.keys())

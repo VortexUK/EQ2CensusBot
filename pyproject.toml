@@ -58,8 +58,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Scripts are standalone CLI tools; unused imports and broad rules are expected.
 "scripts/*" = ["F", "E", "W", "UP"]
-# Tests use wildcard imports and fixture magic that confuse pyflakes.
-"tests/*" = ["F401", "F811"]
+# Tests use wildcard imports and fixture magic that confuse pyflakes, and
+# co-locate imports next to the helpers/classes that exercise them.
+"tests/*" = ["F401", "F811", "E402"]
 # web/app.py must call load_dotenv() before importing other project modules
 # so that env vars are available at import time.
 "web/app.py" = ["E402"]
