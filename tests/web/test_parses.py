@@ -923,3 +923,31 @@ async def test_list_excludes_hidden_rows(app, tmp_path, monkeypatch):
     titles = {f["title"] for f in r.json()["results"]}
     assert "Tarinax" in titles
     assert "Venekor" not in titles  # soft-deleted → hidden from list
+
+
+@pytest.mark.asyncio
+async def test_detail_reports_hidden_flag(app):
+    enc = {
+        "id": 1,
+        "act_encid": "X",
+        "title": "Tarinax",
+        "zone": "Z",
+        "started_at": 1,
+        "ended_at": 2,
+        "duration_s": 1,
+        "total_damage": 0,
+        "encdps": 0.0,
+        "kills": 0,
+        "deaths": 0,
+        "success_level": 1,
+        "hidden_at": 1700000000,
+        "combatants": [],
+    }
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._encounter_detail_sync", MagicMock(return_value=enc)),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/parses/1")
+    assert r.status_code == 200
+    assert r.json()["hidden"] is True

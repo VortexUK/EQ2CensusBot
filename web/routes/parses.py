@@ -404,6 +404,7 @@ class ParseDetailResponse(BaseModel):
     kills: int
     deaths: int
     success_level: int  # ACT enum: 0=unknown, 1=win, 2=loss, 3=mixed
+    hidden: bool = False  # True when the parse is soft-deleted (still openable via a ranking link)
     combatants: list[CombatantSummary]
 
 
@@ -800,6 +801,7 @@ async def get_parse(
         kills=enc["kills"],
         deaths=enc["deaths"],
         success_level=enc.get("success_level", 0) or 0,
+        hidden=bool(enc.get("hidden_at")),
         combatants=combatants,
     )
 
