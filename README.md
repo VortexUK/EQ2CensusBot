@@ -6,7 +6,7 @@
 
 A Discord bot **and** web companion site for EverQuest 2 (TLE server). Queries the [Daybreak Census API](https://census.daybreakgames.com) to provide item tooltips, guild summaries, character sheets, parses ingested from the [ACT plugin](https://github.com/VortexUK/EQ2LexiconACTPlugin), and more.
 
-Live at <https://eq2lexicon.up.railway.app>.
+Live at <https://eq2lexicon.com> (plugin API on <https://parses.eq2lexicon.com>).
 
 ---
 

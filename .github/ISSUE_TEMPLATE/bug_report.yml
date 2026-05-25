@@ -14,7 +14,7 @@ body:
     attributes:
       label: Where did it happen?
       options:
-        - Website (eq2lexicon.up.railway.app)
+        - Website (eq2lexicon.com)
         - Discord bot (slash command)
         - Parse upload / ingest
         - Not sure
