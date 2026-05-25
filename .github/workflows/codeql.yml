@@ -1,13 +1,15 @@
 name: CodeQL
 
 # GitHub-native semantic security scanning for the Python backend and
-# the TypeScript/JavaScript frontend. Runs on every push + PR to main,
-# plus a weekly schedule so newly-published CodeQL rules catch existing
-# code. Findings appear under the repo Security tab. Complements the
-# Dependabot CVE flow (which covers dependencies, not our own code).
+# the TypeScript/JavaScript frontend. Findings appear under the repo
+# Security tab. Complements the Dependabot CVE flow (deps, not our code).
+#
+# Deliberately NOT triggered on push: Railway's "Wait for CI" gates deploys
+# on every push-triggered workflow, and we don't want the slow CodeQL build
+# blocking deploys. CI (ci.yml) is the deploy gate. CodeQL still covers
+# everything that lands via PR, and the weekly schedule catches drift on
+# main plus newly-published CodeQL rules.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   schedule:
