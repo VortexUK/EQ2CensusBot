@@ -2,6 +2,7 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { ItemTooltip, TooltipState } from '../components/ItemTooltip'
 import { Button, Card } from '../components/ui'
+import { itemRarityColor } from '../rarityColors'
 
 // ── Stat options (canonical display names from STAT_MAP) ──────────────────────
 
@@ -90,24 +91,6 @@ const ITEM_TYPE_OPTIONS = [
 
 // ── Quality colour map ─────────────────────────────────────────────────────────
 // Keys match the raw DB tier_display values (ALL-CAPS).
-
-const TIER_COLOUR: Record<string, string> = {
-  'CELESTIAL':              '#ffe566',
-  'ETHEREAL':               '#e8bbff',
-  'MYTHICAL':               '#ffb6ff',
-  'FABLED':                 '#ff99ff',
-  'MASTERCRAFTED FABLED':   '#ff99ff',
-  'LEGENDARY':              '#ffc993',
-  'MASTERCRAFTED LEGENDARY':'#ffc993',
-  'TREASURED':              '#93d9ff',
-  'MASTERCRAFTED TREASURED':'#93d9ff',
-  'UNCOMMON':               '#beff93',
-  'MASTERCRAFTED':          '#93d9ff',
-  'MASTERCRAFTED MYTHICAL': '#ffb6ff',
-  'MASTERCRAFTED CELESTIAL':'#ffe566',
-  'HANDCRAFTED':            '#beff93',
-  'COMMON':                 'var(--text-muted)',
-}
 
 /** Title-case each word of an ALL-CAPS DB tier string: "FABLED" → "Fabled". */
 function displayTier(tier: string | null): string {
@@ -839,13 +822,13 @@ function ItemTable({
                   )}
                   <Link
                     to={`/item/${item.id}`}
-                    style={{ color: TIER_COLOUR[item.tier ?? ''] ?? 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}
+                    style={{ color: itemRarityColor(item.tier, 'var(--accent)'), textDecoration: 'none', fontWeight: 500 }}
                   >
                     {item.name}
                   </Link>
                 </div>
               </td>
-              <td style={{ ...TD, color: TIER_COLOUR[item.tier ?? ''] ?? 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 500 }}>
+              <td style={{ ...TD, color: itemRarityColor(item.tier, 'var(--text-muted)'), fontSize: '0.8rem', fontWeight: 500 }}>
                 {displayTier(item.tier)}
               </td>
               <td style={{ ...TD, color: 'var(--text-muted)', fontSize: '0.82rem' }}>

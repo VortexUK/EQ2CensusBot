@@ -339,16 +339,18 @@ function adornColour(color: string) {
 
 // Adorn name shortening --------------------------------------------------------
 // "<Adjective> Adornment of <Name> (<Quality>)"  →  "Adj <Name> (X)"
+// Adornment quality → tier letter + colour. Colours reference the canonical
+// --rarity-* tokens so adornment rarity matches item/recipe rarity app-wide.
 const ADORN_QUALITY_TIER: Record<string, { letter: string; color: string }> = {
-  Superior:      { letter: 'F', color: '#ff939d' },
-  Fabled:        { letter: 'F', color: '#ff939d' },
-  Legendary:     { letter: 'L', color: '#ffc993' },
-  Treasured:     { letter: 'T', color: '#92d7fd' },
-  Mastercrafted: { letter: 'T', color: '#92d7fd' },
-  Uncommon:      { letter: 'U', color: '#a8d4a8' },
+  Superior:      { letter: 'F', color: 'var(--rarity-fabled)' },
+  Fabled:        { letter: 'F', color: 'var(--rarity-fabled)' },
+  Legendary:     { letter: 'L', color: 'var(--rarity-legendary)' },
+  Treasured:     { letter: 'T', color: 'var(--rarity-treasured)' },
+  Mastercrafted: { letter: 'T', color: 'var(--rarity-treasured)' },
+  Uncommon:      { letter: 'U', color: 'var(--rarity-handcrafted)' },
   Common:        { letter: 'C', color: 'var(--text)' },
-  Greater:       { letter: 'L', color: '#ffc993' },
-  Lesser:        { letter: 'T', color: '#92d7fd' },
+  Greater:       { letter: 'L', color: 'var(--rarity-legendary)' },
+  Lesser:        { letter: 'T', color: 'var(--rarity-treasured)' },
 }
 const _ADORN_RE = /^(\w+)\s+Adornment\s+of\s+(.+?)\s*\((.+?)\)\s*$/i
 
@@ -366,28 +368,30 @@ type TierStyle = { color: string; textShadow?: string }
 
 const _outline = '-1px 0px 0px #000, 0px 1px 0px #000, 1px 0px 0px #000, 0px -1px 0px #000'
 
+// Adornment-name styling: canonical rarity colour + a game-style outline/glow
+// text-shadow. Colours reference the --rarity-* tokens; the glows stay literal.
 const TIER_STYLE: Record<string, TierStyle> = {
   MYTHICAL: {
-    color: '#d99fe9',
+    color: 'var(--rarity-mythical)',
     textShadow: `${_outline}, 0px 0px 4px #C859E6, 0px 0px 4px #C859E6`,
   },
   FABLED: {
-    color: '#ff939d',
+    color: 'var(--rarity-fabled)',
     textShadow: `${_outline}, 0px 0px 4px #DF535F, 0px 0px 4px #DF535F`,
   },
   LEGENDARY: {
-    color: '#ffc993',
+    color: 'var(--rarity-legendary)',
     textShadow: `${_outline}, 0px 0px 4px #D56900, 0px 0px 4px #ffc993`,
   },
   MASTERCRAFTED: {
-    color: '#92d7fd',
+    color: 'var(--rarity-treasured)',
     textShadow: `${_outline}, 0px 0px 4px #D56900, 0px 0px 4px #92d7fd`,
   },
   TREASURED: {   // same as mastercrafted
-    color: '#92d7fd',
+    color: 'var(--rarity-treasured)',
     textShadow: `${_outline}, 0px 0px 4px #D56900, 0px 0px 4px #92d7fd`,
   },
-  UNCOMMON: { color: '#a8d4a8' },
+  UNCOMMON: { color: 'var(--rarity-handcrafted)' },
   COMMON:   { color: 'var(--text)' },
 }
 

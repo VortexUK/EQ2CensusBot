@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { StatGroup } from './CharacterPage'
 import { Button, Card, SectionLabel } from '../components/ui'
 import { SpellTierPip } from '../components/SpellScrollTooltip'
+import { itemRarityColor } from '../rarityColors'
 import {
   type SpellEntry,
   type CharacterSpellsData,
@@ -148,18 +149,8 @@ const _CAT_COLOUR: Record<string, string> = {
   fuel:      '#64748b',   // muted — bulk fuel
 }
 
-const _TIER_COLOUR: Record<string, string> = {
-  Fabled:        '#ff99ff',
-  Legendary:     '#ffc993',
-  Treasured:     '#93d9ff',
-  Mastercrafted: '#93d9ff',
-  Handcrafted:   '#beff93',
-  Uncommon:      '#beff93',
-  Common:        'var(--text)',
-}
-
 function IngredientTooltip({ ing }: { ing: Ingredient }) {
-  const tierColour = _TIER_COLOUR[ing.tier ?? ''] ?? 'var(--text)'
+  const tierColour = itemRarityColor(ing.tier, 'var(--text)')
   return (
     <div style={{
       position: 'absolute', zIndex: 9999,

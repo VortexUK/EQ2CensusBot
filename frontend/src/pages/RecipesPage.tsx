@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button, Card } from '../components/ui'
+import { recipeTierColor } from '../rarityColors'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -210,21 +211,11 @@ function aggregateList(list: ShoppingEntry[]): IngredientSummary {
 
 // ── Tier badge colour ─────────────────────────────────────────────────────────
 
-const TIER_COLOUR: Record<string, string> = {
-  Apprentice:   '#9a9a9a',
-  Journeyman:   '#beff93',
-  Adept:        '#93d9ff',
-  Expert:       '#ffc993',
-  Master:       '#ff99ff',
-  Grandmaster:  '#ffe566',
-  Ancient:      '#ff6666',
-}
-
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function TierBadge({ tier }: { tier: string | null }) {
   if (!tier) return null
-  const colour = TIER_COLOUR[tier] ?? 'var(--text-muted)'
+  const colour = recipeTierColor(tier)
   return (
     <span style={{
       fontSize: '0.72rem',

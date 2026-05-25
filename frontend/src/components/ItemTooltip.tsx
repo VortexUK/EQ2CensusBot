@@ -4,6 +4,12 @@
  */
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { qualityStyle, type QualityStyle } from '../rarityColors'
+
+// Re-exported so existing importers (SpellScrollTooltip) keep working while the
+// canonical definition lives in rarityColors.
+export { qualityStyle }
+export type { QualityStyle }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -74,26 +80,6 @@ function glow(color: string) {
   return `${_outline}, 0 0 4px ${color}, 0 0 4px ${color}`
 }
 
-export interface QualityStyle { color: string; glowColor?: string }
-const QUALITY: Record<string, QualityStyle> = {
-  fabled:        { color: '#ff939d', glowColor: '#df535f' },
-  legendary:     { color: '#ffc993', glowColor: '#D56900' },
-  treasured:     { color: '#93d9ff', glowColor: '#D56900' },
-  mastercrafted: { color: '#93d9ff', glowColor: '#D56900' },
-  uncommon:      { color: '#beff93' },
-  handcrafted:   { color: '#beff93' },
-  common:        { color: '#beff93' },
-}
-export function qualityStyle(q: string): QualityStyle {
-  const key = q.toLowerCase()
-  if (QUALITY[key]) return QUALITY[key]
-  // Compound quality like "mastercrafted fabled" — use the last recognised word
-  const words = key.split(/\s+/)
-  for (let i = words.length - 1; i >= 0; i--) {
-    if (QUALITY[words[i]]) return QUALITY[words[i]]
-  }
-  return { color: C_WHITE }
-}
 
 const ADORN_COLOR: Record<string, string> = {
   white: '#dcdcdc', turquoise: '#3cc0c0', orange: '#ff8a00',

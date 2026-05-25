@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Card } from '../components/ui'
+import { itemRarityColor } from '../rarityColors'
 
 interface ItemStat   { display_name: string; value: number; stat_group: string }
 interface EffectLine { indentation: number; text: string }
@@ -26,13 +27,6 @@ interface ItemDetail {
   extra_info: [string, string][]
 }
 
-const TIER_COLOUR: Record<string, string> = {
-  Fabled:        '#ff99ff',
-  Legendary:     '#ffc993',
-  Treasured:     '#93d9ff',
-  Mastercrafted: '#93d9ff',
-  Handcrafted:   '#beff93',
-}
 
 export default function ItemPage() {
   const { itemId } = useParams<{ itemId: string }>()
@@ -61,7 +55,7 @@ export default function ItemPage() {
     </main>
   )
 
-  const colour = TIER_COLOUR[item.quality] ?? 'var(--text)'
+  const colour = itemRarityColor(item.quality)
   const iconUrl = item.icon_id ? `/icons/${item.icon_id}.png` : null
 
   return (

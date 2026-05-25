@@ -43,12 +43,20 @@
   --space-6: 1.5rem;
   --space-8: 2rem;
 
-  /* Item tier colours */
-  --tier-fabled:     #a335ee;
-  --tier-legendary:  #ff8000;
-  --tier-treasured:  #1eff00;
-  --tier-uncommon:   #ffffff;
-  --tier-common:     #9d9d9d;
+  /* ── Item rarity / tier colour ladder (EQ2) ──────────────────────────
+     ONE source of truth. Item quality names, recipe tiers, and the
+     in-game-style tooltips all map their names onto these tokens via
+     src/rarityColors.ts. Ordered low → high rarity. Previously this was
+     duplicated as four divergent TIER_COLOUR maps across pages. */
+  --rarity-common:       #9d9d9d;  /* Common / Apprentice */
+  --rarity-handcrafted:  #beff93;  /* Handcrafted / Uncommon / Journeyman */
+  --rarity-treasured:    #93d9ff;  /* Treasured / Mastercrafted / Adept */
+  --rarity-legendary:    #ffc993;  /* Legendary / Expert */
+  --rarity-fabled:       #ff99ff;  /* Fabled / Master */
+  --rarity-mythical:     #ffb6ff;  /* Mythical */
+  --rarity-ethereal:     #e8bbff;  /* Ethereal */
+  --rarity-celestial:    #ffe566;  /* Celestial / Grandmaster */
+  --rarity-ancient:      #ff6666;  /* Ancient */
 }
 
 *, *::before, *::after {
