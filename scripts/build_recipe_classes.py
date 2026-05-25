@@ -52,6 +52,14 @@ TRADESKILL_CLASSES = frozenset(
     }
 )
 
+# Secondary tradeskills (Tinkering, Adorning) that every class can learn. Their
+# recipe books carry NO typeinfo.classes — they're identified by the item's
+# top-level requiredskill.text instead. Mapped to a class name the same way.
+SECONDARY_BY_SKILL = {
+    "tinkering": "Tinkerer",
+    "adorning": "Adorner",
+}
+
 
 def build(items_db: str, recipes_db: str) -> None:
     # Read recipe-book items (read-only — never mutate the item catalogue).
@@ -64,10 +72,11 @@ def build(items_db: str, recipes_db: str) -> None:
         for (raw,) in cur:
             if not raw:
                 continue
-            typeinfo = json.loads(raw).get("typeinfo") or {}
+            item = json.loads(raw)
+            typeinfo = item.get("typeinfo") or {}
             classes = typeinfo.get("classes") or {}
             recipe_list = typeinfo.get("recipe_list") or []
-            if not classes or not recipe_list:
+            if not recipe_list:
                 skipped += 1
                 continue
             class_names = [
@@ -78,6 +87,13 @@ def build(items_db: str, recipes_db: str) -> None:
                 )
                 in TRADESKILL_CLASSES
             ]
+            # Secondary tradeskills (Tinkerer/Adorner) have no typeinfo.classes —
+            # identify them by the book's requiredskill instead.
+            if not class_names:
+                skill = ((item.get("requiredskill") or {}).get("text") or "").lower()
+                secondary = SECONDARY_BY_SKILL.get(skill)
+                if secondary:
+                    class_names = [secondary]
             if not class_names:
                 skipped += 1
                 continue

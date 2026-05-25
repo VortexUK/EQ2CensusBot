@@ -65,19 +65,13 @@ const CRAFT_TIER_LABELS: Record<string, string> = {
 // Tradeskill class filter — driven by the recipe_classes mapping (a recipe can
 // belong to more than one class). Values are the class display names stored in
 // recipe_classes. Replaces the old bench-based filter, which merged Armorer +
-// Weaponsmith (shared forge) and had no Jeweler.
-const CRAFT_CLASS_OPTIONS = [
-  { key: '',            label: 'All Artisans' },
-  { key: 'Alchemist',   label: 'Alchemist' },
-  { key: 'Armorer',     label: 'Armorer' },
-  { key: 'Carpenter',   label: 'Carpenter' },
-  { key: 'Jeweler',     label: 'Jeweler' },
-  { key: 'Provisioner', label: 'Provisioner' },
-  { key: 'Sage',        label: 'Sage' },
-  { key: 'Tailor',      label: 'Tailor' },
-  { key: 'Weaponsmith', label: 'Weaponsmith' },
-  { key: 'Woodworker',  label: 'Woodworker' },
+// Weaponsmith (shared forge) and had no Jeweler. Secondary tradeskills
+// (Tinkering/Adorning) are open to every class and grouped separately.
+const PRIMARY_CRAFT_CLASSES = [
+  'Alchemist', 'Armorer', 'Carpenter', 'Jeweler', 'Provisioner',
+  'Sage', 'Tailor', 'Weaponsmith', 'Woodworker',
 ]
+const SECONDARY_CRAFT_CLASSES = ['Adorner', 'Tinkerer']
 
 const CLASS_OPTIONS: { label: string; value: string }[] = [
   { label: 'All Classes',    value: '' },
@@ -443,9 +437,17 @@ export default function RecipesPage() {
                 Artisan class
               </label>
               <select className={CTRL_CLS} value={craftClass} onChange={e => setCraftClass(e.target.value)}>
-                {CRAFT_CLASS_OPTIONS.map(c => (
-                  <option key={c.key} value={c.key}>{c.label}</option>
-                ))}
+                <option value="">All Artisans</option>
+                <optgroup label="Primary Tradeskills">
+                  {PRIMARY_CRAFT_CLASSES.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Secondary Tradeskills">
+                  {SECONDARY_CRAFT_CLASSES.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 
