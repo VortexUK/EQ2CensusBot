@@ -1392,11 +1392,19 @@ async def delete_parses_bulk(
     zone: str | None = None,
     date: str | None = None,  # YYYY-MM-DD in server local timezone
     uploader: str | None = None,
+    purge: bool = False,
 ) -> DeleteParsesResponse:
     """Bulk delete by filter. `guild` is required — there is deliberately no
     "delete everything across all guilds" path. Permission: admin or officer
-    of the named guild."""
+    of the named guild.
+
+    Boss kills are soft-deleted (hidden_at set, ranking entry preserved);
+    trash encounters are hard-deleted. `purge=true` (admin only) hard-deletes
+    everything, including boss kills."""
     user = _require_user(request)
+    if purge and not _is_admin(user):
+        raise HTTPException(status_code=403, detail="Only an admin may hard-purge parses")
+
     guild = guild.strip()
     if not guild:
         raise HTTPException(status_code=400, detail="guild parameter must not be empty")
@@ -1412,16 +1420,19 @@ async def delete_parses_bulk(
 
     loop = asyncio.get_event_loop()
 
+    now = int(time.time())
+
     def _delete_sync() -> int:
         conn = parses_db.init_db()
         try:
-            return parses_db.delete_encounters_by_filter(
+            matches = parses_db.find_encounters_by_filter(
                 conn,
                 guild_name=guild,
                 zone=zone,
                 date=date,
                 uploaded_by=uploader,
             )
+            return sum(1 for enc in matches if _apply_delete(conn, enc, purge=purge, hidden_at=now))
         finally:
             conn.close()
 

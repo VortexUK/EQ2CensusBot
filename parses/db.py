@@ -645,6 +645,35 @@ def delete_encounters_by_filter(
     return cur.rowcount
 
 
+def find_encounters_by_filter(
+    conn: sqlite3.Connection,
+    *,
+    guild_name: str,
+    zone: str | None = None,
+    date: str | None = None,
+    uploaded_by: str | None = None,
+) -> list[dict]:
+    """Return (id, title, guild_name, source_dsn) for encounters matching the
+    same filter `delete_encounters_by_filter` uses — so the route can decide
+    soft-vs-hard delete per row. `guild_name` is mandatory."""
+    if not guild_name:
+        raise ValueError("guild_name is required")
+    clauses = ["guild_name = ?"]
+    params: list = [guild_name]
+    if zone:
+        clauses.append("zone = ?")
+        params.append(zone)
+    if uploaded_by:
+        clauses.append("uploaded_by = ?")
+        params.append(uploaded_by)
+    if date:
+        clauses.append("date(started_at, 'unixepoch', 'localtime') = ?")
+        params.append(date)
+    conn.row_factory = sqlite3.Row
+    sql = f"SELECT id, title, guild_name, source_dsn FROM encounters WHERE {' AND '.join(clauses)}"
+    return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
 def get_combatants_for_encounter(conn: sqlite3.Connection, encounter_id: int) -> list[dict]:
     conn.row_factory = sqlite3.Row
     rows = conn.execute(

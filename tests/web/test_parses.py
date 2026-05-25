@@ -891,19 +891,24 @@ async def test_delete_bulk_requires_guild(app):
 async def test_delete_bulk_admin_passes_filters(app):
     captured = {}
 
-    def fake_delete(conn, *, guild_name, zone=None, date=None, uploaded_by=None):
+    def fake_find(conn, *, guild_name, zone=None, date=None, uploaded_by=None):
         captured.update(guild_name=guild_name, zone=zone, date=date, uploaded_by=uploaded_by)
-        return 7
+        return [
+            {"id": 1, "title": "a krait patriarch", "guild_name": guild_name, "source_dsn": "plugin:X"},
+            {"id": 2, "title": "a krait patriarch", "guild_name": guild_name, "source_dsn": "plugin:Y"},
+        ]
 
     with (
         patch("web.routes.parses._require_user", _fake_user),
         patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.delete_encounters_by_filter", fake_delete),
+        patch("web.routes.parses.parses_db.init_db", return_value=MagicMock()),
+        patch("web.routes.parses.parses_db.find_encounters_by_filter", fake_find),
+        patch("web.routes.parses.parses_db.delete_encounter", MagicMock(return_value=True)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses?guild=Exordium&zone=Great+Divide&date=2026-05-24&uploader=Menludiir")
     assert r.status_code == 200
-    assert r.json() == {"deleted": 7}
+    assert r.json() == {"deleted": 2}
     assert captured == {
         "guild_name": "Exordium",
         "zone": "Great Divide",
@@ -921,12 +926,21 @@ async def test_delete_bulk_officer_allowed(app):
         patch("web.routes.parses._require_user", _fake_user),
         patch("web.routes.parses._is_admin", return_value=False),
         patch("web.routes.guild._officer_chars", fake_officer_chars),
-        patch("web.routes.parses.parses_db.delete_encounters_by_filter", MagicMock(return_value=3)),
+        patch("web.routes.parses.parses_db.init_db", return_value=MagicMock()),
+        patch(
+            "web.routes.parses.parses_db.find_encounters_by_filter",
+            MagicMock(
+                return_value=[
+                    {"id": 1, "title": "a krait patriarch", "guild_name": "Exordium", "source_dsn": "plugin:X"},
+                ]
+            ),
+        ),
+        patch("web.routes.parses.parses_db.delete_encounter", MagicMock(return_value=True)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses?guild=Exordium")
     assert r.status_code == 200
-    assert r.json() == {"deleted": 3}
+    assert r.json() == {"deleted": 1}
 
 
 @pytest.mark.asyncio
@@ -1138,3 +1152,31 @@ async def test_delete_batch_purge_hard_deletes_each(app):
     assert r.status_code == 200 and r.json() == {"deleted": 2}
     assert hard.call_count == 2
     soft.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Bulk-by-filter soft-delete vs hard-delete (Task 7)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_bulk_delete_soft_deletes_bosses(app):
+    matches = [
+        {"id": 1, "title": "Tarinax", "guild_name": "Exordium", "source_dsn": "plugin:OTHER"},
+        {"id": 2, "title": "a krait patriarch", "guild_name": "Exordium", "source_dsn": "plugin:OTHER"},
+    ]
+    soft = MagicMock(return_value=True)
+    hard = MagicMock(return_value=True)
+    with (
+        patch("web.routes.parses._require_user", _fake_user),
+        patch("web.routes.parses._is_admin", return_value=True),
+        patch("web.routes.parses.parses_db.init_db", return_value=MagicMock()),
+        patch("web.routes.parses.parses_db.find_encounters_by_filter", MagicMock(return_value=matches)),
+        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.parses_db.delete_encounter", hard),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.delete("/api/parses?guild=Exordium")
+    assert r.status_code == 200 and r.json() == {"deleted": 2}
+    soft.assert_called_once()  # Tarinax (boss)
+    hard.assert_called_once()  # trash

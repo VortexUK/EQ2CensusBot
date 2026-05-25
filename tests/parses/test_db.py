@@ -696,3 +696,18 @@ class TestDeleteHelpers:
         assert n == 1
         remaining = {r[0] for r in parses_db_conn.execute("SELECT act_encid FROM encounters").fetchall()}
         assert remaining == {"u2"}
+
+
+class TestFindByFilter:
+    def test_find_encounters_by_filter_returns_id_and_title(self, parses_db_conn):
+        enc = _sample_encounter()
+        eid = parses_db.insert_encounter(
+            parses_db_conn,
+            enc,
+            source_dsn="eq2act",
+            ingested_at=1700000000,
+            guild_name="Exordium",
+        )
+        rows = parses_db.find_encounters_by_filter(parses_db_conn, guild_name="Exordium")
+        assert {"id", "title"} <= set(rows[0].keys())
+        assert rows[0]["id"] == eid
