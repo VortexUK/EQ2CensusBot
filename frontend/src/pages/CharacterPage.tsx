@@ -85,6 +85,7 @@ interface Character {
   ts_class: string | null
   ts_level: number | null
   guild_name: string | null
+  ilvl: number | null
   stats: CharacterStats
   equipment: EquipmentSlot[]
 }
@@ -178,11 +179,12 @@ function gradeLabel(avg: number, cfg: RatingConfig): { grade: string; color: str
 
 const SKIP_GEAR_SLOTS = new Set(['food', 'drink'])
 
-function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
+function GearRating({ equipment, ready, maxLevel, ratingConfig, ilvl }: {
   equipment: EquipmentSlot[]
   ready: boolean
   maxLevel: number
   ratingConfig: RatingConfig
+  ilvl: number | null
 }) {
   const bySlot = buildSlotMap(equipment)
 
@@ -235,6 +237,11 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig }: {
             <div className="text-[0.78rem] font-semibold mb-[0.2rem]" style={{ color: raidReady ? 'var(--success)' : 'var(--danger)' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
+            {ilvl != null && (
+              <div className="text-[0.72rem] font-semibold text-gold mb-[0.2rem]">
+                Item Level {Math.round(ilvl).toLocaleString()}
+              </div>
+            )}
             <div className="text-[0.68rem] text-text-muted leading-[1.5]">
               {scored.length} item{scored.length !== 1 ? 's' : ''} rated
               {pending > 0 && <span className="opacity-60"> · {pending} loading</span>}
@@ -601,7 +608,7 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
         <div className="flex gap-6 items-start mt-4">
           {/* Left: gear rating + detailed stats */}
           <div className="w-[260px] shrink-0">
-            <GearRating equipment={char.equipment} ready={itemsReady} maxLevel={maxLevel} ratingConfig={ratingConfig} />
+            <GearRating equipment={char.equipment} ready={itemsReady} maxLevel={maxLevel} ratingConfig={ratingConfig} ilvl={char.ilvl} />
             <StatsPanel char={char}
               onStatHover={setHoveredStat}
               onStatLeave={() => setHoveredStat(null)} />

@@ -11,6 +11,8 @@ from pydantic import BaseModel
 from census.client import CensusClient
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.db import DB_PATH as _ITEMS_DB
+from census.db import ilvls_for_ids
+from census.item_level import character_ilvl
 from census.recipes_db import (
     DB_PATH as _RECIPES_DB,
 )
@@ -225,14 +227,26 @@ class CharacterResponse(BaseModel):
     ts_class: str | None = None
     ts_level: int | None = None
     guild_name: str | None = None
+    ilvl: float | None = None  # average gear ilvl; None if no gear / items.db absent
     stats: CharacterStats = CharacterStats()
     equipment: list[EquipmentSlotResponse] = []
     spell_ids: list[int] = []
 
 
+def _character_ilvl(char) -> float | None:
+    """Average gear ilvl for a CharacterOverview, looked up from items.db."""
+    ids = [int(s.item_id) for s in char.equipment if s.item_id and str(s.item_id).isdigit()]
+    ilvl_map = ilvls_for_ids(ids)
+    return character_ilvl(
+        (s.slot_name, ilvl_map.get(int(s.item_id)) if s.item_id and str(s.item_id).isdigit() else None)
+        for s in char.equipment
+    )
+
+
 def _build_char_response(char) -> CharacterResponse:
     """Convert a CharacterOverview into a CharacterResponse (shared by endpoint + guild pre-warming)."""
     return CharacterResponse(
+        ilvl=_character_ilvl(char),
         id=char.id,
         name=char.name,
         level=char.level,
