@@ -15,23 +15,24 @@ a new leaderboard column.
 `character_ilvl` = the sum of per-item ilvls across a character's **standard gear
 slots**, divided by a **fixed slot denominator**.
 
-- **Slots** (`CHARACTER_GEAR_SLOTS`, 21): primary, secondary, head, chest,
-  shoulders, forearms, hands, legs, feet, left_ring, right_ring, ears, ears2,
-  neck, left_wrist, right_wrist, ranged, waist, cloak, activate1, activate2.
-  Other equipped slots (ammo, food, drink, mount_adornment, mount_armor,
-  event_slot) are not gear slots and are ignored entirely — not in numerator or
-  denominator.
-- **Denominator is fixed at 21** (not "slots that happen to be filled"). An empty
-  slot or an appearance / non-gear / 0-ilvl item counts as **0** in the numerator
-  but still in the /21 — a character isn't "fully geared" just because the pieces
-  they *do* wear are good. (Only Armor/Weapon/Shield carry an ilvl; appearance
-  pieces have no `level_to_use` → 0.)
-- **The only exception is a two-handed weapon.** It fills `primary` while
-  `secondary` is necessarily empty, so the denominator drops to **20** rather
-  than penalising the unavoidable empty off-hand. Detected via the primary item's
-  `wield_style == "Two-Handed"` — a one-hander with an empty off-hand still
-  divides by 21. (The 2H weapon's own ilvl is already potency-halved upstream.)
-- Returns None only when no gear slot holds an ilvl-bearing item at all.
+- **Numerator:** the sum of the equipped *gear* items' ilvls. Only
+  Armor/Weapon/Shield carry an ilvl, so consumables and appearance pieces
+  (no `level_to_use`) contribute 0 automatically. We do **not** match by slot
+  name — the parsed `EquipmentSlot.slot_name` is a Census *display* name
+  ("Primary", "Left Ring", "Charm") that varies and collides, so the per-item
+  ilvl is the reliable signal for "is this a gear piece".
+- **Denominator is fixed at `CHARACTER_GEAR_SLOT_COUNT` = 21** (the standard gear
+  slots: primary, secondary, ranged, head, chest, shoulders, forearms, hands,
+  legs, feet, cloak, neck, 2×ear, 2×ring, 2×wrist, waist, 2×charm) — *not* the
+  number of items present. Empty slots and appearance/0-ilvl items count as 0
+  against the /21, so a character isn't "fully geared" just because the pieces
+  they *do* wear are good. (`_parse_equipment` already drops ammo/event/mount.)
+- **The only exception is a two-handed weapon.** It fills the primary slot while
+  the off-hand is necessarily empty, so the denominator drops to **20** rather
+  than penalising the unavoidable empty off-hand. Detected via any equipped
+  item's `wield_style == "Two-Handed"`. (The 2H weapon's own ilvl is already
+  potency-halved upstream.)
+- Returns None only when no equipped item carries an ilvl at all.
 
 Each equipped item's `(ilvl, wield_style)` is looked up in items.db
 (`gear_for_ids`, read-only batch). No Census calls beyond the one the character

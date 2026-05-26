@@ -240,16 +240,9 @@ def _character_ilvl(char) -> float | None:
     weapon in the primary slot drops the off-hand from the denominator."""
     ids = [int(s.item_id) for s in char.equipment if s.item_id and str(s.item_id).isdigit()]
     gear = gear_for_ids(ids)
-    slot_ilvls: dict[str, float | None] = {}
-    two_handed = False
-    for s in char.equipment:
-        if not (s.item_id and str(s.item_id).isdigit()):
-            continue
-        ilvl, wield_style = gear.get(int(s.item_id), (None, None))
-        slot_ilvls[s.slot_name] = ilvl
-        if s.slot_name == "primary" and wield_style == "Two-Handed":
-            two_handed = True
-    return character_ilvl(slot_ilvls, two_handed=two_handed)
+    item_ilvls = [gear.get(i, (None, None))[0] for i in ids]
+    two_handed = any(wield_style == "Two-Handed" for _, wield_style in gear.values())
+    return character_ilvl(item_ilvls, two_handed=two_handed)
 
 
 def _build_char_response(char) -> CharacterResponse:

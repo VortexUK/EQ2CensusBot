@@ -7,7 +7,7 @@ import math
 import pytest
 
 from census.item_level import (
-    CHARACTER_GEAR_SLOTS,
+    CHARACTER_GEAR_SLOT_COUNT,
     GEAR_TYPES,
     ILVL_POTENCY_WEIGHT,
     character_ilvl,
@@ -125,29 +125,21 @@ def test_worked_examples(level, tier, potency, expected):
 class TestCharacterIlvl:
     def test_fixed_21_slot_denominator(self):
         # One 420 item, every other slot empty -> 420 / 21 (not / 1).
-        assert character_ilvl({"head": 420.0}) == round(420.0 / 21, 1)
+        assert character_ilvl([420.0]) == round(420.0 / 21, 1)
 
     def test_full_set_of_420(self):
         # All 21 slots at 420 -> 420.
-        assert character_ilvl(dict.fromkeys(CHARACTER_GEAR_SLOTS, 420.0)) == 420.0
+        assert character_ilvl([420.0] * CHARACTER_GEAR_SLOT_COUNT) == 420.0
 
-    def test_empty_and_appearance_count_as_zero(self):
-        # Appearance cloak (None) and empty slots count as 0 in the numerator
-        # but still in the /21 denominator, dragging the average down.
-        equipped = {"chest": 420.0, "legs": 420.0, "cloak": None}
-        assert character_ilvl(equipped) == round(840.0 / 21, 1)
-
-    def test_non_gear_slots_excluded_from_numerator(self):
-        # food/ammo/event_slot aren't gear slots: ignored entirely (not /21 members).
-        equipped = {"chest": 420.0, "food": 999.0, "ammo": 999.0, "event_slot": 999.0}
-        assert character_ilvl(equipped) == round(420.0 / 21, 1)
+    def test_appearance_items_count_as_zero(self):
+        # Appearance pieces (None ilvl) don't add to the numerator but the
+        # denominator stays /21, dragging the average down.
+        assert character_ilvl([420.0, 420.0, None]) == round(840.0 / 21, 1)
 
     def test_two_handed_drops_denominator_to_20(self):
-        # 2H in primary, empty secondary -> divide by 20, not 21.
-        equipped = {"primary": 400.0}
-        assert character_ilvl(equipped, two_handed=True) == round(400.0 / 20, 1)
-        assert character_ilvl(equipped, two_handed=False) == round(400.0 / 21, 1)
+        assert character_ilvl([400.0], two_handed=True) == round(400.0 / 20, 1)
+        assert character_ilvl([400.0], two_handed=False) == round(400.0 / 21, 1)
 
     def test_none_when_no_gear_at_all(self):
-        assert character_ilvl({}) is None
-        assert character_ilvl({"food": 500.0, "cloak": None}) is None
+        assert character_ilvl([]) is None
+        assert character_ilvl([None, None]) is None

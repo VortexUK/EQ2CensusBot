@@ -23,34 +23,14 @@ import math
 # adornments live under a different type, so this set excludes them for free.
 GEAR_TYPES = frozenset({"Armor", "Weapon", "Shield"})
 
-# Equipment slots that count toward a character's average ilvl. The standard
-# gear slots only — excludes ammo, food, drink, mount_adornment, mount_armor and
-# event_slot (which can hold an off-level token that would skew the average).
-CHARACTER_GEAR_SLOTS = frozenset(
-    {
-        "primary",
-        "secondary",
-        "head",
-        "chest",
-        "shoulders",
-        "forearms",
-        "hands",
-        "legs",
-        "feet",
-        "left_ring",
-        "right_ring",
-        "ears",
-        "ears2",
-        "neck",
-        "left_wrist",
-        "right_wrist",
-        "ranged",
-        "waist",
-        "cloak",
-        "activate1",
-        "activate2",
-    }
-)
+# The number of standard gear slots a character has — the FIXED denominator for
+# the average-ilvl calc. The 21 slots are: primary, secondary, ranged, head,
+# chest, shoulders, forearms, hands, legs, feet, cloak, neck, 2x ear, 2x ring,
+# 2x wrist, waist, 2x charm. Consumable (food/drink/ammo), mount and event slots
+# are NOT gear and are excluded (they carry no item ilvl anyway). We key off the
+# COUNT rather than slot names because the parsed slot labels are display names
+# that vary; the per-item ilvl already tells us which equipped items are gear.
+CHARACTER_GEAR_SLOT_COUNT = 21
 
 # Fixed reference level. Deliberately a constant (not the server max level) so an
 # item's ilvl never re-bases when the level cap rises.
@@ -124,26 +104,25 @@ def compute_ilvl(
     return round(base + potency_bonus, 1)
 
 
-def character_ilvl(slot_ilvls: dict[str, float | None], *, two_handed: bool = False) -> float | None:
-    """Average gear ilvl over the FIXED set of standard gear slots.
+def character_ilvl(item_ilvls: list[float | None], *, two_handed: bool = False) -> float | None:
+    """Average gear ilvl over the FIXED standard-gear-slot count.
 
-    ``slot_ilvls`` maps slot name → that slot's item ilvl (None for empty slots
-    or appearance / non-gear items). The denominator is always the full
-    CHARACTER_GEAR_SLOTS count (21): empty slots and appearance/0-ilvl items
-    count as 0 and legitimately drag the average down — a character isn't
-    "fully geared" just because the items they *do* wear are good.
+    ``item_ilvls`` is the ilvl of each EQUIPPED item (None for appearance /
+    non-gear pieces, which contribute 0). The denominator is the full gear-slot
+    count (CHARACTER_GEAR_SLOT_COUNT = 21), NOT the number of items present:
+    empty slots and appearance/0-ilvl items legitimately drag the average down —
+    a character isn't "fully geared" just because the pieces they *do* wear are
+    good.
 
-    The only exception is ``two_handed``: a two-handed weapon fills ``primary``
-    while ``secondary`` is necessarily empty, so the denominator drops by one
+    The only exception is ``two_handed``: a two-handed weapon fills the primary
+    slot while the off-hand is necessarily empty, so the denominator drops by one
     (20) rather than penalising the unavoidable empty off-hand. (The 2H weapon's
     own ilvl is already potency-halved upstream.)
 
-    Returns None only when no gear slot holds an ilvl-bearing item at all.
+    Returns None only when no equipped item carries an ilvl at all.
     """
-    denom = len(CHARACTER_GEAR_SLOTS) - (1 if two_handed else 0)
-    if denom <= 0:
+    values = [v for v in item_ilvls if v is not None]
+    if not values:
         return None
-    if not any(slot_ilvls.get(slot) for slot in CHARACTER_GEAR_SLOTS):
-        return None
-    total = sum(slot_ilvls.get(slot) or 0.0 for slot in CHARACTER_GEAR_SLOTS)
-    return round(total / denom, 1)
+    denom = CHARACTER_GEAR_SLOT_COUNT - (1 if two_handed else 0)
+    return round(sum(values) / denom, 1) if denom > 0 else None
