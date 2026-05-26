@@ -57,7 +57,7 @@ export function FilterDropdown({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen(o => !o)}
-        className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${btnClass}`}
+        className={`flex appearance-none items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${btnClass}`}
       >
         <span className={selected ? '' : 'text-text-muted'}>{selected ? selected.label : placeholder}</span>
         <span className={`text-[0.7em] leading-none ${disabled ? 'text-text-muted' : 'text-gold'}`}>▾</span>
@@ -82,8 +82,10 @@ export function FilterDropdown({
                     onChange(opt.value)
                     setOpen(false)
                   }}
-                  className={`block w-full cursor-pointer whitespace-nowrap px-3 py-1.5 text-left text-sm transition-colors ${
-                    isSel ? 'bg-gold/10 text-gold-bright' : 'text-text hover:bg-gold/10 hover:text-gold-bright'
+                  className={`block w-full cursor-pointer appearance-none border-0 whitespace-nowrap px-3 py-1.5 text-left text-sm transition-colors ${
+                    isSel
+                      ? 'bg-gold/10 text-gold-bright'
+                      : 'bg-transparent text-text hover:bg-gold/10 hover:text-gold-bright'
                   }`}
                 >
                   {opt.label}
