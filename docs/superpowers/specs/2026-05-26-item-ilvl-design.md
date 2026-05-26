@@ -59,6 +59,17 @@ Same-tier/level items now separate by small potency differences (≈2 ilvl for t
 6.6→7.2 pair), one quality band ≈20 ilvl, and the endgame stays bounded (potency
 50,000 → ilvl ~696, not ~114,000).
 
+## Two-handed weapons
+
+A two-handed weapon (`typeinfo.wieldstyle == "Two-Handed"`) occupies *both*
+weapon slots and carries roughly twice a one-hander's stat budget. Its potency is
+**halved** in the calculation so it normalises to a one-hand-equivalent ilvl.
+Confirmed on real data: the Toxxulia's L90 set has the 1H at potency 17 and the 2H
+at 34, and after halving both compute to the same ilvl (409.8). This lets a future
+per-character average count a 2H as a single slot (dropping the empty off-hand)
+without unfairly inflating it. Ranged and dual-wield weapons are single-slot and
+untouched.
+
 ## Tier band
 
 The tier string is mapped to a 1–6 band by the **strongest quality keyword** it
