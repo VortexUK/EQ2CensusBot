@@ -356,15 +356,16 @@ class TestParseItemIlvl:
         }
 
     def test_gear_gets_numeric_ilvl(self):
-        # Fabled (5), level 100, no potency -> 100 * 1 * 5 * 1 = 500.
-        assert parse_item(self._gear()).ilvl == 500.0
+        # Fabled (5), level 100, no potency -> (1.0) * (300 + 23*5) = 415.
+        assert parse_item(self._gear()).ilvl == 415.0
 
     def test_potency_boosts_ilvl(self):
-        assert parse_item(self._gear(potency=1000.0)).ilvl == pytest.approx(1000.0)
+        # Potency adds a positive log bonus on top of the base.
+        assert parse_item(self._gear(potency=1000.0)).ilvl > 415.0
 
     def test_weapon_and_shield_are_gear(self):
-        assert parse_item(self._gear(item_type="Weapon")).ilvl == 500.0
-        assert parse_item(self._gear(item_type="Shield")).ilvl == 500.0
+        assert parse_item(self._gear(item_type="Weapon")).ilvl == 415.0
+        assert parse_item(self._gear(item_type="Shield")).ilvl == 415.0
 
     def test_non_gear_has_no_ilvl(self):
         assert parse_item(self._gear(item_type="Spell Scroll")).ilvl is None

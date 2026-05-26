@@ -23,35 +23,41 @@ One stable, comparable number per gear item that:
 ## Formula
 
 ```
-ilvl = SCALE × (L² / REF²) × Tier × (1 + Potency / K)
+ilvl = (L² / REF²) × (LVL_W + TIER_W × Tier)  +  POT_W × ln(Potency)
+       └──────────── level + tier base ────────┘   └── potency bonus ──┘
 ```
 
 | Symbol | Value | Rationale |
 |---|---|---|
 | `L` | `level_to_use` (the equip level) | Player-scaled level. **Not** `item_level`, which is an internal 1–2560 scale that overshoots the player range. |
-| `REF` | **100** (fixed constant) | Stable forever. Using the *server* max level would re-base every item's ilvl whenever the cap rises (and Varsoon is a TLE whose cap unlocks in stages) — the opposite of "stable". A fixed reference makes ilvls comparable across all expansions. Over-cap future gear simply scores >1 on the `L²/REF²` term, which is correct. |
+| `REF` | **100** (fixed constant) | Stable forever. Using the *server* max level would re-base every item's ilvl whenever the cap rises (and Varsoon is a TLE whose cap unlocks in stages) — the opposite of "stable". Over-cap future gear simply scores >1 on the `L²/REF²` term, which is correct. |
 | `Tier` | 1–6 | Quality band (see below). |
-| `Potency` | the item's Potency stat, **0 when absent** | **Bonus form** (`1 + Potency/K`), not a multiplier. A pure `× Potency` would zero the 37% of fabled gear with no potency and let potency's ~1000× range (3.7 → 3578 observed) swamp level and tier. The bonus form keeps a sane base for every item and dampens potency to a ~1–5× contribution. |
-| `K` | **1000** | Potency dampening. Tunable. |
-| `SCALE` | **100** | Lands ilvls in a readable range. Tunable. |
+| `LVL_W` | **300** | Level baseline — the dominant, level-driven part of the score. |
+| `TIER_W` | **23** | Per-tier step. **Additive**, not a multiplier: one quality band is ~18–23 ilvl at L90, not the +25% a full multiplier gave. Scaled by the level factor so a tier upgrade matters more at 90 than at 10. |
+| `POT_W` | **26** | Potency weight on a **natural-log** curve. Equal *percentage* changes in potency give equal ilvl steps at any scale (`ln(p₂)−ln(p₁)=ln(p₂/p₁)`), so single-digit TLE potencies move it per-unit while tens-of-thousands live potencies stay bounded. ~`POT_W·ln 2` ≈ 18 ilvl per potency doubling. Potency ≤ 1 (incl. the ~37% of gear with none) contributes 0 (the log is floored, avoiding `ln 0` and negatives). |
 
-`REF`, `K`, `SCALE` are module-level constants in `census/item_level.py`; changing
-them is a recompute (re-run the backfill), not a schema change.
+`REF`, `LVL_W`, `TIER_W`, `POT_W` are module-level constants in
+`census/item_level.py`; changing them is a recompute (re-run the backfill), not a
+schema change.
 
-The `L²` squaring is intentional — it front-loads weight onto high-level gear.
+The `L²` squaring front-loads weight onto high-level gear. The earlier design
+used a tier *multiplier* and a dampened linear potency bonus; testing showed tier
+swamped everything (one band = +25%) and potency was invisible — hence the move
+to additive tier + log potency.
 
 ### Worked examples
 
 | Item | ilvl |
 |---|---|
-| Treasured, lvl 50, no potency | ~75 |
-| Fabled, lvl 100, no potency | ~500 |
-| Fabled, lvl 100, potency 480 | ~740 |
-| Fabled, lvl 100, potency 3578 | ~2290 |
-| Celestial, lvl 120, potency 3578 | ~3960 |
+| Fabled, lvl 100, no potency | 415 |
+| Fabled, lvl 90, potency 6.6 | 385 |
+| Fabled, lvl 90, potency 7.2 | 388 |
+| Legendary, lvl 90, potency 6.2 | 365 |
+| Mythical, lvl 80, potency 5.1 | 323 |
 
-On a TLE server (low potency) ilvl is driven mostly by level + tier; as potency
-inflates with later content, ilvl climbs accordingly.
+Same-tier/level items now separate by small potency differences (≈2 ilvl for the
+6.6→7.2 pair), one quality band ≈20 ilvl, and the endgame stays bounded (potency
+50,000 → ilvl ~696, not ~114,000).
 
 ## Tier band
 

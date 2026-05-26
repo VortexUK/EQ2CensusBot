@@ -4,12 +4,20 @@ Single source of the ilvl formula. Pure and dependency-free so it can be reused
 by the item parser (live tooltip), the DB upsert path (materialised column), and
 the backfill script, all guaranteeing the same result.
 
-    ilvl = SCALE * (L^2 / REF^2) * Tier * (1 + Potency / K)
+    ilvl = (L^2 / REF^2) * (LVL_W + TIER_W * Tier) + POT_W * ln(Potency)
+
+Tier is an additive contributor to the level base (a modest per-quality step),
+not a whole-formula multiplier. Potency is on a natural-log curve: equal
+*percentage* changes produce equal ilvl steps at any scale, so single-digit TLE
+potencies and tens-of-thousands live potencies both behave sensibly. Potency <= 1
+(including the ~37% of gear with none) contributes 0.
 
 See docs/superpowers/specs/2026-05-26-item-ilvl-design.md for the rationale.
 """
 
 from __future__ import annotations
+
+import math
 
 # Item types that count as "wearable gear". All three carry an equip slot;
 # adornments live under a different type, so this set excludes them for free.
@@ -18,10 +26,12 @@ GEAR_TYPES = frozenset({"Armor", "Weapon", "Shield"})
 # Fixed reference level. Deliberately a constant (not the server max level) so an
 # item's ilvl never re-bases when the level cap rises.
 ILVL_REF = 100.0
-# Display scale — lands ilvls in a readable range.
-ILVL_SCALE = 100.0
-# Potency dampening: turns potency's ~1000x raw range into a ~1-5x contribution.
-ILVL_POTENCY_K = 1000.0
+# Level baseline — the dominant, level-driven part of the score.
+ILVL_LEVEL_WEIGHT = 300.0
+# Per-tier step (scaled by the level factor): ~18-23 ilvl per quality band at L90.
+ILVL_TIER_WEIGHT = 23.0
+# Potency weight on a natural-log curve. ~POT_W*ln(2) ≈ 18 ilvl per potency doubling.
+ILVL_POTENCY_WEIGHT = 26.0
 
 # Quality keyword -> band (1-6). A tier string maps to the band of the strongest
 # keyword it contains, so compound strings ("Mastercrafted Legendary") resolve
@@ -71,6 +81,8 @@ def compute_ilvl(
     if not level_to_use or level_to_use <= 0:
         return None
     tier = tier_band(tier_display)
-    base = ILVL_SCALE * (level_to_use**2 / ILVL_REF**2) * tier
-    bonus = 1.0 + (potency or 0.0) / ILVL_POTENCY_K
-    return round(base * bonus, 1)
+    level_factor = level_to_use**2 / ILVL_REF**2
+    base = level_factor * (ILVL_LEVEL_WEIGHT + ILVL_TIER_WEIGHT * tier)
+    # Potency on a log curve; <=1 (incl. none) contributes nothing.
+    potency_bonus = ILVL_POTENCY_WEIGHT * math.log(potency) if (potency or 0.0) > 1 else 0.0
+    return round(base + potency_bonus, 1)

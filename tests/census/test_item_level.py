@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from census.item_level import (
     GEAR_TYPES,
-    ILVL_POTENCY_K,
+    ILVL_POTENCY_WEIGHT,
     compute_ilvl,
     tier_band,
 )
@@ -63,27 +65,42 @@ def test_missing_level_has_no_ilvl():
 
 
 def test_no_potency_returns_base():
-    # Fabled (tier 5), level 100: SCALE(100) * (100^2/100^2=1) * 5 * (1+0) = 500.
-    assert compute_ilvl(100, "FABLED", 0.0, "Armor") == 500.0
+    # Fabled (tier 5), level 100: (100^2/100^2=1) * (300 + 23*5) = 415, potency 0 adds nothing.
+    assert compute_ilvl(100, "FABLED", 0.0, "Armor") == 415.0
 
 
-def test_potency_is_a_bonus_not_a_gate():
-    # An item with no potency still ranks; potency only adds on top.
+def test_potency_at_or_below_one_adds_nothing():
+    # The log term is floored: potency <= 1 (incl. none) contributes 0.
+    assert compute_ilvl(100, "FABLED", 0.0, "Weapon") == 415.0
+    assert compute_ilvl(100, "FABLED", 1.0, "Weapon") == 415.0
+    assert compute_ilvl(100, "FABLED", 0.5, "Weapon") == 415.0
+
+
+def test_potency_is_a_log_bonus():
+    # potency = e -> ln(e)=1 -> +POT_W on top of the base.
     base = compute_ilvl(100, "FABLED", 0.0, "Weapon")
-    boosted = compute_ilvl(100, "FABLED", ILVL_POTENCY_K, "Weapon")  # +100%
-    assert base == 500.0
-    assert boosted == pytest.approx(1000.0)
+    boosted = compute_ilvl(100, "FABLED", math.e, "Weapon")
+    assert boosted == pytest.approx(base + ILVL_POTENCY_WEIGHT)
+
+
+def test_equal_potency_ratio_gives_equal_step():
+    # A +9% potency bump adds the same ilvl at any scale (the log property).
+    def step(p):
+        return compute_ilvl(90, "FABLED", p * 1.09, "Armor") - compute_ilvl(90, "FABLED", p, "Armor")
+
+    assert step(6.6) == pytest.approx(step(10000.0), abs=0.05)
 
 
 @pytest.mark.parametrize(
     "level,tier,potency,expected",
     [
-        (50, "TREASURED", 0.0, 75.0),  # 100 * 0.25 * 3 * 1
-        (100, "FABLED", 0.0, 500.0),
-        (100, "FABLED", 480.0, 740.0),  # 500 * 1.48
-        (100, "FABLED", 3578.0, 2289.0),  # 500 * 4.578
-        (120, "CELESTIAL", 3578.0, 3955.4),  # 100*1.44*6*4.578
+        # base = (L^2/100^2) * (300 + 23*tier); potency adds 26*ln(p) when p>1.
+        (100, "FABLED", 0.0, 415.0),  # 1.0 * (300+115)
+        (90, "FABLED", 6.6, 385.2),  # 0.81*415 + 26*ln(6.6)
+        (90, "FABLED", 7.2, 387.5),
+        (90, "LEGENDARY", 6.2, 365.0),  # 0.81*(300+92) + 26*ln(6.2)
+        (80, "MYTHICAL", 5.1, 322.7),  # 0.64*(300+138) + 26*ln(5.1)
     ],
 )
 def test_worked_examples(level, tier, potency, expected):
-    assert compute_ilvl(level, tier, potency, "Armor") == expected
+    assert compute_ilvl(level, tier, potency, "Armor") == pytest.approx(expected, abs=0.1)

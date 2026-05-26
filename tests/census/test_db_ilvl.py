@@ -20,12 +20,12 @@ def _raw_gear(*, item_type="Armor", tier="FABLED", leveltouse=100, potency=None,
 
 
 def test_item_to_row_gear_has_ilvl():
-    # Fabled (5), level 100, no potency -> 500.
-    assert item_to_row(_raw_gear())["ilvl"] == 500.0
+    # Fabled (5), level 100, no potency -> (1.0) * (300 + 23*5) = 415.
+    assert item_to_row(_raw_gear())["ilvl"] == 415.0
 
 
 def test_item_to_row_potency_boosts():
-    assert item_to_row(_raw_gear(potency=1000.0))["ilvl"] == 1000.0
+    assert item_to_row(_raw_gear(potency=1000.0))["ilvl"] > 415.0
 
 
 def test_item_to_row_non_gear_is_none():
@@ -41,13 +41,13 @@ def test_upsert_round_trip_persists_ilvl(tmp_path):
     try:
         upsert_items(
             [
-                _raw_gear(item_id=1, potency=480.0),  # 500 * 1.48 = 740
+                _raw_gear(item_id=1, potency=480.0),  # 415 + 26*ln(480) = 575.5
                 _raw_gear(item_id=2, item_type="House Item"),  # non-gear -> NULL
             ],
             conn,
         )
         rows = dict(conn.execute("SELECT id, ilvl FROM items ORDER BY id").fetchall())
-        assert rows[1] == 740.0
+        assert rows[1] == 575.5
         assert rows[2] is None
     finally:
         conn.close()
