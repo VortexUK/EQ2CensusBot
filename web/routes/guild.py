@@ -242,11 +242,12 @@ async def _fetch_and_cache_guild(
         # one items.db query (deduped), then map by name — avoids a DB hit per
         # member. Equipment lives on the CharacterOverview, not GuildMember.
         from census.db import gear_for_ids  # noqa: PLC0415
-        from web.routes.character import _ilvl_from_gear  # noqa: PLC0415 — local to avoid circular import
-
-        all_ids = list(
-            {int(s.item_id) for ov in overviews for s in ov.equipment if s.item_id and str(s.item_id).isdigit()}
+        from web.routes.character import (  # noqa: PLC0415 — local to avoid circular import
+            _equipment_lookup_ids,
+            _ilvl_from_gear,
         )
+
+        all_ids = list({i for ov in overviews for i in _equipment_lookup_ids(ov.equipment)})
         gear = gear_for_ids(all_ids)
         ilvl_by_name = {ov.name.lower(): _ilvl_from_gear(ov.equipment, gear) for ov in overviews}
 

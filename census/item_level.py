@@ -41,6 +41,11 @@ ILVL_LEVEL_WEIGHT = 300.0
 ILVL_TIER_WEIGHT = 23.0
 # Potency weight on a natural-log curve. ~POT_W*ln(2) ≈ 18 ilvl per potency doubling.
 ILVL_POTENCY_WEIGHT = 26.0
+# Per-socketed-adorn bonus weight. Each adorn adds a SMALL amount to its host
+# item's ilvl from its own level + tier (no potency — most adorns lack it):
+# adorn_bonus = (level^2/REF^2) * tier * ADORN_WEIGHT. At weight 1 an L90 fabled
+# adorn is ~4 ilvl (~1% of a gear slot) — a gentle nudge for being fully socketed.
+ILVL_ADORN_WEIGHT = 1.0
 
 # Quality keyword -> band (1-6). A tier string maps to the band of the strongest
 # keyword it contains, so compound strings ("Mastercrafted Legendary") resolve
@@ -126,3 +131,15 @@ def character_ilvl(item_ilvls: list[float | None], *, two_handed: bool = False) 
         return None
     denom = CHARACTER_GEAR_SLOT_COUNT - (1 if two_handed else 0)
     return round(sum(values) / denom, 1) if denom > 0 else None
+
+
+def adorn_bonus(level: int | None, tier_display: str | None) -> float:
+    """Small ilvl bonus a socketed adornment adds to its host item.
+
+    Derived from the adorn's own level and tier (no potency — most adorns lack
+    it): (level^2/REF^2) * tier_band * ILVL_ADORN_WEIGHT. Returns 0 for an adorn
+    with no level. Folded into the host item's ilvl when computing a character's
+    average (not into the bare item's stored/tooltip ilvl)."""
+    if not level or level <= 0:
+        return 0.0
+    return (level**2 / ILVL_REF**2) * tier_band(tier_display) * ILVL_ADORN_WEIGHT

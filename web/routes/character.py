@@ -11,8 +11,8 @@ from pydantic import BaseModel
 from census.client import CensusClient
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.db import DB_PATH as _ITEMS_DB
-from census.db import gear_for_ids
-from census.item_level import character_ilvl
+from census.db import GearRow, gear_for_ids
+from census.item_level import adorn_bonus, character_ilvl
 from census.recipes_db import (
     DB_PATH as _RECIPES_DB,
 )
@@ -233,28 +233,48 @@ class CharacterResponse(BaseModel):
     spell_ids: list[int] = []
 
 
-def _ilvl_from_gear(equipment, gear: dict[int, tuple[float | None, str | None]]) -> float | None:
+def _ilvl_from_gear(equipment, gear: dict[int, GearRow]) -> float | None:
     """Compute a character's average gear ilvl from already-fetched gear data.
 
-    ``gear`` maps item_id → (ilvl, wield_style). Two-handed detection iterates
-    *this* character's equipment so a shared (guild-wide) gear map is safe. See
+    ``gear`` maps item_id → GearRow (covers both worn items and their socketed
+    adorns). Each worn item's ilvl gets a small bonus per socketed adorn (from
+    the adorn's level + tier). Two-handed detection iterates *this* character's
+    equipment so a shared (guild-wide) gear map is safe. See
     census.item_level.character_ilvl for the denominator rules."""
     item_ilvls: list[float | None] = []
     two_handed = False
     for s in equipment:
         if not (s.item_id and str(s.item_id).isdigit()):
             continue
-        ilvl, wield_style = gear.get(int(s.item_id), (None, None))
-        item_ilvls.append(ilvl)
-        if wield_style == "Two-Handed":
+        row = gear.get(int(s.item_id))
+        if row and row.wield_style == "Two-Handed":
             two_handed = True
+        ilvl = row.ilvl if row else None
+        if ilvl is not None:
+            for a in s.adorn_slots:
+                if a.adorn_id and str(a.adorn_id).isdigit():
+                    ar = gear.get(int(a.adorn_id))
+                    if ar:
+                        ilvl += adorn_bonus(ar.level, ar.tier_display)
+        item_ilvls.append(ilvl)
     return character_ilvl(item_ilvls, two_handed=two_handed)
+
+
+def _equipment_lookup_ids(equipment) -> list[int]:
+    """All numeric item ids on a character: worn items + their socketed adorns."""
+    ids: list[int] = []
+    for s in equipment:
+        if s.item_id and str(s.item_id).isdigit():
+            ids.append(int(s.item_id))
+        for a in s.adorn_slots:
+            if a.adorn_id and str(a.adorn_id).isdigit():
+                ids.append(int(a.adorn_id))
+    return ids
 
 
 def _character_ilvl(char) -> float | None:
     """Average gear ilvl for a CharacterOverview, looked up from items.db."""
-    ids = [int(s.item_id) for s in char.equipment if s.item_id and str(s.item_id).isdigit()]
-    return _ilvl_from_gear(char.equipment, gear_for_ids(ids))
+    return _ilvl_from_gear(char.equipment, gear_for_ids(_equipment_lookup_ids(char.equipment)))
 
 
 def _build_char_response(char) -> CharacterResponse:

@@ -10,6 +10,7 @@ from census.item_level import (
     CHARACTER_GEAR_SLOT_COUNT,
     GEAR_TYPES,
     ILVL_POTENCY_WEIGHT,
+    adorn_bonus,
     character_ilvl,
     compute_ilvl,
     tier_band,
@@ -143,3 +144,18 @@ class TestCharacterIlvl:
     def test_none_when_no_gear_at_all(self):
         assert character_ilvl([]) is None
         assert character_ilvl([None, None]) is None
+
+
+class TestAdornBonus:
+    def test_level_and_tier(self):
+        # (90^2/100^2) * tier 5 * weight 1 = 0.81 * 5 = 4.05.
+        assert adorn_bonus(90, "FABLED") == pytest.approx(4.05)
+        # Compound tier resolves via tier_band: Mastercrafted Fabled -> 5.
+        assert adorn_bonus(90, "MASTERCRAFTED FABLED") == pytest.approx(4.05)
+
+    def test_lower_level_and_tier_worth_less(self):
+        assert adorn_bonus(80, "LEGENDARY") < adorn_bonus(90, "FABLED")
+
+    def test_no_level_is_zero(self):
+        assert adorn_bonus(None, "FABLED") == 0.0
+        assert adorn_bonus(0, "FABLED") == 0.0

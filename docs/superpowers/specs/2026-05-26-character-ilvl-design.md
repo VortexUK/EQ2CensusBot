@@ -34,6 +34,23 @@ slots**, divided by a **fixed slot denominator**.
   potency-halved upstream.)
 - Returns None only when no equipped item carries an ilvl at all.
 
+### Socketed adornments
+
+Each socketed adorn adds a **small** bonus to its host item's ilvl, from the
+adorn's own level and tier (no potency — most adorns lack it):
+
+```
+adorn_bonus = (adorn_level² / REF²) × adorn_tier × ILVL_ADORN_WEIGHT   (weight = 1)
+```
+
+At weight 1, an L90 fabled adorn is ~4 ilvl (~1% of a gear slot). The bonus is
+folded into the host item's ilvl when computing a **character's** average (so it
+flows into the character page, roster, snapshot, and leaderboard) — but **not**
+into the bare item's stored/tooltip ilvl, which has no sockets filled. Adorn
+level + tier are fetched in the same `gear_for_ids` query as the worn items
+(`GearRow` carries `ilvl`, `wield_style`, `level`, `tier_display`). Example:
+Menludiir (40 adorns) goes 354.4 → 361.2.
+
 Each equipped item's `(ilvl, wield_style)` is looked up in items.db
 (`gear_for_ids`, read-only batch). No Census calls beyond the one the character
 page already makes.
