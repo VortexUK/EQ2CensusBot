@@ -12,6 +12,7 @@ interface AdornSlot {
   color: string
   adorn_name: string | null
   adorn_id: string | null
+  ilvl_bonus: number
 }
 
 interface EquipmentSlot {
@@ -570,8 +571,8 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
     return adornHit ? 'adorn' : null
   }
 
-  const showTip = useCallback((itemId: string, e: React.MouseEvent) => {
-    setTooltip({ itemId, x: e.clientX, y: e.clientY })
+  const showTip = useCallback((itemId: string, e: React.MouseEvent, adorns?: { color: string; bonus: number }[]) => {
+    setTooltip({ itemId, x: e.clientX, y: e.clientY, adorns })
   }, [])
   const hideTip = useCallback(() => setTooltip(null), [])
   const moveTip = useCallback((e: React.MouseEvent) => {
@@ -861,7 +862,7 @@ function SlotRow({ label, item, iconSide, onShow, onHide, highlight }: {
   label: string
   item: EquipmentSlot | null
   iconSide: 'left' | 'right'
-  onShow: (itemId: string, e: React.MouseEvent) => void
+  onShow: (itemId: string, e: React.MouseEvent, adorns?: { color: string; bonus: number }[]) => void
   onHide: () => void
   highlight: 'direct' | 'adorn' | null
 }) {
@@ -934,7 +935,7 @@ function SlotRow({ label, item, iconSide, onShow, onHide, highlight }: {
           const adornId = adornEl.getAttribute('data-adorn-id')
           if (adornId) { onShow(adornId, e); return }
         }
-        onShow(item.item_id!, e)
+        onShow(item.item_id!, e, item.adorn_slots.map(a => ({ color: a.color, bonus: a.ilvl_bonus })))
       } : undefined}
       onMouseLeave={item?.item_id ? onHide : undefined}
     >

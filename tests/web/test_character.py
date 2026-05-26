@@ -61,3 +61,39 @@ async def test_character_returns_data(app):
     assert data["aa_count"] == 50
     assert data["ts_class"] == "Sage"
     assert data["ts_level"] == 70
+
+
+def test_adorn_ilvl_bonus_from_gear():
+    from census.db import GearRow
+    from census.item_level import adorn_bonus
+    from census.models import AdornSlot
+    from web.routes.character import _adorn_ilvl_bonus
+
+    gear = {200: GearRow(ilvl=None, wield_style=None, level=90, tier_display="FABLED")}
+    filled = AdornSlot(color="white", adorn_name="Adorn", adorn_id="200")
+    empty = AdornSlot(color="yellow", adorn_name=None, adorn_id=None)
+    assert _adorn_ilvl_bonus(filled, gear) == round(adorn_bonus(90, "FABLED"), 1)
+    assert _adorn_ilvl_bonus(empty, gear) == 0.0
+
+
+def test_ilvl_from_gear_folds_adorn_into_host_item():
+    from census.db import GearRow
+    from census.item_level import adorn_bonus
+    from census.models import AdornSlot, EquipmentSlot
+    from web.routes.character import _ilvl_from_gear
+
+    gear = {
+        100: GearRow(ilvl=400.0, wield_style="One-Handed", level=90, tier_display="FABLED"),
+        200: GearRow(ilvl=None, wield_style=None, level=90, tier_display="FABLED"),  # adorn
+    }
+    equip = [
+        EquipmentSlot(
+            slot_name="head",
+            item_name="Helm",
+            item_id="100",
+            adorn_slots=[AdornSlot(color="white", adorn_name="Adorn", adorn_id="200")],
+        )
+    ]
+    # (host 400 + adorn bonus) averaged over the fixed 21-slot denominator.
+    expected = round((400.0 + adorn_bonus(90, "FABLED")) / 21, 1)
+    assert _ilvl_from_gear(equip, gear) == expected

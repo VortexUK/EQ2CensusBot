@@ -60,6 +60,7 @@ class AdornSlotResponse(BaseModel):
     color: str
     adorn_name: str | None = None
     adorn_id: str | None = None
+    ilvl_bonus: float = 0.0  # how much this adorn adds to the host item's ilvl
 
 
 class EquipmentSlotResponse(BaseModel):
@@ -272,15 +273,21 @@ def _equipment_lookup_ids(equipment) -> list[int]:
     return ids
 
 
-def _character_ilvl(char) -> float | None:
-    """Average gear ilvl for a CharacterOverview, looked up from items.db."""
-    return _ilvl_from_gear(char.equipment, gear_for_ids(_equipment_lookup_ids(char.equipment)))
+def _adorn_ilvl_bonus(adorn, gear: dict[int, GearRow]) -> float:
+    """The ilvl bonus a socketed adorn contributes, rounded for display."""
+    if not (adorn.adorn_id and str(adorn.adorn_id).isdigit()):
+        return 0.0
+    row = gear.get(int(adorn.adorn_id))
+    return round(adorn_bonus(row.level, row.tier_display), 1) if row else 0.0
 
 
 def _build_char_response(char) -> CharacterResponse:
     """Convert a CharacterOverview into a CharacterResponse (shared by endpoint + guild pre-warming)."""
+    # One items.db query covers worn items + adorns; reused for the character
+    # ilvl and the per-adorn bonus surfaced on each equipment slot.
+    gear = gear_for_ids(_equipment_lookup_ids(char.equipment))
     return CharacterResponse(
-        ilvl=_character_ilvl(char),
+        ilvl=_ilvl_from_gear(char.equipment, gear),
         id=char.id,
         name=char.name,
         level=char.level,
@@ -302,7 +309,12 @@ def _build_char_response(char) -> CharacterResponse:
                 icon_id=s.icon_id,
                 tier=s.tier,
                 adorn_slots=[
-                    AdornSlotResponse(color=a.color, adorn_name=a.adorn_name, adorn_id=a.adorn_id)
+                    AdornSlotResponse(
+                        color=a.color,
+                        adorn_name=a.adorn_name,
+                        adorn_id=a.adorn_id,
+                        ilvl_bonus=_adorn_ilvl_bonus(a, gear),
+                    )
                     for a in s.adorn_slots
                 ],
             )

@@ -59,10 +59,16 @@ export interface ItemDetail {
   set_bonuses: SetBonus[]
 }
 
+export interface AdornIlvlHint {
+  color: string
+  bonus: number
+}
+
 export interface TooltipState {
   itemId: string
   x: number
   y: number
+  adorns?: AdornIlvlHint[]  // socketed adorns' ilvl bonuses (character context only)
 }
 
 // ── Colours (from tooltip.py) ─────────────────────────────────────────────────
@@ -163,7 +169,7 @@ export function ItemTooltip({ state }: { state: TooltipState }) {
       <div style={{ border: `1px solid ${BORDER_INNER}`, padding: '8px 10px' }}>
         {loading && <div style={{ color: '#777', fontSize: '0.82rem' }}>Loading…</div>}
         {!loading && !item && <div style={{ color: 'var(--danger)', fontSize: '0.82rem' }}>Item not found</div>}
-        {item && <TooltipContent item={item} qs={qs!} />}
+        {item && <TooltipContent item={item} qs={qs!} adorns={state.adorns} />}
       </div>
     </div>,
     document.body,
@@ -172,7 +178,7 @@ export function ItemTooltip({ state }: { state: TooltipState }) {
 
 // ── Content ───────────────────────────────────────────────────────────────────
 
-export function TooltipContent({ item, qs }: { item: ItemDetail; qs: QualityStyle }) {
+export function TooltipContent({ item, qs, adorns }: { item: ItemDetail; qs: QualityStyle; adorns?: AdornIlvlHint[] }) {
   const primary   = item.stats.filter(s => s.stat_group === 'primary'   && s.value !== 0)
   const secondary = item.stats.filter(s => s.stat_group === 'secondary' && s.value !== 0)
   const isAdorn   = item.armor_type.toLowerCase().includes('adornment')
@@ -221,13 +227,22 @@ export function TooltipContent({ item, qs }: { item: ItemDetail; qs: QualityStyl
         </div>
       )}
 
-      {/* Item level — a site annotation, not an in-game field. Subtle. */}
+      {/* Item level — a site annotation, not an in-game field. Subtle.
+          When viewed on a character, each socketed adorn's bonus is shown
+          after the base, tinted by the adorn's colour. */}
       {item.ilvl != null && (
         <div style={{
           color: '#c49e2c', fontSize: '0.78rem', letterSpacing: '0.02em',
           opacity: 0.85, marginTop: -2, marginBottom: 6,
         }}>
           Item Level {Math.round(item.ilvl).toLocaleString()}
+          {(adorns ?? [])
+            .filter(a => a.bonus > 0)
+            .map((a, i) => (
+              <span key={i} style={{ color: ADORN_COLOR[a.color.toLowerCase()] ?? C_WHITE, fontWeight: 'bold' }}>
+                {' +'}{Math.round(a.bonus)}
+              </span>
+            ))}
         </div>
       )}
 
