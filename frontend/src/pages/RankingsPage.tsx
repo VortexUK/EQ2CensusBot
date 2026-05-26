@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import Breadcrumb from '../components/Breadcrumb'
 import { Card } from '../components/ui'
+import { FilterDropdown, type DropdownOption } from '../components/FilterDropdown'
 import { fmtDuration, fmtLocalDate, fmtNum } from '../formatters'
 import { percentileColor } from '../percentileColors'
 
@@ -26,13 +27,12 @@ interface RankingRow {
 }
 interface RankingsResponse { rows: RankingRow[]; classes: string[]; total: number }
 
-const METRICS = [
-  { key: 'dps', label: 'Damage (DPS)' },
-  { key: 'hps', label: 'Healing (HPS)' },
-  { key: 'speed', label: 'Speed' },
+// Metric options grouped Character vs Guild (à la Warcraft Logs).
+const METRICS: DropdownOption[] = [
+  { value: 'dps', label: 'Damage (DPS)', group: 'Character' },
+  { value: 'hps', label: 'Healing (HPS)', group: 'Character' },
+  { value: 'speed', label: 'Speed', group: 'Guild' },
 ]
-
-const CTRL = 'bg-surface border border-border rounded-md text-text px-2 py-1 text-sm'
 
 export default function RankingsPage() {
   const [filters, setFilters] = useState<FiltersResponse>({ scopes: [] })
@@ -88,27 +88,34 @@ export default function RankingsPage() {
       <Breadcrumb items={[{ label: 'Rankings' }]} />
       <h1 className="font-heading text-[1.7rem] text-gold mb-3">EQ2Logs — Rankings</h1>
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <select className={CTRL} value={size} onChange={e => update({ size: e.target.value, zone: '', boss: '' })}>
-          <option value="">Scope…</option>
-          {filters.scopes.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-        </select>
-        <select className={CTRL} value={zone} disabled={!scope} onChange={e => update({ zone: e.target.value, boss: '' })}>
-          <option value="">Zone…</option>
-          {scope?.zones.map(z => <option key={z.zone} value={z.zone}>{z.zone}</option>)}
-        </select>
-        <select className={CTRL} value={boss} disabled={!zoneObj} onChange={e => update({ boss: e.target.value })}>
-          <option value="">Boss…</option>
-          {zoneObj?.bosses.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
-        <select className={CTRL} value={metric} onChange={e => update({ metric: e.target.value })}>
-          {METRICS.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
-        </select>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <FilterDropdown
+          value={size}
+          placeholder="Scope…"
+          options={filters.scopes.map(s => ({ value: s.key, label: s.label }))}
+          onChange={v => update({ size: v, zone: '', boss: '' })}
+        />
+        <FilterDropdown
+          value={zone}
+          placeholder="Zone…"
+          disabled={!scope}
+          options={(scope?.zones ?? []).map(z => ({ value: z.zone, label: z.zone }))}
+          onChange={v => update({ zone: v, boss: '' })}
+        />
+        <FilterDropdown
+          value={boss}
+          placeholder="Boss…"
+          disabled={!zoneObj}
+          options={(zoneObj?.bosses ?? []).map(b => ({ value: b, label: b }))}
+          onChange={v => update({ boss: v })}
+        />
+        <FilterDropdown value={metric} options={METRICS} onChange={v => update({ metric: v })} />
         {!isSpeed && (
-          <select className={CTRL} value={cls} onChange={e => update({ class: e.target.value })}>
-            <option value="">All classes</option>
-            {(board?.classes ?? []).map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <FilterDropdown
+            value={cls}
+            options={[{ value: '', label: 'All classes' }, ...(board?.classes ?? []).map(c => ({ value: c, label: c }))]}
+            onChange={v => update({ class: v })}
+          />
         )}
       </div>
 
