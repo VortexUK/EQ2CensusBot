@@ -6,16 +6,24 @@ Sourced from ``scripts/dev/eq2_zones.cleaned.json`` (produced by
 ``scripts/build_zones_db.py`` to (re)build the DB after the cleaned JSON
 changes — idempotent.
 
-Schema (three tables):
+Schema (five tables):
 
-  * **zones**         — one row per canonical zone with classification.
-  * **zone_types**    — many-to-many zone ↔ type tokens (`raid_x4`,
-                        `solo`, `tradeskill`, etc.). A zone can have
-                        multiple types (a solo+group instance, for
-                        example).
-  * **zone_aliases**  — alias name → canonical zone id. ACT logs may
-                        emit either form ("Fabled Deathtoll" vs "The
-                        Fabled Deathtoll"); the lookup resolves both.
+  * **zones**                  — one row per canonical zone with
+                                 classification.
+  * **zone_types**             — many-to-many zone ↔ type tokens
+                                 (`raid_x4`, `solo`, etc.). A zone can
+                                 have multiple types.
+  * **zone_aliases**           — alias name → canonical zone id. ACT
+                                 logs may emit either form ("Fabled
+                                 Deathtoll" vs "The Fabled Deathtoll").
+  * **zone_encounters**        — raid bosses per zone, one row per
+                                 named encounter (solo OR group),
+                                 with optional stage label and the
+                                 curator-supplied position.
+  * **zone_encounter_mobs**    — individual mob names inside an
+                                 encounter. Solo encounters get one
+                                 row; a 4-mob group gets four. Indexed
+                                 lowercased for fast reverse lookup.
 
 `find_by_name()` is the primary log-lookup entry point — it checks
 aliases before falling back to a fuzzy LIKE on the canonical name.
@@ -107,21 +115,44 @@ CREATE TABLE IF NOT EXISTS zone_aliases (
 );
 """
 
-# Raid bosses (named encounters) per zone. Sourced from the EQ2 wiki via
-# scripts/dev/scrape_eq2i_raids.py — committed as data, rebuilt from
-# scripts/dev/eq2_raid_data.json (and an optional overrides file for
-# excluding false-positive scrape hits). Position preserves wiki order
-# where meaningful. Same name in two zones (e.g. a Fabled variant)
-# distinguishes by zone_id.
-_CREATE_ZONE_BOSSES = """
-CREATE TABLE IF NOT EXISTS zone_bosses (
+# Raid encounters per zone — hand-curated from EQ2i (see
+# scripts/dev/eq2_raid_bosses.review.txt). Each row is a single named
+# *encounter*: usually one mob, but EQ2 has plenty of group encounters
+# where 2-4 mobs spawn together (e.g. The Protector's Realm's "Ludmila
+# Kystov + Jracol Binari + Blorgok the Brutal + Meldrath Kloktik" all
+# at once). The individual mob names live in the zone_encounter_mobs
+# join table below so reverse-lookup ("what zone is mob X in?") stays
+# an indexed query.
+#
+# `encounter_name` is the display label as written by the curator —
+# joined names for groups, single name for solo bosses. `stage` is an
+# optional grouping label ("Wing 1", "First Floor", etc.) for the
+# multi-stage raids like Veeshan's Peak and The Emerald Halls. Position
+# preserves the curator's intended order (which is typically the order
+# you encounter them in the zone).
+_CREATE_ZONE_ENCOUNTERS = """
+CREATE TABLE IF NOT EXISTS zone_encounters (
     id              INTEGER PRIMARY KEY,
     zone_id         INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+    encounter_name  TEXT    NOT NULL,             -- display: "Adkar Vyx" or
+                                                  -- "Ludmila Kystov, Jracol Binari, ..."
+    position        INTEGER NOT NULL,             -- order within the zone
+    stage           TEXT,                         -- "Wing 1", "First Floor", etc.
+    wiki_url        TEXT,
+    UNIQUE (zone_id, position)
+);
+"""
+
+# Per-encounter individual mob names. A solo-boss encounter has one
+# row; a 4-mob group has four. Lower-cased column is what reverse
+# lookups (find_zones_by_boss) hit.
+_CREATE_ZONE_ENCOUNTER_MOBS = """
+CREATE TABLE IF NOT EXISTS zone_encounter_mobs (
+    id              INTEGER PRIMARY KEY,
+    encounter_id    INTEGER NOT NULL REFERENCES zone_encounters(id) ON DELETE CASCADE,
     mob_name        TEXT    NOT NULL,
     mob_name_lower  TEXT    NOT NULL,
-    position        INTEGER NOT NULL DEFAULT 0,
-    wiki_url        TEXT,
-    UNIQUE (zone_id, mob_name_lower)
+    position        INTEGER NOT NULL DEFAULT 0    -- position within the encounter
 );
 """
 
@@ -134,8 +165,9 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_zone_types_zone     ON zone_types (zone_id);",
     "CREATE INDEX IF NOT EXISTS idx_zone_aliases_lower  ON zone_aliases (alias_lower);",
     "CREATE INDEX IF NOT EXISTS idx_zone_aliases_zone   ON zone_aliases (zone_id);",
-    "CREATE INDEX IF NOT EXISTS idx_zone_bosses_zone    ON zone_bosses (zone_id, position);",
-    "CREATE INDEX IF NOT EXISTS idx_zone_bosses_lower   ON zone_bosses (mob_name_lower);",
+    "CREATE INDEX IF NOT EXISTS idx_zone_enc_zone       ON zone_encounters (zone_id, position);",
+    "CREATE INDEX IF NOT EXISTS idx_zone_enc_mobs_enc   ON zone_encounter_mobs (encounter_id, position);",
+    "CREATE INDEX IF NOT EXISTS idx_zone_enc_mobs_lower ON zone_encounter_mobs (mob_name_lower);",
 ]
 
 
@@ -245,7 +277,12 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     conn.execute(_CREATE_ZONES)
     conn.execute(_CREATE_ZONE_TYPES)
     conn.execute(_CREATE_ZONE_ALIASES)
-    conn.execute(_CREATE_ZONE_BOSSES)
+    conn.execute(_CREATE_ZONE_ENCOUNTERS)
+    conn.execute(_CREATE_ZONE_ENCOUNTER_MOBS)
+    # Migration: drop the pre-v2 zone_bosses table if it lingers from
+    # an older DB build. No need to preserve data — bosses are always
+    # rebuilt from the curated source file.
+    conn.execute("DROP TABLE IF EXISTS zone_bosses;")
     for idx in _CREATE_INDEXES:
         conn.execute(idx)
     conn.commit()
@@ -330,13 +367,31 @@ def _hydrate_zone(conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
     d["aliases"] = [
         r[0] for r in conn.execute("SELECT alias FROM zone_aliases WHERE zone_id = ? ORDER BY alias", (d["id"],))
     ]
-    d["bosses"] = [
-        {"mob_name": r[0], "position": r[1], "wiki_url": r[2]}
-        for r in conn.execute(
-            "SELECT mob_name, position, wiki_url FROM zone_bosses WHERE zone_id = ? ORDER BY position, mob_name",
-            (d["id"],),
+    # Encounters: ordered list of named bosses with optional stage
+    # label. Each carries a `mobs` array — single-mob encounters get
+    # one entry, group encounters carry all the individual mob names.
+    encounter_rows = conn.execute(
+        "SELECT id, encounter_name, position, stage, wiki_url FROM zone_encounters WHERE zone_id = ? ORDER BY position",
+        (d["id"],),
+    ).fetchall()
+    d["bosses"] = []
+    for er in encounter_rows:
+        mobs = [
+            {"mob_name": r[0], "position": r[1]}
+            for r in conn.execute(
+                "SELECT mob_name, position FROM zone_encounter_mobs WHERE encounter_id = ? ORDER BY position",
+                (er[0],),
+            )
+        ]
+        d["bosses"].append(
+            {
+                "encounter_name": er[1],
+                "position": er[2],
+                "stage": er[3],
+                "wiki_url": er[4],
+                "mobs": mobs,
+            }
         )
-    ]
     return d
 
 
@@ -434,42 +489,76 @@ def list_by_type(type_token: str, path: Path = DB_PATH) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Raid-boss helpers
+# Raid-encounter helpers
 # ---------------------------------------------------------------------------
 
 
 def replace_bosses_for_zone(
     conn: sqlite3.Connection,
     zone_id: int,
-    bosses: list[dict],
+    encounters: list[dict],
 ) -> int:
-    """Replace the bosses list for a zone. Atomic per-zone.
+    """Replace the encounters list for a zone. Atomic per-zone.
 
-    Each input dict shape: ``{"mob_name": str, "position": int,
-    "wiki_url": str | None}``. Order in the list is preserved via the
-    ``position`` field. Returns the number of bosses written.
+    Each input dict shape:
+        {
+            "encounter_name": "Adkar Vyx" or "Ludmila Kystov, Jracol ...",
+            "position": int,                  # order within the zone
+            "stage": str | None,              # "Wing 1", "First Floor", ...
+            "wiki_url": str | None,
+            "mobs": [                         # one entry per individual mob
+                {"mob_name": "Adkar Vyx", "position": 0},
+                ...
+            ],
+        }
 
-    Re-runnable: a second call with the same zone wipes and rewrites
-    so removed bosses drop cleanly.
+    Re-runnable: wipes and rewrites both child tables so removed
+    encounters and removed group mobs both disappear cleanly. Returns
+    the number of *encounters* written (not individual mobs).
     """
-    conn.execute("DELETE FROM zone_bosses WHERE zone_id = ?", (zone_id,))
-    if not bosses:
+    conn.execute("DELETE FROM zone_encounters WHERE zone_id = ?", (zone_id,))
+    if not encounters:
         return 0
-    rows = [
-        (zone_id, b["mob_name"], b["mob_name"].lower(), int(b.get("position", 0)), b.get("wiki_url")) for b in bosses
-    ]
-    conn.executemany(
-        "INSERT INTO zone_bosses (zone_id, mob_name, mob_name_lower, position, wiki_url) VALUES (?, ?, ?, ?, ?)",
-        rows,
-    )
-    return len(rows)
+    for enc in encounters:
+        cur = conn.execute(
+            "INSERT INTO zone_encounters (zone_id, encounter_name, position, stage, wiki_url) VALUES (?, ?, ?, ?, ?)",
+            (
+                zone_id,
+                enc["encounter_name"],
+                int(enc["position"]),
+                enc.get("stage"),
+                enc.get("wiki_url"),
+            ),
+        )
+        encounter_id = int(cur.lastrowid or 0)
+        mobs = enc.get("mobs") or []
+        if not mobs:
+            # Defensive: an encounter with no listed mobs gets one mob
+            # synthesised from the display name so reverse lookup still
+            # works. Curator-curated data shouldn't hit this branch.
+            mobs = [{"mob_name": enc["encounter_name"], "position": 0}]
+        conn.executemany(
+            "INSERT INTO zone_encounter_mobs (encounter_id, mob_name, mob_name_lower, position) VALUES (?, ?, ?, ?)",
+            [
+                (
+                    encounter_id,
+                    m["mob_name"],
+                    m["mob_name"].lower(),
+                    int(m.get("position", 0)),
+                )
+                for m in mobs
+            ],
+        )
+    return len(encounters)
 
 
 def list_bosses_for_zone(zone_name: str, path: Path = DB_PATH) -> list[dict]:
-    """All raid bosses in a zone (looked up by canonical name OR alias).
+    """All raid encounters in a zone (looked up by canonical name OR alias).
 
-    Returns ``[{"mob_name", "position", "wiki_url"}, ...]`` sorted by
-    position then name. Empty list if zone unknown or has no bosses.
+    Returns a list of dicts in curator order. Each entry has
+    ``encounter_name``, ``position``, ``stage`` (or None), ``wiki_url``
+    (or None), and a ``mobs`` array of ``{"mob_name", "position"}``.
+    Empty list if zone unknown or has no bosses.
     """
     if not path.exists() or not zone_name:
         return []
@@ -484,19 +573,42 @@ def list_bosses_for_zone(zone_name: str, path: Path = DB_PATH) -> list[dict]:
             ).fetchone()
         if row is None:
             return []
-        bosses = conn.execute(
-            "SELECT mob_name, position, wiki_url FROM zone_bosses WHERE zone_id = ? ORDER BY position, mob_name",
-            (row["id"],),
+        zone_id = row["id"]
+        encounter_rows = conn.execute(
+            "SELECT id, encounter_name, position, stage, wiki_url "
+            "FROM zone_encounters WHERE zone_id = ? ORDER BY position",
+            (zone_id,),
         ).fetchall()
-        return [{"mob_name": b["mob_name"], "position": b["position"], "wiki_url": b["wiki_url"]} for b in bosses]
+        out: list[dict] = []
+        for er in encounter_rows:
+            mobs = [
+                {"mob_name": r[0], "position": r[1]}
+                for r in conn.execute(
+                    "SELECT mob_name, position FROM zone_encounter_mobs WHERE encounter_id = ? ORDER BY position",
+                    (er["id"],),
+                )
+            ]
+            out.append(
+                {
+                    "encounter_name": er["encounter_name"],
+                    "position": er["position"],
+                    "stage": er["stage"],
+                    "wiki_url": er["wiki_url"],
+                    "mobs": mobs,
+                }
+            )
+        return out
 
 
 def find_zones_by_boss(mob_name: str, path: Path = DB_PATH) -> list[dict]:
     """Reverse lookup: which zone(s) host a given raid boss?
 
+    Joins through zone_encounter_mobs so individual mob names inside a
+    group encounter all resolve (querying for any one of the four mobs
+    in a 4-mob group finds the encounter and its zone).
+
     Returns a list because the same mob name can appear in multiple
-    zones (e.g. Mayong Mistmoore exists in both the Castle Mistmoore
-    raid AND the Inner Sanctum raid; Fabled variants reuse names).
+    zones (Fabled variants, multi-instance bosses).
     """
     if not path.exists() or not mob_name:
         return []
@@ -506,7 +618,9 @@ def find_zones_by_boss(mob_name: str, path: Path = DB_PATH) -> list[dict]:
             f"""
             SELECT {_SELECT_COLS} FROM zones
             WHERE id IN (
-                SELECT zone_id FROM zone_bosses WHERE mob_name_lower = ?
+                SELECT e.zone_id FROM zone_encounters e
+                INNER JOIN zone_encounter_mobs m ON m.encounter_id = e.id
+                WHERE m.mob_name_lower = ?
             )
             ORDER BY name
             """,

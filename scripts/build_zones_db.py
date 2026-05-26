@@ -1,20 +1,25 @@
 """
-Build ``data/zones/zones.db`` from ``scripts/dev/eq2_zones.cleaned.json``.
+Build ``data/zones/zones.db`` from ``scripts/dev/eq2_zones.cleaned.json``
++ ``scripts/dev/eq2_raid_bosses.review.txt`` (the hand-curated raid roster).
 
-Idempotent — re-run after editing the source / overrides / aliases files
-and re-running ``scripts/dev/clean_eq2_zones.py``. Each upsert replaces
-the zone row + its types + its aliases atomically; removed types/aliases
-disappear cleanly.
+Idempotent — re-run after editing any of the source files. Each upsert
+replaces the zone row + its types + its aliases atomically; encounters
+and group mobs are also fully rebuilt per zone so removed/edited entries
+drop cleanly.
 
-Stamps two ``_meta`` keys on every build so the DB is self-describing:
+Stamps these ``_meta`` keys on every build so the DB is self-describing:
 
-  * ``built_at``       — ISO-8601 UTC timestamp
-  * ``built_from``     — path of the cleaned JSON consumed
+  * ``built_at``           — ISO-8601 UTC timestamp
+  * ``built_from``         — path of the cleaned JSON consumed
+  * ``bosses_built_from``  — path of the curated review.txt consumed
+  * ``bosses_zones``       — number of zones populated with bosses
+  * ``bosses_total``       — total encounters loaded (not individual mobs)
 
 Usage:
 
     .venv/Scripts/python scripts/build_zones_db.py
     .venv/Scripts/python scripts/build_zones_db.py --source path/to/other.json
+    .venv/Scripts/python scripts/build_zones_db.py --curated-bosses path/to/curated.txt
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -32,102 +38,202 @@ sys.path.insert(0, str(ROOT))
 from census import zones_db  # noqa: E402
 
 DEFAULT_SOURCE = ROOT / "scripts" / "dev" / "eq2_zones.cleaned.json"
-DEFAULT_RAID_DATA = ROOT / "scripts" / "dev" / "eq2_raid_data.json"
-DEFAULT_BOSS_OVERRIDES = ROOT / "scripts" / "dev" / "eq2_raid_bosses.overrides.json"
+DEFAULT_CURATED = ROOT / "scripts" / "dev" / "eq2_raid_bosses.review.txt"
 
 
-def _load_boss_overrides(path: Path) -> dict[str, dict]:
-    """Load the per-zone boss-overrides file. Format:
+# ---------------------------------------------------------------------------
+# Curated review.txt parser
+# ---------------------------------------------------------------------------
+#
+# Expected format (produced from clean_eq2_zones output and then
+# hand-edited by the curator):
+#
+#     ### Zone Name  [N]  (raid_x4)
+#         First Floor:
+#         - Mob 1
+#         - Mob 2, Mob 3, Mob 4
+#         Second Floor:
+#         - Mob 5
+#
+# Conventions:
+#   * `### Zone Name [N] (type)` — zone header. `[N]` and `(type)` are
+#     informational; we count actual bullets and read the type from
+#     zones.db, so edits to those bracketed bits don't matter.
+#   * `(!!!)` suffix marks a zone as known-empty — we skip it silently.
+#   * Indented line ending in `:` (no leading `-`) is a STAGE LABEL
+#     applied to every encounter that follows, until the next stage
+#     label or the next zone.
+#   * Indented `- ...` is an encounter. Mob names within can be
+#     comma-separated OR ` and `-separated for group spawns.
+#   * Blank lines are separators.
+#   * Top-level banner lines (===... and the totals line) are ignored.
+#
 
+_ZONE_HEADER_RE = re.compile(r"^###\s+(?P<name>.+?)\s+\[\d+\]\s*\((?P<type>[^)]+)\)\s*(?P<empty>\(!!!\))?\s*$")
+# Stage label: any indented line that doesn't start with '-'. Trailing
+# colon is optional — the curator uses "First Floor:" for Emerald
+# Halls but "Wing 1" (no colon) for Veeshan's Peak; both should work.
+_STAGE_LINE_RE = re.compile(r"^\s+(?P<stage>[^-\s].*?):?\s*$")
+_BULLET_LINE_RE = re.compile(r"^\s*-\s+(?P<content>.+?)\s*$")
+# Splits a bullet's content into individual mob names. Handles:
+#   "Adkar Vyx"                                  -> ["Adkar Vyx"]
+#   "Uthtak the Cruel, Aktar the Dark"           -> two
+#   "Zarda and Kodux"                            -> two
+#   "Foo, Bar, Baz and Qux"                      -> four (mixed)
+# Splits on commas first, then any remaining " and " inside a token.
+_AND_SPLIT_RE = re.compile(r"\s+and\s+", flags=re.IGNORECASE)
+
+
+def _split_encounter_mobs(content: str) -> list[str]:
+    """Split a bullet's mob list into individual names.
+
+    The curator uses two separators interchangeably:
+      * ", "   between most names
+      * " and " for the last pair (e.g. "Foo, Bar, and Baz" or
+        "Foo and Bar")
+    """
+    parts: list[str] = []
+    for chunk in content.split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        # Split each comma-chunk on " and " too, in case the curator
+        # used the Oxford pattern or skipped commas before "and".
+        for piece in _AND_SPLIT_RE.split(chunk):
+            piece = piece.strip()
+            if piece:
+                parts.append(piece)
+    return parts
+
+
+def parse_curated_bosses(path: Path) -> list[dict]:
+    """Parse the curated review.txt file into structured zone records.
+
+    Returns a list of:
         {
-          "_doc": [...],
-          "Zone Name": {
-            "exclude": ["Mob to drop", ...],
-            // Future: "include": [{"mob_name": ..., "wiki_url": ...}]
-          }
+            "zone_name": str,
+            "encounters": [
+                {
+                    "encounter_name": str,    # the curator's text verbatim
+                    "position": int,          # 1-based, in file order
+                    "stage": str | None,
+                    "mobs": [
+                        {"mob_name": str, "position": int},
+                        ...
+                    ],
+                },
+                ...
+            ],
         }
 
-    Keys starting with '_' are ignored (in-file documentation).
-    Missing file returns {}; that's a valid state when no manual
-    overrides have been needed yet.
+    Zones whose header carries ``(!!!)`` (curator marked empty) are
+    skipped. Empty file or missing file returns ``[]``.
     """
     if not path.exists():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        print(f"WARN: {path.name} is invalid JSON ({exc}); ignoring.")
-        return {}
-    if not isinstance(data, dict):
-        print(f"WARN: {path.name} is not a JSON object; ignoring.")
-        return {}
-    return {k: v for k, v in data.items() if not k.startswith("_") and isinstance(v, dict)}
+        return []
 
+    out: list[dict] = []
+    current_zone: dict | None = None
+    current_stage: str | None = None
+    encounter_position: int = 0
 
-def _load_bosses_into_db(
-    raid_data_path: Path,
-    overrides_path: Path,
-    conn,
-) -> tuple[int, int, int, list[str]]:
-    """Populate zone_bosses from the scraped raid-data JSON.
-
-    Returns (zones_with_bosses, total_bosses, bosses_excluded_by_overrides,
-    unmatched_zones).
-    """
-    if not raid_data_path.exists():
-        return (0, 0, 0, [])
-    data = json.loads(raid_data_path.read_text(encoding="utf-8"))
-    overrides = _load_boss_overrides(overrides_path)
-    if overrides:
-        print(f"Loaded boss overrides for {len(overrides)} zone(s) from {overrides_path.name}")
-
-    zones_with: int = 0
-    total: int = 0
-    excluded: int = 0
-    unmatched: list[str] = []
-
-    for z in data.get("zones") or []:
-        zone_name = z.get("zone_name")
-        if not zone_name:
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        # Section/banner lines (===... or TOTALS) are ignored — they
+        # carry no per-zone signal.
+        if not raw_line.strip() or raw_line.startswith("="):
             continue
-        zone_row = conn.execute("SELECT id FROM zones WHERE name = ?", (zone_name,)).fetchone()
-        if zone_row is None:
-            # Scraped a zone we don't know about (shouldn't happen
-            # since the scrape reads from zones.db, but cover the
-            # case where the scrape predates a zone-data refresh).
-            unmatched.append(zone_name)
+
+        # Zone header
+        m = _ZONE_HEADER_RE.match(raw_line)
+        if m:
+            if current_zone is not None:
+                out.append(current_zone)
+            if m.group("empty"):
+                # Curator marked it empty — skip.
+                current_zone = None
+            else:
+                current_zone = {
+                    "zone_name": m.group("name").strip(),
+                    "encounters": [],
+                }
+                current_stage = None
+                encounter_position = 0
             continue
-        zone_id = int(zone_row[0])
 
-        # Apply per-zone exclude list
-        exclude_lower: set[str] = set()
-        ov = overrides.get(zone_name)
-        if ov:
-            for name in ov.get("exclude") or []:
-                exclude_lower.add(name.lower().strip())
+        # Only process body lines once we're inside a zone block
+        if current_zone is None:
+            continue
 
-        bosses_in: list[dict] = []
-        for idx, enc in enumerate(z.get("encounters") or [], start=1):
-            mob_name = enc.get("mob_name")
-            if not mob_name:
+        # Stage label
+        m = _STAGE_LINE_RE.match(raw_line)
+        if m:
+            current_stage = m.group("stage").strip()
+            continue
+
+        # Encounter bullet
+        m = _BULLET_LINE_RE.match(raw_line)
+        if m:
+            content = m.group("content").strip()
+            if not content:
                 continue
-            if mob_name.lower() in exclude_lower:
-                excluded += 1
+            mob_names = _split_encounter_mobs(content)
+            if not mob_names:
                 continue
-            bosses_in.append(
+            encounter_position += 1
+            current_zone["encounters"].append(
                 {
-                    "mob_name": mob_name,
-                    "position": idx,
-                    "wiki_url": enc.get("wiki_url"),
+                    "encounter_name": content,
+                    "position": encounter_position,
+                    "stage": current_stage,
+                    "mobs": [{"mob_name": name, "position": idx} for idx, name in enumerate(mob_names)],
                 }
             )
 
-        n = zones_db.replace_bosses_for_zone(conn, zone_id, bosses_in)
+    if current_zone is not None:
+        out.append(current_zone)
+    return out
+
+
+def _load_curated_bosses_into_db(
+    curated_path: Path,
+    conn,
+) -> tuple[int, int, list[str]]:
+    """Populate zone_encounters + zone_encounter_mobs from the
+    hand-curated review.txt.
+
+    Returns (zones_with_bosses, total_encounters, unmatched_zone_names).
+    Zones in the file that don't exist in zones.db are reported so the
+    user knows about typos.
+    """
+    parsed = parse_curated_bosses(curated_path)
+    if not parsed:
+        return (0, 0, [])
+
+    zones_with: int = 0
+    total: int = 0
+    unmatched: list[str] = []
+
+    for z in parsed:
+        zone_name = z["zone_name"]
+        zone_row = conn.execute("SELECT id FROM zones WHERE name = ?", (zone_name,)).fetchone()
+        if zone_row is None:
+            unmatched.append(zone_name)
+            continue
+        zone_id = int(zone_row[0])
+        encounters = z["encounters"]
+        if not encounters:
+            continue
+        n = zones_db.replace_bosses_for_zone(conn, zone_id, encounters)
         if n:
             zones_with += 1
             total += n
     conn.commit()
-    return (zones_with, total, excluded, unmatched)
+    return (zones_with, total, unmatched)
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 
 def main() -> int:
@@ -145,17 +251,12 @@ def main() -> int:
         help=f"SQLite output path (default: {zones_db.DB_PATH})",
     )
     parser.add_argument(
-        "--raid-data",
+        "--curated-bosses",
         type=Path,
-        default=DEFAULT_RAID_DATA,
-        help=f"Scraped raid-data JSON to populate zone_bosses (default: {DEFAULT_RAID_DATA}). "
-        "Missing file is OK — bosses table just stays empty.",
-    )
-    parser.add_argument(
-        "--boss-overrides",
-        type=Path,
-        default=DEFAULT_BOSS_OVERRIDES,
-        help=f"Per-zone boss-exclude overrides JSON (default: {DEFAULT_BOSS_OVERRIDES}).",
+        default=DEFAULT_CURATED,
+        help=f"Hand-curated raid-bosses review.txt to populate "
+        f"zone_encounters (default: {DEFAULT_CURATED}). "
+        "Missing file is OK — encounters table just stays empty.",
     )
     args = parser.parse_args()
 
@@ -177,21 +278,23 @@ def main() -> int:
     print(f"Target DB:  {args.db}")
 
     conn = zones_db.init_db(args.db)
+    bosses_zones = 0
+    bosses_total = 0
+    unmatched: list[str] = []
     try:
         n = zones_db.upsert_zones(zones, conn)
         zones_db.set_meta(conn, "built_at", dt.datetime.now(dt.timezone.utc).isoformat())
         zones_db.set_meta(conn, "built_from", str(args.source))
         zones_db.set_meta(conn, "source_count", str(len(zones)))
 
-        # Boss list — optional, falls through cleanly when the
-        # scrape output file isn't present yet.
-        bosses_zones, bosses_total, bosses_excluded, unmatched = _load_bosses_into_db(
-            args.raid_data,
-            args.boss_overrides,
-            conn,
-        )
-        if bosses_zones:
-            zones_db.set_meta(conn, "bosses_built_from", str(args.raid_data))
+        # Raid-boss roster from the hand-curated review.txt. Optional —
+        # the encounters tables just stay empty when the file is absent.
+        if args.curated_bosses.exists():
+            bosses_zones, bosses_total, unmatched = _load_curated_bosses_into_db(
+                args.curated_bosses,
+                conn,
+            )
+            zones_db.set_meta(conn, "bosses_built_from", str(args.curated_bosses))
             zones_db.set_meta(conn, "bosses_zones", str(bosses_zones))
             zones_db.set_meta(conn, "bosses_total", str(bosses_total))
     finally:
@@ -199,19 +302,15 @@ def main() -> int:
 
     print(f"Upserted {n} zones.")
     if bosses_zones:
-        print(
-            f"Loaded {bosses_total} bosses across {bosses_zones} zones from "
-            f"{args.raid_data.name}" + (f" ({bosses_excluded} excluded by overrides)" if bosses_excluded else "")
-        )
+        print(f"Loaded {bosses_total} encounters across {bosses_zones} zones from {args.curated_bosses.name}")
         if unmatched:
-            print(f"WARN: {len(unmatched)} zones in raid-data not found in zones.db:")
+            print(f"WARN: {len(unmatched)} zones in curated file not found in zones.db:")
             for name in unmatched[:5]:
                 print(f"  - {name}")
             if len(unmatched) > 5:
                 print(f"  ... and {len(unmatched) - 5} more")
-    elif not args.raid_data.exists():
-        print(f"No raid-data file at {args.raid_data} — zone_bosses table left empty.")
-        print("Run scripts/dev/scrape_eq2i_raids.py --all-raids to produce it.")
+    elif not args.curated_bosses.exists():
+        print(f"No curated bosses file at {args.curated_bosses} — zone_encounters table left empty.")
     print()
     counts = zones_db.expansion_counts(args.db)
     print(f"Zones per expansion ({len(counts)} expansions):")
