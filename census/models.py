@@ -83,6 +83,7 @@ class ItemData:
     item_level: int | None
     required_level: int | None
     classes: list[str]
+    ilvl: float | None = None  # WoW-style item level; None for non-gear
     stats: list[ItemStat] = field(default_factory=list)
     effects: list[ItemEffect] = field(default_factory=list)
     adornment_slots: list[str] = field(default_factory=list)

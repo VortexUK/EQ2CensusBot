@@ -332,3 +332,42 @@ class TestParseItem:
     def test_no_flags_for_empty_flags(self):
         item = parse_item(self._minimal_item())
         assert item.flags == []
+
+
+class TestParseItemIlvl:
+    def _gear(self, *, item_type="Armor", tier="FABLED", leveltouse=100, potency=None):
+        modifiers = {}
+        if potency is not None:
+            modifiers["potency"] = {"value": potency, "displayname": "Potency"}
+        return {
+            "id": "1",
+            "displayname": "Test Gear",
+            "type": item_type,
+            "tier": tier,
+            "leveltouse": leveltouse,
+            "typeinfo": {"classes": {}},
+            "slot_list": [{"name": "Chest"}],
+            "flags": {},
+            "modifiers": modifiers,
+            "effect_list": [],
+            "adornment_list": [],
+            "adornmentslot_list": [],
+            "setbonus_list": [],
+        }
+
+    def test_gear_gets_numeric_ilvl(self):
+        # Fabled (5), level 100, no potency -> 100 * 1 * 5 * 1 = 500.
+        assert parse_item(self._gear()).ilvl == 500.0
+
+    def test_potency_boosts_ilvl(self):
+        assert parse_item(self._gear(potency=1000.0)).ilvl == pytest.approx(1000.0)
+
+    def test_weapon_and_shield_are_gear(self):
+        assert parse_item(self._gear(item_type="Weapon")).ilvl == 500.0
+        assert parse_item(self._gear(item_type="Shield")).ilvl == 500.0
+
+    def test_non_gear_has_no_ilvl(self):
+        assert parse_item(self._gear(item_type="Spell Scroll")).ilvl is None
+
+    def test_gear_without_level_has_no_ilvl(self):
+        assert parse_item(self._gear(leveltouse=0)).ilvl is None

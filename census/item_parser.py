@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from census.constants import ITEM_DISPLAY, STAT_MAP, TYPEINFO_DISPLAY
+from census.item_level import compute_ilvl
 from census.models import ItemData, ItemEffect, ItemStat, RecipeBookEntry, SetBonusEntry
 
 _ITEM_ICONS_DIR = Path(__file__).resolve().parent.parent / "data" / "items" / "icons"
@@ -105,6 +106,16 @@ def parse_item(item: dict) -> ItemData:
     class_level = _int(first_class.get("level")) if isinstance(first_class, dict) else None
     item_level = class_level or _int(item.get("leveltouse"))
 
+    stats = parse_stats(item.get("modifiers") or {})
+    # ilvl reads Potency off the already-parsed stats (no second pass, no import cycle).
+    potency = next((s.value for s in stats if s.display_name == "Potency"), 0.0)
+    ilvl = compute_ilvl(
+        level_to_use=_int(item.get("leveltouse")),
+        tier_display=item.get("tier"),
+        potency=potency,
+        item_type=item.get("type"),
+    )
+
     return ItemData(
         id=str(item.get("id", "")),
         name=item.get("displayname", "Unknown Item"),
@@ -118,7 +129,8 @@ def parse_item(item: dict) -> ItemData:
         item_level=item_level,
         required_level=_int(item.get("leveltouse")),
         classes=classes,
-        stats=parse_stats(item.get("modifiers") or {}),
+        ilvl=ilvl,
+        stats=stats,
         effects=parse_effects(
             item.get("effect_list") or [],
             item.get("adornment_list") or [],
