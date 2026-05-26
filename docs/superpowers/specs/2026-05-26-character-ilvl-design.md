@@ -49,6 +49,7 @@ Verified against `scripts/dev/example_census_character.json` (Menludiir): **354.
 | `census/db.py` | `gear_for_ids(ids)` read-only batch lookup → `(ilvl, wield_style)` |
 | `web/routes/character.py` | `CharacterResponse.ilvl`, computed **once** in `_build_char_response` (so it's cached, and the parse snapshot gets it for free) |
 | `frontend CharacterPage` | "Item Level N" line in the raid-ready box, under the check (the check itself is untouched — it stays the basic per-item grade) |
+| `web/routes/guild.py` + `frontend GuildPage` | `GuildMemberResponse.ilvl`, computed batched (one items.db query for the whole roster via the shared `_ilvl_from_gear`); roster gains an **iLvl** column after AA, and the **Play Time** column is dropped |
 | `parses/db.py` + `parses/models.py` | `combatants.ilvl` column + migration; `CombatantSnapshot.ilvl`; insert/update carry it |
 | `web/routes/parses.py` | snapshot resolution reads `cached.ilvl` (same `getattr` path as level/guild/cls) |
 | `web/routes/rankings.py` + `frontend RankingsPage` | new `iLvl` column |

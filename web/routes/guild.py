@@ -85,6 +85,7 @@ class GuildMemberResponse(BaseModel):
     ts_class: str | None = None
     ts_level: int | None = None
     aa_level: int | None = None
+    ilvl: float | None = None  # average gear item level
     deity: str | None = None
     rank: str | None = None
     rank_id: int | None = None
@@ -237,6 +238,18 @@ async def _fetch_and_cache_guild(
             member_rank,
         )
 
+        # Per-member average gear ilvl. Batch-fetch every equipped item's ilvl in
+        # one items.db query (deduped), then map by name — avoids a DB hit per
+        # member. Equipment lives on the CharacterOverview, not GuildMember.
+        from census.db import gear_for_ids  # noqa: PLC0415
+        from web.routes.character import _ilvl_from_gear  # noqa: PLC0415 — local to avoid circular import
+
+        all_ids = list(
+            {int(s.item_id) for ov in overviews for s in ov.equipment if s.item_id and str(s.item_id).isdigit()}
+        )
+        gear = gear_for_ids(all_ids)
+        ilvl_by_name = {ov.name.lower(): _ilvl_from_gear(ov.equipment, gear) for ov in overviews}
+
         # Roster (sorted by rank then level desc)
         members_sorted = sorted(
             guild_data.members,
@@ -255,6 +268,7 @@ async def _fetch_and_cache_guild(
                         ts_class=m.ts_class,
                         ts_level=m.ts_level,
                         aa_level=m.aa_level,
+                        ilvl=ilvl_by_name.get(m.name.lower()),
                         deity=m.deity,
                         rank=m.rank,
                         rank_id=m.rank_id,

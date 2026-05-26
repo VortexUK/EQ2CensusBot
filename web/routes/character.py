@@ -233,16 +233,28 @@ class CharacterResponse(BaseModel):
     spell_ids: list[int] = []
 
 
-def _character_ilvl(char) -> float | None:
-    """Average gear ilvl for a CharacterOverview, looked up from items.db.
+def _ilvl_from_gear(equipment, gear: dict[int, tuple[float | None, str | None]]) -> float | None:
+    """Compute a character's average gear ilvl from already-fetched gear data.
 
-    Uses a fixed slot denominator (see census.item_level.character_ilvl); a 2H
-    weapon in the primary slot drops the off-hand from the denominator."""
-    ids = [int(s.item_id) for s in char.equipment if s.item_id and str(s.item_id).isdigit()]
-    gear = gear_for_ids(ids)
-    item_ilvls = [gear.get(i, (None, None))[0] for i in ids]
-    two_handed = any(wield_style == "Two-Handed" for _, wield_style in gear.values())
+    ``gear`` maps item_id → (ilvl, wield_style). Two-handed detection iterates
+    *this* character's equipment so a shared (guild-wide) gear map is safe. See
+    census.item_level.character_ilvl for the denominator rules."""
+    item_ilvls: list[float | None] = []
+    two_handed = False
+    for s in equipment:
+        if not (s.item_id and str(s.item_id).isdigit()):
+            continue
+        ilvl, wield_style = gear.get(int(s.item_id), (None, None))
+        item_ilvls.append(ilvl)
+        if wield_style == "Two-Handed":
+            two_handed = True
     return character_ilvl(item_ilvls, two_handed=two_handed)
+
+
+def _character_ilvl(char) -> float | None:
+    """Average gear ilvl for a CharacterOverview, looked up from items.db."""
+    ids = [int(s.item_id) for s in char.equipment if s.item_id and str(s.item_id).isdigit()]
+    return _ilvl_from_gear(char.equipment, gear_for_ids(ids))
 
 
 def _build_char_response(char) -> CharacterResponse:
