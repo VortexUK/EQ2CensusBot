@@ -174,6 +174,7 @@ class CombatantSnapshot:
     level: int | None = None
     guild_name: str | None = None
     cls: str | None = None
+    ilvl: float | None = None
 
 
 @dataclass(frozen=True)

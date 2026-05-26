@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS combatants (
     level           INTEGER,
     guild_name      TEXT,
     cls             TEXT,
+    ilvl            REAL,
     FOREIGN KEY (encounter_id) REFERENCES encounters(id) ON DELETE CASCADE,
     UNIQUE (encounter_id, name)
 );
@@ -225,6 +226,7 @@ _MIGRATIONS: list[str] = [
     "ALTER TABLE combatants ADD COLUMN level INTEGER",
     "ALTER TABLE combatants ADD COLUMN guild_name TEXT",
     "ALTER TABLE combatants ADD COLUMN cls TEXT",
+    "ALTER TABLE combatants ADD COLUMN ilvl REAL",
     # Soft-delete marker for parses. Pre-existing rows are visible (NULL).
     "ALTER TABLE encounters ADD COLUMN hidden_at INTEGER",
 ]
@@ -368,7 +370,7 @@ def insert_combatants_bulk(
                 heals_taken, damage_taken, deaths,
                 to_hit, crit_dam_perc, crit_heal_perc, crit_types,
                 threat_str, threat_delta,
-                level, guild_name, cls
+                level, guild_name, cls, ilvl
             ) VALUES (
                 ?, ?, ?,
                 ?, ?, ?,
@@ -380,7 +382,7 @@ def insert_combatants_bulk(
                 ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?,
-                ?, ?, ?
+                ?, ?, ?, ?
             )
             """,
             (
@@ -420,6 +422,7 @@ def insert_combatants_bulk(
                 snap.level,
                 snap.guild_name,
                 snap.cls,
+                snap.ilvl,
             ),
         )
         name_to_id[c.name] = int(cur.lastrowid or 0)
@@ -440,8 +443,8 @@ def update_combatant_snapshots(
     with conn:
         for name, snap in snapshots.items():
             cur = conn.execute(
-                "UPDATE combatants SET level = ?, guild_name = ?, cls = ? WHERE encounter_id = ? AND name = ?",
-                (snap.level, snap.guild_name, snap.cls, encounter_id, name),
+                "UPDATE combatants SET level = ?, guild_name = ?, cls = ?, ilvl = ? WHERE encounter_id = ? AND name = ?",
+                (snap.level, snap.guild_name, snap.cls, snap.ilvl, encounter_id, name),
             )
             n += cur.rowcount
     return n

@@ -224,6 +224,7 @@ async def _resolve_combatant_snapshots(
                     level=getattr(cached, "level", None),
                     guild_name=getattr(cached, "guild_name", None),
                     cls=getattr(cached, "cls", None),
+                    ilvl=getattr(cached, "ilvl", None),
                 )
     finally:
         if client is not None:
@@ -246,6 +247,7 @@ def _cached_snapshots(names: list[str], world: str | None = None) -> dict[str, C
                 level=getattr(cached, "level", None),
                 guild_name=getattr(cached, "guild_name", None),
                 cls=getattr(cached, "cls", None),
+                ilvl=getattr(cached, "ilvl", None),
             )
     return out
 
