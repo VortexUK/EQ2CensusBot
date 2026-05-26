@@ -815,17 +815,20 @@ def item_count(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
 
 
-def ilvls_for_ids(ids: list[int], db_path: Path = DB_PATH) -> dict[int, float | None]:
-    """Return {item_id: ilvl} for the given ids (read-only). Ids missing from the
-    DB are simply absent from the result; non-gear items map to None. Returns {}
-    if the DB doesn't exist yet (graceful when items.db hasn't been provisioned)."""
+def gear_for_ids(ids: list[int], db_path: Path = DB_PATH) -> dict[int, tuple[float | None, str | None]]:
+    """Return {item_id: (ilvl, wield_style)} for the given ids (read-only).
+
+    ``wield_style`` (e.g. "Two-Handed") lets the caller drop the off-hand slot
+    from a character's ilvl denominator. Ids missing from the DB are absent from
+    the result; non-gear items map to (None, ...). Returns {} if the DB doesn't
+    exist yet (graceful when items.db hasn't been provisioned)."""
     if not ids or not db_path.exists():
         return {}
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
         placeholders = ",".join("?" for _ in ids)
-        rows = conn.execute(f"SELECT id, ilvl FROM items WHERE id IN ({placeholders})", ids)
-        return {row[0]: row[1] for row in rows}
+        rows = conn.execute(f"SELECT id, ilvl, wield_style FROM items WHERE id IN ({placeholders})", ids)
+        return {row[0]: (row[1], row[2]) for row in rows}
     finally:
         conn.close()
 

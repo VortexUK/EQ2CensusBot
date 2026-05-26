@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from census.client import CensusClient
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.db import DB_PATH as _ITEMS_DB
-from census.db import ilvls_for_ids
+from census.db import gear_for_ids
 from census.item_level import character_ilvl
 from census.recipes_db import (
     DB_PATH as _RECIPES_DB,
@@ -234,13 +234,22 @@ class CharacterResponse(BaseModel):
 
 
 def _character_ilvl(char) -> float | None:
-    """Average gear ilvl for a CharacterOverview, looked up from items.db."""
+    """Average gear ilvl for a CharacterOverview, looked up from items.db.
+
+    Uses a fixed slot denominator (see census.item_level.character_ilvl); a 2H
+    weapon in the primary slot drops the off-hand from the denominator."""
     ids = [int(s.item_id) for s in char.equipment if s.item_id and str(s.item_id).isdigit()]
-    ilvl_map = ilvls_for_ids(ids)
-    return character_ilvl(
-        (s.slot_name, ilvl_map.get(int(s.item_id)) if s.item_id and str(s.item_id).isdigit() else None)
-        for s in char.equipment
-    )
+    gear = gear_for_ids(ids)
+    slot_ilvls: dict[str, float | None] = {}
+    two_handed = False
+    for s in char.equipment:
+        if not (s.item_id and str(s.item_id).isdigit()):
+            continue
+        ilvl, wield_style = gear.get(int(s.item_id), (None, None))
+        slot_ilvls[s.slot_name] = ilvl
+        if s.slot_name == "primary" and wield_style == "Two-Handed":
+            two_handed = True
+    return character_ilvl(slot_ilvls, two_handed=two_handed)
 
 
 def _build_char_response(char) -> CharacterResponse:

@@ -18,7 +18,6 @@ See docs/superpowers/specs/2026-05-26-item-ilvl-design.md for the rationale.
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
 
 # Item types that count as "wearable gear". All three carry an equip slot;
 # adornments live under a different type, so this set excludes them for free.
@@ -125,17 +124,26 @@ def compute_ilvl(
     return round(base + potency_bonus, 1)
 
 
-def character_ilvl(equipped: Iterable[tuple[str, float | None]]) -> float | None:
-    """Average ilvl of a character's equipped gear.
+def character_ilvl(slot_ilvls: dict[str, float | None], *, two_handed: bool = False) -> float | None:
+    """Average gear ilvl over the FIXED set of standard gear slots.
 
-    ``equipped`` is an iterable of ``(slot_name, item_ilvl)`` for each equipped
-    slot. Only the standard gear slots (CHARACTER_GEAR_SLOTS) that hold an
-    ilvl-bearing item are averaged — consumables, mounts, the event slot, and
-    appearance pieces (no ilvl) are ignored. A two-handed weapon contributes its
-    (already-halved) ilvl in ``primary`` while the empty ``secondary`` simply
-    isn't counted, so it's never penalised for the empty off-hand.
+    ``slot_ilvls`` maps slot name → that slot's item ilvl (None for empty slots
+    or appearance / non-gear items). The denominator is always the full
+    CHARACTER_GEAR_SLOTS count (21): empty slots and appearance/0-ilvl items
+    count as 0 and legitimately drag the average down — a character isn't
+    "fully geared" just because the items they *do* wear are good.
 
-    Returns None when no qualifying gear is equipped.
+    The only exception is ``two_handed``: a two-handed weapon fills ``primary``
+    while ``secondary`` is necessarily empty, so the denominator drops by one
+    (20) rather than penalising the unavoidable empty off-hand. (The 2H weapon's
+    own ilvl is already potency-halved upstream.)
+
+    Returns None only when no gear slot holds an ilvl-bearing item at all.
     """
-    values = [ilvl for slot, ilvl in equipped if slot in CHARACTER_GEAR_SLOTS and ilvl is not None]
-    return round(sum(values) / len(values), 1) if values else None
+    denom = len(CHARACTER_GEAR_SLOTS) - (1 if two_handed else 0)
+    if denom <= 0:
+        return None
+    if not any(slot_ilvls.get(slot) for slot in CHARACTER_GEAR_SLOTS):
+        return None
+    total = sum(slot_ilvls.get(slot) or 0.0 for slot in CHARACTER_GEAR_SLOTS)
+    return round(total / denom, 1)
