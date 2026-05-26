@@ -1,0 +1,74 @@
+"""Tests for the ilvl column on items.db — item_to_row + upsert round-trip."""
+
+from __future__ import annotations
+
+from census.db import init_db, item_to_row, upsert_items
+
+
+def _raw_gear(*, item_type="Armor", tier="FABLED", leveltouse=100, potency=None, item_id=1):
+    modifiers = {}
+    if potency is not None:
+        modifiers["potency"] = {"value": potency, "displayname": "Potency"}
+    return {
+        "id": item_id,
+        "displayname": "Test Gear",
+        "type": item_type,
+        "tier": tier,
+        "leveltouse": leveltouse,
+        "modifiers": modifiers,
+    }
+
+
+def test_item_to_row_gear_has_ilvl():
+    # Fabled (5), level 100, no potency -> 500.
+    assert item_to_row(_raw_gear())["ilvl"] == 500.0
+
+
+def test_item_to_row_potency_boosts():
+    assert item_to_row(_raw_gear(potency=1000.0))["ilvl"] == 1000.0
+
+
+def test_item_to_row_non_gear_is_none():
+    assert item_to_row(_raw_gear(item_type="Spell Scroll"))["ilvl"] is None
+
+
+def test_item_to_row_no_level_is_none():
+    assert item_to_row(_raw_gear(leveltouse=0))["ilvl"] is None
+
+
+def test_upsert_round_trip_persists_ilvl(tmp_path):
+    conn = init_db(tmp_path / "items.db")
+    try:
+        upsert_items(
+            [
+                _raw_gear(item_id=1, potency=480.0),  # 500 * 1.48 = 740
+                _raw_gear(item_id=2, item_type="House Item"),  # non-gear -> NULL
+            ],
+            conn,
+        )
+        rows = dict(conn.execute("SELECT id, ilvl FROM items ORDER BY id").fetchall())
+        assert rows[1] == 740.0
+        assert rows[2] is None
+    finally:
+        conn.close()
+
+
+def test_init_db_adds_ilvl_column_to_legacy_db(tmp_path):
+    # A pre-existing DB without the column gains it on init_db (migration).
+    # Simulate "legacy" by creating the full schema then dropping the column.
+    import sqlite3
+
+    path = tmp_path / "legacy.db"
+    init_db(path).close()
+    legacy = sqlite3.connect(path)
+    legacy.execute("ALTER TABLE items DROP COLUMN ilvl")
+    legacy.commit()
+    legacy.close()
+    assert "ilvl" not in {row[1] for row in sqlite3.connect(path).execute("PRAGMA table_info(items)")}
+
+    conn = init_db(path)
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
+        assert "ilvl" in cols
+    finally:
+        conn.close()

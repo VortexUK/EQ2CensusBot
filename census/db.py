@@ -6,6 +6,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from census.item_level import compute_ilvl
+
 
 def _resolve_db_path() -> Path:
     """
@@ -174,6 +176,7 @@ CREATE TABLE IF NOT EXISTS items (
     item_level           INTEGER,
     level_to_use         INTEGER,
     planar_level         INTEGER,
+    ilvl                 REAL,          -- WoW-style item level; NULL for non-gear
     icon_id              INTEGER,
     max_stack_size       INTEGER,
 
@@ -334,12 +337,13 @@ _MIGRATIONS = [
     ("spell_resistability", "TEXT"),
     ("flag_pvp", "INTEGER DEFAULT 0"),
     ("classification_list", "TEXT"),
+    ("ilvl", "REAL"),
 ]
 
 _UPSERT_SQL = """
 INSERT OR REPLACE INTO items (
     id, displayname, displayname_lower, gamelink, description, last_update,
-    tier, tierid, type, typeid, item_level, level_to_use, planar_level, icon_id, max_stack_size,
+    tier, tierid, type, typeid, item_level, level_to_use, planar_level, ilvl, icon_id, max_stack_size,
     slot,
     armor_class_min, armor_class_max,
     damage_min, damage_max, damage_base, damage_type, damage_type_id, damage_rating, delay, wield_style,
@@ -363,7 +367,7 @@ INSERT OR REPLACE INTO items (
     raw_json, classification_list
 ) VALUES (
     :id, :displayname, :displayname_lower, :gamelink, :description, :last_update,
-    :tier, :tierid, :type, :typeid, :item_level, :level_to_use, :planar_level, :icon_id, :max_stack_size,
+    :tier, :tierid, :type, :typeid, :item_level, :level_to_use, :planar_level, :ilvl, :icon_id, :max_stack_size,
     :slot,
     :armor_class_min, :armor_class_max,
     :damage_min, :damage_max, :damage_base, :damage_type, :damage_type_id, :damage_rating, :delay, :wield_style,
@@ -524,12 +528,18 @@ def _is_pvp_item(item: dict) -> int:
     2. The raw item JSON contains the substring 'pvp' (case-insensitive), which
        catches effect restrictions like 'Must be engaged in pvp combat'.
     """
-    # Check stat modifiers
+    # Check stat modifiers. Census ships `modifiers` as a dict keyed by stat name
+    # (e.g. {"pvptoughness": {...}}); older/alternate shapes are a list of dicts.
     for mod_list_key in ("modifiers", "stat_list", "stats"):
-        for mod in item.get(mod_list_key) or []:
-            name = str(mod.get("name") or mod.get("stat") or "").lower()
-            if any(name.startswith(p) for p in _PVP_STAT_PREFIXES):
-                return 1
+        coll = item.get(mod_list_key)
+        if isinstance(coll, dict):
+            names = [str(k).lower() for k in coll]
+        elif isinstance(coll, list):
+            names = [str(mod.get("name") or mod.get("stat") or "").lower() for mod in coll if isinstance(mod, dict)]
+        else:
+            continue
+        if any(name.startswith(p) for name in names for p in _PVP_STAT_PREFIXES):
+            return 1
     # Check raw JSON text (catches effects + any other pvp references)
     raw = json.dumps(item).lower()
     if "pvp" in raw:
@@ -551,6 +561,14 @@ def item_to_row(item: dict) -> dict:
     aq = _int_field(item.get("associatedquest"))
     autoq = _int_field(item.get("autoquest"))
 
+    tier_display = _str_field(item, "tier") or "COMMON"
+    ilvl = compute_ilvl(
+        level_to_use=_int_field_zero(item.get("leveltouse")),
+        tier_display=tier_display,
+        potency=extract_item_stats(item).get("Potency", 0.0),
+        item_type=_str_field(item, "type"),
+    )
+
     return {
         "id": item.get("id"),
         "displayname": str(item.get("displayname") or ""),
@@ -560,12 +578,13 @@ def item_to_row(item: dict) -> dict:
         "last_update": _int_field_zero(item.get("last_update")),
         "tier": _str_field(item, "tier"),
         "tierid": _int_field_zero(item.get("tierid")),
-        "tier_display": _str_field(item, "tier") or "COMMON",
+        "tier_display": tier_display,
         "type": _str_field(item, "type"),
         "typeid": _int_field_zero(item.get("typeid")),
         "item_level": _int_field_zero(item.get("itemlevel")),
         "level_to_use": _int_field_zero(item.get("leveltouse")),
         "planar_level": _int_field_zero(item.get("planar_level")),
+        "ilvl": ilvl,
         "icon_id": _int_field_zero(item.get("iconid")),
         "max_stack_size": _int_field_zero(item.get("maxstacksize")),
         "slot": slot_list[0].get("name") if slot_list else None,
