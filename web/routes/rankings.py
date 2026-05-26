@@ -88,6 +88,7 @@ def _build_character_board(
                     "guild_name": c.get("guild_name"),
                     "level": c.get("level"),
                     "cls": c["cls"],
+                    "ilvl": c.get("ilvl"),
                     "score": score,
                     "encounter_id": k["id"],
                     "size": k["player_count"],
@@ -106,6 +107,13 @@ def _build_character_board(
     return entries, sorted(by_cls.keys())
 
 
+def _avg_player_ilvl(combatants: list[dict]) -> float | None:
+    """Average ilvl of the resolved player combatants in an encounter — the
+    'raid ilvl' shown on a guild speed row. None if nobody resolved an ilvl."""
+    vals = [c["ilvl"] for c in combatants if _is_player_combatant(c) and c.get("ilvl") is not None]
+    return round(sum(vals) / len(vals), 1) if vals else None
+
+
 def _build_speed_board(kills: list[dict], *, size: str, zone: str, boss: str) -> list[dict]:
     """Per-guild fastest clear. Returns rows sorted by time asc with percentile."""
     best: dict[str, dict] = {}  # guild.lower() -> entry
@@ -121,6 +129,7 @@ def _build_speed_board(kills: list[dict], *, size: str, zone: str, boss: str) ->
                 "kind": "guild",
                 "guild_name": guild,
                 "duration_s": k["duration_s"],
+                "ilvl": _avg_player_ilvl(k["combatants"]),
                 "encounter_id": k["id"],
                 "size": k["player_count"],
                 "started_at": k["started_at"],
@@ -220,6 +229,8 @@ class RankingRow(BaseModel):
     score: float | None = None
     # guild rows (Speed)
     duration_s: int | None = None
+    # ilvl: the character's snapshot for character rows; the raid average for guild rows
+    ilvl: float | None = None
 
 
 class RankingsResponse(BaseModel):

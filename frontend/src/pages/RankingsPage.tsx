@@ -22,6 +22,7 @@ interface RankingRow {
   cls: string | null
   score: number | null
   duration_s: number | null
+  ilvl: number | null
 }
 interface RankingsResponse { rows: RankingRow[]; classes: string[]; total: number }
 
@@ -126,6 +127,7 @@ export default function RankingsPage() {
                 {!isSpeed && <th className="px-3 py-2">Lvl</th>}
                 {!isSpeed && <th className="px-3 py-2">Class</th>}
                 <th className="px-3 py-2 text-right">{isSpeed ? 'Time' : metric === 'hps' ? 'HPS' : 'DPS'}</th>
+                <th className="px-3 py-2 text-right" title={isSpeed ? 'Average raid item level' : 'Character item level'}>iLvl</th>
                 <th className="px-3 py-2 text-right">Size</th>
                 <th className="px-3 py-2 text-right">Date</th>
               </tr>
@@ -158,6 +160,7 @@ export default function RankingsPage() {
                   <td className="px-3 py-2 text-right tabular-nums">
                     {isSpeed ? fmtDuration(r.duration_s ?? 0) : fmtNum(Math.round(r.score ?? 0))}
                   </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-gold">{r.ilvl != null ? Math.round(r.ilvl).toLocaleString() : '—'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{r.size}</td>
                   <td className="px-3 py-2 text-right text-text-muted">{fmtLocalDate(r.started_at)}</td>
                 </tr>

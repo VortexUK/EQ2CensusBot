@@ -48,7 +48,7 @@ def _kill(eid, *, zone, title, pcount, combatants):
     }
 
 
-def _c(name, cls, encdps, *, ally=1, guild="Exordium", level=95):
+def _c(name, cls, encdps, *, ally=1, guild="Exordium", level=95, ilvl=None):
     return {
         "name": name,
         "cls": cls,
@@ -57,6 +57,7 @@ def _c(name, cls, encdps, *, ally=1, guild="Exordium", level=95):
         "enchps": 0.0,
         "guild_name": guild,
         "level": level,
+        "ilvl": ilvl,
     }
 
 
@@ -124,6 +125,13 @@ class TestCharacterBoard:
         with _pytest.raises(ValueError):
             _build_character_board([], size="raid", zone="Z", boss="Tarinax", metric="speed")
 
+    def test_carries_character_ilvl(self):
+        kills = [
+            _kill(1, zone="Z", title="Tarinax", pcount=24, combatants=[_c("Menludiir", "Wizard", 900.0, ilvl=372.2)])
+        ]
+        rows, _ = _build_character_board(kills, size="raid", zone="Z", boss="Tarinax", metric="dps")
+        assert rows[0]["ilvl"] == 372.2
+
 
 from web.routes.rankings import _build_filters, _build_speed_board
 
@@ -185,6 +193,25 @@ class TestSpeedBoard:
             }
         ]
         assert _build_speed_board(kills, size="raid", zone="Z", boss="Tarinax") == []
+
+    def test_ilvl_is_raid_average(self):
+        # Averages resolved players' ilvls; pets/unresolved ilvls excluded.
+        kills = [
+            _kill(
+                1,
+                zone="Z",
+                title="Tarinax",
+                pcount=24,
+                combatants=[
+                    _c("Menludiir", "Wizard", 900.0, ilvl=400.0),
+                    _c("Buddy", "Templar", 100.0, ilvl=300.0),
+                    _c("Nogeared", "Brigand", 50.0, ilvl=None),  # no ilvl -> excluded
+                    _c("a pet thing", "Wizard", 80.0, ilvl=999.0),  # not a player -> excluded
+                ],
+            )
+        ]
+        rows = _build_speed_board(kills, size="raid", zone="Z", boss="Tarinax")
+        assert rows[0]["ilvl"] == 350.0  # mean(400, 300)
 
 
 class TestFilters:
