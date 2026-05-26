@@ -237,11 +237,6 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig, ilvl }: {
             <div className="text-[0.78rem] font-semibold mb-[0.2rem]" style={{ color: raidReady ? 'var(--success)' : 'var(--danger)' }}>
               {raidReady ? '✓ Raid Ready' : '✗ Not Ready'}
             </div>
-            {ilvl != null && (
-              <div className="text-[0.72rem] font-semibold text-gold mb-[0.2rem]">
-                Item Level {Math.round(ilvl).toLocaleString()}
-              </div>
-            )}
             <div className="text-[0.68rem] text-text-muted leading-[1.5]">
               {scored.length} item{scored.length !== 1 ? 's' : ''} rated
               {pending > 0 && <span className="opacity-60"> · {pending} loading</span>}
@@ -251,6 +246,16 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig, ilvl }: {
             </div>
           </div>
         </div>
+
+        {/* Average gear item level — under the grade/check, full width */}
+        {ilvl != null && (
+          <div className="mt-2 pt-2 border-t border-border flex items-baseline justify-between">
+            <span className="text-[0.68rem] uppercase tracking-wide text-text-muted">Item Level</span>
+            <span className="font-heading text-[1.1rem] font-bold text-gold leading-none">
+              {Math.round(ilvl).toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )
