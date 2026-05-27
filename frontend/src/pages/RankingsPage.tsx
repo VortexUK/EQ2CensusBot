@@ -68,12 +68,22 @@ export default function RankingsPage() {
   const groupZones = useMemo(() => filters.scopes.find(s => s.key === 'group')?.zones ?? [], [filters])
   const raidExpansions = filters.raid_expansions ?? []
 
-  // Active raid expansion: explicit ?xpac, else the selected raid zone's own
-  // expansion, else the server's default (SERVER_CURRENT_XPAC / most recent).
-  const xpac = params.get('xpac') || (size === 'raid' ? zoneObj?.expansion : null) || filters.default_expansion || ''
+  // Active expansion: explicit ?xpac, else the selected zone's own expansion
+  // (raids OR dungeons — both carry expansion now since dungeons came from
+  // the curated zones.db tagging in #36, not from kill data), else the
+  // server's default (SERVER_CURRENT_XPAC / most recent).
+  const xpac = params.get('xpac') || zoneObj?.expansion || filters.default_expansion || ''
   const raidZonesForXpac = useMemo(
     () => raidZones.filter(z => (z.expansion ?? 'Other') === xpac),
     [raidZones, xpac],
+  )
+  // Same xpac-filter pattern for dungeons. groupZones now carry expansion
+  // (server-side from the zone_types dungeon overlay) — pre-curation they
+  // were kill-data-driven with expansion=null, which is why the old code
+  // showed them all regardless of expansion.
+  const groupZonesForXpac = useMemo(
+    () => groupZones.filter(z => (z.expansion ?? 'Other') === xpac),
+    [groupZones, xpac],
   )
 
   // Picking a zone from the top bar also selects its first boss.
@@ -131,8 +141,8 @@ export default function RankingsPage() {
             label="Dungeons"
             active={size === 'group'}
             value={size === 'group' ? zone : ''}
-            options={groupZones.map(z => ({ value: z.zone, label: z.zone }))}
-            onChange={v => pickZone('group', v, groupZones)}
+            options={groupZonesForXpac.map(z => ({ value: z.zone, label: z.zone }))}
+            onChange={v => pickZone('group', v, groupZonesForXpac)}
           />
           <FilterDropdown label="Raid Guides" disabled value="" options={[]} onChange={() => {}} />
         </FilterBar>

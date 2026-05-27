@@ -153,21 +153,28 @@ def _build_speed_board(kills: list[dict], *, size: str, zone: str, boss: str) ->
 
 
 @lru_cache(maxsize=1)
-def _cached_zones_data() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
+def _cached_zones_data() -> tuple[dict[str, list[tuple[str, str]]], list[dict], list[dict]]:
     """Authoritative zone/boss data from zones.db, built once per process.
 
-    Returns (boss_index, raid_tree):
+    Returns (boss_index, raid_tree, dungeon_tree):
       * boss_index: ``mob_name_lower -> [(canonical_zone, encounter_name), ...]``
         — the lookup that gates a raid title and maps it to its canonical boss.
-      * raid_tree:  ordered ``[{zone, expansion, bosses:[encounter_name,...]}]``
-        for raid zones that have encounters (newest expansion first, bosses in
-        wing/position order) — drives the dropdowns.
+      * raid_tree:    ordered ``[{zone, expansion, bosses:[...]}]`` for zones
+                      with the ``raid_x4`` type. Drives the Raids dropdown.
+      * dungeon_tree: same shape, for zones with the ``dungeon`` type overlay
+                      (curated max-level group instances). Drives the
+                      Dungeons dropdown.
 
-    Empty when zones.db is absent (dev/pre-upload), so everything falls back to
-    the is_boss heuristic and parse-derived dropdowns."""
+    The two trees are deliberately separate even though raid_tree used to
+    contain everything with encounters — without the split a curated dungeon
+    that happens to have bosses (which they all do, post-PR #36) would show
+    under the "Raids" dropdown alongside the actual raids.
+
+    Empty when zones.db is absent (dev/pre-upload), so everything falls back
+    to the is_boss heuristic and parse-derived dropdowns."""
     path = zones_db.DB_PATH
     if not path.exists():
-        return {}, []
+        return {}, [], []
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
         boss_index: dict[str, list[tuple[str, str]]] = defaultdict(list)
@@ -180,24 +187,34 @@ def _cached_zones_data() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
             """
         ):
             boss_index[mob_lower].append((zname, ename))
-        raid_tree: list[dict] = []
-        for zid, zname, exp, exp_name in conn.execute(
-            """
-            SELECT z.id, z.name, z.expansion_short, z.expansion_name
-            FROM zones z
-            WHERE z.id IN (SELECT DISTINCT zone_id FROM zone_encounters)
-            ORDER BY z.expansion_year DESC, z.name
-            """
-        ):
-            bosses = [
-                r[0]
-                for r in conn.execute(
-                    "SELECT encounter_name FROM zone_encounters WHERE zone_id = ? ORDER BY position",
-                    (zid,),
-                )
-            ]
-            raid_tree.append({"zone": zname, "expansion": exp, "expansion_name": exp_name, "bosses": bosses})
-        return dict(boss_index), raid_tree
+
+        def _tree_for_type(type_token: str) -> list[dict]:
+            """Materialise the (zone, expansion, bosses) ordered list for one
+            zone-type token. Joins zones → zone_types so the same query
+            powers both the raid and dungeon trees with no duplication."""
+            out: list[dict] = []
+            for zid, zname, exp, exp_name in conn.execute(
+                """
+                SELECT z.id, z.name, z.expansion_short, z.expansion_name
+                FROM zones z
+                JOIN zone_types t ON t.zone_id = z.id
+                WHERE t.type = ?
+                  AND z.id IN (SELECT DISTINCT zone_id FROM zone_encounters)
+                ORDER BY z.expansion_year DESC, z.name
+                """,
+                (type_token,),
+            ):
+                bosses = [
+                    r[0]
+                    for r in conn.execute(
+                        "SELECT encounter_name FROM zone_encounters WHERE zone_id = ? ORDER BY position",
+                        (zid,),
+                    )
+                ]
+                out.append({"zone": zname, "expansion": exp, "expansion_name": exp_name, "bosses": bosses})
+            return out
+
+        return dict(boss_index), _tree_for_type("raid_x4"), _tree_for_type("dungeon")
     finally:
         conn.close()
 
@@ -211,7 +228,7 @@ def _resolve_boss(title: str, zone: str | None, scope: str) -> tuple[bool, str |
     group/dungeon content fall back to the is_boss heuristic, keeping the ACT
     zone/title."""
     if scope == "raid":
-        boss_index, _ = _cached_zones_data()
+        boss_index, _, _ = _cached_zones_data()
         candidates = boss_index.get(title.lower())
         if candidates:
             if len(candidates) > 1 and zone:
@@ -228,16 +245,26 @@ def _resolve_boss(title: str, zone: str | None, scope: str) -> tuple[bool, str |
 
 
 def _build_filters(kills: list[dict]) -> dict:
-    """Scope -> zone -> boss tree for the dropdowns. Raid zones/bosses come from
-    zones.db (authoritative, full structure including bosses with no kills yet),
-    each tagged with its expansion; group/dungeon zones come from the uploaded
-    kills. Heuristic-matched raid kills for zones not yet in zones.db are appended
-    under an "Other" expansion so they still appear.
+    """Scope → zone → boss tree for the dropdowns.
 
-    Also returns ``raid_expansions`` (newest first) and a ``default_expansion``
-    for the expansion selector — the SERVER_CURRENT_XPAC env var if it has raids,
+    Two sources of truth, both from zones.db:
+
+      * **Raid** zones/bosses come from the ``raid_x4`` type — full structure
+        including bosses with no kills yet, each tagged with its expansion.
+        Heuristic-matched raid kills for zones not yet in zones.db are
+        appended under an "Other" expansion so they still appear.
+      * **Dungeon** zones/bosses come from the ``dungeon`` type overlay (the
+        curated max-level group instances). All curated dungeons appear in
+        the dropdown even when zero kills have been uploaded yet, so the
+        viewer sees the full tracked set. Group-scope kills for zones NOT in
+        the curated set are dropped from the dropdown (still in the DB —
+        they just don't pollute the rankings UI).
+
+    Also returns ``raid_expansions`` (newest first) and ``default_expansion``
+    for the expansion selector — the server's current_xpac when it has raids,
     else the most recent expansion that does."""
-    _, raid_tree = _cached_zones_data()
+    _, raid_tree, dungeon_tree = _cached_zones_data()
+
     raid_zones: dict[str, dict] = {}  # insertion-ordered: zone -> {bosses, expansion}
     exp_names: dict[str, str] = {}  # short -> display name
     exp_order: list[str] = []  # distinct expansion shorts, newest first
@@ -248,19 +275,31 @@ def _build_filters(kills: list[dict]) -> dict:
             exp_names[short] = entry.get("expansion_name") or short
             exp_order.append(short)
 
-    group_zones: dict[str, set] = defaultdict(set)
+    # Curated dungeons — keyed identically to raid_zones so the per-zone
+    # shape downstream is consistent. Bosses come straight from zones.db
+    # (the curated 3–11 per zone for EoF), not from kill data.
+    dungeon_zones: dict[str, dict] = {}
+    for entry in dungeon_tree:
+        dungeon_zones[entry["zone"]] = {"bosses": list(entry["bosses"]), "expansion": entry["expansion"]}
+        short = entry["expansion"]
+        if short and short not in exp_names:
+            exp_names[short] = entry.get("expansion_name") or short
+            exp_order.append(short)
+
     has_other_raid = False
     for k in kills:
+        if k.get("scope") != "raid":
+            # Non-raid kills (group-scope, etc.) no longer build the
+            # dropdown — see the dungeon-curation block above. They're
+            # still queryable for the leaderboard once a zone is selected.
+            continue
         zone = k.get("zone") or "(unknown zone)"
-        if k.get("scope") == "raid":
-            z = raid_zones.setdefault(zone, {"bosses": [], "expansion": None})
-            if z["expansion"] is None:
-                z["expansion"] = "Other"
-                has_other_raid = True
-            if k["title"] not in z["bosses"]:
-                z["bosses"].append(k["title"])
-        elif k.get("scope") == "group":
-            group_zones[zone].add(k["title"])
+        z = raid_zones.setdefault(zone, {"bosses": [], "expansion": None})
+        if z["expansion"] is None:
+            z["expansion"] = "Other"
+            has_other_raid = True
+        if k["title"] not in z["bosses"]:
+            z["bosses"].append(k["title"])
 
     raid_expansions = [{"short": s, "name": exp_names[s]} for s in exp_order]
     if has_other_raid:
@@ -286,12 +325,17 @@ def _build_filters(kills: list[dict]) -> dict:
                 ],
             }
         )
-    if group_zones:
+    if dungeon_zones:
         scopes.append(
             {
                 "key": "group",
                 "label": _SCOPE_LABELS["group"],
-                "zones": [{"zone": z, "bosses": sorted(b), "expansion": None} for z, b in sorted(group_zones.items())],
+                # ``expansion`` populated per-zone so the frontend can filter
+                # the dungeon dropdown by the selected xpac, parallel to how
+                # the raid dropdown is filtered.
+                "zones": [
+                    {"zone": z, "bosses": v["bosses"], "expansion": v["expansion"]} for z, v in dungeon_zones.items()
+                ],
             }
         )
     return {"scopes": scopes, "raid_expansions": raid_expansions, "default_expansion": default_expansion}

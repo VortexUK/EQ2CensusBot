@@ -233,21 +233,61 @@ class TestSpeedBoard:
 
 
 class TestFilters:
-    def test_tree_groups_by_scope_zone_boss(self):
+    def test_tree_groups_raid_kills_drops_uncurated_group_kills(self):
+        """Raid kills land under the 'raid' scope. Group-scope kills for
+        zones that aren't in the curated dungeon overlay (PR #34) are
+        silently dropped from the dropdown — they're still in the DB and
+        queryable on a leaderboard, just not surfaced as a filter option."""
         from unittest.mock import patch
 
         kills = [
             {"scope": "raid", "zone": "Vetrovia", "title": "Tarinax"},
             {"scope": "raid", "zone": "Vetrovia", "title": "Cazel"},
+            # Non-curated group kill — should NOT create a 'group' scope.
             {"scope": "group", "zone": "Crypt", "title": "Bonebreaker"},
         ]
-        # Isolate from zones.db so this exercises the kills-only merge path.
-        with patch("web.routes.rankings._cached_zones_data", return_value=({}, [])):
+        # Empty zones.db state: no curated raids or dungeons. With nothing
+        # curated, the group dropdown should be absent entirely (not just
+        # empty) — curation is the only source of dungeon entries now.
+        with patch("web.routes.rankings._cached_zones_data", return_value=({}, [], [])):
             tree = _build_filters(kills)
         raid = next(s for s in tree["scopes"] if s["key"] == "raid")
         zone = raid["zones"][0]
         assert zone["zone"] == "Vetrovia" and set(zone["bosses"]) == {"Cazel", "Tarinax"}
-        assert {s["key"] for s in tree["scopes"]} == {"raid", "group"}
+        # Only 'raid' scope present — no 'group' since no dungeons curated.
+        assert {s["key"] for s in tree["scopes"]} == {"raid"}
+
+    def test_tree_includes_dungeons_from_curated_overlay(self):
+        """Dungeons come from the zones.db 'dungeon' type overlay, with
+        ALL curated zones appearing even when no group-scope kills exist
+        yet (so the rankings UI shows what's being tracked, not what's
+        been farmed)."""
+        from unittest.mock import patch
+
+        dungeon_tree = [
+            {
+                "zone": "Crypt of Valdoon",
+                "expansion": "EoF",
+                "expansion_name": "Echoes of Faydwer",
+                "bosses": ["Elenorel", "Irodal", "Count Valdoon"],
+            },
+            {
+                "zone": "Shard of Fear",
+                "expansion": "EoF",
+                "expansion_name": "Echoes of Faydwer",
+                "bosses": ["The Skeletal Lord", "Terror"],
+            },
+        ]
+        with patch("web.routes.rankings._cached_zones_data", return_value=({}, [], dungeon_tree)):
+            # Zero kills — curated dungeons should still appear in the tree.
+            tree = _build_filters([])
+        group_scope = next((s for s in tree["scopes"] if s["key"] == "group"), None)
+        assert group_scope is not None, "group scope missing despite curated dungeons"
+        names = {z["zone"] for z in group_scope["zones"]}
+        assert names == {"Crypt of Valdoon", "Shard of Fear"}
+        # Each curated dungeon zone carries its expansion so the frontend
+        # can xpac-filter the Dungeons dropdown parallel to Raids.
+        assert all(z["expansion"] == "EoF" for z in group_scope["zones"])
 
     def test_raid_tree_comes_from_zones_db_with_kills_appended(self):
         from unittest.mock import patch
@@ -259,7 +299,7 @@ class TestFilters:
             {"scope": "raid", "zone": "Some Unpopulated Raid", "title": "Mystery Boss"},
             {"scope": "group", "zone": "Crypt", "title": "Bonebreaker"},
         ]
-        with patch("web.routes.rankings._cached_zones_data", return_value=({}, raid_tree)):
+        with patch("web.routes.rankings._cached_zones_data", return_value=({}, raid_tree, [])):
             tree = _build_filters(kills)
         raid = next(s for s in tree["scopes"] if s["key"] == "raid")
         # zones.db zone first, bosses in wing order (not alphabetical).
@@ -285,7 +325,7 @@ class TestFilters:
 
             return Server("Varsoon", "varsoon", "Varsoon", 50, xpac, None)
 
-        with patch("web.routes.rankings._cached_zones_data", return_value=({}, raid_tree)):
+        with patch("web.routes.rankings._cached_zones_data", return_value=({}, raid_tree, [])):
             with patch("web.routes.rankings.current_server", return_value=_srv(None)):
                 f = _build_filters([])
                 # newest expansion first; each raid zone tagged with its expansion.
@@ -313,7 +353,7 @@ class TestFilters:
         from web.routes.rankings import _resolve_boss
 
         index = {"phara dar": [("Veeshan's Peak", "Phara Dar")]}
-        with patch("web.routes.rankings._cached_zones_data", return_value=(index, [])):
+        with patch("web.routes.rankings._cached_zones_data", return_value=(index, [], [])):
             # Raid: matches zones.db → canonical zone + encounter.
             assert _resolve_boss("Phara Dar", "ACT Zone Name", "raid") == (True, "Veeshan's Peak", "Phara Dar")
             # Raid, unknown to zones.db → heuristic fallback keeps ACT zone/title.
@@ -518,7 +558,7 @@ async def test_rankings_default_xpac_per_server(app, monkeypatch, tmp_path):
     ]
     with (
         patch("web.routes.rankings._require_user", _fake_user),
-        patch("web.routes.rankings._cached_zones_data", return_value=({}, raid_tree)),
+        patch("web.routes.rankings._cached_zones_data", return_value=({}, raid_tree, [])),
         patch("web.routes.rankings._cached_kills", return_value=[]),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
@@ -635,7 +675,7 @@ async def test_rankings_leaderboard_is_world_scoped(app, monkeypatch, tmp_path):
 
     with (
         patch("web.routes.rankings._require_user", _fake_user),
-        patch("web.routes.rankings._cached_zones_data", return_value=({}, [])),
+        patch("web.routes.rankings._cached_zones_data", return_value=({}, [], [])),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             r_v = await c.get(
