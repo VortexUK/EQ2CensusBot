@@ -7,6 +7,8 @@ import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
 import { useClasses } from '../useClasses'
 import { SPELL_TIER_COLOURS as TIER_COLOURS } from '../spellConstants'
 import { Button, Card } from '../components/ui'
+import { FreshnessBadge } from '../components/FreshnessBadge'
+import { useCensusStream } from '../hooks/useCensusStream'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,6 +30,8 @@ interface GuildData {
   name: string
   world: string
   members: GuildMember[]
+  fetched_at?: number | null
+  stale?: boolean
 }
 
 interface GuildInfo {
@@ -994,6 +998,7 @@ export default function GuildPage() {
   const { guildName } = useParams<{ guildName: string }>()
   const claimState = useClaim()
   const auth = useAuth()
+  const { subscribe } = useCensusStream()
 
   const myChars = useMemo<Set<string>>(() => {
     if (claimState.status !== 'ready') return new Set()
@@ -1035,7 +1040,11 @@ export default function GuildPage() {
       fetch(`/api/guild/${encodeURIComponent(guildName)}/info`, { credentials: 'include' }),
       fetch(`/api/guild/${encodeURIComponent(guildName)}/officer-status`, { credentials: 'include' }),
     ]).then(async ([rosterRes, infoRes, officerRes]) => {
-      if (!rosterRes.ok) {
+      if (rosterRes.status === 503) {
+        setRosterError(
+          `${guildName} isn't cached yet and Census is currently unavailable. Try again shortly.`
+        )
+      } else if (!rosterRes.ok) {
         setRosterError((await rosterRes.json().catch(() => ({}))).detail ?? `Error ${rosterRes.status}`)
       } else {
         setRoster(await rosterRes.json())
@@ -1049,6 +1058,20 @@ export default function GuildPage() {
       .catch(() => setRosterError('Network error — please try again.'))
       .finally(() => setRosterLoading(false))
   }, [guildName])
+
+  // SSE live-swap: replace roster state when the server pushes a fresh record.
+  // Deps use stable primitives (roster name/world strings + the stable subscribe
+  // callback) — the effect re-runs only when the guild identity changes, never
+  // on every roster state update, so there is no render loop risk.
+  const rosterName  = roster?.name
+  const rosterWorld = roster?.world
+  useEffect(() => {
+    if (!rosterName || !rosterWorld) return
+    const key = `guild:${rosterName.toLowerCase()}:${rosterWorld.toLowerCase()}`
+    return subscribe(key, (data) => {
+      setRoster(data as GuildData)
+    })
+  }, [rosterName, rosterWorld, subscribe])
 
   // Load spell check when tab first selected
   function loadSpells() {
@@ -1139,10 +1162,13 @@ export default function GuildPage() {
           {guildDisplayName}
         </h1>
         {guildWorld && (
-          <div className="text-text-muted text-[0.88rem] mb-4">
+          <div className="text-text-muted text-[0.88rem] mb-1">
             {guildWorld}{memberCount != null ? ` · ${memberCount} members` : ''}
           </div>
         )}
+        <div className="mb-4">
+          <FreshnessBadge stale={roster?.stale} />
+        </div>
 
         {/* Guild info panel */}
         {info && (
