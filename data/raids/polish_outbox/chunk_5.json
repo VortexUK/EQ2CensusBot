@@ -1,0 +1,99 @@
+{
+  "entries": [
+    {
+      "zone_name": "Bloodskull Valley: Maulic's Stronghold",
+      "mob_name": "Overseer Maulic",
+      "polished_md": "Leader of [The Bloodskull Orcs](https://eq2.fandom.com/wiki/Category:The_Bloodskull_Orcs_(Faction))."
+    },
+    {
+      "zone_name": "Deathtoll",
+      "mob_name": "Fitzpitzle",
+      "polished_md": "## Mechanics\n\n- When HP hits **((55/60))%**, raid is stunned and he moves to other side\n- Short-range large **power drain** with crushing damage\n- Several [book minions](https://eq2.fandom.com/wiki/a_book_minion) (**70^^^**) adds spawn during fight\n- He will damage/break an **equipment item** of his target"
+    },
+    {
+      "zone_name": "Deathtoll",
+      "mob_name": "Harla Dar",
+      "polished_md": "## Trash Clear\n\nClear all drakes on the lower platform in a (clockwise or counterclockwise), leaving the droags for a second clearing, as these have a shorter respawn time. **KILL FAST**, aiming for clearing in **10-15 minutes**!\n\n> If you're not averaging **13k DPS** or better don't bother do this.\n\nMove raid to top of stairs and body pull the drakes, again in a clockwise or counterclockwise manner. All can be pulled without aggro'ing Harla Dar.\n\n## Pull\n\nOnce all drakes and droags are clear, pull Harla Dar to the blocked wall behind the area where she stands (the zone out) and be careful of **knockback**."
+    },
+    {
+      "zone_name": "Deathtoll",
+      "mob_name": "Yitzik the Hurler",
+      "polished_md": "- Knockback\n- Low dps\n- Spawns Bone Devil (70^^^) at **10% HP**"
+    },
+    {
+      "zone_name": "Drayek's Chamber",
+      "mob_name": "King Drayek",
+      "polished_md": "- This is a **ring event**. After each wave is cleared, just wait and eventually the next wave spawns.\n- When King Drayek reaches **80% health**, 2x lvl52^^^ and 2x lvl52 ^^ **Kromise Royal Guard** come to his aid."
+    },
+    {
+      "zone_name": "Lockjaw's Lair",
+      "mob_name": "Lockjaw the Ancient",
+      "polished_md": "**Memwipes** once at about **50% health**. Has a dragon-style **tail lash** if you stand behind him, so don't do that."
+    },
+    {
+      "zone_name": "The Court of Al'Afaz",
+      "mob_name": "Brius Lakado",
+      "polished_md": "'The Epitaph of Grandius Lakado' will not drop if Brius Lakado is grey."
+    },
+    {
+      "zone_name": "The Cove of Decay: Epic Angler",
+      "mob_name": "Googegguta",
+      "polished_md": "Speak with him to obtain access to the raid zone [The Cove of Decay: Epic Angler](https://eq2.fandom.com/wiki/The_Cove_of_Decay:_Epic_Angler)."
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Elaani the collector",
+      "polished_md": "## Activating the Encounter\n\nTo make this mob active, you must kill the three named bixies, [Trixie](https://eq2.fandom.com/wiki/Trixie), [Mixie](https://eq2.fandom.com/wiki/Mixie), and [Dixie](https://eq2.fandom.com/wiki/Dixie) at the same time. If you do not kill them within **10 seconds** of each other, they will respawn.\n\n## Strategy\n\n- Pull all three at once, bring each down to **10%** and then AoE.\n- As soon as they die, the collector goes active and immediately aggoes with a few adds.\n- She has a fairly large kickback so fight with your back to the walls.\n\n### Alternate Approach\n\nPull them from left to right one by one; when you burn one down enough, grab the next one. This helps if you're low on heals."
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Gardener Thirgen",
+      "polished_md": "- Will summon every brownie trickster and prankster in the zone. Kill them first, then he's just a tank and spank.\n- Be sure to also kill the Bixies and the Far Strider Unicorn if it's up — they will all assist him in the battle if not killed first."
+    },
+    {
+      "zone_name": "The Gates of Ahket Aken",
+      "mob_name": "Ahk'Mun Rhoen",
+      "polished_md": "## Mechanics\n\nAhk'Mun Rhoen possesses a strong **knockback** effect and a **long duration stun**.\n\n## Pull & Positioning\n\n- Do **not fight him on the tower** where he spawns.\n- Choose one person to climb the tower and aggro Ahk'Mun Rhoen.\n- Pull him down and have your **tank put their back against something** to keep Ahk'Mun Rhoen from wandering around while you fight.\n\n> It is entirely possible to **wipe** due to the long duration stun if the knockback is not controlled.\n\n## Notes\n\n- Keep **healers** unstunned.\n- Keep **slow** on the epic monster.\n- Keep **tanks** back to the wall."
+    },
+    {
+      "zone_name": "The Laboratory of Lord Vyemm",
+      "mob_name": "Lord Vyemm",
+      "polished_md": "## Strategy 1\n\n### Pull\n\n- **Pet pull** Vyemm to the hallway all the way back at the bottom of the stairs (a rather long pull).\n- The raid group should wait behind the door at the top of the stairs to avoid the **frontal AOE** on pull.\n- **Healers** should wait at the bottom of the stairs.\n- The **MT** waits in the area at the bottom of the stairs to taunt Vyemm while Alzid is distracted. (The goal is to get Alzid to reset after the summoner has run up the stairs, but keep Vyemm with you.)\n\n### Positioning\n\n- Turn Vyemm to be **perpendicular to the hallway**.\n- Once properly turned, send in the forces to rush his side.\n- Everyone needs to fight from his **belly**. He will move you around during the fight, so stay with him and don't get in front or behind him.\n\n## Strategy 2\n\n### Pull\n\n- Have the raid sit at the top of the side stairs going to the upper level.\n- Have a **monk** disband and **FD pull** him to the encounter room. When he resets he will be single pull able. This eliminates the **Heals from the Dracon**.\n- Have everyone move down into the room and stand on one side of the entrance against the wall leading into the arena.\n\n### Positioning\n\n- **Tank** will pull him down the stairs and turn him till his head is facing towards the arena and his back legs and tail are in the room.\n- Everyone will attack him from the **sides**.\n- **Tank healers** will need to fight him under his belly.\n- **Dirges and backup healers** can joust or rotate in on the tank if they are hit with aoe."
+    },
+    {
+      "zone_name": "The Lyceum of Abhorrence",
+      "mob_name": "Gnorbl the Playful",
+      "polished_md": "## Adds\n\nHe comes with two large groups of adds, which will taunt and therefore cause members of the raid to target them (instead of the **MT** or **MA**).\n\n### First Group\n\nThe first set of adds can be killed fairly quickly with **AE**, so if you get taunted, this is not too much of a problem.\n\n### Second Group\n\n> **Do not kill** any of the second group of adds — if you kill one of them, Gnorbl receives a **powerful heal**.\n\nThis means that **nobody** in the raid should AoE, use AoE pets, or dumbfire pets; the adds will taunt your pets.\n\n## Staying on the Named\n\nKeep clicking the named to retarget, or stop attacking when the adds spawn (they despawn after 10–20 seconds). The adds spawn every **30 seconds**.\n\n## Notes\n\nAs long as you don't kill any of the second group of adds, he goes down quickly."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Adkar Vyx",
+      "polished_md": "## Pull\n\nThe encounter will turn aggro as soon as the character with the seal approaches it, so it is safest to have a character with **feign death** make the approach.\n\n## Haze of Thule (AoE)\n\nMassive **poison/stifle AoE** (**Haze of Thule**) every **45s** (varies slightly) does more damage the closer you are (can be resisted):\n\n- **0 to 9 metres**: 13044-25894 poison damage plus 3069-6093 poison damage every 5 seconds.\n- **10 to 15 metres**: 8017-12025 poison damage plus 2290-3436 every 5 seconds.\n- **15 to 75 metres**: 5154-6299 poison damage and 1546-1890 every 5 seconds.\n\nThe **stifle** will apply to all characters standing between **9 and 75 metres** away. Because the stifle applies equally at 10 to 15 metres as it does at 15 to 75, there is no advantage to be gained by standing in the mid-range. [Sanctuary](https://eq2.fandom.com/wiki/Sanctuary) can avoid the stifle, as can potions and AoE block.\n\n## Strategy\n\n- **MT** pulls to far left corner (with back to corner to avoid knockback).\n- The rest of the raid stays out until **Haze of Thule** is cast.\n- **Joust** all the way out of the room every 45s (before Haze of Thule hits) then back in after.\n- The adds (which **fear and stun**) can be mezzed, or burn them down first with **OT**.\n- Anti-stifle potions, poison and elemental resists, [Sanctuary](https://eq2.fandom.com/wiki/Sanctuary) and AoE block will make the job easier.\n\n## Wipe Recovery\n\nIf the raid wipes but in the process takes down one or both adds, the adds will take a couple of minutes to respawn, making it possible to run in during this time for a slightly easier fight. Once the adds respawn, the entire encounter will reset and the raid needs to start the fight again using the seal."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Doomcoil",
+      "polished_md": "## Preparation\n\n- Make sure all party members have maximized their **noxious and arcane resists**.\n- To activate Doomcoil, you need shards from defeating [Adkar Vyx](https://eq2.fandom.com/wiki/Adkar_Vyx), [Iztapa Vyx](https://eq2.fandom.com/wiki/Iztapa_Vyx), [Wymbulu Vyx](https://eq2.fandom.com/wiki/Wymbulu_Vyx) and [Zykluk Vyx](https://eq2.fandom.com/wiki/Zykluk_Vyx). Whoever has these fragments initiates the sequence by giving them to the NPC **Meldrath**.\n\n## Positioning\n\n- Have the raid force move into the room with the inactive Doomcoil.\n- The whole raid force (apart from the **Fighters**) stands in the corner near the door.\n- **Fighters** stand on the other side of Doomcoil in the far corner so that Doomcoil is between the MT and the rest of the raid.\n\n## Barrier and Wipe Risk\n\n> Once the fight starts, a **barrier** goes up around the room. Every time a member of the raid dies, Doomcoil **heals himself for 138,677 health**. If you revive, you will do so outside the room (and hence be unable to re-enter because of the barrier). This means you only get **one chance** to kill Doomcoil before the whole raid gets locked out. Locked out characters will continue to be hit by the AoE.\n\n## Fight Mechanics\n\n- Once Doomcoil is activated, the **Fighters** need to keep Doomcoil as far away from the raid as possible to avoid having the AoEs kill the rest of the raid.\n- **Melee DPS** should joust the AoEs.\n- After casting **Sonic Burst**, Doomcoil will teleport himself to the door side of the room. He will be immobile for a couple of seconds, during which he will likely target someone other than the tanks. At that point, back off completely until one of the tanks has recovered aggro and moved Doomcoil back to the far corner.\n- Coordinate the use of **emergency abilities** — e.g. **Rescue** — so that they are not all spent at once.\n\n### AoE Timers\n\n- **Choking Mist** hits every **60s**\n- **Sonic Burst** hits every **55s**\n\n## Notes\n\nKilling Doomcoil is all about keeping your raid alive through his AoEs; between them he does not hit hard on tank.\n\nMake sure everyone has good resists for both **poison and divine**. The AoEs will hit you everywhere in the room but they hit harder if you are closer, so jousting helps. Jousting both AoEs helps a lot, but it's also doable without if the melees have good resists.\n\nRun with **2 tanks** fighting for aggro and let everyone target the mob directly. **Stop all DPS** when he is on someone other than the tanks; if you see that he is on you, run over to the tanks.\n\nIf people don't die to the AoEs it's a rather easy fight, but if people keep dying he will keep healing and the raid will wipe."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Venril Sathir",
+      "polished_md": "## Setup\n\n- **Healers** only heal and cure and don't do damage of any kind.\n- **1–2 people** devoted to clicking the statues in his room. Statues must be clicked **constantly** during the fight to prevent the two larger statues in the hallway leading up to his room from spawning.\n\n## Mechanics\n\n### Toxic Infusion (throughout)\n\n- Venril will cast **Toxic Infusion**, an AOE on a **38s timer**.\n- You have **6 seconds** to cure this **Noxious** effect from your raid.\n- Cure it or die from a follow-up spell called **Fatalisis**.\n- Bring potions in case you don't have group noxious cures in every group.\n\n### 65% — Soulcube\n\nAt **65%** Venril will emote how he will finish the fight. Use the [Mistmyrian Soulcube](https://eq2.fandom.com/wiki/Mistmyrian_Soulcube) from [Tairiza the Widow Mistress](https://eq2.fandom.com/wiki/Tairiza_the_Widow_Mistress) within **5 seconds** or die.\n\n### 60% — Power Management\n\nAt **60%**, with Venril's main ability disabled, he will begin to watch your power consumption.\n\n- Your raid force must keep their power around **30% or higher** to be safe.\n- A raid member who gets under 30% for too long will spawn adds that will most likely wipe the raid.\n\n### Power Effects (every 45s on 2 random members)\n\nThese effects last for about **10–12 seconds** and make it more challenging to keep your power in the target zone.\n\n**Mana Sacrifice**\n\n- Causes you to consume **200% more power** than usual.\n- Do not use any abilities that use power while this effect is on you.\n- Turn up your particle effects — you will glow **'BLUE'** when Mana Sacrifice is on you.\n- If you are in the middle of casting anything and the effect lands on you, cancel it immediately.\n\n**Enhanced Power Regen**\n\n- The opposite effect — a feed of about **1% power every 2 seconds** for 10–12 seconds.\n\n## Notes\n\n> If you kill Sathir without the Soulcube, your entire group/raid will be hit for 100,000+ focus damage and Sathir will reset rather than dying."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Wymbulu Vyx",
+      "polished_md": "## Positioning\n\n- Position **MT** in one corner nearest the door to his room.\n- Raid in other corner near door.\n- **MT** pulls, **OT** pulls adds to corner opposite MT.\n- **Healers** stay in corner near door, away from MT.\n- All **casters** go to opposite corner and stay there.\n\n## Kill Order\n\nBurn adds, then name. **Melee** jousts **Spinning Fury** (**50s** timer). Mob is quite easy."
+    },
+    {
+      "zone_name": "The Unkempt Vale: A Lordly Confrontation",
+      "mob_name": "Qeynos",
+      "polished_md": ""
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Silverwing",
+      "polished_md": "## Pull & Positioning\n\n**MT** can pull this named out of the room, which is recommended. Pull him up the ramp and have the **MT** park against one of the pillars in the upper hallway. He has a pretty hefty AoE on a **1:35 second** timer (seen **55sec - 1min 45sec**). Stand about **50 meters** away (end of the ramp around the corner works well).\n\nSilverwing may need to be pulled into the hallway because of a **healing-to-100%** effect.\n\n## Warding Statues (80%)\n\n***Beginning when Silverwing's health hits 80%***, someone in the raid will be ultra-visioned. It will be announced zonewide: \"(target) is now seeing through their mind's eye!\"\n\nThat person will need to go deactivate the large warding statue by clicking the small device *on the floor next to the large statue*. It can be difficult to see, so be sure to hover over the floor all around the warding statues.\n\n> Until that person deactivates the statue, Silverwing will be ***immune to damage***, but he ***will*** continue to AoE.\n\n### Statue Assignments\n\n- **Fighters** deactivate the first statue on the left when entering Silverwing's room. (SouthWest)\n- **Scouts** deactivate the center far side opposite Silverwing. (East)\n- **Mages** deactivate the statue opposite the fighters. (Northwest)\n- **Priests** deactivate the one where Silverwing resides before he is pulled. (West)\n\n**Note:** If you have not reprogrammed the wards already you will ***not*** be able to deactivate them now.\n\n## Adds (60%)\n\n***Starting at 60% of Silverwing's health,*** adds will start to spawn. A successful strategy is to mesmerize these until Silverwing is Immune, then focus on the adds while the ultra-visioned person works on deactivating their ward statue.\n\n## Levers\n\nThere are two **levers** flanking Silverwing's original position. Deactivating one will summon a droag to turn it back on. Put two people on those levers and you will have less problems with the **stuns**."
+    }
+  ]
+}
