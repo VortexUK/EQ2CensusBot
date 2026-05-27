@@ -8,6 +8,25 @@ export interface DropdownOption {
 }
 
 /**
+ * Convert a legacy `{label, value}[]` list that used `value: '__hdr'` separator
+ * rows + indented labels (the old grouped <select> pattern) into grouped
+ * DropdownOptions. Header rows become the group for the options beneath them;
+ * `──`/leading-space decoration is stripped from labels.
+ */
+export function groupedFromHeaders(opts: { label: string; value: string }[]): DropdownOption[] {
+  const out: DropdownOption[] = []
+  let group: string | undefined
+  for (const o of opts) {
+    if (o.value === '__hdr') {
+      group = o.label.replace(/─/g, '').trim()
+      continue
+    }
+    out.push({ value: o.value, label: o.label.trim(), group })
+  }
+  return out
+}
+
+/**
  * Seamless Warcraft-Logs-style filter strip: one continuous gilded bar that
  * holds FilterDropdown segments flush together, divided only by hairlines.
  * `overflow-hidden` clips the segment hovers to the rounded ends — safe because
@@ -33,6 +52,8 @@ export function FilterDropdown({
   disabled = false,
   label,
   active = false,
+  standalone = false,
+  className = '',
 }: {
   value: string
   options: DropdownOption[]
@@ -43,6 +64,10 @@ export function FilterDropdown({
   label?: string
   /** Highlight as the currently-active tab even when closed. */
   active?: boolean
+  /** Bordered, self-contained control for use OUTSIDE a FilterBar (e.g. a form field). */
+  standalone?: boolean
+  /** Extra classes for the trigger — e.g. width control (`w-full justify-between`, `min-w-[130px]`). */
+  className?: string
 }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -91,11 +116,20 @@ export function FilterDropdown({
   const displayText = label ?? (selected ? selected.label : placeholder)
   const dim = !label && !selected // dim only a true placeholder, never a fixed category label
 
+  // Bar variant: flush, transparent, borderless (lives inside the gold-rule
+  // FilterBar). Standalone: a bordered, self-contained control for form rows.
+  const base = standalone ? 'rounded-md border px-3 py-1.5' : 'border-0 bg-transparent px-4 py-2'
   const triggerState = disabled
-    ? 'cursor-not-allowed text-gold/30'
+    ? standalone
+      ? 'cursor-not-allowed border-border bg-surface text-gold/30'
+      : 'cursor-not-allowed text-gold/30'
     : open || active
-      ? 'cursor-pointer bg-gold/10 text-gold-bright'
-      : 'cursor-pointer text-gold hover:bg-gold/10 hover:text-gold-bright'
+      ? standalone
+        ? 'cursor-pointer border-gold bg-surface-raised text-gold-bright'
+        : 'cursor-pointer bg-gold/10 text-gold-bright'
+      : standalone
+        ? 'cursor-pointer border-border bg-surface text-gold hover:border-gold/60'
+        : 'cursor-pointer text-gold hover:bg-gold/10 hover:text-gold-bright'
 
   return (
     <>
@@ -104,7 +138,7 @@ export function FilterDropdown({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen(o => !o)}
-        className={`flex appearance-none items-center gap-2 border-0 bg-transparent px-4 py-2 font-heading text-sm tracking-wide transition-colors ${triggerState}`}
+        className={`flex appearance-none items-center gap-2 font-heading text-sm tracking-wide transition-colors ${base} ${triggerState} ${className}`}
       >
         <span className={`max-w-[14rem] truncate ${dim ? 'opacity-55' : ''}`}>{displayText}</span>
         <span className={`text-[0.6rem] leading-none transition-transform duration-150 ${open ? 'rotate-180' : ''}`}>▼</span>
