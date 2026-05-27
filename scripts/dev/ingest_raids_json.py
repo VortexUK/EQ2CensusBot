@@ -67,6 +67,47 @@ def _normalise_md(md: str | None) -> str | None:
     return stripped if stripped else None
 
 
+# EQ2i uses parenthetical suffixes to disambiguate wiki page titles when a
+# name is reused (e.g. "Trakanon" the disambig page vs "Trakanon (Monster)"
+# the raid version, "Mayong Mistmoore" vs "Mayong Mistmoore (Instanced)").
+# The curated zones_db roster uses the plain name; stripping the suffix at
+# ingest time keeps the strategy editor's lookup (mob_name_lower) hitting
+# the right row.
+import re  # noqa: E402
+
+_DISAMBIG_SUFFIX_RE = re.compile(r"\s*\([^)]+\)\s*$")
+
+
+def _normalise_mob_name(name: str) -> str:
+    """Strip a trailing parenthetical disambiguator from a wiki mob name.
+
+    Examples::
+
+        Trakanon (Monster)            -> Trakanon
+        Mayong Mistmoore (Instanced)  -> Mayong Mistmoore
+        Druushk                        -> Druushk
+    """
+    return _DISAMBIG_SUFFIX_RE.sub("", name).strip()
+
+
+def _dedupe_encounters_for_zone(encounters: list[dict]) -> list[dict]:
+    """Collapse encounters whose normalised mob_name collides. When two
+    scrape entries normalise to the same canonical name (e.g. a disambig
+    landing page + the actual mob page), keep the one with the longer
+    ``strategy_md`` — the empty/stub entry would otherwise overwrite the
+    real content."""
+    by_norm: dict[str, dict] = {}
+    for enc in encounters:
+        norm = _normalise_mob_name(enc.get("mob_name") or "")
+        if not norm:
+            continue
+        prev = by_norm.get(norm.lower())
+        cur_len = len((enc.get("strategy_md") or "").strip())
+        if prev is None or cur_len > len((prev.get("strategy_md") or "").strip()):
+            by_norm[norm.lower()] = enc
+    return list(by_norm.values())
+
+
 # ---------------------------------------------------------------------------
 # Ingest
 # ---------------------------------------------------------------------------
@@ -117,12 +158,17 @@ def ingest(json_path: Path, *, dry_run: bool = False) -> dict:
                 zone_id = raids_db.upsert_raid_zone(conn, **zone_kwargs)
                 n_zones_inserted += 1
 
-                for enc in z.get("encounters") or []:
+                # Dedupe by normalised name within the zone, then iterate.
+                # Normalising both the row's mob_name AND collapsing
+                # collisions means a wiki disambig pair (e.g. "Trakanon"
+                # the empty landing page + "Trakanon (Monster)" the raid
+                # version) lands as a single canonically-named row.
+                for enc in _dedupe_encounters_for_zone(z.get("encounters") or []):
                     md = _normalise_md(enc.get("strategy_md"))
                     raids_db.upsert_raid_encounter(
                         conn,
                         raid_zone_id=zone_id,
-                        mob_name=enc["mob_name"],
+                        mob_name=_normalise_mob_name(enc["mob_name"]),
                         position=int(enc.get("position") or 0),
                         strategy_md=md,
                         wiki_url=enc.get("wiki_url"),
