@@ -9,5 +9,6 @@ from census.config import (  # noqa: F401
     LAUNCH_DT_ISO,
     SERVER_MAX_LEVEL,
     SERVICE_ID,
+    SESSION_COOKIE_DOMAIN,
     WORLD,
 )

@@ -51,3 +51,30 @@ def test_override_ignored_when_disabled(monkeypatch, tmp_path):
     # And when allowed (dev), the override wins.
     monkeypatch.setattr(sc, "_ALLOW_OVERRIDE", True)
     assert sc.resolve_host("varsoon.eq2lexicon.com", override="wuoshi").world == "Wuoshi"
+
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+
+@pytest.mark.asyncio
+async def test_middleware_sets_world_from_host(monkeypatch, tmp_path):
+    from fastapi import FastAPI
+
+    from web import server_context as sc2
+
+    _seed(monkeypatch, tmp_path)
+    app = FastAPI()
+    app.add_middleware(sc2.ServerContextMiddleware)
+
+    @app.get("/w")
+    async def _w():
+        return {"world": sc2.current_world()}
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://wuoshi.eq2lexicon.com") as c:
+        r = await c.get("/w", headers={"host": "wuoshi.eq2lexicon.com"})
+    assert r.json()["world"] == "Wuoshi"
+    async with AsyncClient(transport=transport, base_url="http://x") as c:
+        r = await c.get("/w", headers={"host": "varsoon.eq2lexicon.com"})
+    assert r.json()["world"] == "Varsoon"
