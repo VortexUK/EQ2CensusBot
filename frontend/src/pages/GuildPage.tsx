@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
+import { FilterPill } from '../components/FilterPill'
 import { useClaim } from '../hooks/useClaim'
 import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
 import { useClasses } from '../useClasses'
@@ -1193,25 +1194,11 @@ export default function GuildPage() {
               <span className="text-[0.72rem] text-text-muted uppercase tracking-[0.06em] mr-[0.2rem]">
                 Ranks
               </span>
-              {ranksOrdered.map(rank => {
-                const hidden = hiddenRanks.has(rank)
-                return (
-                  <button
-                    key={rank}
-                    onClick={() => toggleRank(rank)}
-                    className="px-[0.65rem] py-[0.2rem] rounded-[20px] border text-[0.78rem] cursor-pointer transition-all duration-150"
-                    style={{
-                      borderColor: hidden ? 'var(--border)' : 'rgba(200,169,110,0.45)',
-                      background: hidden ? 'transparent' : 'rgba(200,169,110,0.1)',
-                      color: hidden ? 'var(--text-muted)' : 'rgba(232,213,163,0.9)',
-                      textDecoration: hidden ? 'line-through' : 'none',
-                      opacity: hidden ? 0.5 : 1,
-                    }}
-                  >
-                    {rank}
-                  </button>
-                )
-              })}
+              {ranksOrdered.map(rank => (
+                <FilterPill key={rank} active={!hiddenRanks.has(rank)} onClick={() => toggleRank(rank)}>
+                  {rank}
+                </FilterPill>
+              ))}
               {hiddenRanks.size > 0 && (
                 <Button
                   variant="ghost"

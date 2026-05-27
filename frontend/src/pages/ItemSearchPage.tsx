@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ItemTooltip, TooltipState } from '../components/ItemTooltip'
+import { FilterDropdown, groupedFromHeaders } from '../components/FilterDropdown'
 import { Button, Card } from '../components/ui'
 import { itemRarityColor } from '../rarityColors'
 
@@ -449,51 +450,43 @@ export default function ItemSearchPage() {
             </Field>
 
             <Field label="Quality">
-              <select value={tier} onChange={e => setTier(e.target.value)} className={`${CTRL_CLS} min-w-[130px]`}>
-                <option value="">Any</option>
-                {TIER_OPTIONS.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              <FilterDropdown
+                standalone
+                value={tier}
+                placeholder="Any"
+                options={[{ value: '', label: 'Any' }, ...TIER_OPTIONS.map(t => ({ value: t, label: t }))]}
+                onChange={setTier}
+              />
             </Field>
 
             <Field label="Item Type">
-              <select value={itemType} onChange={e => setItemType(e.target.value)} className={`${CTRL_CLS} min-w-[140px]`}>
-                <option value="">Any</option>
-                {ITEM_TYPE_OPTIONS.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              <FilterDropdown
+                standalone
+                value={itemType}
+                placeholder="Any"
+                options={[{ value: '', label: 'Any' }, ...ITEM_TYPE_OPTIONS.map(t => ({ value: t, label: t }))]}
+                onChange={setItemType}
+              />
             </Field>
 
             <Field label="Slot">
-              <select value={slot} onChange={e => setSlot(e.target.value)} className={`${CTRL_CLS} min-w-[130px]`}>
-                <option value="">Any</option>
-                {SLOT_OPTIONS.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <FilterDropdown
+                standalone
+                value={slot}
+                placeholder="Any"
+                options={[{ value: '', label: 'Any' }, ...SLOT_OPTIONS.map(s => ({ value: s, label: s }))]}
+                onChange={setSlot}
+              />
             </Field>
 
             <Field label="Class">
-              <select
+              <FilterDropdown
+                standalone
                 value={classVal}
-                onChange={e => {
-                  if (e.target.value !== '__hdr') setClassVal(e.target.value)
-                }}
-                className={`${CTRL_CLS} min-w-[160px]`}
-              >
-                {CLASS_OPTIONS.map((opt, i) => (
-                  <option
-                    key={i}
-                    value={opt.value}
-                    disabled={opt.value === '__hdr'}
-                    style={opt.value === '__hdr' ? { color: 'var(--text-muted)', fontWeight: 700 } : {}}
-                  >
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                placeholder="All Classes"
+                options={groupedFromHeaders(CLASS_OPTIONS)}
+                onChange={setClassVal}
+              />
             </Field>
 
           </div>
@@ -539,32 +532,25 @@ export default function ItemSearchPage() {
                 {statFilters.map(f => (
                   <div key={f.id} className="flex gap-2 items-center">
                     {/* Stat name */}
-                    <select
+                    <FilterDropdown
+                      standalone
                       value={f.stat}
-                      onChange={e => updateStatFilter(f.id, 'stat', e.target.value)}
-                      className={`${CTRL_CLS} min-w-[180px]`}
-                    >
-                      <optgroup label="Primary">
-                        {STAT_OPTIONS_PRIMARY.map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Secondary">
-                        {STAT_OPTIONS_SECONDARY.map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </optgroup>
-                    </select>
+                      options={[
+                        ...STAT_OPTIONS_PRIMARY.map(s => ({ value: s, label: s, group: 'Primary' })),
+                        ...STAT_OPTIONS_SECONDARY.map(s => ({ value: s, label: s, group: 'Secondary' })),
+                      ]}
+                      onChange={v => updateStatFilter(f.id, 'stat', v)}
+                    />
                     {/* Operator */}
-                    <select
+                    <FilterDropdown
+                      standalone
                       value={f.op}
-                      onChange={e => updateStatFilter(f.id, 'op', e.target.value)}
-                      className={`${CTRL_CLS} w-[60px] pl-[0.4rem] pr-[0.2rem]`}
-                      title="Comparison operator"
-                    >
-                      <option value="gte">≥</option>
-                      <option value="lte">≤</option>
-                    </select>
+                      options={[
+                        { value: 'gte', label: '≥' },
+                        { value: 'lte', label: '≤' },
+                      ]}
+                      onChange={v => updateStatFilter(f.id, 'op', v)}
+                    />
                     {/* Value */}
                     <input
                       type="number"

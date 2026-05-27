@@ -4,6 +4,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 
 import Caret from '../components/Caret'
 import { Card } from '../components/ui'
+import { FilterPill } from '../components/FilterPill'
 import { fmtDuration, fmtLocalDate, fmtLocalTime, fmtNum } from '../formatters'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -252,25 +253,19 @@ export default function ParsesPage() {
       {/* Filter pills */}
       <div className="flex flex-wrap gap-[0.4rem] mb-[1.2rem]">
         {SIZE_OPTIONS.map(opt => (
-          <button
-            key={opt.value || 'all'}
-            onClick={() => setFilter(opt.value)}
-            style={pillStyle(size === opt.value)}
-          >
+          <FilterPill key={opt.value || 'all'} active={size === opt.value} onClick={() => setFilter(opt.value)}>
             {opt.label}
-            {opt.range && (
-              <span className="ml-[0.35rem] opacity-60 text-[0.72rem]">{opt.range}</span>
-            )}
-          </button>
+            {opt.range && <span className="ml-[0.35rem] opacity-60 text-[0.72rem]">{opt.range}</span>}
+          </FilterPill>
         ))}
         <span className="w-px bg-border mx-[0.2rem]" />
-        <button
+        <FilterPill
+          active={bossesOnly}
           onClick={() => setBossesOnly(v => !v)}
-          style={pillStyle(bossesOnly)}
           title="Hide trash mobs (titles starting with 'a' / 'an')"
         >
           Bosses only
-        </button>
+        </FilterPill>
       </div>
 
       {loading && <p className="text-text-muted">Loading…</p>}
@@ -688,16 +683,4 @@ const headerBtnStyle: CSSProperties = {
 
 const HDR_CELL_CLS = 'text-text-muted text-[0.7rem] uppercase tracking-[0.06em] py-1 border-b border-border mb-[0.2rem]'
 
-function pillStyle(active: boolean): CSSProperties {
-  return {
-    background: active ? 'var(--gold)' : 'var(--surface)',
-    color: active ? 'var(--bg)' : 'var(--text)',
-    border: `1px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
-    borderRadius: 'var(--radius-pill)',
-    padding: '0.35rem 0.85rem',
-    fontSize: '0.82rem',
-    fontWeight: active ? 700 : 500,
-    cursor: 'pointer',
-  }
-}
 

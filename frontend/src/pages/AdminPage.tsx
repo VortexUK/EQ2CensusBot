@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
 import { Button } from '../components/ui'
+import { FilterPill } from '../components/FilterPill'
 import { fmtLocalDate } from '../formatters'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -120,11 +121,6 @@ const SECTION_TITLE_CLS = 'text-[0.8rem] uppercase tracking-[0.07em] text-text-m
 const TABLE_CLS = 'w-full border-collapse text-[0.875rem]'
 const TH_CLS = 'text-left px-3 py-[0.45rem] text-text-muted text-[0.72rem] font-semibold uppercase tracking-[0.05em] border-b border-border whitespace-nowrap'
 const TD_CLS = 'px-3 py-2 border-b border-white/5 align-middle'
-// Filter-pill base (border/background/colour applied conditionally inline).
-const BTN_BASE: React.CSSProperties = {
-  padding: '0.22rem 0.65rem', borderRadius: 4, cursor: 'pointer',
-  fontSize: '0.78rem', fontWeight: 600, border: 'none', whiteSpace: 'nowrap',
-}
 
 // ── Users table ───────────────────────────────────────────────────────────────
 
@@ -298,19 +294,9 @@ function UsersTable({ users, onAction }: { users: UserItem[]; onAction: () => vo
       {/* Filter pills */}
       <div className="flex gap-[0.4rem] mb-3 flex-wrap">
         {(['all', 'pending', 'approved', 'denied'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            style={{
-              ...BTN_BASE,
-              background: filter === f ? 'rgba(200,169,110,0.15)' : 'transparent',
-              color: filter === f ? 'var(--gold)' : 'var(--text-muted)',
-              border: filter === f ? '1px solid rgba(200,169,110,0.4)' : '1px solid var(--border)',
-            }}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}{' '}
-            <span className="opacity-70 text-[0.7rem]">({counts[f]})</span>
-          </button>
+          <FilterPill key={f} active={filter === f} onClick={() => setFilter(f)}>
+            {f.charAt(0).toUpperCase() + f.slice(1)} <span className="opacity-70 text-[0.7rem]">({counts[f]})</span>
+          </FilterPill>
         ))}
       </div>
 
@@ -499,19 +485,9 @@ function ClaimsTable({ claims, onAction }: { claims: ClaimDetail[]; onAction: ()
         {(['pending', 'all'] as const).map(f => {
           const count = f === 'pending' ? pendingCount : claims.length
           return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                ...BTN_BASE,
-                background: filter === f ? 'rgba(200,169,110,0.15)' : 'transparent',
-                color: filter === f ? 'var(--gold)' : 'var(--text-muted)',
-                border: filter === f ? '1px solid rgba(200,169,110,0.4)' : '1px solid var(--border)',
-              }}
-            >
-              {f === 'pending' ? 'Pending' : 'All'}{' '}
-              <span className="opacity-70 text-[0.7rem]">({count})</span>
-            </button>
+            <FilterPill key={f} active={filter === f} onClick={() => setFilter(f)}>
+              {f === 'pending' ? 'Pending' : 'All'} <span className="opacity-70 text-[0.7rem]">({count})</span>
+            </FilterPill>
           )
         })}
       </div>

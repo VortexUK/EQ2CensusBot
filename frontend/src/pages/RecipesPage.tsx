@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button, Card } from '../components/ui'
+import { FilterDropdown, groupedFromHeaders } from '../components/FilterDropdown'
 import { recipeTierColor } from '../rarityColors'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -252,7 +253,6 @@ export default function RecipesPage() {
 
   // ── Shopping list state (localStorage) ───────────────────────────────────────
   const [list,     setList]     = useState<ShoppingEntry[]>(() => loadList())
-  const [listOpen, setListOpen] = useState(() => searchParams.get('list') === 'open')
   const [showMats, setShowMats] = useState<boolean>(() => {
     try {
       const raw = localStorage.getItem('eq2-shopping-show-mats')
@@ -373,7 +373,6 @@ export default function RecipesPage() {
   const clearList = useCallback(() => { setList([]) }, [])
 
   const summary = aggregateList(list)
-  const totalItems = list.reduce((s, e) => s + e.qty, 0)
 
   const totalPages = Math.ceil(total / perPage)
 
@@ -383,22 +382,9 @@ export default function RecipesPage() {
         <h1 className="font-heading text-[1.7rem] text-gold m-0">
           Recipes
         </h1>
-        {list.length > 0 && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setListOpen(v => !v)}
-            className="ml-auto"
-          >
-            🛒 Shopping List
-            <span className="bg-gold text-bg rounded-[50%] w-[18px] h-[18px] inline-flex items-center justify-center text-[0.72rem] font-bold leading-none">
-              {totalItems}
-            </span>
-          </Button>
-        )}
       </div>
 
-      <div className="grid gap-5" style={{ gridTemplateColumns: listOpen ? '1fr 340px' : '1fr' }}>
+      <div className="grid gap-5" style={{ gridTemplateColumns: '1fr 340px' }}>
 
         {/* ── Left column: filters + results ─────────────────────────────────── */}
         <div>
@@ -423,12 +409,17 @@ export default function RecipesPage() {
               <label className="text-xs text-text-muted block mb-[3px]">
                 Crafting tier
               </label>
-              <select className={CTRL_CLS} value={tier} onChange={e => setTier(e.target.value)}>
-                <option value="">All tiers</option>
-                {CRAFT_TIERS.map(t => (
-                  <option key={t} value={t}>{CRAFT_TIER_LABELS[t] ?? t}</option>
-                ))}
-              </select>
+              <FilterDropdown
+                standalone
+                className="w-full justify-between"
+                value={tier}
+                placeholder="All tiers"
+                options={[
+                  { value: '', label: 'All tiers' },
+                  ...CRAFT_TIERS.map(t => ({ value: t, label: CRAFT_TIER_LABELS[t] ?? t })),
+                ]}
+                onChange={setTier}
+              />
             </div>
 
             {/* Tradeskill class */}
@@ -436,19 +427,18 @@ export default function RecipesPage() {
               <label className="text-xs text-text-muted block mb-[3px]">
                 Artisan class
               </label>
-              <select className={CTRL_CLS} value={craftClass} onChange={e => setCraftClass(e.target.value)}>
-                <option value="">All Artisans</option>
-                <optgroup label="Primary Tradeskills">
-                  {PRIMARY_CRAFT_CLASSES.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="Secondary Tradeskills">
-                  {SECONDARY_CRAFT_CLASSES.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </optgroup>
-              </select>
+              <FilterDropdown
+                standalone
+                className="w-full justify-between"
+                value={craftClass}
+                placeholder="All Artisans"
+                options={[
+                  { value: '', label: 'All Artisans' },
+                  ...PRIMARY_CRAFT_CLASSES.map(c => ({ value: c, label: c, group: 'Primary Tradeskills' })),
+                  ...SECONDARY_CRAFT_CLASSES.map(c => ({ value: c, label: c, group: 'Secondary Tradeskills' })),
+                ]}
+                onChange={setCraftClass}
+              />
             </div>
 
             {/* Adventure class */}
@@ -456,17 +446,14 @@ export default function RecipesPage() {
               <label className="text-xs text-text-muted block mb-[3px]">
                 Adventure class
               </label>
-              <select
-                className={CTRL_CLS}
+              <FilterDropdown
+                standalone
+                className="w-full justify-between"
                 value={className}
-                onChange={e => setClassName(e.target.value)}
-              >
-                {CLASS_OPTIONS.map((opt, i) =>
-                  opt.value === '__hdr'
-                    ? <option key={i} disabled className="text-text-muted">{opt.label}</option>
-                    : <option key={i} value={opt.value}>{opt.label}</option>
-                )}
-              </select>
+                placeholder="All Classes"
+                options={groupedFromHeaders(CLASS_OPTIONS)}
+                onChange={setClassName}
+              />
             </div>
 
             {/* Search button */}
@@ -529,9 +516,8 @@ export default function RecipesPage() {
           )}
         </div>
 
-        {/* ── Right column: shopping list ─────────────────────────────────────── */}
-        {listOpen && (
-          <Card className="p-4 self-start sticky top-16 max-h-[calc(100vh-5rem)] overflow-y-auto">
+        {/* ── Right column: shopping list (always shown) ─────────────────────── */}
+        <Card className="p-4 self-start sticky top-16 max-h-[calc(100vh-5rem)] overflow-y-auto">
             <div className="flex justify-between items-center mb-[0.8rem]">
               <h2 className="m-0 text-base font-heading text-gold">
                 Shopping List
@@ -554,14 +540,6 @@ export default function RecipesPage() {
                   className="border-none"
                 >
                   Clear
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setListOpen(false)}
-                  className="text-base leading-none"
-                >
-                  ×
                 </Button>
               </div>
             </div>
@@ -637,23 +615,7 @@ export default function RecipesPage() {
               </p>
             )}
           </Card>
-        )}
       </div>
-
-      {/* Floating cart button when panel is closed */}
-      {!listOpen && list.length > 0 && (
-        <Button
-          variant="primary"
-          onClick={() => setListOpen(true)}
-          title="Open Shopping List"
-          className="fixed bottom-6 right-6 rounded-[50%] w-[52px] h-[52px] text-[1.4rem] shadow-[0_4px_16px_rgba(0,0,0,0.5)] z-[100]"
-        >
-          🛒
-          <span className="absolute -top-1 -right-1 bg-danger text-white rounded-[50%] w-5 h-5 flex items-center justify-center text-[0.65rem] font-bold">
-            {totalItems}
-          </span>
-        </Button>
-      )}
     </main>
   )
 }
