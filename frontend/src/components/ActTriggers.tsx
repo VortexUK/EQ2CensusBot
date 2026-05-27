@@ -119,6 +119,19 @@ export function ActTriggers({ zoneName, position }: Props) {
     return m
   }, [spellTimers])
 
+  // How many triggers reference each spell-timer (for the Spell Timers section
+  // badge and the nameEditable guard).
+  const triggerUsageByTimer = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const t of triggers) {
+      if (t.timer && t.timer_name) {
+        const k = t.timer_name.toLowerCase()
+        m.set(k, (m.get(k) ?? 0) + 1)
+      }
+    }
+    return m
+  }, [triggers])
+
   // Fetch on encounter change. Both endpoints are public-GET; failures
   // surface as a single error banner (the trigger list is the primary view).
   useEffect(() => {
@@ -270,6 +283,13 @@ export function ActTriggers({ zoneName, position }: Props) {
               ))}
             </ul>
           )}
+          <SpellTimersSection
+            base={base}
+            spellTimers={spellTimers}
+            triggerUsageByTimer={triggerUsageByTimer}
+            canEdit={canEdit}
+            onReload={refresh}
+          />
         </>
       )}
     </section>
@@ -472,6 +492,111 @@ interface SpellTimerDraft {
   tooltip: string
 }
 
+// ── Shared SpellTimerEditor sub-form ──────────────────────────────────────────
+
+interface SpellTimerEditorProps {
+  draft: SpellTimerDraft
+  onChange: (next: SpellTimerDraft) => void
+  nameEditable?: boolean
+  /** Fired on blur of the name field (no-op when nameEditable is false). */
+  onNameBlur?: (name: string) => void
+}
+
+function SpellTimerEditor({ draft, onChange, nameEditable = true, onNameBlur }: SpellTimerEditorProps) {
+  return (
+    <>
+      <Field label="Timer name *">
+        {nameEditable ? (
+          <input
+            type="text"
+            value={draft.name}
+            onChange={e => onChange({ ...draft, name: e.target.value })}
+            onBlur={e => onNameBlur?.(e.target.value)}
+            placeholder="e.g. Doom Cooldown"
+            className={inputCls}
+          />
+        ) : (
+          <div className={inputCls + ' text-text-muted cursor-not-allowed select-none'}>
+            {draft.name}
+            <span className="ml-2 text-[0.72rem] text-gold-dim uppercase tracking-[0.06em]">(in use — rename blocked)</span>
+          </div>
+        )}
+      </Field>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <Field label="Duration (s)">
+          <input
+            type="number"
+            min={1}
+            value={draft.timer_duration_s}
+            onChange={e => onChange({ ...draft, timer_duration_s: Number(e.target.value) })}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="Warning (s)">
+          <input
+            type="number"
+            min={0}
+            value={draft.warning_value}
+            onChange={e => onChange({ ...draft, warning_value: Number(e.target.value) })}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="Fill colour">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={draft.fill_color_hex}
+              onChange={e => {
+                const hex = e.target.value
+                onChange({
+                  ...draft,
+                  fill_color_hex: hex,
+                  fill_color_packed: hexToArgb(hex, draft.fill_color_packed),
+                })
+              }}
+              className="h-8 w-12 border border-border rounded-sm bg-bg/60"
+            />
+            <code className="font-mono text-[0.78rem] text-text-muted">{draft.fill_color_hex}</code>
+          </div>
+        </Field>
+      </div>
+
+      <Field label="Tooltip">
+        <input
+          type="text"
+          value={draft.tooltip}
+          onChange={e => onChange({ ...draft, tooltip: e.target.value })}
+          className={inputCls}
+        />
+      </Field>
+
+      <div className="flex items-center gap-4 flex-wrap text-[0.85rem]">
+        <Checkbox
+          label="Panel 1"
+          checked={draft.panel1}
+          onChange={v => onChange({ ...draft, panel1: v })}
+        />
+        <Checkbox
+          label="Panel 2"
+          checked={draft.panel2}
+          onChange={v => onChange({ ...draft, panel2: v })}
+        />
+        <Checkbox
+          label="Absolute"
+          checked={draft.absolute}
+          onChange={v => onChange({ ...draft, absolute: v })}
+        />
+        <Checkbox
+          label="Master ticks"
+          checked={draft.only_master_ticks}
+          onChange={v => onChange({ ...draft, only_master_ticks: v })}
+        />
+      </div>
+    </>
+  )
+}
+
 function defaultTriggerDraft(t?: Trigger): TriggerDraft {
   return {
     label: t?.label ?? '',
@@ -515,12 +640,21 @@ function TriggerEditor({ base, spellTimers, existing, existingTimer, onCancel, o
   // If the user types a timer name that matches an existing spell-timer for
   // this encounter, snap the timer-draft to that row so they edit the same
   // record. Otherwise treat it as a fresh definition.
-  function onTimerNameBlur() {
-    const want = draft.timer_name.trim().toLowerCase()
+  function onTimerNameBlur(name: string) {
+    const want = name.trim().toLowerCase()
     if (!want) return
     const hit = spellTimers.find(s => s.name.toLowerCase() === want)
     if (hit && hit.id !== existingTimer?.id) {
       setTimerDraft(defaultSpellTimerDraft(hit))
+    }
+  }
+
+  // Intercept SpellTimerEditor onChange: when the name changes, keep
+  // draft.timer_name in sync so the trigger body stays consistent.
+  function handleTimerDraftChange(next: SpellTimerDraft) {
+    setTimerDraft(next)
+    if (next.name !== timerDraft.name) {
+      setDraft(d => ({ ...d, timer_name: next.name }))
     }
   }
 
@@ -529,7 +663,7 @@ function TriggerEditor({ base, spellTimers, existing, existingTimer, onCancel, o
       setError('Regex is required.')
       return
     }
-    if (draft.timer && !draft.timer_name.trim()) {
+    if (draft.timer && !timerDraft.name.trim()) {
       setError('Timer enabled but no Timer name given.')
       return
     }
@@ -548,7 +682,7 @@ function TriggerEditor({ base, spellTimers, existing, existingTimer, onCancel, o
         category_restrict: draft.category_restrict,
         category: draft.category.trim() || null,
         timer: draft.timer,
-        timer_name: draft.timer ? draft.timer_name.trim() || null : null,
+        timer_name: draft.timer ? timerDraft.name.trim() || null : null,
         tabbed: draft.tabbed,
         active: draft.active,
         position: existing?.position ?? 0,
@@ -567,9 +701,9 @@ function TriggerEditor({ base, spellTimers, existing, existingTimer, onCancel, o
       // If the trigger uses a timer, upsert the matching spell-timer row.
       // Match by name (UNIQUE within encounter); fall back to POST then
       // gracefully handle the 409 by switching to PUT against the existing.
-      if (draft.timer && draft.timer_name.trim()) {
+      if (draft.timer && timerDraft.name.trim()) {
         const timerBody = {
-          name: draft.timer_name.trim(),
+          name: timerDraft.name.trim(),
           timer_duration_s: timerDraft.timer_duration_s,
           warning_value: timerDraft.warning_value,
           fill_color: timerDraft.fill_color_packed,
@@ -582,7 +716,7 @@ function TriggerEditor({ base, spellTimers, existing, existingTimer, onCancel, o
 
         // Existing row known? PUT directly.
         const target = spellTimers.find(
-          s => s.name.toLowerCase() === draft.timer_name.trim().toLowerCase()
+          s => s.name.toLowerCase() === timerDraft.name.trim().toLowerCase()
         ) ?? existingTimer ?? null
 
         let r2: Response
@@ -694,87 +828,11 @@ function TriggerEditor({ base, spellTimers, existing, existingTimer, onCancel, o
               Spell timer
             </h5>
 
-            <Field label="Timer name *">
-              <input
-                type="text"
-                value={draft.timer_name}
-                onChange={e => setDraft({ ...draft, timer_name: e.target.value })}
-                onBlur={onTimerNameBlur}
-                placeholder="e.g. Doom Cooldown"
-                className={inputCls}
-              />
-            </Field>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <Field label="Duration (s)">
-                <input
-                  type="number"
-                  min={1}
-                  value={timerDraft.timer_duration_s}
-                  onChange={e => setTimerDraft({ ...timerDraft, timer_duration_s: Number(e.target.value) })}
-                  className={inputCls}
-                />
-              </Field>
-              <Field label="Warning (s)">
-                <input
-                  type="number"
-                  min={0}
-                  value={timerDraft.warning_value}
-                  onChange={e => setTimerDraft({ ...timerDraft, warning_value: Number(e.target.value) })}
-                  className={inputCls}
-                />
-              </Field>
-              <Field label="Fill colour">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={timerDraft.fill_color_hex}
-                    onChange={e => {
-                      const hex = e.target.value
-                      setTimerDraft({
-                        ...timerDraft,
-                        fill_color_hex: hex,
-                        fill_color_packed: hexToArgb(hex, timerDraft.fill_color_packed),
-                      })
-                    }}
-                    className="h-8 w-12 border border-border rounded-sm bg-bg/60"
-                  />
-                  <code className="font-mono text-[0.78rem] text-text-muted">{timerDraft.fill_color_hex}</code>
-                </div>
-              </Field>
-            </div>
-
-            <Field label="Tooltip">
-              <input
-                type="text"
-                value={timerDraft.tooltip}
-                onChange={e => setTimerDraft({ ...timerDraft, tooltip: e.target.value })}
-                className={inputCls}
-              />
-            </Field>
-
-            <div className="flex items-center gap-4 flex-wrap text-[0.85rem]">
-              <Checkbox
-                label="Panel 1"
-                checked={timerDraft.panel1}
-                onChange={v => setTimerDraft({ ...timerDraft, panel1: v })}
-              />
-              <Checkbox
-                label="Panel 2"
-                checked={timerDraft.panel2}
-                onChange={v => setTimerDraft({ ...timerDraft, panel2: v })}
-              />
-              <Checkbox
-                label="Absolute"
-                checked={timerDraft.absolute}
-                onChange={v => setTimerDraft({ ...timerDraft, absolute: v })}
-              />
-              <Checkbox
-                label="Master ticks"
-                checked={timerDraft.only_master_ticks}
-                onChange={v => setTimerDraft({ ...timerDraft, only_master_ticks: v })}
-              />
-            </div>
+            <SpellTimerEditor
+              draft={timerDraft}
+              onChange={handleTimerDraftChange}
+              onNameBlur={onTimerNameBlur}
+            />
           </div>
         )}
 
@@ -817,6 +875,237 @@ function Checkbox({ label, checked, onChange }: { label: string; checked: boolea
       <span className="text-text">{label}</span>
     </label>
   )
+}
+
+// ── Spell Timers section ──────────────────────────────────────────────────────
+
+interface SpellTimersSectionProps {
+  base: string
+  spellTimers: SpellTimer[]
+  triggerUsageByTimer: Map<string, number>
+  canEdit: boolean
+  onReload: () => Promise<void>
+}
+
+function SpellTimersSection({
+  base, spellTimers, triggerUsageByTimer, canEdit, onReload,
+}: SpellTimersSectionProps) {
+  const [editingId, setEditingId] = useState<number | 'new' | null>(null)
+  const [timerDraft, setTimerDraft] = useState<SpellTimerDraft>(defaultSpellTimerDraft)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const sorted = [...spellTimers].sort((a, b) => a.name.localeCompare(b.name))
+
+  function startNew() {
+    setTimerDraft(defaultSpellTimerDraft())
+    setSaveError(null)
+    setEditingId('new')
+  }
+
+  function startEdit(timer: SpellTimer) {
+    setTimerDraft(defaultSpellTimerDraft(timer))
+    setSaveError(null)
+    setEditingId(timer.id)
+  }
+
+  function cancel() {
+    setEditingId(null)
+    setSaveError(null)
+  }
+
+  async function saveNew() {
+    if (!timerDraft.name.trim()) {
+      setSaveError('Timer name is required.')
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const body = buildTimerBody(timerDraft)
+      const r = await fetch(`${base}/spell-timers`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (r.status === 409) {
+        setSaveError('A spell timer with that name already exists for this encounter.')
+        return
+      }
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
+      setEditingId(null)
+      await onReload()
+    } catch (e) {
+      setSaveError(String((e as Error).message ?? e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveExisting(id: number) {
+    if (!timerDraft.name.trim()) {
+      setSaveError('Timer name is required.')
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const body = buildTimerBody(timerDraft)
+      const r = await fetch(`${base}/spell-timers/${id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (r.status === 409) {
+        setSaveError('A spell timer with that name already exists for this encounter.')
+        return
+      }
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
+      setEditingId(null)
+      await onReload()
+    } catch (e) {
+      setSaveError(String((e as Error).message ?? e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteTimer(id: number, name: string) {
+    const usedBy = triggerUsageByTimer.get(name.toLowerCase()) ?? 0
+    const msg = usedBy > 0
+      ? `Delete "${name}"? It is referenced by ${usedBy} trigger${usedBy === 1 ? '' : 's'} — those triggers will lose their timer. Cannot be undone.`
+      : `Delete "${name}"? Cannot be undone.`
+    if (!confirm(msg)) return
+    setSaveError(null)
+    const r = await fetch(`${base}/spell-timers/${id}`, { method: 'DELETE', credentials: 'include' })
+    if (!r.ok) {
+      setSaveError(`Failed to delete: ${r.status} ${r.statusText}`)
+      return
+    }
+    await onReload()
+  }
+
+  return (
+    <section className="mt-6">
+      <header className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
+        <SectionLabel>Spell Timers</SectionLabel>
+        {canEdit && editingId !== 'new' && (
+          <Button size="sm" variant="primary" onClick={startNew}>
+            New spell timer
+          </Button>
+        )}
+      </header>
+
+      {editingId === null && saveError && (
+        <p className="text-danger text-sm mb-2">{saveError}</p>
+      )}
+
+      {editingId === 'new' && (
+        <div className="border border-border rounded-md p-3 bg-bg/40 mb-2 flex flex-col gap-2">
+          <h4 className="font-heading text-gold text-[1rem]">New spell timer</h4>
+          <SpellTimerEditor draft={timerDraft} onChange={setTimerDraft} nameEditable={true} />
+          {saveError && <p className="text-danger text-sm">{saveError}</p>}
+          <div className="flex items-center gap-2 justify-end mt-1">
+            <Button size="sm" variant="ghost" onClick={cancel} disabled={saving}>Cancel</Button>
+            <Button size="sm" variant="primary" onClick={saveNew} disabled={saving || !timerDraft.name.trim()}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {sorted.length === 0 && editingId !== 'new' && (
+        <p className="text-text-muted text-sm leading-relaxed">
+          No spell timers defined for this encounter yet.
+          {canEdit && <> Click <em>New spell timer</em> above to add a standalone timer.</>}
+        </p>
+      )}
+
+      {sorted.length > 0 && (
+        <ul className="border border-border rounded-md divide-y divide-border/60 overflow-hidden mt-1">
+          {sorted.map(timer => {
+            const usedBy = triggerUsageByTimer.get(timer.name.toLowerCase()) ?? 0
+            return (
+              <li key={timer.id} className="bg-surface-raised/30">
+                {editingId === timer.id ? (
+                  <div className="px-4 py-3 bg-bg/40 flex flex-col gap-2">
+                    <h4 className="font-heading text-gold text-[1rem]">Edit spell timer</h4>
+                    <SpellTimerEditor
+                      draft={timerDraft}
+                      onChange={setTimerDraft}
+                      nameEditable={usedBy === 0}
+                    />
+                    {saveError && <p className="text-danger text-sm">{saveError}</p>}
+                    <div className="flex items-center gap-2 justify-end mt-1">
+                      <Button size="sm" variant="ghost" onClick={cancel} disabled={saving}>Cancel</Button>
+                      <Button size="sm" variant="primary" onClick={() => saveExisting(timer.id)} disabled={saving || !timerDraft.name.trim()}>
+                        {saving ? 'Saving…' : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 px-3 py-2 flex-wrap">
+                    <span
+                      className="w-3 h-3 rounded-sm border border-border shrink-0"
+                      style={{ backgroundColor: argbToHex(timer.fill_color) }}
+                      aria-hidden
+                    />
+                    <span className="flex-1 min-w-0 text-[0.92rem] text-text font-medium truncate">
+                      {timer.name}
+                    </span>
+                    <span className="text-text-muted text-[0.82rem] shrink-0">{timer.timer_duration_s}s</span>
+                    <span className="text-[0.72rem] text-text-muted shrink-0">
+                      {[timer.panel1 && 'P1', timer.panel2 && 'P2', timer.absolute && 'Abs', timer.only_master_ticks && 'MT']
+                        .filter(Boolean).join(' · ') || ''}
+                    </span>
+                    <span
+                      className={[
+                        'text-[0.7rem] px-2 py-[1px] rounded-sm border shrink-0',
+                        usedBy > 0
+                          ? 'border-gold/40 bg-gold/10 text-gold-dim'
+                          : 'border-border bg-bg/60 text-text-muted',
+                      ].join(' ')}
+                    >
+                      {usedBy > 0
+                        ? `used by ${usedBy} trigger${usedBy === 1 ? '' : 's'}`
+                        : 'standalone'}
+                    </span>
+                    {canEdit && (
+                      <div className="flex items-center gap-2 shrink-0 ml-auto">
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(timer)}>Edit</Button>
+                        <Button size="sm" variant="danger" onClick={() => deleteTimer(timer.id, timer.name)}>Delete</Button>
+                      </div>
+                    )}
+                    {timer.last_edited_at && !canEdit && (
+                      <span className="text-text-muted text-[0.72rem] ml-auto">
+                        Edited {fmtRelative(timer.last_edited_at)}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function buildTimerBody(d: SpellTimerDraft) {
+  return {
+    name: d.name.trim(),
+    timer_duration_s: d.timer_duration_s,
+    warning_value: d.warning_value,
+    fill_color: d.fill_color_packed,
+    panel1: d.panel1,
+    panel2: d.panel2,
+    absolute: d.absolute,
+    only_master_ticks: d.only_master_ticks,
+    tooltip: d.tooltip,
+  }
 }
 
 // ── XML paste-import ──────────────────────────────────────────────────────────
