@@ -821,6 +821,32 @@ async def test_import_xml_unknown_encounter_is_404(app):
 
 
 @pytest.mark.asyncio
+async def test_export_all_triggers_includes_standalone_spell_timer(app):
+    """A spell timer that NO trigger references must still appear in the boss
+    export (standalone timers fire off ACT's native skill/CA name match)."""
+    trigger_no_timer = {**_TRIGGER_ROW, "id": 11, "timer": 0, "timer_name": None}
+    standalone = {**_SPELL_ROW, "id": 99, "name": "Manaward Reuse", "name_lower": "manaward reuse"}
+    with (
+        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
+        patch(
+            "web.routes.act_triggers.raids_db.list_act_triggers_for_encounter",
+            return_value=[trigger_no_timer],
+        ),
+        patch(
+            "web.routes.act_triggers.raids_db.list_act_spell_timers_for_encounter",
+            return_value=[standalone],
+        ),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/zones/The Emerald Halls/encounters/1/triggers/export.xml")
+    assert r.status_code == 200
+    body = r.text
+    assert "<Trigger " in body
+    assert "<Spell " in body
+    assert 'Name="Manaward Reuse"' in body
+
+
+@pytest.mark.asyncio
 async def test_export_trigger_quotes_attributes_safely(app):
     """Regex content with the literal quote/ampersand chars must be escaped
     in the XML output so the file still parses."""

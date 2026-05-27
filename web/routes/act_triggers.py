@@ -396,17 +396,19 @@ async def list_triggers(zone_name: str, position: int) -> list[TriggerEntry]:
     response_class=Response,
 )
 async def export_all_triggers(zone_name: str, position: int) -> Response:
-    """Bundle every trigger + every referenced spell timer for this
-    encounter into a single ACT-importable file. Spell timers are filtered
-    to just those actually referenced by a trigger with ``timer=true`` —
-    standalone-defined-but-unreferenced spell timers stay out of the
-    export."""
+    """Bundle every trigger + every spell timer for this encounter into a
+    single ACT-importable file. Both trigger-referenced and standalone
+    spell timers are included so ACT picks up timers that fire off a
+    skill/combat-art via native name-matching."""
     canonical_zone, mob_name, encounter_id = await _resolve_encounter(zone_name, position)
     loop = asyncio.get_event_loop()
     triggers = await loop.run_in_executor(None, raids_db.list_act_triggers_for_encounter, encounter_id)
     spells = await loop.run_in_executor(None, raids_db.list_act_spell_timers_for_encounter, encounter_id)
-    used_spells = _spell_timers_referenced_by(triggers, spells)
-    xml = _build_xml(triggers, used_spells)
+    # Emit EVERY spell timer for this encounter — both the ones a trigger
+    # references and standalone ones (which fire off ACT's native skill/CA
+    # name-match). The table's UNIQUE(encounter, name_lower) keeps <Spell>
+    # rows unique without extra dedup.
+    xml = _build_xml(triggers, spells)
     filename = _safe_filename(f"{canonical_zone}-{mob_name}-triggers.xml")
     return Response(
         content=xml,
