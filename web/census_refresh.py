@@ -19,6 +19,13 @@ from web.config import WORLD as _WORLD
 
 _log = logging.getLogger(__name__)
 
+
+def _scrub(value: object) -> str:
+    """Strip CR/LF before logging a user-supplied value, so a crafted name
+    can't forge log lines (CWE-117 log injection)."""
+    return str(value).replace("\r", " ").replace("\n", " ")
+
+
 _THROTTLE = 900  # 15 minutes between refresh attempts per entity
 _last_attempt: dict[str, float] = {}
 _in_flight: set[str] = set()
@@ -75,7 +82,7 @@ async def _run_character_refresh(name: str, key: str) -> None:
             character_cache.set(key, resp)
             census_events.publish({"type": "character", "key": key, "data": data, "fetched_at": int(time.time())})
     except Exception as exc:
-        _log.warning("[census-refresh] character %s failed: %s", name, exc)
+        _log.warning("[census-refresh] character %s failed: %s", _scrub(name), exc)
     finally:
         _in_flight.discard(key)
 
@@ -111,6 +118,6 @@ async def _run_guild_refresh(name: str, key: str) -> None:
     try:
         await _persist_and_publish_guild(name)
     except Exception as exc:
-        _log.warning("[census-refresh] guild %s failed: %s", name, exc)
+        _log.warning("[census-refresh] guild %s failed: %s", _scrub(name), exc)
     finally:
         _in_flight.discard(key)

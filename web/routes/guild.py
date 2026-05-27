@@ -40,6 +40,13 @@ _log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["guild"])
 
+
+def _scrub(value: object) -> str:
+    """Strip CR/LF before logging a user-supplied value, so a crafted name
+    can't forge log lines (CWE-117 log injection)."""
+    return str(value).replace("\r", " ").replace("\n", " ")
+
+
 _OFFICER_RANKS = frozenset({0, 1})  # rank_ids that count as "officer"
 
 # Guild name validation: EQ2 guild names are letters, digits, spaces, hyphens,
@@ -668,7 +675,7 @@ async def get_guild_info(request: Request, guild_name: str) -> GuildInfoResponse
     try:
         await _persist_and_publish_guild(guild_name)
     except Exception as exc:
-        _log.error("[guild] Live fetch failed for %s: %s", guild_name, exc)
+        _log.error("[guild] Live fetch failed for %s: %s", _scrub(guild_name), exc)
         raise HTTPException(
             status_code=503,
             detail=f"Census error while fetching guild '{guild_name}'.",
@@ -720,7 +727,7 @@ async def get_guild(request: Request, guild_name: str) -> GuildResponse:
     try:
         await _persist_and_publish_guild(guild_name)
     except Exception as exc:
-        _log.error("[guild] Live fetch failed for %s: %s", guild_name, exc)
+        _log.error("[guild] Live fetch failed for %s: %s", _scrub(guild_name), exc)
         raise HTTPException(
             status_code=503,
             detail=f"Census error while fetching guild '{guild_name}'.",
