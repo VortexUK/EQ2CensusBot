@@ -1418,16 +1418,17 @@ async def _can_delete_encounter(user: dict, enc: dict) -> bool:
     return False
 
 
-def _fetch_encounter_auth_rows(ids: list[int]) -> list[dict]:
+def _fetch_encounter_auth_rows(ids: list[int], world: str) -> list[dict]:
     """Fetch the (id, guild_name, source_dsn, title, hidden_at) rows needed to
-    authorise a delete. Runs in an executor."""
-    conn = parses_db.init_db()
+    authorise a delete, scoped to *world* so a cross-server id returns nothing.
+    Runs in an executor."""
+    conn = parses_db.init_db(parses_db.DB_PATH)
     try:
         conn.row_factory = sqlite3.Row
         placeholders = ",".join("?" * len(ids))
         rows = conn.execute(
-            f"SELECT id, guild_name, source_dsn, title, hidden_at FROM encounters WHERE id IN ({placeholders})",
-            ids,
+            f"SELECT id, guild_name, source_dsn, title, hidden_at FROM encounters WHERE id IN ({placeholders}) AND world = ?",
+            [*ids, world],
         ).fetchall()
         return [dict(r) for r in rows]
     finally:
@@ -1485,7 +1486,7 @@ async def delete_parses_batch(
         raise HTTPException(status_code=400, detail="ids must not be empty")
 
     loop = asyncio.get_event_loop()
-    rows = await loop.run_in_executor(None, _fetch_encounter_auth_rows, id_list)
+    rows = await loop.run_in_executor(None, _fetch_encounter_auth_rows, id_list, current_world())
     if not rows:
         raise HTTPException(status_code=404, detail="No matching parses")
 
@@ -1496,7 +1497,7 @@ async def delete_parses_batch(
     now = int(time.time())
 
     def _delete_many() -> int:
-        conn = parses_db.init_db()
+        conn = parses_db.init_db(parses_db.DB_PATH)
         try:
             return sum(1 for enc in allowed_rows if _apply_delete(conn, enc, purge=purge, hidden_at=now))
         finally:
@@ -1518,9 +1519,10 @@ async def delete_parse(
         raise HTTPException(status_code=403, detail="Only an admin may hard-purge a parse")
 
     # Look up the row so we can authorise against its real guild_name and
-    # source_dsn — never trust the caller for either.
+    # source_dsn — never trust the caller for either.  Also enforces
+    # per-server isolation: an id from another world returns no rows → 404.
     loop = asyncio.get_event_loop()
-    rows = await loop.run_in_executor(None, _fetch_encounter_auth_rows, [encounter_id])
+    rows = await loop.run_in_executor(None, _fetch_encounter_auth_rows, [encounter_id], current_world())
     if not rows:
         raise HTTPException(status_code=404, detail="Parse not found")
 
@@ -1531,7 +1533,7 @@ async def delete_parse(
     now = int(time.time())
 
     def _delete_sync() -> bool:
-        conn = parses_db.init_db()
+        conn = parses_db.init_db(parses_db.DB_PATH)
         try:
             return _apply_delete(conn, enc, purge=purge, hidden_at=now)
         finally:
@@ -1579,8 +1581,10 @@ async def delete_parses_bulk(
 
     now = int(time.time())
 
+    _world = current_world()
+
     def _delete_sync() -> int:
-        conn = parses_db.init_db()
+        conn = parses_db.init_db(parses_db.DB_PATH)
         try:
             matches = parses_db.find_encounters_by_filter(
                 conn,
@@ -1588,6 +1592,7 @@ async def delete_parses_bulk(
                 zone=zone,
                 date=date,
                 uploaded_by=uploader,
+                world=_world,
             )
             return sum(1 for enc in matches if _apply_delete(conn, enc, purge=purge, hidden_at=now))
         finally:

@@ -891,8 +891,8 @@ async def test_delete_bulk_requires_guild(app):
 async def test_delete_bulk_admin_passes_filters(app):
     captured = {}
 
-    def fake_find(conn, *, guild_name, zone=None, date=None, uploaded_by=None):
-        captured.update(guild_name=guild_name, zone=zone, date=date, uploaded_by=uploaded_by)
+    def fake_find(conn, *, guild_name, zone=None, date=None, uploaded_by=None, world=None):
+        captured.update(guild_name=guild_name, zone=zone, date=date, uploaded_by=uploaded_by, world=world)
         return [
             {"id": 1, "title": "a krait patriarch", "guild_name": guild_name, "source_dsn": "plugin:X"},
             {"id": 2, "title": "a krait patriarch", "guild_name": guild_name, "source_dsn": "plugin:Y"},
@@ -909,12 +909,12 @@ async def test_delete_bulk_admin_passes_filters(app):
             r = await client.delete("/api/parses?guild=Exordium&zone=Great+Divide&date=2026-05-24&uploader=Menludiir")
     assert r.status_code == 200
     assert r.json() == {"deleted": 2}
-    assert captured == {
-        "guild_name": "Exordium",
-        "zone": "Great Divide",
-        "date": "2026-05-24",
-        "uploaded_by": "Menludiir",
-    }
+    assert captured["guild_name"] == "Exordium"
+    assert captured["zone"] == "Great Divide"
+    assert captured["date"] == "2026-05-24"
+    assert captured["uploaded_by"] == "Menludiir"
+    # world must always be passed (per-server isolation)
+    assert captured["world"] is not None
 
 
 @pytest.mark.asyncio

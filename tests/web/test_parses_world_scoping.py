@@ -5,6 +5,7 @@ Covers:
   * list endpoint (Varsoon context) excludes Wuoshi encounters
   * _resolve_parse_world maps logger_server to registry world with fallback
   * _ingest_payload_sync deduplication is world-scoped
+  * delete endpoints are blocked from deleting cross-server encounters
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from parses import db as parses_db
 from parses.models import Encounter
@@ -250,3 +252,58 @@ class TestListEncountersSyncWorldScoping:
         assert "WUOSHI01" not in v_encids
         assert "WUOSHI01" in w_encids
         assert "VARSOON1" not in w_encids
+
+
+# ---------------------------------------------------------------------------
+# Cross-server delete isolation
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteCrossServerIsolation:
+    """Admin (or any caller) on Varsoon must not be able to delete an encounter
+    that belongs to Wuoshi — the delete must return 404 and leave the row
+    untouched."""
+
+    def _fake_admin(self, request=None):
+        return {"id": "admin1", "username": "boss"}
+
+    @pytest.mark.asyncio
+    async def test_cross_server_delete_by_id_blocked(self, tmp_path, monkeypatch, app):
+        """Seeded: id A=Varsoon, id B=Wuoshi.
+        DELETE /api/parses/{B} under Varsoon context → 404, B still in DB.
+        DELETE /api/parses/{A} under Varsoon context → 200, A gone."""
+        db_file = tmp_path / "parses.db"
+        monkeypatch.setattr(parses_db, "DB_PATH", db_file)
+        parses_db.init_db(db_file).close()
+
+        # Seed two encounters in different worlds.
+        payload_a = IngestRequest(**_minimal_payload("AAAAAA"))
+        payload_b = IngestRequest(**_minimal_payload("BBBBBB"))
+        _, id_a, *_ = _ingest_payload_sync(payload_a, "Menludiir", "Exordium", "plugin:admin1", {}, world="Varsoon")
+        _, id_b, *_ = _ingest_payload_sync(payload_b, "Menludiir", "Exordium", "plugin:admin1", {}, world="Wuoshi")
+
+        with (
+            patch("web.routes.parses._require_user", self._fake_admin),
+            patch("web.routes.parses._is_admin", return_value=True),
+            patch("web.routes.parses.current_world", return_value="Varsoon"),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                # Cross-server: should be 404 and B must survive.
+                r_cross = await client.delete(f"/api/parses/{id_b}")
+                # Same-server: should succeed and A must be gone.
+                r_same = await client.delete(f"/api/parses/{id_a}")
+
+        assert r_cross.status_code == 404, "cross-server delete must return 404"
+        assert r_same.status_code == 200, "same-server delete must succeed"
+        assert r_same.json() == {"deleted": 1}
+
+        # Verify B still exists in the DB; A is gone.
+        conn = parses_db.init_db(db_file)
+        try:
+            b_row = conn.execute("SELECT id FROM encounters WHERE id = ?", (id_b,)).fetchone()
+            a_row = conn.execute("SELECT id FROM encounters WHERE id = ?", (id_a,)).fetchone()
+        finally:
+            conn.close()
+
+        assert b_row is not None, "Wuoshi encounter B must still exist after cross-server delete attempt"
+        assert a_row is None, "Varsoon encounter A must be gone after same-server delete"

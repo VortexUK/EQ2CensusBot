@@ -707,15 +707,22 @@ def list_encounters_for_admin(
     *,
     search: str | None = None,
     limit: int = 200,
+    world: str | None = None,
 ) -> list[dict]:
     """All encounters INCLUDING hidden (soft-deleted) ones, newest first, for
     the admin sanitize view. Optional case-insensitive search over
     title / uploaded_by / guild_name. Includes a player_count and the hidden_at
     marker so an admin can spot a bogus parse even when it's hidden but still
-    polluting the leaderboards."""
+    polluting the leaderboards.
+
+    ``world`` scopes to a single EQ2 server; ``None`` returns all worlds
+    (no longer recommended — pass the active server world in all call sites)."""
     conn.row_factory = sqlite3.Row
     clauses: list[str] = []
     params: list = []
+    if world is not None:
+        clauses.append("e.world = ?")
+        params.append(world)
     if search:
         like = f"%{search.lower()}%"
         clauses.append(
@@ -815,14 +822,21 @@ def find_encounters_by_filter(
     zone: str | None = None,
     date: str | None = None,
     uploaded_by: str | None = None,
+    world: str | None = None,
 ) -> list[dict]:
     """Return (id, title, guild_name, source_dsn) for encounters matching the
     same filter `delete_encounters_by_filter` uses — so the route can decide
-    soft-vs-hard delete per row. `guild_name` is mandatory."""
+    soft-vs-hard delete per row. `guild_name` is mandatory.
+
+    Pass `world` to restrict results to a single server (used by the bulk-
+    delete route to enforce per-server isolation)."""
     if not guild_name:
         raise ValueError("guild_name is required")
     clauses = ["guild_name = ?"]
     params: list = [guild_name]
+    if world:
+        clauses.append("world = ?")
+        params.append(world)
     if zone:
         clauses.append("zone = ?")
         params.append(zone)
