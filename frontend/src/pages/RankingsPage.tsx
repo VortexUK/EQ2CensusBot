@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
-import Breadcrumb from '../components/Breadcrumb'
 import { Card } from '../components/ui'
-import { FilterDropdown, type DropdownOption } from '../components/FilterDropdown'
+import { FilterBar, FilterDropdown, type DropdownOption } from '../components/FilterDropdown'
 import { fmtDuration, fmtLocalDate, fmtNum } from '../formatters'
 import { percentileColor } from '../percentileColors'
 
-interface FilterZone { zone: string; bosses: string[] }
+interface FilterZone { zone: string; bosses: string[]; expansion?: string | null }
 interface FilterScope { key: string; label: string; zones: FilterZone[] }
-interface FiltersResponse { scopes: FilterScope[] }
+interface RaidExpansion { short: string; name: string }
+interface FiltersResponse { scopes: FilterScope[]; raid_expansions?: RaidExpansion[]; default_expansion?: string | null }
 
 interface RankingRow {
   kind: 'character' | 'guild'
@@ -64,6 +64,31 @@ export default function RankingsPage() {
 
   const scope = useMemo(() => filters.scopes.find(s => s.key === size), [filters, size])
   const zoneObj = useMemo(() => scope?.zones.find(z => z.zone === zone), [scope, zone])
+  const raidZones = useMemo(() => filters.scopes.find(s => s.key === 'raid')?.zones ?? [], [filters])
+  const groupZones = useMemo(() => filters.scopes.find(s => s.key === 'group')?.zones ?? [], [filters])
+  const raidExpansions = filters.raid_expansions ?? []
+
+  // Active raid expansion: explicit ?xpac, else the selected raid zone's own
+  // expansion, else the server's default (SERVER_CURRENT_XPAC / most recent).
+  const xpac = params.get('xpac') || (size === 'raid' ? zoneObj?.expansion : null) || filters.default_expansion || ''
+  const raidZonesForXpac = useMemo(
+    () => raidZones.filter(z => (z.expansion ?? 'Other') === xpac),
+    [raidZones, xpac],
+  )
+
+  // Picking a zone from the top bar also selects its first boss.
+  function pickZone(scopeKey: string, zoneName: string, zones: FilterZone[]) {
+    const z = zones.find(x => x.zone === zoneName)
+    update({ size: scopeKey, zone: zoneName, boss: z?.bosses[0] ?? '' })
+  }
+
+  // Default to the first boss when a zone is set without a valid boss (e.g. URL load).
+  useEffect(() => {
+    if (size && zone && zoneObj && zoneObj.bosses.length && (!boss || !zoneObj.bosses.includes(boss))) {
+      update({ boss: zoneObj.bosses[0] })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size, zone, zoneObj, boss])
 
   useEffect(() => {
     if (!size || !zone || !boss) { setBoard(null); return }
@@ -85,45 +110,71 @@ export default function RankingsPage() {
 
   return (
     <main className="page-enter mx-auto max-w-5xl px-4 py-6">
-      <Breadcrumb items={[{ label: 'Rankings' }]} />
-      <h1 className="font-heading text-[1.7rem] text-gold mb-3">EQ2Logs — Rankings</h1>
-
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <FilterDropdown
-          value={size}
-          placeholder="Scope…"
-          options={filters.scopes.map(s => ({ value: s.key, label: s.label }))}
-          onChange={v => update({ size: v, zone: '', boss: '' })}
-        />
-        <FilterDropdown
-          value={zone}
-          placeholder="Zone…"
-          disabled={!scope}
-          options={(scope?.zones ?? []).map(z => ({ value: z.zone, label: z.zone }))}
-          onChange={v => update({ zone: v, boss: '' })}
-        />
-        <FilterDropdown
-          value={boss}
-          placeholder="Boss…"
-          disabled={!zoneObj}
-          options={(zoneObj?.bosses ?? []).map(b => ({ value: b, label: b }))}
-          onChange={v => update({ boss: v })}
-        />
-        <FilterDropdown value={metric} options={METRICS} onChange={v => update({ metric: v })} />
-        {!isSpeed && (
+      {/* Top — category nav: Raids · Expansion · Dungeons · Raid Guides */}
+      <div className="mb-5">
+        <FilterBar>
+          {raidExpansions.length > 0 && (
+            <FilterDropdown
+              value={xpac}
+              options={raidExpansions.map(e => ({ value: e.short, label: e.name }))}
+              onChange={v => update({ xpac: v })}
+            />
+          )}
           <FilterDropdown
-            value={cls}
-            options={[{ value: '', label: 'All classes' }, ...(board?.classes ?? []).map(c => ({ value: c, label: c }))]}
-            onChange={v => update({ class: v })}
+            label="Raids"
+            active={size === 'raid'}
+            value={size === 'raid' ? zone : ''}
+            options={raidZonesForXpac.map(z => ({ value: z.zone, label: z.zone }))}
+            onChange={v => pickZone('raid', v, raidZonesForXpac)}
           />
-        )}
+          <FilterDropdown
+            label="Dungeons"
+            active={size === 'group'}
+            value={size === 'group' ? zone : ''}
+            options={groupZones.map(z => ({ value: z.zone, label: z.zone }))}
+            onChange={v => pickZone('group', v, groupZones)}
+          />
+          <FilterDropdown label="Raid Guides" disabled value="" options={[]} onChange={() => {}} />
+        </FilterBar>
       </div>
 
-      {loading && <p className="text-text-muted">Loading…</p>}
-      {!loading && (!size || !zone || !boss) && (
-        <p className="text-text-muted">Pick a scope, zone, and boss to see the rankings.</p>
+      {/* Middle — selected zone title + type */}
+      {zone ? (
+        <div className="mb-5">
+          <h2 className="font-heading text-[1.8rem] leading-tight text-gold">{zone}</h2>
+          <p className="mt-0.5 text-sm text-text-muted">{size === 'raid' ? 'Raid Zone' : 'Dungeon'}</p>
+        </div>
+      ) : (
+        <p className="mb-5 text-text-muted">Choose a raid or dungeon above to see its rankings.</p>
       )}
-      {!loading && board && size && zone && boss && (
+
+      {/* Lower — view filters: Type / Boss / Class */}
+      {size && zone && (
+        <div className="mb-4">
+          <FilterBar>
+            <FilterDropdown value={metric} options={METRICS} onChange={v => update({ metric: v })} />
+            <FilterDropdown
+              value={boss}
+              placeholder="Boss…"
+              options={(zoneObj?.bosses ?? []).map(b => ({ value: b, label: b }))}
+              onChange={v => update({ boss: v })}
+            />
+            {!isSpeed && (
+              <FilterDropdown
+                value={cls}
+                options={[{ value: '', label: 'All classes' }, ...(board?.classes ?? []).map(c => ({ value: c, label: c }))]}
+                onChange={v => update({ class: v })}
+              />
+            )}
+          </FilterBar>
+        </div>
+      )}
+
+      {loading && <p className="text-text-muted">Loading…</p>}
+      {!loading && size && zone && boss && board && board.rows.length === 0 && (
+        <p className="text-text-muted">No ranked kills recorded for this boss yet.</p>
+      )}
+      {!loading && board && board.rows.length > 0 && size && zone && boss && (
         <Card className="p-0 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
