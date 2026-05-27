@@ -272,6 +272,7 @@ data/raids/raids.db-shm
 #               the polished/audited state on a fresh clone.
 data/raids/polish_inbox/
 data/raids/zone_overview_inbox/
+data/raids/rebalance_inbox/
 
 # Parses feature (v1, local-only) — ACT-written export and our normalized DB
 data/parses/act_export.db
