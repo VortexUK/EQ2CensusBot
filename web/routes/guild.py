@@ -546,7 +546,7 @@ async def _persist_and_publish_guild(guild_name: str) -> None:
     finally:
         conn.close()
     # SSE event carries the ROSTER (that's what the guild page live-swaps):
-    census_events.publish({"type": "guild", "key": f"{glower}:{wlower}", "data": roster_data, "fetched_at": now})
+    census_events.publish({"type": "guild", "key": f"guild:{glower}:{wlower}", "data": roster_data, "fetched_at": now})
 
 
 def _overview_to_char_response(ov: CharacterOverview):  # → CharacterResponse
