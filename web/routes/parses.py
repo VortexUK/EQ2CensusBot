@@ -219,6 +219,27 @@ async def _resolve_combatant_snapshots(
                     # own prewarm for the same guild.
                     await _prewarm_guild_silently(guild_name)
                     cached, _ = character_cache.get_stale(cache_key)
+            # The guild-roster resolve sometimes returns a member's class/level
+            # but no equipment, so the cached ilvl is None even for a real
+            # player. A direct character fetch returns equipment — fill the ilvl
+            # so they aren't missing it on the leaderboard. Bounded: only fires
+            # for resolved players still lacking an ilvl.
+            if cached is not None and getattr(cached, "cls", None) and getattr(cached, "ilvl", None) is None:
+                if client is None:
+                    client = CensusClient(service_id=_SERVICE_ID)
+                try:
+                    char = await client.get_character(name, effective_world)
+                except Exception as exc:
+                    _log.warning("Combatant ilvl backfill failed for %r: %s", name, exc)
+                    char = None
+                if char is not None:
+                    from web.routes.character import (
+                        _build_char_response,  # noqa: PLC0415 — local, avoid circular import
+                    )
+
+                    resp = _build_char_response(char)
+                    character_cache.set(cache_key, resp)
+                    cached = resp
             if cached is not None:
                 out[name] = CombatantSnapshot(
                     level=getattr(cached, "level", None),
@@ -414,6 +435,13 @@ class CombatantSummary(BaseModel):
     damage_perc: float
     dps: float
     encdps: float
+    # encDPS/encHPS ranked against this class's best for this boss (class leader
+    # = 100), for percentile colouring on the parse page; None for non-players /
+    # unresolved characters / no data. *_best_overall flags the all-class best.
+    dps_percentile: int | None = None
+    dps_best_overall: bool = False
+    hps_percentile: int | None = None
+    hps_best_overall: bool = False
     healed: int
     enchps: float
     heals: int
@@ -748,6 +776,26 @@ async def get_parse(
     if enc is None:
         raise HTTPException(status_code=404, detail="Parse not found")
 
+    # encDPS percentile colouring: rank each combatant's encDPS against their
+    # class's best for this boss (class leader = 100%), and flag the all-class
+    # best with a star. Empty for non-boss encounters (no matching kills).
+    from web.routes.rankings import benchmarks_for_boss  # noqa: PLC0415 — local, avoid import cycle
+
+    bench = await loop.run_in_executor(None, benchmarks_for_boss, enc["title"])
+
+    def _pct(c: dict, metric: str, value_key: str) -> int | None:
+        cls = c.get("cls")
+        if not cls:
+            return None
+        best = bench[metric][0].get(cls, 0.0)
+        if best <= 0:
+            return None
+        return min(100, round(100 * (c.get(value_key) or 0.0) / best))
+
+    def _best_overall(c: dict, metric: str, value_key: str) -> bool:
+        overall = bench[metric][1]
+        return bool(c.get("cls") and overall > 0 and (c.get(value_key) or 0.0) >= overall)
+
     combatants = [
         CombatantSummary(
             id=c["id"],
@@ -761,6 +809,10 @@ async def get_parse(
             damage_perc=c["damage_perc"],
             dps=c["dps"],
             encdps=c["encdps"],
+            dps_percentile=_pct(c, "dps", "encdps"),
+            dps_best_overall=_best_overall(c, "dps", "encdps"),
+            hps_percentile=_pct(c, "hps", "enchps"),
+            hps_best_overall=_best_overall(c, "hps", "enchps"),
             healed=c["healed"],
             enchps=c["enchps"],
             heals=c["heals"],

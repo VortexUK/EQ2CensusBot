@@ -814,7 +814,8 @@ async def test_resolve_snapshots_cache_hit_skips_census():
     traffic — no CensusClient is even constructed."""
     from web.routes import parses as parses_mod
 
-    cached = SimpleNamespace(level=90, guild_name="Exordium", cls="Templar")
+    # A COMPLETE cache hit (ilvl present) skips Census entirely.
+    cached = SimpleNamespace(level=90, guild_name="Exordium", cls="Templar", ilvl=372.2)
     fake_cache = MagicMock()
     fake_cache.get_stale.return_value = (cached, 0)
 
@@ -827,6 +828,34 @@ async def test_resolve_snapshots_cache_hit_skips_census():
     assert out["Menludiir"].level == 90
     assert out["Menludiir"].guild_name == "Exordium"
     assert out["Menludiir"].cls == "Templar"
+    assert out["Menludiir"].ilvl == 372.2
+
+
+@pytest.mark.asyncio
+async def test_resolve_snapshots_backfills_missing_ilvl():
+    """A cache hit with a class but no ilvl (guild resolve omitted equipment)
+    triggers a direct get_character to fill the ilvl."""
+    from web.routes import parses as parses_mod
+
+    cached = SimpleNamespace(level=92, guild_name="Exordium", cls="Wizard", ilvl=None)
+    fake_cache = MagicMock()
+    fake_cache.get_stale.return_value = (cached, 0)
+
+    client = MagicMock()
+    client.get_character = AsyncMock(return_value=object())  # opaque; _build_char_response is patched
+    client.close = AsyncMock()
+
+    filled = SimpleNamespace(level=92, guild_name="Exordium", cls="Wizard", ilvl=355.0)
+
+    with (
+        patch.object(parses_mod, "character_cache", fake_cache),
+        patch.object(parses_mod, "CensusClient", return_value=client),
+        patch("web.routes.character._build_char_response", return_value=filled),
+    ):
+        out = await parses_mod._resolve_combatant_snapshots(["Wiz"], "Varsoon")
+
+    client.get_character.assert_awaited_once_with("Wiz", "Varsoon")
+    assert out["Wiz"].ilvl == 355.0
 
 
 @pytest.mark.asyncio
@@ -836,7 +865,7 @@ async def test_resolve_snapshots_miss_warms_roster_then_hits():
     raider's lookup cover the rest of the (same-guild) raid."""
     from web.routes import parses as parses_mod
 
-    cached = SimpleNamespace(level=88, guild_name="Exordium", cls="Fury")
+    cached = SimpleNamespace(level=88, guild_name="Exordium", cls="Fury", ilvl=410.0)
     fake_cache = MagicMock()
     # 1st check → miss; after prewarm → hit.
     fake_cache.get_stale.side_effect = [(None, 0), (cached, 0)]
