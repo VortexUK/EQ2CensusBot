@@ -28,6 +28,7 @@ import argparse
 import json
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parent.parent.parent
@@ -56,7 +57,7 @@ def apply_entries(entries: list[dict], *, dry_run: bool = False) -> dict:
     (rename typo, dropped row, etc) so they're visible in the report rather
     than silently lost."""
     n_applied = 0
-    n_skipped_empty = 0
+    n_nulled = 0
     n_zones_unknown = 0
     n_encs_unknown = 0
 
@@ -67,10 +68,6 @@ def apply_entries(entries: list[dict], *, dry_run: bool = False) -> dict:
             polished = (entry.get("polished_md") or "").strip()
             zone_name = entry["zone_name"]
             mob_name = entry["mob_name"]
-
-            if not polished:
-                n_skipped_empty += 1
-                continue
 
             zrow = conn.execute(
                 "SELECT id FROM raid_zones WHERE zone_name_lower = ?",
@@ -88,6 +85,31 @@ def apply_entries(entries: list[dict], *, dry_run: bool = False) -> dict:
             if erow is None:
                 print(f"  [warn] encounter not found: {zone_name} / {mob_name!r}")
                 n_encs_unknown += 1
+                continue
+
+            if not polished:
+                # Empty polished_md means "the original was entirely anecdote /
+                # easter-egg / out-of-era — null the field". Targeted UPDATE
+                # rather than going through upsert_raid_encounter so the row
+                # ends up with strategy_md = NULL (the helper's revision logic
+                # treats a None strategy_md as "no change" and skips it).
+                if dry_run:
+                    print(f"  [dry-run] would null {zone_name} / {mob_name!r}")
+                    continue
+                now = int(time.time())
+                conn.execute(
+                    """
+                    UPDATE raid_encounters SET
+                        strategy_md    = NULL,
+                        source         = ?,
+                        last_edited_at = ?,
+                        last_edited_by = ?
+                    WHERE id = ?
+                    """,
+                    (raids_db.SOURCE_MANUAL, now, "ai-polish", erow["id"]),
+                )
+                conn.commit()
+                n_nulled += 1
                 continue
 
             if dry_run:
@@ -109,7 +131,7 @@ def apply_entries(entries: list[dict], *, dry_run: bool = False) -> dict:
 
     return {
         "applied": n_applied,
-        "skipped_empty": n_skipped_empty,
+        "nulled": n_nulled,
         "zones_unknown": n_zones_unknown,
         "encs_unknown": n_encs_unknown,
     }
@@ -136,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Looked in: {_OUTBOX}")
         return 1
 
-    totals = {"applied": 0, "skipped_empty": 0, "zones_unknown": 0, "encs_unknown": 0}
+    totals = {"applied": 0, "nulled": 0, "zones_unknown": 0, "encs_unknown": 0}
     for path in files:
         print(f"\nReading {path.name}")
         entries = _load_entries(path)
