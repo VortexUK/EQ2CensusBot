@@ -297,11 +297,14 @@ def _build_filters(kills: list[dict]) -> dict:
     return {"scopes": scopes, "raid_expansions": raid_expansions, "default_expansion": default_expansion}
 
 
-def _load_primary_boss_kills() -> list[dict]:
+def _load_primary_boss_kills(world: str = "Varsoon") -> list[dict]:
     """Load winning boss-kill encounters, mirror-group them, and return one
     'primary' (longest) upload per fight with its combatants attached. Ignores
     hidden_at so soft-deleted parses still rank. Called from an executor by the
-    async endpoints."""
+    async endpoints.
+
+    ``world`` scopes to the active server so each server sees only its own
+    leaderboard data."""
     if not parses_db.DB_PATH.exists():
         return []
     conn = parses_db.init_db(parses_db.DB_PATH)
@@ -313,9 +316,10 @@ def _load_primary_boss_kills() -> list[dict]:
                    e.started_at, e.duration_s, e.success_level,
                    ({_PLAYER_COUNT_SQL}) AS player_count
             FROM encounters e
-            WHERE e.success_level = 1
+            WHERE e.success_level = 1 AND e.world = ?
             ORDER BY e.started_at DESC
-            """
+            """,
+            (world,),
         ).fetchall()
         # Gate + canonicalise per row (scope is known from player_count): raid
         # bosses resolve against zones.db, everything else via the heuristic.
@@ -354,26 +358,34 @@ def _load_primary_boss_kills() -> list[dict]:
         conn.close()
 
 
-def _cached_kills() -> list[dict]:
-    cached = rankings_cache.get(_KILLS_KEY)
+def _cached_kills(world: str | None = None) -> list[dict]:
+    """Return the cached boss-kill list for ``world`` (defaults to
+    current_world() when called inside a request context).  The cache key
+    is per-world so each server's leaderboard is independently cached."""
+    effective_world = world or current_server().world
+    cache_key = f"{_KILLS_KEY}:{effective_world}"
+    cached = rankings_cache.get(cache_key)
     if cached is not None:
         return cached
-    kills = _load_primary_boss_kills()
-    rankings_cache.set(_KILLS_KEY, kills)
+    kills = _load_primary_boss_kills(effective_world)
+    rankings_cache.set(cache_key, kills)
     return kills
 
 
-def benchmarks_for_boss(boss_title: str) -> dict[str, tuple[dict[str, float], float]]:
+def benchmarks_for_boss(boss_title: str, world: str | None = None) -> dict[str, tuple[dict[str, float], float]]:
     """Best encDPS and encHPS achieved per class, and overall, for a boss across
     all primary winning kills (the rankings dataset). Lets the parse page colour
     each combatant's encDPS/encHPS by where it sits among their class for that
     boss (class leader = 100%), and flag the all-class best. Returns
-    {"dps": ({class: best}, overall), "hps": ({class: best}, overall)}."""
+    {"dps": ({class: best}, overall), "hps": ({class: best}, overall)}.
+
+    ``world`` defaults to current_world() — pass explicitly when calling from
+    a thread where the contextvar may not be propagated."""
     dps_by_class: dict[str, float] = {}
     hps_by_class: dict[str, float] = {}
     dps_overall = 0.0
     hps_overall = 0.0
-    for k in _cached_kills():
+    for k in _cached_kills(world):
         if k["title"] != boss_title:
             continue
         for c in k["combatants"]:

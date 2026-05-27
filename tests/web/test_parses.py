@@ -357,7 +357,7 @@ async def test_list_parses_clamps_fight_limit(app):
     The inner SQL cap is generous (limit*30) so grouping has headroom."""
     captured = {}
 
-    def fake_list_sync(inner_cap, zone, size):
+    def fake_list_sync(inner_cap, zone, size, world="Varsoon"):
         captured["inner_cap"] = inner_cap
         captured["zone"] = zone
         captured["size"] = size
@@ -380,7 +380,7 @@ async def test_list_parses_clamps_fight_limit(app):
 async def test_list_parses_passes_zone_filter(app):
     captured = {}
 
-    def fake_list_sync(inner_cap, zone, size):
+    def fake_list_sync(inner_cap, zone, size, world="Varsoon"):
         captured["zone"] = zone
         return []
 
@@ -397,7 +397,7 @@ async def test_list_parses_passes_zone_filter(app):
 async def test_list_parses_passes_size_filter(app):
     captured = {}
 
-    def fake_list_sync(inner_cap, zone, size):
+    def fake_list_sync(inner_cap, zone, size, world="Varsoon"):
         captured["size"] = size
         return []
 
@@ -519,7 +519,7 @@ async def test_get_parse_missing_returns_404(app):
 async def test_get_parse_clamps_top_attacks(app):
     captured = {}
 
-    def fake_detail_sync(encounter_id, top_attacks_per_combatant):
+    def fake_detail_sync(encounter_id, top_attacks_per_combatant, world="Varsoon"):
         captured["top"] = top_attacks_per_combatant
         return None  # 404 — we just want to inspect the captured arg
 

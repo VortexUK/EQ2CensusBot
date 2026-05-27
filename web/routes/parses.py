@@ -53,6 +53,8 @@ from web.cache import character_cache
 from web.config import SERVICE_ID as _SERVICE_ID
 from web.config import WORLD as _WORLD
 from web.limiter import limiter
+from web.server_context import _by_world as _server_registry_by_world
+from web.server_context import current_world
 
 _log = logging.getLogger(__name__)
 
@@ -96,6 +98,27 @@ def _sanitize_world(world: str | None) -> str | None:
     if not candidate:
         return None
     return candidate if _VALID_WORLD_RE.match(candidate) else None
+
+
+def _resolve_parse_world(logger_server: str | None) -> str:
+    """Map a plugin-supplied logger_server to a canonical world name from the
+    server registry.  Falls back to current_world() (the request's active
+    server, or the EQ2_WORLD env-var default) when logger_server is absent,
+    fails sanitisation, or doesn't match any registered world.
+
+    Case-insensitive match against server.world values in the registry so
+    'varsoon' and 'Varsoon' both resolve to 'Varsoon'."""
+    sanitized = _sanitize_world(logger_server)
+    if sanitized:
+        # Fast exact match first.
+        if sanitized in _server_registry_by_world:
+            return sanitized
+        # Case-insensitive scan (registry keys are canonical-cased).
+        lower = sanitized.lower()
+        for world_key, _srv in _server_registry_by_world.items():
+            if world_key.lower() == lower:
+                return world_key
+    return current_world()
 
 
 async def _resolve_uploader_guild_async(
@@ -512,19 +535,24 @@ def _list_encounters_sync(
     inner_cap: int,
     zone: str | None,
     size: str | None,
+    world: str = "Varsoon",
 ) -> list[dict]:
     """Return matching encounter rows most-recent-first, capped at
     ``inner_cap`` raw uploads (not fights). Mirror grouping happens after
     this call — inner_cap must be generous enough to cover the requested
-    fight limit × the worst-case mirror count per fight."""
+    fight limit × the worst-case mirror count per fight.
+
+    ``world`` scopes results to the active server so a Varsoon viewer only
+    sees Varsoon parses."""
     if not parses_db.DB_PATH.exists():
         return []
 
     # Soft-deleted parses are hidden from the list (but still feed rankings).
-    where_clauses: list[str] = ["hidden_at IS NULL"]
-    params: list = []
+    # Note: the WHERE clause operates on the outer query's columns (no alias).
+    where_clauses: list[str] = ["hidden_at IS NULL", "world = ?"]
+    params: list = [world]
     if zone:
-        where_clauses.append("e.zone = ?")
+        where_clauses.append("zone = ?")
         params.append(zone)
     if size and size in SIZE_BUCKETS:
         lo, hi = SIZE_BUCKETS[size]
@@ -614,14 +642,17 @@ def _group_into_fights(encounters: list[dict]) -> list[dict]:
     return groups
 
 
-def _encounter_detail_sync(encounter_id: int, top_attacks_per_combatant: int) -> dict | None:
-    """Return the encounter + its combatants + top attacks per combatant."""
+def _encounter_detail_sync(encounter_id: int, top_attacks_per_combatant: int, world: str = "Varsoon") -> dict | None:
+    """Return the encounter + its combatants + top attacks per combatant.
+
+    ``world`` is used to scope the lookup so a viewer on one server can't
+    read another server's encounter by guessing its integer id."""
     if not parses_db.DB_PATH.exists():
         return None
     conn = parses_db.init_db()
     try:
         conn.row_factory = sqlite3.Row
-        enc_row = conn.execute("SELECT * FROM encounters WHERE id = ?", (encounter_id,)).fetchone()
+        enc_row = conn.execute("SELECT * FROM encounters WHERE id = ? AND world = ?", (encounter_id, world)).fetchone()
         if enc_row is None:
             return None
         enc = dict(enc_row)
@@ -707,7 +738,7 @@ async def list_parses(
     inner_cap = max(limit * 30, 2000)
 
     loop = asyncio.get_event_loop()
-    encounters = await loop.run_in_executor(None, _list_encounters_sync, inner_cap, zone, size)
+    encounters = await loop.run_in_executor(None, _list_encounters_sync, inner_cap, zone, size, current_world())
 
     # Group uploads into fights, then apply the user-facing limit to the
     # FIGHT list. `total` reports total fights (pre-limit) so the UI can
@@ -772,7 +803,7 @@ async def get_parse(
     top_attacks = max(1, min(top_attacks, 50))
 
     loop = asyncio.get_event_loop()
-    enc = await loop.run_in_executor(None, _encounter_detail_sync, encounter_id, top_attacks)
+    enc = await loop.run_in_executor(None, _encounter_detail_sync, encounter_id, top_attacks, current_world())
     if enc is None:
         raise HTTPException(status_code=404, detail="Parse not found")
 
@@ -781,7 +812,10 @@ async def get_parse(
     # best with a star. Empty for non-boss encounters (no matching kills).
     from web.routes.rankings import benchmarks_for_boss  # noqa: PLC0415 — local, avoid import cycle
 
-    bench = await loop.run_in_executor(None, benchmarks_for_boss, enc["title"])
+    # Pass the encounter's own world so benchmarks use the same server's
+    # leaderboard data, regardless of the active request context.
+    enc_world = enc.get("world") or current_world()
+    bench = await loop.run_in_executor(None, benchmarks_for_boss, enc["title"], enc_world)
 
     def _pct(c: dict, metric: str, value_key: str) -> int | None:
         cls = c.get("cls")
@@ -1120,6 +1154,7 @@ def _ingest_payload_sync(
     guild_name: str | None,
     source_dsn: str,
     snapshots: dict[str, CombatantSnapshot] | None = None,
+    world: str = "Varsoon",
 ) -> tuple[str, int | None, int, int, int]:
     """Write the payload into parses.db. Returns (status, encounter_id,
     n_combatants, n_damage_types, n_attack_types).
@@ -1127,7 +1162,11 @@ def _ingest_payload_sync(
     status: 'inserted' on success, 'revived' if the encid was already
     ingested but soft-deleted (re-upload un-hides it), 'skipped' if the
     encid was already ingested and still visible — the upload is
-    idempotent on retries."""
+    idempotent on retries.
+
+    ``world`` is the authoritative server name (resolved from logger_server
+    via _resolve_parse_world) and is stored on the encounter row and in
+    ingest_log so the same act_encid from two different servers are distinct."""
     enc = _encounter_from_payload(payload.encounter)
     if enc is None:
         raise HTTPException(status_code=400, detail="Encounter starttime/endtime unparseable")
@@ -1139,12 +1178,9 @@ def _ingest_payload_sync(
 
     conn = parses_db.init_db(parses_db.DB_PATH)
     try:
-        # Idempotency: skip if this uploader has already ingested this encid.
-        # NOTE: the current UNIQUE constraint is on act_encid alone, so a
-        # different uploader's payload with the same encid will collide at
-        # insert time. Phase 3+ will switch to UNIQUE(act_encid, uploaded_by).
-        if parses_db.is_ingested(conn, enc.encid):
-            existing = parses_db.find_encounter_by_act_encid(conn, enc.encid)
+        # Idempotency: skip if this world+encid pair was already ingested.
+        if parses_db.is_ingested(conn, enc.encid, world):
+            existing = parses_db.find_encounter_by_act_encid(conn, enc.encid, world)
             # A re-upload of a soft-deleted (hidden) parse should bring it back,
             # not silently skip — un-hide it so it returns to the list.
             if existing and existing.get("hidden_at") is not None:
@@ -1161,6 +1197,7 @@ def _ingest_payload_sync(
                 ingested_at=ingested_at,
                 uploaded_by=uploaded_by,
                 guild_name=guild_name,
+                world=world,
             )
             name_to_id = parses_db.insert_combatants_bulk(conn, encounter_id, combatants, snapshots)
             n_dt = parses_db.insert_damage_types_bulk(conn, name_to_id, damage_types)
@@ -1171,6 +1208,7 @@ def _ingest_payload_sync(
                 encounter_id,
                 source_dsn=source_dsn,
                 ingested_at=ingested_at,
+                world=world,
             )
         return ("inserted", encounter_id, len(combatants), n_dt, n_at)
     finally:
@@ -1285,6 +1323,11 @@ async def ingest_parse(
             detail="logger_name must be 1-15 letters (the EQ2 character-name shape).",
         )
 
+    # Resolve the parse's authoritative server world.  logger_server from the
+    # plugin (v0.1.10+) is mapped to a known registry world; unrecognised or
+    # absent values fall back to the active request server (current_world()).
+    parse_world = _resolve_parse_world(body.logger_server)
+
     # Cache-aware guild resolve: hits character_cache first; on miss does a
     # one-character Census call and pre-warms the full roster in the
     # background so the rest of the raid's uploads are zero-Census.
@@ -1321,6 +1364,7 @@ async def ingest_parse(
         guild_name,
         f"plugin:{user['id']}",  # source_dsn marks the auth path
         snapshots,
+        parse_world,
     )
 
     # Schedule the full (Census-backed) resolution off the response path. For

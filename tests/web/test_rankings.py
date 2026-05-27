@@ -402,7 +402,13 @@ def rankings_db(tmp_path, monkeypatch):
     _ins(conn, "LOSS", "Cazel", success=2, players=8, guild="Exordium", duration=90)  # not a win
     conn.close()
     from web.routes import rankings as rk
+    from web.server_context import default_server
 
+    # Clear per-world cache keys so each test starts with a fresh board.
+    # The key format changed to "{_KILLS_KEY}:{world}" in Task 8.
+    world = default_server().world
+    rk.rankings_cache.delete(f"{rk._KILLS_KEY}:{world}")
+    # Also clear the legacy bare key in case it was left behind by an older run.
     rk.rankings_cache.delete(rk._KILLS_KEY)
     return db_file
 
