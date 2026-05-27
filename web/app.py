@@ -28,6 +28,7 @@ from web.config import SESSION_COOKIE_DOMAIN as _SESSION_COOKIE_DOMAIN
 from web.config import WORLD as _WORLD
 from web.limiter import limiter
 from web.metrics import (
+    APP_ERRORS,
     APP_INFO,
     HTTP_REQUEST_DURATION,
     HTTP_REQUESTS,
@@ -164,6 +165,14 @@ class _MetricsMiddleware(BaseHTTPMiddleware):
                 method=request.method,
                 path=label_path,
             ).observe(elapsed)
+
+            # Server-error counter for the Databases dashboard. Only 5xx — 4xx
+            # is mostly user error (auth, validation) and would drown out the
+            # actual server-side failures we want to alert on. `source` is the
+            # matched route template so spikes can be attributed to the
+            # offending endpoint without exploding label cardinality.
+            if response.status_code >= 500:
+                APP_ERRORS.labels(source=label_path).inc()
 
             # Per-user page views: authenticated GET requests only.
             # Session is already populated by SessionMiddleware (runs before us).

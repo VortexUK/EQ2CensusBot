@@ -83,38 +83,174 @@ CENSUS_DURATION = Histogram(
 
 APP_INFO: Info = Info("eq2_companion", "Static build / configuration info")
 
+# ── App-level error counter ───────────────────────────────────────────────────
+# Bumped by the FastAPI exception handler for unhandled 500s. 4xx user-errors
+# (auth, validation) deliberately don't count here — they'd drown out the
+# server-side problems this metric is meant to surface.
+
+APP_ERRORS = Counter(
+    "app_errors_total",
+    "Server-side errors (unhandled exceptions or explicit 500s)",
+    ["source"],
+)
+
 # ── DB gauges (collected on-demand) ──────────────────────────────────────────
 
 
 class _DBCollector(Collector):
     """
-    Custom collector that runs fast COUNT queries against the local SQLite DB
-    each time Prometheus scrapes /metrics.  SQLite queries on a tiny DB are
-    < 1 ms so blocking the collector is acceptable.
+    Custom collector that runs fast COUNT queries against the local SQLite DBs
+    each time Prometheus scrapes /metrics. SQLite COUNTs on indexed tables in
+    the few-thousand-row range are sub-millisecond, so blocking the collector
+    is fine.
+
+    A 30-second scrape interval × ~12 queries × <1 ms each is ~12 ms/scrape
+    of total DB work — well under any threshold worth caching for.
     """
 
     def collect(self):  # type: ignore[override]
-        from web.db import DB_PATH
+        # Lazy imports — keep metrics.py importable from tests without the
+        # full DB modules loaded.
+        from census import raids_db
+        from parses import db as parses_db
+        from web.db import DB_PATH as users_db_path
 
         g_users = GaugeMetricFamily("users_total", "Registered users by access status", labels=["status"])
         g_claims = GaugeMetricFamily("character_claims_total", "Character claims by status", labels=["status"])
+        g_parses = GaugeMetricFamily(
+            "parses_encounters_total",
+            "Total normalised encounters in parses.db (visible / hidden)",
+            labels=["visibility"],
+        )
+        g_raids = GaugeMetricFamily(
+            "raid_encounters_total",
+            "Curated raid-encounter strategy rows in raids.db",
+        )
+        g_triggers = GaugeMetricFamily(
+            "act_triggers_total",
+            "ACT triggers stored across all encounters",
+        )
+        g_spell_timers = GaugeMetricFamily(
+            "act_spell_timers_total",
+            "ACT spell-timer definitions stored across all encounters",
+        )
 
+        # users.db ----------------------------------------------------------
         try:
-            conn = sqlite3.connect(DB_PATH, timeout=1.0)
+            conn = sqlite3.connect(users_db_path, timeout=1.0)
             for status in ("approved", "pending", "denied"):
-                row = conn.execute("SELECT COUNT(*) FROM users WHERE access_status = ?", (status,)).fetchone()
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM users WHERE access_status = ?",
+                    (status,),
+                ).fetchone()
                 g_users.add_metric([status], row[0] if row else 0)
 
             for status in ("pending", "approved", "rejected", "withdrawn", "superseded"):
-                row = conn.execute("SELECT COUNT(*) FROM character_claims WHERE status = ?", (status,)).fetchone()
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM character_claims WHERE status = ?",
+                    (status,),
+                ).fetchone()
                 g_claims.add_metric([status], row[0] if row else 0)
-
             conn.close()
         except Exception as exc:
-            _log.error("[metrics] DB collector error: %s", exc)
+            _log.error("[metrics] users.db collector error: %s", exc)
+
+        # parses.db — encounters split by hidden_at (visible vs soft-deleted)
+        # so dashboards can distinguish "live leaderboard rows" from
+        # accumulated history.
+        try:
+            if parses_db.DB_PATH.exists():
+                conn = sqlite3.connect(parses_db.DB_PATH, timeout=1.0)
+                row = conn.execute("SELECT COUNT(*) FROM encounters WHERE hidden_at IS NULL").fetchone()
+                g_parses.add_metric(["visible"], row[0] if row else 0)
+                row = conn.execute("SELECT COUNT(*) FROM encounters WHERE hidden_at IS NOT NULL").fetchone()
+                g_parses.add_metric(["hidden"], row[0] if row else 0)
+                conn.close()
+        except Exception as exc:
+            _log.error("[metrics] parses.db collector error: %s", exc)
+
+        # raids.db — strategies + the ACT trigger pack.
+        try:
+            if raids_db.DB_PATH.exists():
+                conn = sqlite3.connect(raids_db.DB_PATH, timeout=1.0)
+                row = conn.execute("SELECT COUNT(*) FROM raid_encounters").fetchone()
+                g_raids.add_metric([], row[0] if row else 0)
+                row = conn.execute("SELECT COUNT(*) FROM act_triggers").fetchone()
+                g_triggers.add_metric([], row[0] if row else 0)
+                row = conn.execute("SELECT COUNT(*) FROM act_spell_timers").fetchone()
+                g_spell_timers.add_metric([], row[0] if row else 0)
+                conn.close()
+        except Exception as exc:
+            _log.error("[metrics] raids.db collector error: %s", exc)
 
         yield g_users
         yield g_claims
+        yield g_parses
+        yield g_raids
+        yield g_triggers
+        yield g_spell_timers
+
+
+class _DBFileSizeCollector(Collector):
+    """File-size gauge for every SQLite DB the app reads/writes. Lets the
+    Databases dashboard show growth trends per DB without per-table COUNTs
+    (those live in :class:`_DBCollector`).
+
+    Inspects only what's on disk; doesn't touch the DBs. Missing DBs are
+    silently absent from the output rather than reporting 0 — a missing
+    file is a different state than an empty one, and the dashboard can
+    spot the difference via the labelset gap."""
+
+    def collect(self):  # type: ignore[override]
+        from census import census_store, classes_db, raids_db, recipes_db, spells_db, zones_db
+        from census import db as items_db
+        from parses import db as parses_db
+        from web.db import DB_PATH as users_db_path
+
+        # Map label → Path. Centralised so adding a new DB is one tuple.
+        candidates = [
+            ("users", users_db_path),
+            ("parses", parses_db.DB_PATH),
+            ("census", census_store.DB_PATH),
+            ("raids", raids_db.DB_PATH),
+            ("zones", zones_db.DB_PATH),
+            ("items", items_db.DB_PATH),
+            ("spells", spells_db.DB_PATH),
+            ("recipes", recipes_db.DB_PATH),
+            ("classes", classes_db.DB_PATH),
+        ]
+
+        g_size = GaugeMetricFamily(
+            "db_file_size_bytes",
+            "On-disk size of each SQLite database (bytes)",
+            labels=["db"],
+        )
+
+        for label, path in candidates:
+            try:
+                if path.exists():
+                    g_size.add_metric([label], path.stat().st_size)
+            except Exception as exc:
+                _log.error("[metrics] db file-size for %s: %s", label, exc)
+
+        yield g_size
+
+
+class _CensusHealthCollector(Collector):
+    """Read the in-memory census-health state at scrape time and surface it
+    as a gauge (1 = up, 0 = down/unknown). Avoids needing a feedback hook
+    from census_health into the metrics module."""
+
+    def collect(self):  # type: ignore[override]
+        from web import census_health
+
+        g = GaugeMetricFamily(
+            "census_health_status",
+            "Census API health (1 = up, 0 = down/unknown)",
+        )
+        state = census_health.get_state()
+        g.add_metric([], 1.0 if state.get("status") == "up" else 0.0)
+        yield g
 
 
 # Register once — guarded so re-imports in tests don't raise DuplicateCollector
@@ -122,9 +258,12 @@ _db_collector_registered = False
 
 
 def _register_db_collector() -> None:
+    """Register the on-scrape collectors. Called once from FastAPI startup."""
     global _db_collector_registered
     if not _db_collector_registered:
         REGISTRY.register(_DBCollector())
+        REGISTRY.register(_DBFileSizeCollector())
+        REGISTRY.register(_CensusHealthCollector())
         _db_collector_registered = True
 
 
