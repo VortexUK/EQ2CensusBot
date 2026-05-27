@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import Breadcrumb from '../components/Breadcrumb'
+import { EncounterStrategy } from '../components/EncounterStrategy'
 import { Card, SectionLabel } from '../components/ui'
 import { fmtRelative } from '../formatters'
 import { useRaidProgress, type KilledEncounter } from '../hooks/useRaidProgress'
@@ -144,6 +145,7 @@ export default function RaidZonePage() {
             <section className="min-w-0">
               {selected ? (
                 <EncounterDetail
+                  zoneName={zone.name}
                   encounter={selected}
                   kill={killsByName.get(selected.encounter_name)}
                 />
@@ -302,11 +304,12 @@ function KillIndicator({ killed }: { killed: boolean }) {
 // ── Main pane ─────────────────────────────────────────────────────────────────
 
 interface EncounterDetailProps {
+  zoneName: string
   encounter: Encounter
   kill: KilledEncounter | undefined
 }
 
-function EncounterDetail({ encounter, kill }: EncounterDetailProps) {
+function EncounterDetail({ zoneName, encounter, kill }: EncounterDetailProps) {
   const isGroup = encounter.mobs.length > 1
   return (
     <Card className="flex flex-col gap-4">
@@ -358,29 +361,11 @@ function EncounterDetail({ encounter, kill }: EncounterDetailProps) {
         </section>
       )}
 
-      {/* Strategy placeholder — the markdown editor lands in a follow-up commit. */}
-      <section>
-        <SectionLabel>Strategy</SectionLabel>
-        <p className="text-text-muted text-sm leading-relaxed">
-          No strategy written yet for this encounter.{' '}
-          {encounter.wiki_url ? (
-            <>
-              The{' '}
-              <a
-                href={encounter.wiki_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gold-dim underline decoration-dotted underline-offset-2 hover:text-gold"
-              >
-                EQ2i wiki page
-              </a>{' '}
-              is the best reference for now.
-            </>
-          ) : (
-            <>The EQ2i wiki is the best reference for now.</>
-          )}
-        </p>
-      </section>
+      <EncounterStrategy
+        zoneName={zoneName}
+        position={encounter.position}
+        wikiUrl={encounter.wiki_url}
+      />
     </Card>
   )
 }
