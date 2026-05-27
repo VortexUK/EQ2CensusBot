@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
+import { ActTriggers } from '../components/ActTriggers'
 import Breadcrumb from '../components/Breadcrumb'
 import { EncounterStrategy } from '../components/EncounterStrategy'
 import { ZoneOverview } from '../components/ZoneOverview'
@@ -374,6 +375,11 @@ function EncounterDetail({ zoneName, encounter, kill }: EncounterDetailProps) {
         zoneName={zoneName}
         position={encounter.position}
         wikiUrl={encounter.wiki_url}
+      />
+
+      <ActTriggers
+        zoneName={zoneName}
+        position={encounter.position}
       />
     </Card>
   )
