@@ -448,12 +448,18 @@ class CensusClient:
         }
         return rank_map, guild.get("member_list") or []
 
-    async def get_guild_full(self, name: str, world: str) -> tuple[GuildData, list[CharacterOverview], dict] | None:
+    async def get_guild_full(
+        self, name: str, world: str
+    ) -> tuple[GuildData, list[CharacterOverview], dict, list[dict]] | None:
         """
         Fetch guild with full member profiles (type + stats + equipment + spell IDs).
-        Returns (GuildData, list[CharacterOverview], guild_info_dict) for cache
-        pre-warming.  guild_info_dict contains the same fields as get_guild_info()
-        so callers can warm the info cache without a second Census round-trip.
+        Returns (GuildData, list[CharacterOverview], guild_info_dict, roster_stubs)
+        for cache pre-warming.  guild_info_dict contains the same fields as
+        get_guild_info() so callers can warm the info cache without a second Census
+        round-trip.  roster_stubs lists EVERY member (resolved and unresolved) as
+        {"name", "rank", "rank_id"} — the member LIST is reliable regardless of
+        login recency, so this preserves names+ranks of offline members that the
+        resolved 'members'/'overviews' lists drop (those keep the type-dict filter).
         Spell IDs are raw integers stored in CharacterOverview.spell_ids; callers
         should resolve them against the local spells DB rather than making
         per-character Census calls.
@@ -492,19 +498,34 @@ class CensusClient:
 
         members: list[GuildMember] = []
         overviews: list[CharacterOverview] = []
+        roster_stubs: list[dict] = []
 
         guild_name_str = guild.get("name", name)
 
         for m in guild.get("member_list") or []:
+            guild_sec = m.get("guild") or {}
+            raw_rank = _int(guild_sec.get("rank"))
+            # Guild member resolve puts the character name in 'name' or 'displayname'.
+            # Name + rank are available for ALL members regardless of login recency,
+            # so build the stub BEFORE the type-dict filter below.
+            stub_name = m.get("name") or m.get("displayname")
+            if not stub_name:
+                # No usable name — can't carry this member forward at all.
+                continue
+            roster_stubs.append(
+                {
+                    "name": stub_name,
+                    "rank": rank_map.get(raw_rank) if raw_rank is not None else None,
+                    "rank_id": raw_rank,
+                }
+            )
+
             t = m.get("type")
             if not isinstance(t, dict):
                 continue
-            guild_sec = m.get("guild") or {}
-            raw_rank = _int(guild_sec.get("rank"))
             guild_status = _int(guild_sec.get("status"))
             deity_val = t.get("deity")
-            # Guild member resolve puts the character name in 'name' or 'displayname'
-            member_name = m.get("name") or m.get("displayname", "Unknown")
+            member_name = stub_name
             gender = t.get("gender", "")
             ts_class = t.get("ts_class", "")
 
@@ -583,6 +604,7 @@ class CensusClient:
             ),
             overviews,
             guild_info,
+            roster_stubs,
         )
 
     async def get_character_guild_name(self, character_name: str, world: str) -> str | None:

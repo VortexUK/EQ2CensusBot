@@ -40,6 +40,7 @@ from web.routes.act_triggers import router as act_triggers_router
 from web.routes.admin import router as admin_router
 from web.routes.auth import router as auth_router
 from web.routes.auth_tokens import router as auth_tokens_router
+from web.routes.census import router as census_router
 from web.routes.character import prewarm_character_cache
 from web.routes.character import router as character_router
 from web.routes.characters import router as characters_router
@@ -227,6 +228,9 @@ def create_app(session_secret: str | None = None) -> FastAPI:
 
         _asyncio.create_task(prewarm_character_cache())
         _asyncio.create_task(_cache_sweep_loop())
+        from web import census_health
+
+        _asyncio.create_task(census_health.poll_loop())
 
     async def _cache_sweep_loop() -> None:
         """Periodically evict max_age-expired entries from all caches.
@@ -304,6 +308,7 @@ def create_app(session_secret: str | None = None) -> FastAPI:
     app.include_router(raid_strategies_router, prefix="/api")
     app.include_router(act_triggers_router, prefix="/api")
     app.include_router(role_requests_router, prefix="/api")
+    app.include_router(census_router, prefix="/api")
 
     # ── /metrics — Prometheus text format ───────────────────────────────────
     # Runs synchronously (FastAPI auto-offloads sync def to a thread pool)

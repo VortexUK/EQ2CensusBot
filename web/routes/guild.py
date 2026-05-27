@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from collections import Counter
 
 import aiosqlite
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from census import census_store
 from census.client import CensusClient
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.models import CharacterOverview, GuildData, SpellEntry
@@ -37,6 +39,13 @@ from web.limiter import limiter
 _log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["guild"])
+
+
+def _scrub(value: object) -> str:
+    """Strip CR/LF before logging a user-supplied value, so a crafted name
+    can't forge log lines (CWE-117 log injection)."""
+    return str(value).replace("\r", " ").replace("\n", " ")
+
 
 _OFFICER_RANKS = frozenset({0, 1})  # rank_ids that count as "officer"
 
@@ -76,6 +85,8 @@ class GuildInfoResponse(BaseModel):
     members: int | None = None
     accounts: int | None = None
     achievement_count: int = 0
+    fetched_at: int | None = None
+    stale: bool = False
 
 
 class GuildMemberResponse(BaseModel):
@@ -97,6 +108,8 @@ class GuildResponse(BaseModel):
     name: str
     world: str
     members: list[GuildMemberResponse]
+    fetched_at: int | None = None
+    stale: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -203,10 +216,16 @@ async def _fetch_and_cache_guild(
         if not full or not full[0].members:
             return None
 
-        guild_data, overviews, guild_info = full
+        guild_data, overviews, guild_info, roster_stubs = full
         world_lower = _WORLD.lower()
         guild_lower = guild_name.lower()
         member_rank: dict[str, tuple] = {m.name: (m.rank, m.rank_id) for m in guild_data.members}
+
+        # Cache the full member stubs (every member, resolved AND offline) so
+        # _persist_and_publish_guild can build the best-known merged roster
+        # without a second Census round-trip. The LIVE roster: cache below stays
+        # resolved-only (unchanged).
+        guild_cache.set(f"roster_stubs:{guild_lower}:{world_lower}", roster_stubs)
 
         # Info
         guild_cache.set(
@@ -280,7 +299,10 @@ async def _fetch_and_cache_guild(
                 ],
             ),
         )
-        return full
+        # Return the 3-tuple (guild_data, overviews, guild_info) — every caller
+        # (_roster_rank_map, spell-check, adorn-check, parses) unpacks 3 elements.
+        # The 4th element (roster_stubs) is consumed via the roster_stubs: cache.
+        return (guild_data, overviews, guild_info)
 
     task: asyncio.Task = asyncio.create_task(_do_fetch())
     _guild_fetch_tasks[task_key] = task
@@ -514,6 +536,73 @@ async def _bg_refresh_guild(guild_name: str) -> None:
         _guild_refresh_in_flight.discard(key)
 
 
+async def _persist_and_publish_guild(guild_name: str) -> None:
+    """Full guild refresh: fetch + warm the in-memory caches (existing behaviour),
+    then build the BEST-KNOWN merged roster (resolved members this fetch + offline
+    members carried forward with last-good data from the character store), persist
+    that to census_store, upsert ONLY the freshly-resolved members into the
+    character store, and publish an SSE roster event with the merged roster."""
+    from web import census_events
+    from web.census_refresh import _merge_roster  # local import — cycle avoidance
+
+    await _fetch_and_cache_guild(guild_name)  # existing: warms roster/info/spells/adorns + char cache
+    now = int(time.time())
+    glower, wlower = guild_name.lower(), _WORLD.lower()
+    roster, _ = guild_cache.get_stale(f"roster:{glower}:{wlower}")
+    if roster is None:
+        return
+    info, _ = guild_cache.get_stale(f"info:{glower}:{wlower}")
+    roster_stubs, _ = guild_cache.get_stale(f"roster_stubs:{glower}:{wlower}")
+    if roster_stubs is None:
+        roster_stubs = []
+
+    # Members that resolved THIS fetch (the live, resolved-only roster).
+    resolved_members = roster.model_dump()["members"]
+    fresh_by_name: dict[str, dict] = {m["name"]: m for m in resolved_members}
+
+    _member_fields = set(GuildMemberResponse.model_fields)
+
+    conn = census_store.init_db(census_store.DB_PATH)
+    try:
+        # For each stub NOT resolved this fetch, pull last-good data from the store.
+        stored_by_lower: dict[str, dict] = {}
+        for stub in roster_stubs:
+            sname = stub.get("name")
+            if not sname or sname in fresh_by_name:
+                continue
+            rec = census_store.get_character(conn, sname, _WORLD)
+            if rec is not None:
+                stored_by_lower[sname.lower()] = rec["data"]
+
+        merged = _merge_roster(roster_stubs, fresh_by_name, stored_by_lower)
+
+        # Sort by the same key the live roster uses (rank then level desc).
+        merged_sorted = sorted(
+            merged,
+            key=lambda m: (m["rank_id"] if m.get("rank_id") is not None else 9999, -(m.get("level") or 0)),
+        )
+        merged_response = GuildResponse(
+            name=roster.name,
+            world=roster.world,
+            members=[GuildMemberResponse(**{k: v for k, v in m.items() if k in _member_fields}) for m in merged_sorted],
+        )
+        merged_data = merged_response.model_dump()
+
+        blob = {"roster": merged_data, "info": info.model_dump() if info is not None else None}
+        census_store.upsert_guild(conn, guild_name, _WORLD, blob, now=now)
+
+        # Upsert ONLY the freshly-resolved members — carrying-forward a stored-only
+        # member must NOT bump its last_resolved_at (that would mark stale data fresh).
+        for m in fresh_by_name.values():
+            if not m.get("name"):
+                continue
+            census_store.upsert_character(conn, m["name"], _WORLD, m, resolved=True, now=now)
+    finally:
+        conn.close()
+    # SSE event carries the MERGED roster (that's what the guild page live-swaps):
+    census_events.publish({"type": "guild", "key": f"guild:{glower}:{wlower}", "data": merged_data, "fetched_at": now})
+
+
 def _overview_to_char_response(ov: CharacterOverview):  # → CharacterResponse
     """Convert a CharacterOverview into the shared CharacterResponse model.
 
@@ -538,19 +627,60 @@ async def get_guild_info(request: Request, guild_name: str) -> GuildInfoResponse
     Return lightweight guild metadata (no member list).
     The info cache is pre-warmed by any guild endpoint that calls
     _fetch_and_cache_guild, so this usually hits cache on first load.
-    On cache miss it triggers a full guild fetch (also warms roster/chars).
+    On a fresh cache hit returns immediately.  On a stale hit or full miss:
+    checks the durable census_store (using the roster blob to derive member
+    count), and only calls Census when the store is also empty and Census is up.
     """
+    from web import census_health
+    from web.census_refresh import request_guild_refresh
+
     _validate_guild_name(guild_name)
-    cache_key = f"info:{guild_name.lower()}:{_WORLD.lower()}"
-    cached, is_stale = guild_cache.get_stale(cache_key)
-    if cached is not None:
-        if is_stale:
-            asyncio.create_task(_bg_refresh_guild(guild_name))
+    info_key = f"info:{guild_name.lower()}:{_WORLD.lower()}"
+    cached, is_stale = guild_cache.get_stale(info_key)
+    if cached is not None and not is_stale:
         return cached
-    full = await _fetch_and_cache_guild(guild_name)
-    if full is None:
-        raise HTTPException(status_code=404, detail=f"Guild '{guild_name}' not found on {_WORLD}.")
-    result, _ = guild_cache.get_stale(cache_key)
+    # Fall through to the durable store (the stored blob is the roster shape;
+    # derive a minimal GuildInfoResponse from it — name/world + member count).
+    conn = census_store.init_db(census_store.DB_PATH)
+    try:
+        rec = census_store.get_guild(conn, guild_name, _WORLD)
+    finally:
+        conn.close()
+    if rec is not None:
+        age = int(time.time()) - rec["last_resolved_at"]
+        stale = age > 900
+        if stale:
+            request_guild_refresh(guild_name)
+        info_data = rec["data"].get("info")
+        if info_data:
+            info_resp = GuildInfoResponse(**{**info_data, "fetched_at": rec["last_resolved_at"], "stale": stale})
+        else:
+            # older/partial row without info — degrade gracefully to what the roster gives us
+            roster_data = rec["data"]["roster"]
+            info_resp = GuildInfoResponse(
+                name=roster_data.get("name", guild_name),
+                world=roster_data.get("world", _WORLD),
+                members=len(roster_data.get("members", [])),
+                fetched_at=rec["last_resolved_at"],
+                stale=stale,
+            )
+        guild_cache.set(info_key, info_resp)
+        return info_resp
+    # Never seen in the store.
+    if census_health.is_down():
+        raise HTTPException(
+            status_code=503,
+            detail=f"Guild '{guild_name}' not cached yet and Census is unavailable.",
+        )
+    try:
+        await _persist_and_publish_guild(guild_name)
+    except Exception as exc:
+        _log.error("[guild] Live fetch failed for %s: %s", _scrub(guild_name), exc)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Census error while fetching guild '{guild_name}'.",
+        ) from exc
+    result, _ = guild_cache.get_stale(info_key)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Guild '{guild_name}' not found on {_WORLD}.")
     return result
@@ -561,23 +691,51 @@ async def get_guild_info(request: Request, guild_name: str) -> GuildInfoResponse
 async def get_guild(request: Request, guild_name: str) -> GuildResponse:
     """
     Return the guild roster sorted by rank then level descending.
-    On cache miss triggers a full guild fetch that simultaneously pre-warms
-    the info, per-character, adorn, and spell caches.
+    On a fresh cache hit returns immediately.  On a stale hit or full miss:
+    checks the durable census_store first (serving stored data if Census is
+    down), and only calls Census when both the store is empty and Census is up.
     """
+    from web import census_health
+    from web.census_refresh import request_guild_refresh
+
     _validate_guild_name(guild_name)
     cache_key = f"roster:{guild_name.lower()}:{_WORLD.lower()}"
     cached, is_stale = guild_cache.get_stale(cache_key)
-    if cached is not None:
-        if is_stale:
-            asyncio.create_task(_bg_refresh_guild(guild_name))
+    if cached is not None and not is_stale:
         return cached
-    full = await _fetch_and_cache_guild(guild_name)
-    if full is None:
+    conn = census_store.init_db(census_store.DB_PATH)
+    try:
+        rec = census_store.get_guild(conn, guild_name, _WORLD)
+    finally:
+        conn.close()
+    if rec is not None:
+        age = int(time.time()) - rec["last_resolved_at"]
+        stale = age > 900
+        if stale:
+            request_guild_refresh(guild_name)
+        stored = rec["data"]
+        roster_data = stored["roster"]
+        resp = GuildResponse(**{**roster_data, "fetched_at": rec["last_resolved_at"], "stale": stale})
+        guild_cache.set(cache_key, resp)
+        return resp
+    # Never seen in the store — need a live Census fetch.
+    if census_health.is_down():
+        raise HTTPException(
+            status_code=503,
+            detail=f"Guild '{guild_name}' not cached yet and Census is unavailable.",
+        )
+    try:
+        await _persist_and_publish_guild(guild_name)
+    except Exception as exc:
+        _log.error("[guild] Live fetch failed for %s: %s", _scrub(guild_name), exc)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Census error while fetching guild '{guild_name}'.",
+        ) from exc
+    final_cached, _ = guild_cache.get_stale(cache_key)
+    if final_cached is None:
         raise HTTPException(status_code=404, detail=f"Guild '{guild_name}' not found on {_WORLD}.")
-    result, _ = guild_cache.get_stale(cache_key)
-    if result is None:
-        raise HTTPException(status_code=404, detail=f"Guild '{guild_name}' not found on {_WORLD}.")
-    return result
+    return final_cached
 
 
 @router.get("/guild/{guild_name}/spell-check", response_model=GuildSpellCheckResponse)

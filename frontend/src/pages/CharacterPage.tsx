@@ -3,8 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
 import { Card, SectionLabel } from '../components/ui'
 import { ItemTooltip, TooltipState, getCachedItem, prefetchItem } from '../components/ItemTooltip'
+import { FreshnessBadge } from '../components/FreshnessBadge'
 import { AAsTab } from './CharacterAAsTab'
 import { SpellsTab } from './CharacterSpellsTab'
+import { useCensusStream } from '../hooks/useCensusStream'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,6 +91,8 @@ interface Character {
   ilvl: number | null
   stats: CharacterStats
   equipment: EquipmentSlot[]
+  fetched_at?: number | null
+  stale?: boolean
 }
 
 // ── Gear rating ──────────────────────────────────────────────────────────────
@@ -463,6 +467,7 @@ type State =
   | { status: 'ok'; char: Character }
   | { status: 'not_found'; name: string }
   | { status: 'error'; message: string }
+  | { status: 'census_unavailable'; name: string }
 
 // Module-level config cache — fetched once, shared across navigations.
 let _serverMaxLevel   = 50
@@ -477,6 +482,7 @@ export default function CharacterPage() {
   })
   const [maxLevel,     setMaxLevel]     = useState(_serverMaxLevel)
   const [ratingConfig, setRatingConfig] = useState<RatingConfig>(_ratingConfig)
+  const { subscribe } = useCensusStream()
 
   // Fetch public server config once (cached in module scope after first load).
   useEffect(() => {
@@ -499,6 +505,10 @@ export default function CharacterPage() {
     fetch(`/api/character/${encodeURIComponent(name)}`, { credentials: 'include' })
       .then(async res => {
         if (res.status === 404) { setState({ status: 'not_found', name }); return }
+        if (res.status === 503) {
+          setState({ status: 'census_unavailable', name })
+          return
+        }
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           setState({ status: 'error', message: body.detail ?? `HTTP ${res.status}` })
@@ -511,11 +521,31 @@ export default function CharacterPage() {
       .catch(err => setState({ status: 'error', message: String(err) }))
   }, [name])
 
+  // SSE live-swap: replace character state when the server pushes a fresh record.
+  // Deps use stable primitives (name/world strings + the stable subscribe callback)
+  // so this effect never re-runs after the character loads — no render loop risk.
+  const charName  = state.status === 'ok' ? state.char.name  : undefined
+  const charWorld = state.status === 'ok' ? state.char.world : undefined
+  useEffect(() => {
+    if (!charName || !charWorld) return
+    const key = `${charName.toLowerCase()}:${charWorld.toLowerCase()}`
+    return subscribe(key, (data) => {
+      const updated = data as Character
+      _charCache.set(updated.name.toLowerCase(), updated)
+      setState({ status: 'ok', char: updated })
+    })
+  }, [charName, charWorld, subscribe])
+
   return (
     <main className="max-w-[1280px] my-8 mx-auto px-4">
       <Breadcrumb items={[{ label: 'Characters', to: '/characters' }, { label: name ?? '…' }]} />
       {state.status === 'loading' && <p className="mt-8 text-text-muted">Loading…</p>}
       {state.status === 'not_found' && <p className="mt-8 text-text-muted">Character <strong>{state.name}</strong> not found.</p>}
+      {state.status === 'census_unavailable' && (
+        <p className="mt-8 text-text-muted">
+          <strong>{state.name}</strong> isn't cached yet and Census is currently unavailable. Try again shortly.
+        </p>
+      )}
       {state.status === 'error' && <p className="mt-8 text-danger">Error: {state.message}</p>}
       {state.status === 'ok' && <CharacterView char={state.char} maxLevel={maxLevel} ratingConfig={ratingConfig} />}
     </main>
@@ -703,6 +733,7 @@ function GeneralBanner({ char }: { char: Character }) {
         <div className="text-text-muted text-[0.82rem] mt-[0.15rem]">
           {[char.world, char.race, char.gender].filter(Boolean).join(' · ')}
         </div>
+        <FreshnessBadge stale={char.stale} />
         {char.guild_name && (
           <Link
             to={`/guild/${encodeURIComponent(char.guild_name)}`}

@@ -17,6 +17,7 @@ A Discord bot and web companion site (FastAPI + React/TypeScript) that queries t
 | `census/zones_db.py` | Local SQLite zone catalogue (~1124 rows). Four tables: `zones` (canonical record + expansion attribution + classification flags), `zone_types` (many-to-many type tokens — `solo`/`group`/`raid_x4`/etc.), `zone_aliases` (alias→canonical for ACT log fuzziness), `zone_bosses` (raid boss list per zone, sourced from EQ2i scrape). Lookup helpers: `find_by_name` (canonical OR alias, includes bosses array), `list_by_expansion(short, type_filter=None)`, `list_by_event`, `list_by_type`, `list_bosses_for_zone`, `find_zones_by_boss`. Sourced from `scripts/dev/eq2_zones.cleaned.json` + `scripts/dev/eq2_raid_data.json`; rebuild via `scripts/build_zones_db.py`. |
 | `census/wikitext_md.py` | MediaWiki wikitext → markdown converter using `mwparserfromhell`. Handles EQ2i-specific templates (`{{Monster}}`, `{{loc}}`, `{{IZoneInformation}}`), wikilinks → markdown links with EQ2i base URL, nested lists, headings, bold/italic. Used by the raid scraper and (future) the strategy editor preview. |
 | `census/raids_db.py` | Local SQLite raid-strategy catalogue. Schema: `raid_zones` + `raid_encounters` (one markdown blob per encounter for PoC) + `raid_encounter_revisions` (version history). Companion to `zones_db.py` — strategies are human-edited and revision-tracked, while the boss LIST lives in `zones_db.zone_bosses`. RAIDS_DB_PATH env var. |
+| `census/census_store.py` | Persistent SQLite store (characters + guilds tables keyed (name_lower, world), data_json + last_resolved_at). Keep-best-known merge: a sparse Census refresh never nulls good data. CENSUS_DB_PATH env, mirrors parses/db.py. |
 | `image/tooltip.py` | PIL renderer for item tooltips. Renders at 2× then downsamples (SCALE=2, ZOOM=1.3). Width is `round(368 * ZOOM)`. |
 | `image/aa_tree.py` | AA tree renderers and coordinate systems. See AA tree notes below. |
 | `bot/bot.py` | Registers all cogs, syncs slash commands to three specific guild IDs (648253204760625160, 955890381847928892, 1502314690041221260) for instant propagation plus a global sync. |
@@ -25,11 +26,15 @@ A Discord bot and web companion site (FastAPI + React/TypeScript) that queries t
 | `bot/cogs/spellcheck.py` | `/spellcheck` — spell tier summary or full list (`details:True`) |
 | `bot/cogs/aacheck.py` | `/aacheck` — renders a character's AA tree with tier badges |
 | `web/config.py` | Single source of truth: SERVICE_ID, WORLD from env vars |
-| `web/cache.py` | TTLCache with stale-while-revalidate: character_cache, guild_cache, claim_cache |
+| `web/cache.py` | TTLCache with stale-while-revalidate: character_cache, guild_cache, claim_cache. Character and guild read paths serve from `census_store` first and never block on Census. |
 | `web/routes/aa.py` | GET /api/character/{name}/aas — AA profile list with per-tree data |
 | `web/routes/characters.py` | GET /api/characters/search — character name search |
 | `web/routes/guild_officer.py` | Officer claim-review endpoints; imports _officer_chars, _roster_rank_map from guild.py |
 | `web/routes/item_watch.py` | Item watch endpoints; imports _officer_chars, _roster_rank_map from guild.py |
+| `web/census_health.py` | Site-wide Census availability signal: background poll of the Census base URL every 5 min; `is_down()`/`get_state()` read by the read/refresh paths. |
+| `web/census_events.py` | In-process async pub/sub backing the SSE stream (single-process only). |
+| `web/census_refresh.py` | Background refresh orchestration (throttle 15 min / in-flight dedupe / skip-when-down); merges into census_store, updates cache, publishes SSE. `_merge_roster` best-known join. |
+| `web/routes/census.py` | `GET /api/census/health` (first-paint snapshot) + `GET /api/census/stream` (SSE: character/guild refresh records + health changes). |
 
 ## ACT plugin upload (`POST /api/parses/ingest`)
 
@@ -85,6 +90,7 @@ Tailwind v4 is the **single** styling system. There is no `tailwind.config.js` a
 | `USERS_DB_PATH` | Override the default `data/users.db` location (set on Railway to the persistent-volume mount) |
 | `PARSES_DB_PATH` | Override the default `data/parses/parses.db` location (set on Railway to the persistent-volume mount) |
 | `ZONES_DB_PATH` | Override the default `data/zones/zones.db` location. Set on Railway to the persistent-volume mount (the `.db` itself is not committed — uploaded manually; see "Manual upload: zones.db" below). |
+| `CENSUS_DB_PATH` | Override the default `data/census/census.db` location (persistent last-known character/guild lookups for resilient caching). Set on Railway to the persistent-volume mount; the `.db` is gitignored + generated at runtime. |
 | `R2_ENDPOINT` | Litestream backups → `https://<account>.r2.cloudflarestorage.com` |
 | `R2_BUCKET` | Litestream backups → bucket name (e.g. `eq2lexicon-backups`) |
 | `R2_ACCESS_KEY_ID` | Litestream backups → R2 API token Access Key ID |
