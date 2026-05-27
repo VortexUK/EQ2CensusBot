@@ -1,0 +1,94 @@
+{
+  "entries": [
+    {
+      "zone_name": "Ascent of the Awakened",
+      "mob_name": "Talendor",
+      "polished_md": "## Mechanics\n\nThe primary danger posed by this Dragon is **Breath of Fire**, which spawns **2 flame blobs for every player or pet** within the Area of Effect. This will instantly overwhelm a raid.\n\n## Pull\n\n- Place everyone well out of AE range.\n- Pull the Dragon and the **MT** must get him nose into a crook near an alcove.\n- Now it is a long slow burn.\n\n## Execution\n\n- **MT's healers** must joust in between the **Breath of Flame** attacks to heal, then get OUT of AE range before the **50 seconds** expires.\n- As soon as the 2 mobs (for the MT) spawn, **ST** runs in, grabs them, and drags them well out of range and, assisted by all the **melee'rs**, kills them.\n- **DPS** can assist a little, but all the long-range DPS (**mages** and **bowmen**) should be on the Dragon.\n- Use all hate reducers to make sure the **MT** does not lose agro or it is all over."
+    },
+    {
+      "zone_name": "Deathtoll",
+      "mob_name": "Cruor Alluvium",
+      "polished_md": "- Will teleport plater underwater. Without a way to breathe underwater the player will drown.\n- Joust his stifle effect or cure"
+    },
+    {
+      "zone_name": "Halls of the Seeing",
+      "mob_name": "Suffering",
+      "polished_md": "## Mechanics\n\n- Fears\n- Heat based power-drain on target\n- Frontal AE **100% power-drain** and Mental damage"
+    },
+    {
+      "zone_name": "Halls of the Seeing",
+      "mob_name": "Tolapmuj",
+      "polished_md": "- To spawn Tolapmuj, as well as [Pain](https://eq2.fandom.com/wiki/Pain) and [Suffering](https://eq2.fandom.com/wiki/Suffering), you must find and scrutinize (inspect) a random weapon rack (**'Weapons of the Fall'**) throughout the zone."
+    },
+    {
+      "zone_name": "Spirits of the Lost",
+      "mob_name": "Qzyk the Conqueror",
+      "polished_md": "- Accompanied by **two lizardman chanters** and **four lizardman sentries**."
+    },
+    {
+      "zone_name": "Spirits of the Lost",
+      "mob_name": "T`Lrzt the Tyrant",
+      "polished_md": "- Although this mob is also a [ghost](https://eq2.fandom.com/wiki/category:Ghost), it drops [lizardman](https://eq2.fandom.com/wiki/Category:Lizardman) specific items.\n- Linked with:\n  - [defiling spirit](https://eq2.fandom.com/wiki/defiling_spirit) x3\n  - [malevolent spirit](https://eq2.fandom.com/wiki/malevolent_spirit) x3\n  - [warrior spirit](https://eq2.fandom.com/wiki/warrior_spirit) x3"
+    },
+    {
+      "zone_name": "Spirits of the Lost",
+      "mob_name": "Ukdan the Dark",
+      "polished_md": "## Encounter\n\nGrouped with:\n\n- [a lizardman chanter](https://eq2.fandom.com/wiki/a_lizardman_chanter) x2\n- [a lizardman eliminator](https://eq2.fandom.com/wiki/a_lizardman_eliminator) x1\n- [a lizardman sentry](https://eq2.fandom.com/wiki/a_lizardman_sentry) x1"
+    },
+    {
+      "zone_name": "The Court of Al'Afaz",
+      "mob_name": "Walheed Raffini",
+      "polished_md": "- Gives access to the raid instance The Court of Al'Afaz."
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Sarik the Fang",
+      "polished_md": "## Overview\n\nSarik is an **endurance fight**. The idea of the fight is to outlast the waves of **level 74 ^^^** [fang pack members](https://eq2.fandom.com/wiki/a_fang_pack_member) that Sarik will spawn periodically.\n\n## Strategy\n\n- Use your **AOE DPS** to take out the wolves while the **main tank** fights Sarik in a save position.\n- When the raid DPS kills the adds they should focus back on Sarik.\n\nRepeat this process until the boss is defeated."
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Tender of the Seedlings",
+      "polished_md": "## Mechanics\n\n- Along with **Chilling Mist**, this named casts a **noxious-based AoE stifle every 45 seconds**\n- It has a **30 meter range** and is **curable**\n- Also **memblurs every 25–35 seconds**\n\n## Pull Prep\n\n> The first thing you must do is **kill all the other mobs on the first floor**. If any mobs are still alive (including nameds), they will run in to assist.\n\n## Positioning\n\nPlace the **Main Tank** at the big rock and place all the **DPS** near mushroom. Put the **offtank** between the two, on the side nearest to the named, and **healers** on the other side. Should look something like this:\n\n```\n --------R(MT)--------------------\n ---------------------------------\n (H)--------------(OT)-----------T\n ---------------------------------\n -----------(DPS)-----------------\n```\n\n- **R** = Rock\n- **MT** = Main Tank\n- **H** = Healers\n- **DPS** = DPS\n- **OT** = Offtank\n- **T** = Tender's spawn point\n\n## Execution\n\nThe **MT** pulls the named, everyone casts **AOEs** to kill the adds in the encounter. Try to have **1 debuffer** ([Brigand](https://eq2.fandom.com/wiki/Brigand) preferable) on the Tender all the time. One **DPS** ([Assassin](https://eq2.fandom.com/wiki/Assassin) or such) could also stay.\n\n### Storytellers\n\nEvery **45–60 seconds**, 'a seedling storyteller' will pop. They are **epic x2**. The **offtank must grab the storytellers** as soon as they pop, and the raid should kill them. Once they are dead, kill the Tender.\n\n## Kill Priority\n\n1. Encounter adds\n1. Storytellers (a Seedling Storyteller)\n1. Tender"
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Tunare",
+      "polished_md": "- Tunare is the deity of most [Fae](https://eq2.fandom.com/wiki/Category:Fae).\n- Tunare appears in-game as an older humanoid female wearing flowing robes and a crown of vines and leaves."
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Wuoshi",
+      "polished_md": "## Pull\n\n- Clear the entire third level before engaging Wuoshi, otherwise all mobs on the level will aggro.\n\n## Mechanics\n\n- All of Wuoshi's special attacks **drain power** (AE).\n- Wuoshi spawns a **Bloodbeast** at **75%** and **25%** health during the fight. *(Almost the same as An Ancient Bloodbeast from Halls of the Seeing.)*"
+    },
+    {
+      "zone_name": "The Gates of Ahket Aken",
+      "mob_name": "Muleek Mahaja",
+      "polished_md": "- Speak to this NPC to gain the option to enter [The Gates of Ahket Aken](https://eq2.fandom.com/wiki/The_Gates_of_Ahket_Aken) when attempting to enter [The Living Tombs](https://eq2.fandom.com/wiki/The_Living_Tombs)."
+    },
+    {
+      "zone_name": "The Lyceum of Abhorrence",
+      "mob_name": "Vilucidae the Priest of Thule",
+      "polished_md": "## Pull\n\nHere's the easiest way to kill Vilucidae: **Pet pull** Vilucidae out of his room to a side room.\n\n## Execution\n\n- There is **no AOE** from Vilucidae so everyone can stand **BEHIND** the mob and melee.\n- This helps with dps and with aggro, as he will not be pulled out of taunt range.\n- He hits hard in the **first and final stances**, so communicating when you need extra heals will really help.\n- **Chain healing** in the final stage is recommended.\n\n## Why Pull Him Out\n\n> The reason for this strategy is because **in the pit**, he spawns these **flowers** that will cast **REALLY long fears** on you. You are also unable to leave/enter the pit once the fight begins because a **barrier** is placed."
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Aktar the Dark",
+      "polished_md": "## Overview\n\nThis mob is a **non-loot mob**. The only thing you get from this fight is the device to activate Atrebe. It is best to **duel tank** this mob due to a noxious stun that is also a nasty uncurable dot.\n\n- **Noxious Mist**: a stun and uncurable DoT with a seemingly **50 sec.** recast. Joust this AoE to avoid it.\n\n## Strategy\n\n### Off-tank\n\n- The **offtank** needs to stick **Uthtak the Cruel** with an arrow and pull him and the adds to the corner opposite where the raid force is.\n- The adds will taunt the offtank and force him to stay on that target — best to stay on that target and burn it.\n\n### Main tank\n\n- The **MT** needs to taunt **Aktar the Dark** away from the raid force to avoid the AoE and tank him about where he stands.\n\n> Again, the AoE is nasty and uncurable as well as stuns.\n\n### Uthtak's reflect\n\n> **Uthtak** has a reflect shield on him — be careful with your big nukes and big debuffs, they can be reflected back to you and your group.\n\n### Burn phase\n\n- Once Uthtak is down, have the raid force joust Aktar's AoE and burn him.\n\n## Notes\n\n- Don't be alarmed when a box does not hit the ground after the encounter is over."
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Selrach Di'Zok",
+      "polished_md": "## Overview\n\nThe Overking is the final mob in the Temple of Kor-Sha.\n\n- Make sure the **assassins** are cleared out of the pools before engaging him, or they will join the fight.\n- Use **elemental resist** gear if you are low, and have the **Troubador** run **Elemental Chorus**.\n\n## Group Setup\n\n### Off-tank group\n\n- Should be a good **AoE setup**. For example a **Paladin** with **amends** on a **Warlock**, a **Shadowknight** or **Berserker**.\n\n### Main tank group\n\n- Can use a **third healer** to deal with the incredible amount of curing required.\n- Ideal setup for your first time: **Guardian, Templar, Defiler, Warden, Coercer, Dirge**.\n- Keeping this group cured is important due to the large amount of stun/stifles caused by the **Mentalist** adds.\n- Have your healers set up `/tell` macros to assigned casters to cure them.\n\n### Tank target macro\n\nThe main tank will be frequently taunted off the Overking, so make a target macro to keep clicking and get your target back:\n\n- `/target Selrach`\n\n## Pull & Positioning\n\n- Everyone should set up just before the two pillars.\n- The fight will start with the tank running to the throne and holding the Overking there.\n- The rest of the raid goes into a tight group **directly in the middle of the two pillars** and starts casting AoEs.\n- The off-tank should pull the adds to the raid and hold them there so AoEs have maximum effect, keeping them away from the main tank.\n\n## Adds Phase\n\n- Once the first set of adds are dead you will get a continuous spawn of weaker adds with stunning casters called **Mentalists**.\n- When these waves spawn, **kill the Mentalists first**.\n- Once you have the waves under control, you can assign more single-target damage to attack the Overking with the main tank. Figuring out just the right number of people you can take off the adds and put on the Overking will speed this fight up.\n\n## AoEs\n\nDuring the fight two AoEs will go off:\n\n- **Concussive Blast**: magic based, hits every **52 seconds**, and is fairly weak.\n- **Heat AoE** (the one of concern): hits every **30 seconds**.\n  - This is the reason the Overking must be kept away from the raid; using a tank with good heat resists like a **Guardian** helps on the healing.\n\n## Mid-fight Repositioning (~80%)\n\n- Once things are under control and the Overking is at about **80%** health, the tank should move the Overking from the throne past the pillars.\n- Wait for the Mentalists to be dead from the current set of adds, and for the **heat AoE** to have gone off.\n- Once the heat DoT has been cured and there are only a couple of adds up, pull the Overking through the raid force and onto the other side. **Thought snap** is useful here.\n- The tank should be far enough from the raid that the heat AoE doesn't do much damage to them.\n\n> **Don't** pull against the wall — you need to be in the center of the left area so when the flame adds come they don't all come around the side.\n\n## Wand Phase (~58%)\n\n- Once you get him to **58%** he is going to start speaking.\n- At this point make sure the person who has the [Wand of Intervention](https://eq2.fandom.com/wiki/Isydryl's_Wand_of_Intervention) from [Pawbuster](https://eq2.fandom.com/wiki/Pawbuster) is cured of all effects so they can use the wand on the Overking. This will disable his brutal AoE.\n- The tank should use any damage prevention (such as **Tower of Stone**) at this point, because the Overking will cast an additional AoE.\n\n## Flame Phase\n\nThe Overking is now upset and will begin calling in the flames from the fire pots around his throne to come help him.\n\n> If the flames reach the Overking he gets to do his AoE again, which will likely kill everyone.\n\n> **Don't** target the flames directly without them getting far enough away from the throne area — they will port you to the Overking and he will kill you.\n\n- The trick is to let them funnel past the pillars to the raid force and use **blue AoEs** to destroy the flames without directly targeting them.\n- There will be a couple of flames that sneak around the pillars on the outer sides. **Call these** and have a **brig** or some other class assigned to go and kill them.\n- Have a few AoE classes continue to kill the flames, and the rest of the raid can focus DPS on the Overking."
+    },
+    {
+      "zone_name": "The Tomb of Thuuga",
+      "mob_name": "Venril Sathir",
+      "polished_md": "## Setup\n\n- **Healers** only heal and cure and don't do damage of any kind.\n- **1–2 people** devoted to clicking the statues in his room. Statues must be clicked **constantly** during the fight to prevent the two larger statues in the hallway leading up to his room from spawning.\n\n## Mechanics\n\n### Toxic Infusion (throughout)\n\n- Venril will cast **Toxic Infusion**, an AOE on a **38s timer**.\n- You have **6 seconds** to cure this **Noxious** effect from your raid.\n- Cure it or die from a follow-up spell called **Fatalisis**.\n- Bring potions in case you don't have group noxious cures in every group.\n\n### 65% — Soulcube\n\nAt **65%** Venril will emote how he will finish the fight. Use the [Mistmyrian Soulcube](https://eq2.fandom.com/wiki/Mistmyrian_Soulcube) from [Tairiza the Widow Mistress](https://eq2.fandom.com/wiki/Tairiza_the_Widow_Mistress) within **5 seconds** or die.\n\nIf Sathir is killed without the Soulcube, the entire group/raid will be hit for 100,000+ focus damage and Sathir will reset rather than dying.\n\n### 60% — Power Management\n\nAt **60%**, with Venril's main ability disabled, he will begin to watch your power consumption.\n\n- Your raid force must keep their power around **30% or higher** to be safe.\n- A raid member who gets under 30% for too long will spawn adds that will most likely wipe the raid.\n\n### Power Effects (every 45s on 2 random members)\n\nThese effects last for about **10–12 seconds** and make it more challenging to keep your power in the target zone.\n\n**Mana Sacrifice**\n\n- Causes you to consume **200% more power** than usual.\n- Do not use any abilities that use power while this effect is on you.\n- If you can, turn up your particle effects because you will glow **'BLUE'** when Mana Sacrifice is on you.\n- If you are in the middle of casting anything and the effect lands on you, cancel it immediately.\n\n**Enhanced Power Regen**\n\n- The opposite effect — a feed of about **1% power every 2 seconds** for 10–12 seconds."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Taskmaster Nichok",
+      "polished_md": "## Pull\n\n- Entire raid starts by **facing north**, standing far north of the named near the rocks.\n- Have **tank** run up just close enough to bow shot the named, then he needs to run back (get to at least **45 meters** away).\n- The entire raid must then run **north** until everyone is **ported** to the little island the named is standing on.\n\n## Jousting Cycle\n\n- After the raid gets ported to the island, they should continue running **north about 30–45 meters** away from the named (back by the rocks).\n- **10 seconds** after the port a **massive AoE** goes off. This AoE will only hit people closer than that **30–45 meter** range.\n- Once the AoE goes off, the entire raid has about **15 seconds** to run close enough to get some **ranged dps** on the mob.\n- After about 15 seconds of dps'ing, everyone needs to start running **north again** until they are at least **45 meters** away from the named.\n\n> It may be helpful to **cancel your current target** so that you don't get turned around when ported, since you might end up running in the wrong direction.\n\n## Snare\n\n> If anyone is still within **45 meters** of the named when he ports you, those people will get a **snare (incurable -75% run speed)**. This means those people that got snared are not going to get far enough away when his massive AoE goes off.\n\n- **Sprint** can be helpful if you are snared.\n- If you die, **do not wait to be resurrected** — just revive and start heading north so that when he does his zonewide raid port, you will be brought back instantly and can start fighting again.\n\n## Adds & Enslave\n\n- Continue this jousting until the mob is dead.\n- **Adds spawn at 70%, 50% and 30%.**\n- At about **50%** the **2nd person in the first group** will be **enslaved** (teleported away from the raid and unable to attack while doing a mining animation)."
+    }
+  ]
+}

@@ -63,6 +63,24 @@ function LoginGate() {
   )
 }
 
+/**
+ * Stable portion of the pathname used to key the page-enter wrapper.
+ *
+ * For most routes this is just the pathname — every URL change replays the
+ * fade-up entrance and resets in-page state.
+ *
+ * For `/raids/<zone>/<position>` the `:position` segment drives the sidebar
+ * boss selection. Including it in the key would remount RaidZonePage on
+ * every sidebar click (scroll reset, fetch re-runs, animation replay). The
+ * regex below collapses the position out so the same key is returned for
+ * every boss within a zone — React Router still updates `useParams` so the
+ * selected encounter changes, but the surrounding chrome stays mounted.
+ */
+function stablePathKey(pathname: string): string {
+  const m = pathname.match(/^(\/raids\/[^/]+)/)
+  return m ? m[1] : pathname
+}
+
 const navLinkStyle = ({ isActive }: { isActive: boolean }): CSSProperties => ({
   fontFamily: "var(--font-heading)",
   fontSize: '0.82rem',
@@ -160,8 +178,11 @@ function Layout() {
       </div>
       {/* Push content below fixed header (~52px) */}
       <div className="pt-14 flex flex-col min-h-[calc(100vh-3.5rem)]">
-        {/* key by pathname so the fade-up entrance replays on each navigation */}
-        <div className="page-enter flex-1" key={pathname}>
+        {/* key by the *stable* portion of pathname so the fade-up entrance
+            replays on real navigation but NOT on in-page URL changes (the
+            raid sidebar updates :position to drive boss selection — we
+            don't want that to remount the page + reset scroll). */}
+        <div className="page-enter flex-1" key={stablePathKey(pathname)}>
           <Outlet />
         </div>
         <footer className="border-t border-border py-[1.1rem] px-6 flex items-center justify-between flex-wrap gap-2 text-[0.72rem] text-text-muted opacity-70">

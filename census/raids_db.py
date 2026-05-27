@@ -147,12 +147,93 @@ CREATE TABLE IF NOT EXISTS raid_encounter_revisions (
 );
 """
 
+# ACT Triggers — regex-driven matchers a player imports into Advanced Combat
+# Tracker to react to in-game log lines (boss callouts, debuffs, mechanic
+# triggers). One row maps 1:1 to a <Trigger> element in ACT's
+# `spell_timers.xml` export format (column names mirror XML attributes via
+# snake_case).
+#
+# A trigger with `timer=1` references an entry in `act_spell_timers` by
+# `timer_name`; on XML export both rows are emitted so the dropped file
+# round-trips in ACT without manual fix-up.
+_CREATE_ACT_TRIGGERS = """
+CREATE TABLE IF NOT EXISTS act_triggers (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    raid_encounter_id   INTEGER NOT NULL REFERENCES raid_encounters(id) ON DELETE CASCADE,
+
+    -- Display / curation (web-only — no XML counterpart)
+    position            INTEGER NOT NULL DEFAULT 0,    -- ordering within encounter
+    label               TEXT,                          -- human-readable summary line; falls back to sound_data/regex preview
+    notes               TEXT,                          -- contributor explanation, never exported
+
+    -- ACT <Trigger> attributes (9 fields)
+    active              INTEGER NOT NULL DEFAULT 1,
+    regex               TEXT    NOT NULL,
+    sound_data          TEXT    NOT NULL DEFAULT '',
+    sound_type          INTEGER NOT NULL DEFAULT 3,    -- 3 = TTS, 0 = silent / file
+    category_restrict   INTEGER NOT NULL DEFAULT 0,
+    category            TEXT,                          -- defaults to mob_name at write time
+    timer               INTEGER NOT NULL DEFAULT 0,
+    timer_name          TEXT,                          -- loose name-FK into act_spell_timers (same encounter)
+    tabbed              INTEGER NOT NULL DEFAULT 0,
+
+    -- Audit
+    last_edited_at      INTEGER,
+    last_edited_by      TEXT,
+    created_at          INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+"""
+
+# ACT Spell Timers — named timer definitions referenced by `act_triggers`
+# via `timer_name`. One row maps 1:1 to a <Spell> element in ACT's
+# spell_timers.xml. Multiple triggers MAY reference the same timer name
+# within an encounter (DRY); export deduplicates by name.
+_CREATE_ACT_SPELL_TIMERS = """
+CREATE TABLE IF NOT EXISTS act_spell_timers (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    raid_encounter_id    INTEGER NOT NULL REFERENCES raid_encounters(id) ON DELETE CASCADE,
+
+    -- Identity (Name is what triggers reference via TimerName)
+    name                 TEXT NOT NULL,
+    name_lower           TEXT NOT NULL,
+
+    -- ACT <Spell> attributes (17 fields)
+    checked              INTEGER NOT NULL DEFAULT 0,
+    timer_duration_s     INTEGER NOT NULL,             -- "Timer" attribute in XML
+    only_master_ticks    INTEGER NOT NULL DEFAULT 0,
+    restrict             INTEGER NOT NULL DEFAULT 0,
+    absolute_            INTEGER NOT NULL DEFAULT 0,   -- "Absolute" — column name disambiguated from SQL keyword
+    start_wav            TEXT    NOT NULL DEFAULT '',
+    warning_wav          TEXT    NOT NULL DEFAULT '',
+    warning_value        INTEGER NOT NULL DEFAULT 10,
+    radial_display       INTEGER NOT NULL DEFAULT 0,
+    modable              INTEGER NOT NULL DEFAULT 0,
+    tooltip              TEXT    NOT NULL DEFAULT '',
+    fill_color           INTEGER NOT NULL DEFAULT -16776961,  -- ACT default blue (.NET ARGB packed int)
+    panel1               INTEGER NOT NULL DEFAULT 1,
+    panel2               INTEGER NOT NULL DEFAULT 0,
+    remove_value         INTEGER NOT NULL DEFAULT -15,
+    category             TEXT,                          -- defaults to mob_name at write time
+    restrict_category    INTEGER NOT NULL DEFAULT 0,
+
+    -- Audit
+    last_edited_at       INTEGER,
+    last_edited_by       TEXT,
+    created_at           INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+
+    UNIQUE (raid_encounter_id, name_lower)
+);
+"""
+
 _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_raid_zones_name_lower  ON raid_zones (zone_name_lower);",
     "CREATE INDEX IF NOT EXISTS idx_raid_zones_expansion   ON raid_zones (expansion_short);",
     "CREATE INDEX IF NOT EXISTS idx_raid_enc_zone          ON raid_encounters (raid_zone_id, position);",
     "CREATE INDEX IF NOT EXISTS idx_raid_enc_mob_lower     ON raid_encounters (mob_name_lower);",
     "CREATE INDEX IF NOT EXISTS idx_raid_rev_encounter     ON raid_encounter_revisions (encounter_id, edited_at);",
+    "CREATE INDEX IF NOT EXISTS idx_act_triggers_enc       ON act_triggers (raid_encounter_id, position);",
+    "CREATE INDEX IF NOT EXISTS idx_act_triggers_timer     ON act_triggers (raid_encounter_id, timer_name);",
+    "CREATE INDEX IF NOT EXISTS idx_act_spell_timers_enc   ON act_spell_timers (raid_encounter_id);",
 ]
 
 
@@ -174,6 +255,8 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     conn.execute(_CREATE_RAID_ZONES)
     conn.execute(_CREATE_RAID_ENCOUNTERS)
     conn.execute(_CREATE_REVISIONS)
+    conn.execute(_CREATE_ACT_TRIGGERS)
+    conn.execute(_CREATE_ACT_SPELL_TIMERS)
     for idx in _CREATE_INDEXES:
         conn.execute(idx)
     conn.commit()
@@ -212,16 +295,65 @@ def upsert_raid_zone(
 ) -> int:
     """Insert or update a raid_zones row. Returns its id.
 
-    Re-runnable: a second call with the same zone_name UPDATEs the row,
-    setting last_synced_at to now() when source==SOURCE_SCRAPE so
-    callers can see how stale the wiki sync is. Doesn't touch
-    last_edited_at — that's reserved for SOURCE_MANUAL writes via the
-    editor API.
+    Re-runnable. The behaviour depends on the existing row's ``source``:
+
+      * **New row** — inserts as given.
+      * **Existing row, called with SOURCE_SCRAPE** — refreshes the wiki-
+        owned columns (``expansion_short``, ``wiki_url``, level_range,
+        ``zdiff``, ``lockout_*``, ``last_synced_at``) but **never clobbers
+        a human-edited markdown blob**. When the existing source is
+        ``SOURCE_MANUAL``, the markdown columns (access/background/overview)
+        are left as-is. When the existing source is ``SOURCE_SCRAPE``, the
+        markdown is refreshed with the latest scrape (so wiki edits
+        propagate).
+      * **Existing row, called with SOURCE_MANUAL** — this helper isn't the
+        canonical write path for manual edits (the route layer uses targeted
+        UPDATEs that only touch the field the user edited — see
+        ``_write_overview_sync`` in web/routes/raid_strategies.py). Calling
+        this helper with SOURCE_MANUAL upserts every field passed and stamps
+        ``source='manual'`` — useful from migration scripts, not user-facing.
+
+    Doesn't touch ``last_edited_at`` — that's reserved for the route layer's
+    targeted UPDATEs.
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"source must be one of {sorted(VALID_SOURCES)}, got {source!r}")
     now = int(time.time())
     last_synced = now if source == SOURCE_SCRAPE else None
+
+    existing = conn.execute("SELECT id, source FROM raid_zones WHERE zone_name = ?", (zone_name,)).fetchone()
+
+    if existing and source == SOURCE_SCRAPE and existing[1] == SOURCE_MANUAL:
+        # Re-scrape against a human-edited row: refresh the wiki-owned
+        # metadata but leave the markdown blobs + source flag alone. The
+        # revision history (encounters only) doesn't apply at the zone
+        # level for now; future raid_zone_revisions table is the right
+        # home for tracking these.
+        conn.execute(
+            """
+            UPDATE raid_zones SET
+                expansion_short = ?,
+                wiki_url        = ?,
+                level_range     = ?,
+                zdiff           = ?,
+                lockout_min     = ?,
+                lockout_max     = ?,
+                last_synced_at  = ?
+            WHERE id = ?
+            """,
+            (
+                expansion_short,
+                wiki_url,
+                level_range,
+                zdiff,
+                lockout_min,
+                lockout_max,
+                now,
+                existing[0],
+            ),
+        )
+        conn.commit()
+        return int(existing[0])
 
     conn.execute(
         """
@@ -479,3 +611,237 @@ def stats(path: Path = DB_PATH) -> dict:
             ),
         }
         return out
+
+
+# ---------------------------------------------------------------------------
+# ACT Triggers + Spell Timers
+# ---------------------------------------------------------------------------
+#
+# Column names mirror the XML attribute names (snake_case) so the
+# serialisation layer is a near-1:1 mapping. `name_lower` on spell timers
+# powers the case-insensitive `timer_name`-based linkage from triggers.
+
+_ACT_TRIGGER_COLS = (
+    "id, raid_encounter_id, position, label, notes, "
+    "active, regex, sound_data, sound_type, "
+    "category_restrict, category, "
+    "timer, timer_name, tabbed, "
+    "last_edited_at, last_edited_by, created_at"
+)
+
+_ACT_SPELL_TIMER_COLS = (
+    "id, raid_encounter_id, name, name_lower, "
+    "checked, timer_duration_s, only_master_ticks, restrict, absolute_, "
+    "start_wav, warning_wav, warning_value, "
+    "radial_display, modable, tooltip, fill_color, "
+    "panel1, panel2, remove_value, category, restrict_category, "
+    "last_edited_at, last_edited_by, created_at"
+)
+
+
+def list_act_triggers_for_encounter(encounter_id: int, path: Path = DB_PATH) -> list[dict]:
+    """Every ACT trigger row for an encounter, ordered by position then id."""
+    if not path.exists():
+        return []
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"SELECT {_ACT_TRIGGER_COLS} FROM act_triggers WHERE raid_encounter_id = ? ORDER BY position, id",
+            (encounter_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_act_trigger(trigger_id: int, path: Path = DB_PATH) -> dict | None:
+    if not path.exists():
+        return None
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            f"SELECT {_ACT_TRIGGER_COLS} FROM act_triggers WHERE id = ?",
+            (trigger_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def upsert_act_trigger(
+    conn: sqlite3.Connection,
+    *,
+    trigger_id: int | None = None,
+    raid_encounter_id: int,
+    regex: str,
+    position: int = 0,
+    label: str | None = None,
+    notes: str | None = None,
+    active: bool = True,
+    sound_data: str = "",
+    sound_type: int = 3,
+    category_restrict: bool = False,
+    category: str | None = None,
+    timer: bool = False,
+    timer_name: str | None = None,
+    tabbed: bool = False,
+    edited_by: str | None = None,
+) -> int:
+    """Insert or update a single trigger row. Pass ``trigger_id`` to UPDATE,
+    omit it to INSERT. Returns the row id either way.
+
+    Stores the audit stamp via the ``edited_by`` argument so route callers
+    don't have to reach into the schema themselves."""
+    now = int(time.time())
+    params = (
+        raid_encounter_id, position, label, notes,
+        int(bool(active)), regex, sound_data, int(sound_type),
+        int(bool(category_restrict)), category,
+        int(bool(timer)), timer_name, int(bool(tabbed)),
+        now, edited_by,
+    )  # fmt: skip
+
+    if trigger_id is None:
+        cur = conn.execute(
+            """
+            INSERT INTO act_triggers (
+                raid_encounter_id, position, label, notes,
+                active, regex, sound_data, sound_type,
+                category_restrict, category,
+                timer, timer_name, tabbed,
+                last_edited_at, last_edited_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            params,
+        )
+        conn.commit()
+        return int(cur.lastrowid or 0)
+
+    conn.execute(
+        """
+        UPDATE act_triggers SET
+            raid_encounter_id = ?, position = ?, label = ?, notes = ?,
+            active = ?, regex = ?, sound_data = ?, sound_type = ?,
+            category_restrict = ?, category = ?,
+            timer = ?, timer_name = ?, tabbed = ?,
+            last_edited_at = ?, last_edited_by = ?
+        WHERE id = ?
+        """,
+        params + (trigger_id,),
+    )
+    conn.commit()
+    return trigger_id
+
+
+def delete_act_trigger(conn: sqlite3.Connection, trigger_id: int) -> bool:
+    """Delete a trigger by id. Returns True if a row was removed."""
+    cur = conn.execute("DELETE FROM act_triggers WHERE id = ?", (trigger_id,))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def list_act_spell_timers_for_encounter(encounter_id: int, path: Path = DB_PATH) -> list[dict]:
+    """Every spell-timer row for an encounter, alphabetical by name."""
+    if not path.exists():
+        return []
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"SELECT {_ACT_SPELL_TIMER_COLS} FROM act_spell_timers WHERE raid_encounter_id = ? ORDER BY name",
+            (encounter_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_act_spell_timer(timer_id: int, path: Path = DB_PATH) -> dict | None:
+    if not path.exists():
+        return None
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            f"SELECT {_ACT_SPELL_TIMER_COLS} FROM act_spell_timers WHERE id = ?",
+            (timer_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def upsert_act_spell_timer(
+    conn: sqlite3.Connection,
+    *,
+    timer_id: int | None = None,
+    raid_encounter_id: int,
+    name: str,
+    timer_duration_s: int,
+    checked: bool = False,
+    only_master_ticks: bool = False,
+    restrict: bool = False,
+    absolute_: bool = False,
+    start_wav: str = "",
+    warning_wav: str = "",
+    warning_value: int = 10,
+    radial_display: bool = False,
+    modable: bool = False,
+    tooltip: str = "",
+    fill_color: int = -16776961,
+    panel1: bool = True,
+    panel2: bool = False,
+    remove_value: int = -15,
+    category: str | None = None,
+    restrict_category: bool = False,
+    edited_by: str | None = None,
+) -> int:
+    """Insert or update a spell-timer row. Pass ``timer_id`` to UPDATE,
+    omit it to INSERT. ``(raid_encounter_id, name_lower)`` is UNIQUE — on
+    insert collision the caller should pass ``timer_id`` of the existing
+    row instead."""
+    now = int(time.time())
+    params = (
+        raid_encounter_id, name, name.lower(),
+        int(bool(checked)), int(timer_duration_s),
+        int(bool(only_master_ticks)), int(bool(restrict)), int(bool(absolute_)),
+        start_wav, warning_wav, int(warning_value),
+        int(bool(radial_display)), int(bool(modable)), tooltip, int(fill_color),
+        int(bool(panel1)), int(bool(panel2)), int(remove_value),
+        category, int(bool(restrict_category)),
+        now, edited_by,
+    )  # fmt: skip
+
+    if timer_id is None:
+        cur = conn.execute(
+            """
+            INSERT INTO act_spell_timers (
+                raid_encounter_id, name, name_lower,
+                checked, timer_duration_s,
+                only_master_ticks, restrict, absolute_,
+                start_wav, warning_wav, warning_value,
+                radial_display, modable, tooltip, fill_color,
+                panel1, panel2, remove_value,
+                category, restrict_category,
+                last_edited_at, last_edited_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            params,
+        )
+        conn.commit()
+        return int(cur.lastrowid or 0)
+
+    conn.execute(
+        """
+        UPDATE act_spell_timers SET
+            raid_encounter_id = ?, name = ?, name_lower = ?,
+            checked = ?, timer_duration_s = ?,
+            only_master_ticks = ?, restrict = ?, absolute_ = ?,
+            start_wav = ?, warning_wav = ?, warning_value = ?,
+            radial_display = ?, modable = ?, tooltip = ?, fill_color = ?,
+            panel1 = ?, panel2 = ?, remove_value = ?,
+            category = ?, restrict_category = ?,
+            last_edited_at = ?, last_edited_by = ?
+        WHERE id = ?
+        """,
+        params + (timer_id,),
+    )
+    conn.commit()
+    return timer_id
+
+
+def delete_act_spell_timer(conn: sqlite3.Connection, timer_id: int) -> bool:
+    """Delete a spell-timer by id. Returns True if a row was removed."""
+    cur = conn.execute("DELETE FROM act_spell_timers WHERE id = ?", (timer_id,))
+    conn.commit()
+    return cur.rowcount > 0

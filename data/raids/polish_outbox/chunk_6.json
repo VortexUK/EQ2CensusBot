@@ -1,0 +1,99 @@
+{
+  "entries": [
+    {
+      "zone_name": "Deathtoll",
+      "mob_name": "Lord Vyemm",
+      "polished_md": "## Strategy 1 — Pet Pull\n\n### Pull\n\n- **Pet pull** Vyemm to the hallway all the way back at the bottom of the stairs (a rather long pull).\n- The raid group should wait behind the door at the top of the stairs to avoid the **frontal AOE** on pull.\n- **Healers** should wait at the bottom of the stairs.\n- The **MT** waits in the area at the bottom of the stairs to taunt Vyemm while **Alzid** is distracted. (The goal is to get Alzid to reset after the summoner has run up the stairs, but keep Vyemm with you.)\n\n### Positioning\n\n- Turn Vyemm to be **perpendicular** to the hallway.\n- Once properly turned, send in the forces to rush his side.\n- Everyone needs to fight from his **belly**. He will move you around during the fight, so stay with him and don't get in front or behind him.\n\n## Strategy 2 — Monk FD Reset\n\n### Pull\n\n- Have the raid sit at the top of the side stairs going to the upper level.\n- Have a **monk** disband and **FD pull** him to the encounter room. When he resets he will be **single pullable**. This eliminates the heals from the Dracon.\n- Have everyone move down into the room and stand on one side of the entrance against the wall leading into the arena.\n\n### Positioning\n\n- **Tank** will pull him down the stairs and turn him until his head is facing towards the arena and his back legs and tail are in the room.\n- Everyone will attack him from the **sides**.\n- **Tank healers** will need to fight him under his belly with dirges, and backup healers can joust or rotate in on the tank if they are hit with AOE."
+    },
+    {
+      "zone_name": "Deathtoll",
+      "mob_name": "Tarinax the Destroyer",
+      "polished_md": "## Pull\n\nHave a **Defiler** pull with pet to either the pool to front left or front right of him when Tarinax passes raid (who is floating in water in one big clump). Have **Monk** rescue saving the Defiler who is ultra self-warded. Have the Monk position him in water so he doesn't frontal cone the raid, then FD — **Guardian** takes over, then raid moves in and gets under him.\n\n## Tanking & Cures\n\n- **Group cure poison** in every group\n- Have **2 Guardians** rotate Reinforcement/reinforcement/rescue/rescue/reinforcement/reinforcement\n- **Heal through Tarinax** because he will be switching targets a lot\n\n## Adds\n\nHave **Enchanters** under water mezzing adds every **45 seconds**.\n\n> If anyone dies, more adds spawn — so either raid doesn't die or you get a ton of adds. **Rez people quickly** or you will wipe."
+    },
+    {
+      "zone_name": "Firemyst Gully: Shattered Stillness",
+      "mob_name": "Arch Lich Udalan",
+      "polished_md": "- Named is grouped with **5 skeletons**. Bring some **aoe dps** and they go down fast (each one has only **30-35k hp**).\n- Summons [a chaotic elemental](https://eq2.fandom.com/wiki/a_chaotic_elemental), **53 ^^^ Heroic** adds, every so often that stun you for a period of time. You want to have someone dps these down away from the **Tank**."
+    },
+    {
+      "zone_name": "Firemyst Gully: Shattered Stillness",
+      "mob_name": "Qeynos",
+      "polished_md": ""
+    },
+    {
+      "zone_name": "Firemyst Gully: Shattered Stillness",
+      "mob_name": "Relana Everglade",
+      "polished_md": "Talking to Relana will grant you access to [Shattered Stillness](https://eq2.fandom.com/wiki/Firemyst_Gully:_Shattered_Stillness), an epic instance of [The Firemyst Gully](https://eq2.fandom.com/wiki/The_Firemyst_Gully). No quest is received, just the access."
+    },
+    {
+      "zone_name": "Freethinker Hideout",
+      "mob_name": "Othysis Muravian",
+      "polished_md": "## Mechanics\n\n- Auto attack does **crushing** and **disease** damage.\n- Every **34 seconds** she emotes, *\"Through the portal now\"*, and summons a [D'Morte preserver](https://eq2.fandom.com/wiki/a_D'Morte_preserver) (heroic).\n  - The preserver will heal Othysis Muravian with **Gift of Rejuvenation** and **Superior Gift of Rejuvenation** for **12.3 million HP** if it gets close enough.\n- Every **30 seconds** she emotes, *\"Time for some soul searching\"*, and casts a Disease DD (**Prone to Corruption**) on a random raid member.\n\n> If the target of **Prone to Corruption** does **NOT** die to it, it spawns an add (Epic x2)."
+    },
+    {
+      "zone_name": "Spirits of the Lost",
+      "mob_name": "Hundar the Punisher",
+      "polished_md": "- Hundar and his adds are a different encounter from the group of amygdalans; however, he will immediately engage anyone who is on the ritual master's threat list."
+    },
+    {
+      "zone_name": "The Crypt of Vox",
+      "mob_name": "Spirit of Vox",
+      "polished_md": "## Mechanics\n\n- She has a **3k cold AE** attack, and has an amazing health regen rate.\n- Try to have the **tank** turn her away from the raid — her AE can be jousted.\n- Cure **Elemental** quickly."
+    },
+    {
+      "zone_name": "The Djinn Master's Prism",
+      "mob_name": "Servant of Sky",
+      "polished_md": "- Talk to him to start the encounter."
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Galiel Spirithoof",
+      "polished_md": "## Positioning\n\nShe has a kickback so plant against the wall. The **mushroom in the center of the room** works best since it helps avoid Wuoshi.\n\n## Mechanics\n\n- Every **10% HP** she will pop an **x2 add** — it's best to burn it down and then continue on the mob so that you don't become overrun by adds.\n- Galiel has **mana drain** and will occasionally drain mana, so having some mana regen may be necessary.\n- Adds have a total of **2,500,000 HP**."
+    },
+    {
+      "zone_name": "The Lyceum of Abhorrence",
+      "mob_name": "Essence of Fear",
+      "polished_md": "- The Essence of Fear will AE fear every 20 seconds. (Or more depending on [Fear's Grasp](https://eq2.fandom.com/wiki/Fear's_Grasp))"
+    },
+    {
+      "zone_name": "The Lyceum of Abhorrence",
+      "mob_name": "Gnillaw the Demented",
+      "polished_md": "- Heals from 1% to 25%\n- Adds can be mesmerized\n- Nukes hard on 2%"
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Ludmila Kystov",
+      "polished_md": "## Encounter Members\n\nThis is a group encounter. The participants are:\n\n### Jracol Binari — Healer\n- ~**1.3 million HP**\n- Will periodically **group heal** for ~**200K**\n\n### Blorgok the Brutal — Fighter\n- ~**1 million HP**\n- Will periodically force you to target him, at which point you are unable to change targets\n\n### Meldrath Kloktik — Mage\n- ~**2.7 million HP**\n- Periodic stifle, **knockback** on melee hit (is a buff, **dispel** if you can)\n\n### 2 Froglok Mercenaries — Fighters\n- ~**200K HP** each\n- Will taunt and force you to switch targets, but you are able to change back to your previous target\n\n### Ludmila Kystov — Scout\n- ~**4.9 million HP**\n- Will periodically change targets and go after someone else in the raid, **charms males** on occasion\n\n## Kill Order\n\n> If you did **not** successfully kill **Doomcoil**, Meldrath will summon him to aid in this fight. To avoid this, you must **kill Meldrath before any of the other named NPCs**.\n\nIf you did kill Doomcoil, the recommended order is **Jracol, Blorgok, Meldrath, and then Ludmila**. The froglok mercenaries can be taken out at any point, or taken out by AoEs.\n\n## Tactics\n\n- **DPS** should target **Jracol** directly as the **MT** (and others) will be taunted to Blorgok and unable to change back.\n- When other members of the raid are targeted by **Ludmila** they should run to the MT to make it easier for the tank to recover aggro.\n- Alternative: **offtank Blorgok** away from raid to avoid people getting taunted too much, then full DPS first on the **frogs** (they die fast) and then the **healer** (must die fast or his heals make the fight harder).\n- The **MT** has a lot to do keeping aggro on **Ludmila** — if aggro is an issue, use a second tank to hold the current kill target, and have the raid hold back AoEs."
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Atrebe's Statue",
+      "polished_md": "## Pull\n\n- One person needs to loot and equip [a cryptic device](https://eq2.fandom.com/wiki/a_cryptic_device) dropped from the Uthtak/Aktar fight.\n- They can then right-click on Atrebe's Statue and select **\"Press Glowing Gem on the Cryptic Device\"** to make Atrebe's Statue attackable.\n\n## Preparation\n\n- Maximize **Poison & Magic resists**.\n\n## Mechanics\n\nJoust the two AoEs, which increase in damage the closer you are to the mob. **Cure immediately** with healers or potions when hit with either one.\n\n### Sebilisian Sporecloud\n\n- At **0 to 10 meters**: 12338-24492 poison damage plus 2903-5763 poison damage every 5 seconds\n- At **10 to 15 meters**: 7583-11374 poison damage plus 2166-3250 poison damage every 5 seconds\n- At **15 to 75 meters**: 4875-5958 poison damage plus 1462-1787 poison damage every 5 seconds\n- For ACT the spell needs to read **\"Statue's Sebilisian Sporecloud\"** and goes off at about the **45 sec.** mark\n\n### Force of Atrebe\n\n- You will be **launched into the air** and hurled toward Atrebe's Statue\n- At **0 to 10 meters**: 7936-23808 magic damage plus 3174-9523 magic damage every 9 seconds\n- At **10 to 15 meters**: 5079-11851 magic damage plus 1905-4444 magic damage every 9 seconds\n- At **15 to 100 meters**: 3809-5714 magic damage plus 1693-2540 magic damage every 9 seconds\n- For ACT the spell needs to read **\"Statue's Force of Atrebe\"** and goes off at about the **40 sec.** mark\n\n> **Force of Atrebe** actually kicks you in the direction you are facing — if you face the mob it will pull you to him; if you face away you will get a standard knockback.\n\n## Notes\n\n- Resists, fast cures for the dots, jousting, and a bit of luck (if both AoEs go off at the same time or very close, it is very likely that it kills MT) are the keys to this fight.\n- If healers cannot cure fast enough then bring potions."
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Kunark",
+      "polished_md": ""
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Milyex Vioren",
+      "polished_md": "## Overview\n\nAfter the engineer goes down for the first time, **one decent healer can keep one decent MT alive** vs. the Named.\n\n## Pull\n\n- **MT** pulls the named anywhere convenient.\n- **Raid assists the MA.** On pull, MA should target a **\"generator\"** that has appeared somewhere around the circle that the named is flying around.\n- After the **\"generator\"** is down, take out the **engineer**.\n- After the engineer is down, keep him down with a couple of **melee dps'ers** on him.\n\n## Generators\n\n**\"Generators\"** spawn every **~20 seconds**:\n\n- **1** for the first **20%** of the named's health.\n- **2** for the next **20%**.\n- **3** spawn every ~20 seconds for the rest of the fight.\n\n> If any \"generator\" is still standing after **15 seconds** of their appearance, the Named will do a **KB** that will send everyone flying all over the place. The named will also **heal himself** a good amount.\n\n## Notes\n\nThe fight comes down to having the DPS to take out the generators when they start spawning **3 at a time**."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Nexona",
+      "polished_md": "## DPS Requirements\n\n- DPS on Nexona must be kept **greater than 10k** at all times in order to avoid a nasty AE.\n- An additional AoE, **Noxious Rot**, can be avoided if DPS is kept **greater than 25k**.\n\n## Pull & Positioning\n\n- Pull Nexona down the ramp to the **left corner** (left upon entering the room). **MT** group stays down there.\n- Assign **4 \"shiny\" collectors**:\n  - One at each weapon rack on either side of the room on the main floor.\n  - One outside in the hallway.\n  - One up top where Nexona is — three shinies spawn up there: in the middle back, and **BEHIND** each of the two specimens.\n- Rest of the raid go up the ramp that is to the left when entering the room and stack on the **\"specimen\"**.\n- **MT** cleric hammer pull or pet pull.\n\n## Specimens\n\nOnce Nex is pulled, the entire raid force that is stacked on the **\"specimen\"** starts killing the specimen. Do this as fast as you can.\n\n- Move to the other side up top where another **\"specimen\"** is located and take it out fast.\n- Run down the ramp on the right side and take out the **\"specimen\"** there.\n- By this time one shiny should have been harvested.\n\n> Harvested shinies spawn an **x2 add**, and they do **memwipes**. Whoever harvested that shiny needs to let the raid know where it (the x2 add) is coming from so they can kill it.\n\n- Leave the **\"specimen\"** that is in the middle of the lower section — it's of little concern.\n- Move to where Nexona is being tanked and take out a **4th \"specimen\"**.\n- The **5th \"specimen\"** in the middle will be consumed by Nex when she gets to **90%** health — all it does is heal her to 100%. Not worth wasting time on.\n\n## Main Phase\n\n- Focus on the mobs that spawn when someone harvests a shiny, and DPS on Nex in between.\n\n## 45% — Drake Spawn\n\n- When Nex gets to **45%** two **drake 83^^^ heroics** will spawn from the water in the lower section.\n- These are easily **mezzed** for the remainder of the fight.\n- Drakes should be **mezzed the whole fight** or they will stun and knock back everyone trying to kill shiny adds.\n- Having a **healer** that can joust between the shiny group and the mezzers is very helpful in case one breaks.\n\n## Burn\n\n- Concentrate on the shiny-spawned mobs and Nexona."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Qunard Ashenclaw",
+      "polished_md": "## Spawn\n\n- Minor **KB**, minor **AoE** if within **20 meters**.\n- To spawn him, **click the beehive**.\n- **^^ orange heroics** will come — about 4, two sets of them.\n- After they are done, the **Queen Bee** will come.\n- After she is dead, **Ashenclaw** will spawn.\n\n## Fight\n\nMinor **KB** and minor **AoE** — drag him to one of the hallways and **tank and spank**."
+    },
+    {
+      "zone_name": "Venril Sathir's Lair",
+      "mob_name": "Venril Sathir",
+      "polished_md": "## Roles\n\n- **Healers** only heal and cure and **don't do damage of any kind**.\n- **1-2 people** devoted to clicking the statues in his room. Statues must be clicked **constantly** during the fight to prevent the two larger statues in the hallway leading up to his room from spawning.\n\n## Toxic Infusion / Fatalisis\n\nDuring the fight Venril will cast **Toxic Infusion**, which is an AOE that is on a **38s timer**. You have **6 seconds** to cure this **Noxious** effect from your raid.\n\n> **Cure it or die** from a follow-up spell called **Fatalisis**. Bring potions in case you don't have group noxious cures in every group.\n\n## 65% — Soulcube Check\n\nAt **65%** Venril will emote how he will finish the fight. Use the [Mistmyrian Soulcube](https://eq2.fandom.com/wiki/Mistmyrian_Soulcube) from [Tairiza the Widow Mistress](https://eq2.fandom.com/wiki/Tairiza_the_Widow_Mistress) within **5 seconds** or die.\n\n## 60% — Power Management Phase\n\nAt **60%**, with Venril's main ability disabled, he will begin to watch your **power consumption**. Your raid force must keep their power around **30% or higher** to be safe.\n\n> A raid member who gets under **30%** for too long will spawn adds that will wipe the raid most likely.\n\n### Power Effects\n\nOn top of just maintaining your power, Venril will also place 2 kinds of effects on 2 random members every **45 seconds**. These effects last for about **10-12 seconds** and make it more challenging to keep your power in the target zone.\n\n- **Mana Sacrifice** — causes you to consume **200% more power** than usual.\n  - Do **not** use any abilities that use power while this effect is on you.\n  - If you can, turn up your particle effects because you will glow **'BLUE'** when Mana Sacrifice is on you.\n  - If you are in the middle of casting anything and the effect lands on you, **cancel it immediately**.\n- **Enhanced Power Regen** — the opposite. It gives the target enhanced power regen. A feed of about **1% power every 2 seconds** for **10-12 seconds**.\n\n> If you kill Sathir without the Soulcube, your entire group/raid will be hit for 100,000+ focus damage and Sathir will reset rather than dying.\n"
+    }
+  ]
+}

@@ -11,7 +11,20 @@ builder = "nixpacks"
 #      streamed to R2 in near-real-time.
 # The trailing `exec` matters: litestream then becomes PID 1's child and
 # Railway's restart policy applies to the app process correctly.
-startCommand = "mkdir -p /app/data/parses && (litestream restore -if-replica-exists -config /app/litestream.yml /app/data/users.db || true) && (litestream restore -if-replica-exists -config /app/litestream.yml /app/data/parses/parses.db || true) && exec litestream replicate -config /app/litestream.yml -exec '/app/.venv/bin/python main.py'"
+#
+# Python binary discovery (2026-05-27): we MUST use the project's venv
+# (`/app/.venv/bin/python`) — that's where `uv sync` installed the
+# project's dependencies. The `python` on PATH is the bare Nix-store
+# Python from /root/.nix-profile/bin which has no site-packages, so
+# resolving via `command -v python` would land us there and crash with
+# `ModuleNotFoundError: No module named 'dotenv'` on first import.
+#
+# Discovery order: try the known venv paths first (`/app/.venv` then a
+# legacy `/opt/venv` fallback), then PATH as a last resort. A diagnostic
+# dump of every candidate runs unconditionally so any future Nixpacks
+# layout change is visible in the first 10 log lines without another
+# round-trip through build logs.
+startCommand = "set -x; mkdir -p /app/data/parses; echo '=== python path discovery ==='; (which python python3 2>&1 || true); (ls -la /app/.venv/bin/ 2>&1 | head -20 || true); (ls -la /opt/venv/bin/ 2>&1 | head -20 || true); echo \"PATH=$PATH\"; echo '=== end discovery ==='; PYTHON_BIN=''; for c in /app/.venv/bin/python /opt/venv/bin/python; do if [ -x \"$c\" ]; then PYTHON_BIN=\"$c\"; break; fi; done; if [ -z \"$PYTHON_BIN\" ]; then PYTHON_BIN=$(command -v python || command -v python3 || echo ''); fi; if [ -z \"$PYTHON_BIN\" ]; then echo 'FATAL: no python found in project venv or on PATH' >&2; exit 78; fi; echo \"Resolved Python: $PYTHON_BIN\"; (litestream restore -if-replica-exists -config /app/litestream.yml /app/data/users.db || true); (litestream restore -if-replica-exists -config /app/litestream.yml /app/data/parses/parses.db || true); exec litestream replicate -config /app/litestream.yml -exec \"$PYTHON_BIN main.py\""
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 watchPaths = ["**", "!alloy/**", "!grafana/**"]

@@ -36,6 +36,7 @@ from web.metrics import (
     should_track_user_view,
 )
 from web.routes.aa import router as aa_router
+from web.routes.act_triggers import router as act_triggers_router
 from web.routes.admin import router as admin_router
 from web.routes.auth import router as auth_router
 from web.routes.auth_tokens import router as auth_tokens_router
@@ -305,6 +306,7 @@ def create_app(session_secret: str | None = None) -> FastAPI:
     app.include_router(classes_router, prefix="/api")
     app.include_router(zones_router, prefix="/api")
     app.include_router(raid_strategies_router, prefix="/api")
+    app.include_router(act_triggers_router, prefix="/api")
     app.include_router(role_requests_router, prefix="/api")
     app.include_router(census_router, prefix="/api")
 

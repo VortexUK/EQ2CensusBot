@@ -205,7 +205,33 @@ python scripts/dev/clean_eq2_zones.py                # re-clean scripts/dev/eq2_
 python scripts/build_zones_db.py                     # build data/zones/zones.db from the cleaned JSON
 python scripts/dev/_smoke_test_zones.py              # validate the cleaned JSON
 python scripts/dev/_smoke_test_zones_db.py           # validate the built SQLite DB
+python scripts/dev/scrape_eq2i_raids.py              # scrape ~3 sample zones (PoC, 40 KB JSON)
+python scripts/dev/scrape_eq2i_raids.py --all-raids  # scrape every Vanilla–RoK raid (~60 zones, ~1-2 MB)
+python scripts/dev/ingest_raids_json.py              # ingest the sample JSON into data/raids/raids.db
+python scripts/dev/ingest_raids_json.py --in scripts/dev/eq2_raid_data.json   # ingest the full scrape
+python scripts/dev/ingest_raids_json.py --dry-run    # parse + summarise without writing
 ```
+
+### Raid-strategies seed pipeline
+
+Two-stage by design — the network-dependent scrape is decoupled from the fast
+local DB ingest:
+
+  1. **Scrape** (`scrape_eq2i_raids.py`) — fetches EQ2i zone/encounter pages
+     via the polite-API cache (`scripts/dev/.eq2i_cache/`, gitignored).
+     Produces JSON only. Discovers zones dynamically via `zones_db.list_by_expansion`
+     filtered to raid types — no hardcoded URL list.
+  2. **Ingest** (`ingest_raids_json.py`) — reads the JSON, calls
+     `raids_db.upsert_raid_zone` + `upsert_raid_encounter` with
+     `source=SOURCE_SCRAPE`. The helper itself **skips rows with
+     `source=SOURCE_MANUAL`** on re-scrape (refreshing only `wiki_url` /
+     `position` / `last_synced_at`), so a re-run never clobbers a human edit.
+     The first ever write per encounter records a revision row with
+     `before_md=NULL`.
+
+`eq2_raid_data.json` (the full-scrape output) is **committed** so a fresh
+clone can run `ingest_raids_json.py` without re-scraping. The intermediate
+HTTP cache and the 3-zone sample JSON are gitignored — both rebuildable.
 
 ## Deployment
 
@@ -268,6 +294,28 @@ litestream restore -config /app/litestream.yml -timestamp 2026-05-24T18:00:00Z -
 4. **Verify** post-deploy with any code path that hits `zones_db.find_by_name(...)` — or curl an endpoint that reads it once one exists.
 
 The DB has no migration story right now because everything is regenerated. If the schema in `census/zones_db.py` ever changes, just rebuild + re-upload — there's no user-data risk because zones.db carries no user-supplied rows.
+
+### Manual upload: raids.db (first-time seed)
+
+`data/raids/raids.db` is a **hybrid** — wiki-seeded strategy content plus
+user edits + revision history. Unlike `zones.db` you can't just clobber it
+on every deploy. Two-phase deploy story:
+
+1. **First-time seed** (do this once, before any production user edits):
+   ```powershell
+   python scripts/dev/scrape_eq2i_raids.py --all-raids   # produces eq2_raid_data.json (committed)
+   python scripts/dev/ingest_raids_json.py --in scripts/dev/eq2_raid_data.json
+   ```
+   Then upload `data/raids/raids.db` to the Railway volume the same way
+   you'd upload zones.db. Set `RAIDS_DB_PATH` if your volume mount differs
+   from the default `/app/data/raids/raids.db`.
+
+2. **Refreshing scraped content** (future ingest after a wiki update):
+   re-run the scrape, then run the ingest **in place** on the production
+   volume. The ingest is safe — `upsert_raid_encounter` skips
+   `SOURCE_MANUAL` rows so human edits survive every re-scrape. The
+   plan-of-record for "running it in place" is a one-shot admin endpoint
+   (not yet built; the script can also be invoked via `railway run`).
 
 ## Frontend design principles
 
