@@ -5,6 +5,7 @@ whether to attempt a refresh and what to tell the user."""
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 
@@ -15,7 +16,9 @@ from web.config import SERVICE_ID as _SERVICE_ID
 _log = logging.getLogger(__name__)
 
 _POLL_INTERVAL = 300  # 5 minutes
-_PROBE_URL = f"https://census.daybreakgames.com/s:{_SERVICE_ID}/json/get/eq2/"
+# Probe a real collection (not the base `/eq2/` index) so the response is a
+# normal Census JSON document we can validate. ``c:limit=1`` keeps it tiny.
+_PROBE_URL = f"https://census.daybreakgames.com/s:{_SERVICE_ID}/json/get/eq2/world?c:limit=1"
 
 _status: str = "unknown"  # "up" | "down" | "unknown"
 _checked_at: int = 0
@@ -34,12 +37,42 @@ def is_down() -> bool:
     return _status == "down"
 
 
+def _body_looks_healthy(body: dict) -> bool:
+    """A Census response counts as healthy only if it's:
+
+      * a JSON object, and
+      * has NO ``errorCode`` field at the top level, and
+      * has a non-negative ``returned`` count (the standard envelope field
+        for collection queries — present on every working response).
+
+    During Census outages we've observed `200 OK` with a body like
+    ``{"errorCode":"SERVER_ERROR"}`` (no ``returned`` field), so the
+    status-code-only check used to false-positive as healthy. This is the
+    minimum body validation needed to catch that.
+    """
+    if not isinstance(body, dict):
+        return False
+    if "errorCode" in body:
+        return False
+    return body.get("returned", -1) >= 0
+
+
 async def _probe_census() -> bool:
-    """True if Census answers 200 within a short timeout, else False."""
+    """True iff Census responds 200 AND its body parses as a healthy Census
+    envelope (no ``errorCode`` field, ``returned`` present). See
+    ``_body_looks_healthy`` for the validation rules."""
     timeout = aiohttp.ClientTimeout(total=8)
     try:
         async with aiohttp.ClientSession(timeout=timeout) as s, s.get(_PROBE_URL) as r:
-            return r.status == 200
+            if r.status != 200:
+                return False
+            text = await r.text()
+            try:
+                body = json.loads(text)
+            except json.JSONDecodeError:
+                _log.warning("[census-health] non-JSON 200 response: %r", text[:200])
+                return False
+            return _body_looks_healthy(body)
     except Exception:
         return False
 
