@@ -209,8 +209,10 @@ async def test_fetch_and_cache_guild_populates_roster_and_info(app):
         "type": None,
     }
 
+    roster_stubs = [{"name": "Sihtric", "rank": "Officer", "rank_id": 1}]
+
     mock_client = AsyncMock()
-    mock_client.get_guild_full = AsyncMock(return_value=(guild_data, overviews, guild_info))
+    mock_client.get_guild_full = AsyncMock(return_value=(guild_data, overviews, guild_info, roster_stubs))
     mock_client.close = AsyncMock()
 
     set_calls: list[tuple] = []
@@ -231,7 +233,9 @@ async def test_fetch_and_cache_guild_populates_roster_and_info(app):
         call_count += 1
         if call_count == 1:
             return (None, False)  # first call → cache miss, triggers fetch
-        if "roster" in key:
+        if "roster_stubs:" in key:
+            return ([{"name": "Sihtric", "rank": "Officer", "rank_id": 1}], False)
+        if "roster:" in key:
             return (roster_response, False)
         return (None, False)
 
@@ -347,3 +351,128 @@ async def test_guild_info_served_from_store_when_census_down(app, tmp_census_db,
     # Non-degraded fields from the stored info blob must survive Census-down
     assert body["level"] == 300
     assert body["dateformed"] == 1234567890
+
+
+# ---------------------------------------------------------------------------
+# Best-known merged roster: offline members carried forward from the store
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_persist_merges_offline_member_from_store(app, tmp_path, monkeypatch):
+    """_persist_and_publish_guild merges fresh-resolved members with last-good
+    data for offline members (carried from the store), omits never-seen members,
+    and does NOT bump the carried-forward member's last_resolved_at."""
+    from census.models import CharacterOverview, GuildData, GuildMember
+    from web.cache import guild_cache
+    from web.routes.guild import _WORLD, _persist_and_publish_guild
+
+    db_path = tmp_path / "census.db"
+    monkeypatch.setattr(census_store, "DB_PATH", db_path)
+    monkeypatch.setenv("CENSUS_DB_PATH", str(db_path))
+
+    # Seed an offline alt that resolved in the PAST (now=1000).
+    conn = census_store.init_db(db_path)
+    census_store.upsert_character(
+        conn,
+        "OfflineAlt",
+        _WORLD,
+        {"name": "OfflineAlt", "level": 80, "cls": "Fury"},
+        resolved=True,
+        now=1000,
+    )
+    conn.close()
+
+    # Census returns ONLY OnlineMain resolved, but the member LIST (stubs) carries
+    # OnlineMain + OfflineAlt + GhostNoData (never-seen, no data anywhere).
+    guild_data = GuildData(
+        name="TestGuild",
+        world=_WORLD,
+        members=[
+            GuildMember(
+                name="OnlineMain",
+                level=90,
+                cls="Templar",
+                ts_class=None,
+                ts_level=None,
+                aa_level=300,
+                deity=None,
+                rank="Leader",
+                rank_id=0,
+            )
+        ],
+    )
+    overviews = [
+        CharacterOverview(
+            id="1",
+            name="OnlineMain",
+            level=90,
+            cls="Templar",
+            race="Human",
+            gender="Male",
+            deity=None,
+            aa_count=300,
+            world=_WORLD,
+        )
+    ]
+    guild_info = {
+        "name": "TestGuild",
+        "world": _WORLD,
+        "level": 300,
+        "members": 3,
+        "accounts": 3,
+        "achievement_count": 0,
+        "dateformed": None,
+        "description": None,
+        "alignment": None,
+        "type": None,
+    }
+    roster_stubs = [
+        {"name": "OnlineMain", "rank": "Leader", "rank_id": 0},
+        {"name": "OfflineAlt", "rank": "Member", "rank_id": 2},
+        {"name": "GhostNoData", "rank": "Member", "rank_id": 2},
+    ]
+
+    mock_client = AsyncMock()
+    mock_client.get_guild_full = AsyncMock(return_value=(guild_data, overviews, guild_info, roster_stubs))
+    mock_client.close = AsyncMock()
+
+    # Start from a cold cache so _fetch_and_cache_guild actually fetches.
+    glower, wlower = "testguild", _WORLD.lower()
+    for prefix in ("roster", "info", "roster_stubs", "adorns", "spells"):
+        guild_cache.delete(f"{prefix}:{glower}:{wlower}")
+
+    with patch("web.routes.guild.CensusClient", return_value=mock_client):
+        await _persist_and_publish_guild("TestGuild")
+
+    conn = census_store.init_db(db_path)
+    try:
+        guild_rec = census_store.get_guild(conn, "TestGuild", _WORLD)
+        assert guild_rec is not None
+        members = {m["name"]: m for m in guild_rec["data"]["roster"]["members"]}
+
+        # Fresh member present with its fresh data.
+        assert "OnlineMain" in members
+        assert members["OnlineMain"]["level"] == 90
+
+        # Offline member carried forward from the store with its last-good data.
+        assert "OfflineAlt" in members
+        assert members["OfflineAlt"]["level"] == 80
+        assert members["OfflineAlt"]["cls"] == "Fury"
+        # Rank comes from the (reliable) member list stub.
+        assert members["OfflineAlt"]["rank"] == "Member"
+
+        # Never-seen member with no data anywhere is omitted (no blank row).
+        assert "GhostNoData" not in members
+
+        # OfflineAlt was carried-forward, NOT freshly resolved → timestamp unchanged.
+        alt_rec = census_store.get_character(conn, "OfflineAlt", _WORLD)
+        assert alt_rec is not None
+        assert alt_rec["last_resolved_at"] == 1000
+
+        # OnlineMain genuinely resolved this fetch → record now exists, freshly stamped.
+        main_rec = census_store.get_character(conn, "OnlineMain", _WORLD)
+        assert main_rec is not None
+        assert main_rec["last_resolved_at"] > 1000
+    finally:
+        conn.close()

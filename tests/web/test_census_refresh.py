@@ -28,3 +28,17 @@ def test_merge_roster_keeps_best_known():
     assert by["Menludiir"]["level"] == 92  # fresh
     assert by["Alt"]["level"] == 80  # best-known from stored
     assert by["Menludiir"]["rank"] == "Leader"  # rank from roster
+
+
+def test_merge_roster_skips_unknown_members():
+    # A member with NEITHER fresh NOR stored data is omitted — no blank rows.
+    fresh = {"Menludiir": {"name": "Menludiir", "level": 92, "cls": "Templar"}}
+    roster = [
+        {"name": "Menludiir", "rank": "Leader"},
+        {"name": "Ghost", "rank": "Member"},  # never resolved, not in store
+    ]
+    stored: dict[str, dict] = {}
+    out = cr._merge_roster(roster, fresh, stored)
+    names = {m["name"] for m in out}
+    assert names == {"Menludiir"}
+    assert "Ghost" not in names

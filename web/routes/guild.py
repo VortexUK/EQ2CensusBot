@@ -209,10 +209,16 @@ async def _fetch_and_cache_guild(
         if not full or not full[0].members:
             return None
 
-        guild_data, overviews, guild_info = full
+        guild_data, overviews, guild_info, roster_stubs = full
         world_lower = _WORLD.lower()
         guild_lower = guild_name.lower()
         member_rank: dict[str, tuple] = {m.name: (m.rank, m.rank_id) for m in guild_data.members}
+
+        # Cache the full member stubs (every member, resolved AND offline) so
+        # _persist_and_publish_guild can build the best-known merged roster
+        # without a second Census round-trip. The LIVE roster: cache below stays
+        # resolved-only (unchanged).
+        guild_cache.set(f"roster_stubs:{guild_lower}:{world_lower}", roster_stubs)
 
         # Info
         guild_cache.set(
@@ -286,7 +292,10 @@ async def _fetch_and_cache_guild(
                 ],
             ),
         )
-        return full
+        # Return the 3-tuple (guild_data, overviews, guild_info) — every caller
+        # (_roster_rank_map, spell-check, adorn-check, parses) unpacks 3 elements.
+        # The 4th element (roster_stubs) is consumed via the roster_stubs: cache.
+        return (guild_data, overviews, guild_info)
 
     task: asyncio.Task = asyncio.create_task(_do_fetch())
     _guild_fetch_tasks[task_key] = task
@@ -522,9 +531,12 @@ async def _bg_refresh_guild(guild_name: str) -> None:
 
 async def _persist_and_publish_guild(guild_name: str) -> None:
     """Full guild refresh: fetch + warm the in-memory caches (existing behaviour),
-    then persist the roster to census_store, merge resolved members into the
-    character store, and publish an SSE roster event."""
+    then build the BEST-KNOWN merged roster (resolved members this fetch + offline
+    members carried forward with last-good data from the character store), persist
+    that to census_store, upsert ONLY the freshly-resolved members into the
+    character store, and publish an SSE roster event with the merged roster."""
     from web import census_events
+    from web.census_refresh import _merge_roster  # local import — cycle avoidance
 
     await _fetch_and_cache_guild(guild_name)  # existing: warms roster/info/spells/adorns + char cache
     now = int(time.time())
@@ -533,20 +545,55 @@ async def _persist_and_publish_guild(guild_name: str) -> None:
     if roster is None:
         return
     info, _ = guild_cache.get_stale(f"info:{glower}:{wlower}")
-    roster_data = roster.model_dump()
-    blob = {"roster": roster_data, "info": info.model_dump() if info is not None else None}
+    roster_stubs, _ = guild_cache.get_stale(f"roster_stubs:{glower}:{wlower}")
+    if roster_stubs is None:
+        roster_stubs = []
+
+    # Members that resolved THIS fetch (the live, resolved-only roster).
+    resolved_members = roster.model_dump()["members"]
+    fresh_by_name: dict[str, dict] = {m["name"]: m for m in resolved_members}
+
+    _member_fields = set(GuildMemberResponse.model_fields)
+
     conn = census_store.init_db(census_store.DB_PATH)
     try:
+        # For each stub NOT resolved this fetch, pull last-good data from the store.
+        stored_by_lower: dict[str, dict] = {}
+        for stub in roster_stubs:
+            sname = stub.get("name")
+            if not sname or sname in fresh_by_name:
+                continue
+            rec = census_store.get_character(conn, sname, _WORLD)
+            if rec is not None:
+                stored_by_lower[sname.lower()] = rec["data"]
+
+        merged = _merge_roster(roster_stubs, fresh_by_name, stored_by_lower)
+
+        # Sort by the same key the live roster uses (rank then level desc).
+        merged_sorted = sorted(
+            merged,
+            key=lambda m: (m["rank_id"] if m.get("rank_id") is not None else 9999, -(m.get("level") or 0)),
+        )
+        merged_response = GuildResponse(
+            name=roster.name,
+            world=roster.world,
+            members=[GuildMemberResponse(**{k: v for k, v in m.items() if k in _member_fields}) for m in merged_sorted],
+        )
+        merged_data = merged_response.model_dump()
+
+        blob = {"roster": merged_data, "info": info.model_dump() if info is not None else None}
         census_store.upsert_guild(conn, guild_name, _WORLD, blob, now=now)
-        for m in roster_data.get("members", []):
+
+        # Upsert ONLY the freshly-resolved members — carrying-forward a stored-only
+        # member must NOT bump its last_resolved_at (that would mark stale data fresh).
+        for m in fresh_by_name.values():
             if not m.get("name"):
                 continue
-            resolved = bool(m.get("cls") or m.get("level"))
-            census_store.upsert_character(conn, m["name"], _WORLD, m, resolved=resolved, now=now)
+            census_store.upsert_character(conn, m["name"], _WORLD, m, resolved=True, now=now)
     finally:
         conn.close()
-    # SSE event carries the ROSTER (that's what the guild page live-swaps):
-    census_events.publish({"type": "guild", "key": f"guild:{glower}:{wlower}", "data": roster_data, "fetched_at": now})
+    # SSE event carries the MERGED roster (that's what the guild page live-swaps):
+    census_events.publish({"type": "guild", "key": f"guild:{glower}:{wlower}", "data": merged_data, "fetched_at": now})
 
 
 def _overview_to_char_response(ov: CharacterOverview):  # → CharacterResponse

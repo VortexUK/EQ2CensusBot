@@ -88,6 +88,10 @@ def _merge_roster(roster: list[dict], fresh: dict[str, dict], stored: dict[str, 
     for m in roster:
         name = m["name"]
         data = fresh.get(name) or stored.get(name.lower()) or {}
+        if not data:
+            # Neither fresh nor stored — never seen online. Omit rather than
+            # emit a blank row (no level/class).
+            continue
         out.append({**data, "name": name, "rank": m.get("rank"), "rank_id": m.get("rank_id")})
     return out
 
