@@ -52,12 +52,13 @@ Echoes of Faydwer (2006)  [EoF]
 Rise of Kunark (2007)  [RoK]
 ======================================================================
 
-### Shard of Hate  [5]  (raid_x4)
-    - Demetrius Crane 
+### Shard of Hate  [6]  (raid_x4)
+    - Demetrius Crane
     - Dreadlord D'Somni
     - Scorn, Malevolence
     - Kpul D'Vngur
     - Byzola
+    - Master P'Tasa
 
 ### The Chamber of Destiny  [1]  (raid_x4)
     - The Leviathan
