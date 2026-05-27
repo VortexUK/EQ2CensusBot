@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 @pytest.mark.asyncio
 async def test_server_endpoint_reflects_subdomain(app, monkeypatch, tmp_path):
     from web import db, server_context
+
     p = tmp_path / "users.db"
     db.init_db(p)
     monkeypatch.setattr(db, "DB_PATH", p)
@@ -24,6 +25,7 @@ async def test_server_endpoint_reflects_subdomain(app, monkeypatch, tmp_path):
 @pytest.mark.asyncio
 async def test_server_endpoint_unknown_host_defaults(app, monkeypatch, tmp_path):
     from web import db, server_context
+
     p = tmp_path / "users.db"
     db.init_db(p)
     monkeypatch.setattr(db, "DB_PATH", p)
