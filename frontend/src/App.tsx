@@ -20,6 +20,7 @@ import UserWidget from './components/UserWidget'
 import NotFoundPage from './pages/NotFoundPage'
 import NotificationBell from './components/NotificationBell'
 import { useAuth } from './hooks/useAuth'
+import { CensusStreamProvider } from './hooks/useCensusStream'
 import { Link } from 'react-router-dom'
 import logo from './assets/EQ2L.png'
 import ServerLaunchTimer from './components/ServerLaunchTimer'
@@ -193,6 +194,7 @@ function Layout() {
 
 function App() {
   return (
+    <CensusStreamProvider>
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
@@ -216,6 +218,7 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
+    </CensusStreamProvider>
   )
 }
 
