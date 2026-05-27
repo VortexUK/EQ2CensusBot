@@ -78,3 +78,35 @@ async def _run_character_refresh(name: str, key: str) -> None:
         _log.warning("[census-refresh] character %s failed: %s", name, exc)
     finally:
         _in_flight.discard(key)
+
+
+def _merge_roster(roster: list[dict], fresh: dict[str, dict], stored: dict[str, dict]) -> list[dict]:
+    """Build the displayed roster: each member's rank from the (reliable) roster
+    list, merged with the best-known per-member data — fresh resolve if present,
+    else the stored character record (keyed by lower-cased name)."""
+    out: list[dict] = []
+    for m in roster:
+        name = m["name"]
+        data = fresh.get(name) or stored.get(name.lower()) or {}
+        out.append({**data, "name": name, "rank": m.get("rank"), "rank_id": m.get("rank_id")})
+    return out
+
+
+def request_guild_refresh(name: str) -> None:
+    key = f"guild:{name.lower()}:{_WORLD.lower()}"
+    if not _should_refresh(key):
+        return
+    _mark_attempt(key)
+    _in_flight.add(key)
+    asyncio.create_task(_run_guild_refresh(name, key))
+
+
+async def _run_guild_refresh(name: str, key: str) -> None:
+    from web.routes.guild import _persist_and_publish_guild  # type: ignore[attr-defined]  # defined in Task 10
+
+    try:
+        await _persist_and_publish_guild(name)
+    except Exception as exc:
+        _log.warning("[census-refresh] guild %s failed: %s", name, exc)
+    finally:
+        _in_flight.discard(key)
