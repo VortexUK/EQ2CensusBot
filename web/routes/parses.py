@@ -50,11 +50,17 @@ from web.auth_deps import (
     require_user_session_or_token,
 )
 from web.cache import character_cache
+from web.config import ALLOWED_SERVERS as _ALLOWED_SERVERS
 from web.config import SERVICE_ID as _SERVICE_ID
 from web.config import WORLD as _WORLD
 from web.limiter import limiter
-from web.server_context import _by_world as _server_registry_by_world
 from web.server_context import current_world
+
+# Pre-lowered comparison set so each ingest doesn't redo the work.
+# Computed at module import — env changes need a process restart, same
+# as ADMIN_DISCORD_IDS. ALLOWED_SERVERS itself stays in its original
+# casing for display in /auth/whoami responses.
+_ALLOWED_SERVERS_LOWER: frozenset[str] = frozenset(s.lower() for s in _ALLOWED_SERVERS)
 
 _log = logging.getLogger(__name__)
 
@@ -98,27 +104,6 @@ def _sanitize_world(world: str | None) -> str | None:
     if not candidate:
         return None
     return candidate if _VALID_WORLD_RE.match(candidate) else None
-
-
-def _resolve_parse_world(logger_server: str | None) -> str:
-    """Map a plugin-supplied logger_server to a canonical world name from the
-    server registry.  Falls back to current_world() (the request's active
-    server, or the EQ2_WORLD env-var default) when logger_server is absent,
-    fails sanitisation, or doesn't match any registered world.
-
-    Case-insensitive match against server.world values in the registry so
-    'varsoon' and 'Varsoon' both resolve to 'Varsoon'."""
-    sanitized = _sanitize_world(logger_server)
-    if sanitized:
-        # Fast exact match first.
-        if sanitized in _server_registry_by_world:
-            return sanitized
-        # Case-insensitive scan (registry keys are canonical-cased).
-        lower = sanitized.lower()
-        for world_key, _srv in _server_registry_by_world.items():
-            if world_key.lower() == lower:
-                return world_key
-    return current_world()
 
 
 async def _resolve_uploader_guild_async(
@@ -1164,9 +1149,10 @@ def _ingest_payload_sync(
     encid was already ingested and still visible — the upload is
     idempotent on retries.
 
-    ``world`` is the authoritative server name (resolved from logger_server
-    via _resolve_parse_world) and is stored on the encounter row and in
-    ingest_log so the same act_encid from two different servers are distinct."""
+    ``world`` is the authoritative server name (on the HTTP path this is the
+    allowlist-gated ``sanitized_server`` derived from logger_server) and is
+    stored on the encounter row and in ingest_log so the same act_encid from
+    two different servers are distinct."""
     enc = _encounter_from_payload(payload.encounter)
     if enc is None:
         raise HTTPException(status_code=400, detail="Encounter starttime/endtime unparseable")
@@ -1323,17 +1309,61 @@ async def ingest_parse(
             detail="logger_name must be 1-15 letters (the EQ2 character-name shape).",
         )
 
-    # Resolve the parse's authoritative server world.  logger_server from the
-    # plugin (v0.1.10+) is mapped to a known registry world; unrecognised or
-    # absent values fall back to the active request server (current_world()).
-    parse_world = _resolve_parse_world(body.logger_server)
+    # Server allowlist gate — strict mode.
+    #
+    # The plugin stamps logger_server from the active ACT log path
+    # (v0.1.10+). Pre-v0.1.10 builds didn't send the field at all and
+    # any plugin more than two minor versions behind the latest release
+    # has been blocked client-side by the version gate, plus rejected
+    # server-side by the X-Lexicon-Signature strict check since
+    # 2026-05-25. So any payload that lands here without logger_server
+    # is effectively a misconfigured client we want to surface, not a
+    # legitimate request to silently fall back to EQ2_WORLD.
+    #
+    # Three rejection cases, ordered from most-actionable-for-user to
+    # least:
+    #   1. logger_server missing/empty   → 400, "update your plugin"
+    #   2. logger_server malformed shape → 400, "logger_server is bad"
+    #   3. logger_server not in allow set → 403, with the allowed list
+    raw_server = (body.logger_server or "").strip()
+    if not raw_server:
+        raise HTTPException(
+            status_code=400,
+            detail="logger_server is required. Please update the EQ2 Lexicon ACT plugin to v0.1.14 or later.",
+        )
+    sanitized_server = _sanitize_world(raw_server)
+    if sanitized_server is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"logger_server '{raw_server}' is malformed.",
+        )
+    if sanitized_server.lower() not in _ALLOWED_SERVERS_LOWER:
+        # Sort the allowed list so the error message renders
+        # deterministically — same display order as /auth/whoami.
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Server '{sanitized_server}' is not on the allowed list. "
+                f"Allowed: {', '.join(sorted(_ALLOWED_SERVERS))}."
+            ),
+        )
+
+    # After the strict gate, sanitized_server is a guaranteed-valid,
+    # allowlisted server name (Varsoon/Wuoshi) — and those ARE registry
+    # worlds — so it is the authoritative `world` we persist this parse
+    # under. The gate has already established a concrete world, so there is
+    # no current_world() fallback to fall through to on this HTTP path.
+    parse_world = sanitized_server
 
     # Cache-aware guild resolve: hits character_cache first; on miss does a
     # one-character Census call and pre-warms the full roster in the
     # background so the rest of the raid's uploads are zero-Census.
     # logger_server (plugin v0.1.10+) overrides EQ2_WORLD when present —
     # enables a Varsoon-configured deployment to correctly resolve a
-    # Kaladim upload, for instance.
+    # Wuoshi upload, for instance. After the strict gate above the value is
+    # guaranteed valid; _resolve_uploader_guild_async re-sanitises it
+    # defensively and that fallback is now only reachable from the
+    # local-ingest pipeline.
     guild_name = await _resolve_uploader_guild_async(uploader, body.logger_server)
 
     # Freeze each player ally's level/guild/class at ingest. Restricted to

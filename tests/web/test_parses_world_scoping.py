@@ -3,7 +3,6 @@
 Covers:
   * ingest with logger_server='Wuoshi' stores encounter under world='Wuoshi'
   * list endpoint (Varsoon context) excludes Wuoshi encounters
-  * _resolve_parse_world maps logger_server to registry world with fallback
   * _ingest_payload_sync deduplication is world-scoped
   * delete endpoints are blocked from deleting cross-server encounters
 """
@@ -19,7 +18,7 @@ from httpx import ASGITransport, AsyncClient
 
 from parses import db as parses_db
 from parses.models import Encounter
-from web.routes.parses import IngestRequest, _ingest_payload_sync, _resolve_parse_world
+from web.routes.parses import IngestRequest, _ingest_payload_sync
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -75,67 +74,6 @@ def _minimal_payload(encid: str = "ABCD1234") -> dict:
             },
         ],
     }
-
-
-# ---------------------------------------------------------------------------
-# _resolve_parse_world
-# ---------------------------------------------------------------------------
-
-
-class TestResolveParsaWorld:
-    def test_known_world_from_registry(self):
-        """A logger_server that matches a registry entry returns the canonical
-        world name (exact case from the registry)."""
-        fake_registry = {"Varsoon": object(), "Wuoshi": object()}
-        with patch("web.routes.parses._server_registry_by_world", fake_registry):
-            assert _resolve_parse_world("Varsoon") == "Varsoon"
-            assert _resolve_parse_world("Wuoshi") == "Wuoshi"
-
-    def test_case_insensitive_match(self):
-        """'varsoon' and 'VARSOON' both resolve to the canonical casing."""
-        fake_registry = {"Varsoon": object()}
-        with (
-            patch("web.routes.parses._server_registry_by_world", fake_registry),
-            patch("web.routes.parses.current_world", return_value="Varsoon"),
-        ):
-            assert _resolve_parse_world("varsoon") == "Varsoon"
-            assert _resolve_parse_world("VARSOON") == "Varsoon"
-
-    def test_unknown_world_falls_back_to_current_world(self):
-        """A logger_server that isn't in the registry falls back to the active
-        request world (current_world())."""
-        fake_registry = {"Varsoon": object()}
-        with (
-            patch("web.routes.parses._server_registry_by_world", fake_registry),
-            patch("web.routes.parses.current_world", return_value="Varsoon"),
-        ):
-            assert _resolve_parse_world("UnknownServer") == "Varsoon"
-
-    def test_none_falls_back_to_current_world(self):
-        """Absent logger_server falls back to current_world()."""
-        fake_registry = {"Varsoon": object()}
-        with (
-            patch("web.routes.parses._server_registry_by_world", fake_registry),
-            patch("web.routes.parses.current_world", return_value="Varsoon"),
-        ):
-            assert _resolve_parse_world(None) == "Varsoon"
-
-    def test_empty_string_falls_back_to_current_world(self):
-        fake_registry = {"Varsoon": object()}
-        with (
-            patch("web.routes.parses._server_registry_by_world", fake_registry),
-            patch("web.routes.parses.current_world", return_value="Varsoon"),
-        ):
-            assert _resolve_parse_world("") == "Varsoon"
-
-    def test_invalid_shape_falls_back_to_current_world(self):
-        """logger_server that fails sanitisation falls back."""
-        fake_registry = {"Varsoon": object()}
-        with (
-            patch("web.routes.parses._server_registry_by_world", fake_registry),
-            patch("web.routes.parses.current_world", return_value="Varsoon"),
-        ):
-            assert _resolve_parse_world("varsoon:hack") == "Varsoon"
 
 
 # ---------------------------------------------------------------------------
