@@ -1,17 +1,28 @@
 from __future__ import annotations
 
-from web.routes.rankings import _percentile, _scope_for
+from web.routes.rankings import _apply_percentiles, _scope_for
 
 
-class TestPercentile:
-    def test_best_is_100(self):
-        assert _percentile(1, 4) == 100
-
-    def test_quartiles(self):
-        assert [_percentile(r, 4) for r in (1, 2, 3, 4)] == [100, 75, 50, 25]
+class TestApplyPercentiles:
+    def test_leader_is_100_rest_relative(self):
+        rows = [{"score": 1000.0}, {"score": 500.0}, {"score": 250.0}]
+        _apply_percentiles(rows, score_key="score", higher_better=True)
+        assert [r["percentile"] for r in rows] == [100, 50, 25]
 
     def test_single_entry_is_100(self):
-        assert _percentile(1, 1) == 100
+        rows = [{"score": 42.0}]
+        _apply_percentiles(rows, score_key="score", higher_better=True)
+        assert rows[0]["percentile"] == 100
+
+    def test_speed_lower_time_is_better(self):
+        rows = [{"duration_s": 100}, {"duration_s": 200}]
+        _apply_percentiles(rows, score_key="duration_s", higher_better=False)
+        assert [r["percentile"] for r in rows] == [100, 50]
+
+    def test_empty_is_zero(self):
+        rows = [{"score": 0.0}]
+        _apply_percentiles(rows, score_key="score", higher_better=True)
+        assert rows[0]["percentile"] == 0
 
 
 class TestScopeFor:
@@ -72,7 +83,10 @@ class TestCharacterBoard:
         assert rows[0]["score"] == 900.0 and rows[0]["encounter_id"] == 2
         assert classes == ["Wizard"]
 
-    def test_percentile_within_class(self):
+    def test_percentile_relative_to_board_leader(self):
+        # Only the top scorer is 100%; the rest scale by score vs the leader,
+        # across the whole board (not per class) — fixes the "all 100%" bug when
+        # each resolved character is a different class.
         kills = [
             _kill(
                 1,
@@ -81,16 +95,18 @@ class TestCharacterBoard:
                 pcount=24,
                 combatants=[
                     _c("A", "Wizard", 900.0),
-                    _c("B", "Wizard", 500.0),
-                    _c("H", "Templar", 100.0),
+                    _c("B", "Brigand", 450.0),
+                    _c("H", "Templar", 90.0),
                 ],
             )
         ]
         rows, classes = _build_character_board(kills, size="raid", zone="Z", boss="Tarinax", metric="dps")
+        _apply_percentiles(rows, score_key="score", higher_better=True)
         pct = {r["name"]: r["percentile"] for r in rows}
-        assert pct["A"] == 100 and pct["B"] == 50  # two Wizards
-        assert pct["H"] == 100  # only Templar
-        assert classes == ["Templar", "Wizard"]
+        assert pct["A"] == 100  # leader
+        assert pct["B"] == 50  # 450/900
+        assert pct["H"] == 10  # 90/900
+        assert classes == ["Brigand", "Templar", "Wizard"]
 
     def test_excludes_unresolved_class_and_pets(self):
         kills = [
@@ -174,9 +190,11 @@ class TestSpeedBoard:
             },
         ]
         rows = _build_speed_board(kills, size="raid", zone="Z", boss="Tarinax")
+        _apply_percentiles(rows, score_key="duration_s", higher_better=False)
         assert [r["guild_name"] for r in rows] == ["Exordium", "Misfits"]
         assert rows[0]["duration_s"] == 168 and rows[0]["encounter_id"] == 2
-        assert rows[0]["percentile"] == 100 and rows[1]["percentile"] == 50
+        # Fastest = 100%; slower scales by fastest/this (168/211 ≈ 80).
+        assert rows[0]["percentile"] == 100 and rows[1]["percentile"] == 80
 
     def test_excludes_unresolved_guild(self):
         kills = [
@@ -216,16 +234,80 @@ class TestSpeedBoard:
 
 class TestFilters:
     def test_tree_groups_by_scope_zone_boss(self):
+        from unittest.mock import patch
+
         kills = [
             {"scope": "raid", "zone": "Vetrovia", "title": "Tarinax"},
             {"scope": "raid", "zone": "Vetrovia", "title": "Cazel"},
             {"scope": "group", "zone": "Crypt", "title": "Bonebreaker"},
         ]
-        tree = _build_filters(kills)
+        # Isolate from zones.db so this exercises the kills-only merge path.
+        with patch("web.routes.rankings._cached_zones_data", return_value=({}, [])):
+            tree = _build_filters(kills)
         raid = next(s for s in tree["scopes"] if s["key"] == "raid")
         zone = raid["zones"][0]
-        assert zone["zone"] == "Vetrovia" and zone["bosses"] == ["Cazel", "Tarinax"]
+        assert zone["zone"] == "Vetrovia" and set(zone["bosses"]) == {"Cazel", "Tarinax"}
         assert {s["key"] for s in tree["scopes"]} == {"raid", "group"}
+
+    def test_raid_tree_comes_from_zones_db_with_kills_appended(self):
+        from unittest.mock import patch
+
+        # zones.db supplies the full raid structure (wing order preserved);
+        # group + unpopulated raid kills are merged on top.
+        raid_tree = [{"zone": "Veeshan's Peak", "expansion": "RoK", "bosses": ["Kluzen", "Nexona", "Phara Dar"]}]
+        kills = [
+            {"scope": "raid", "zone": "Some Unpopulated Raid", "title": "Mystery Boss"},
+            {"scope": "group", "zone": "Crypt", "title": "Bonebreaker"},
+        ]
+        with patch("web.routes.rankings._cached_zones_data", return_value=({}, raid_tree)):
+            tree = _build_filters(kills)
+        raid = next(s for s in tree["scopes"] if s["key"] == "raid")
+        # zones.db zone first, bosses in wing order (not alphabetical).
+        assert raid["zones"][0]["zone"] == "Veeshan's Peak"
+        assert raid["zones"][0]["bosses"] == ["Kluzen", "Nexona", "Phara Dar"]
+        assert raid["zones"][0]["expansion"] == "RoK"
+        # heuristic-matched raid kill for an unlisted zone still appears, under "Other".
+        other = next(z for z in raid["zones"] if z["zone"] == "Some Unpopulated Raid")
+        assert other["expansion"] == "Other"
+
+    def test_expansion_list_and_default(self, monkeypatch):
+        from unittest.mock import patch
+
+        raid_tree = [
+            {"zone": "VP", "expansion": "RoK", "expansion_name": "Rise of Kunark", "bosses": ["Phara Dar"]},
+            {"zone": "EH", "expansion": "EoF", "expansion_name": "Echoes of Faydwer", "bosses": ["Wuoshi"]},
+        ]
+        with patch("web.routes.rankings._cached_zones_data", return_value=({}, raid_tree)):
+            monkeypatch.delenv("SERVER_CURRENT_XPAC", raising=False)
+            f = _build_filters([])
+            # newest expansion first; each raid zone tagged with its expansion.
+            assert [e["short"] for e in f["raid_expansions"]] == ["RoK", "EoF"]
+            assert f["raid_expansions"][0]["name"] == "Rise of Kunark"
+            assert f["default_expansion"] == "RoK"  # no env → most recent
+            raid = next(s for s in f["scopes"] if s["key"] == "raid")
+            assert {z["zone"]: z["expansion"] for z in raid["zones"]} == {"VP": "RoK", "EH": "EoF"}
+
+            monkeypatch.setenv("SERVER_CURRENT_XPAC", "EoF")
+            assert _build_filters([])["default_expansion"] == "EoF"  # valid env wins
+
+            monkeypatch.setenv("SERVER_CURRENT_XPAC", "ZZZ")
+            assert _build_filters([])["default_expansion"] == "RoK"  # invalid env → most recent
+
+    def test_resolve_boss_uses_zones_db_for_raids(self):
+        from unittest.mock import patch
+
+        from web.routes.rankings import _resolve_boss
+
+        index = {"phara dar": [("Veeshan's Peak", "Phara Dar")]}
+        with patch("web.routes.rankings._cached_zones_data", return_value=(index, [])):
+            # Raid: matches zones.db → canonical zone + encounter.
+            assert _resolve_boss("Phara Dar", "ACT Zone Name", "raid") == (True, "Veeshan's Peak", "Phara Dar")
+            # Raid, unknown to zones.db → heuristic fallback keeps ACT zone/title.
+            assert _resolve_boss("Tarinax", "Vetrovia", "raid") == (True, "Vetrovia", "Tarinax")
+            # Heuristic correctly rejects trash ("a "/"an " prefixes).
+            assert _resolve_boss("a decaying skeleton", "Vetrovia", "raid")[0] is False
+            # Group scope never consults zones.db — pure heuristic.
+            assert _resolve_boss("Phara Dar", "Crypt", "group") == (True, "Crypt", "Phara Dar")
 
 
 import time as _time

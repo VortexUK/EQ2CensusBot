@@ -12,12 +12,15 @@ docs/superpowers/specs/2026-05-25-eq2logs-rankings-design.md.
 from __future__ import annotations
 
 import asyncio
+import os
 import sqlite3
 from collections import defaultdict
+from functools import lru_cache
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
+from census import zones_db
 from parses import db as parses_db
 from parses.boss import is_boss
 from web.auth_deps import require_user_session as _require_user
@@ -41,11 +44,28 @@ rankings_cache: TTLCache = TTLCache(ttl=60, max_age=600, name="rankings", maxsiz
 _KILLS_KEY = "primary_boss_kills"
 
 
-def _percentile(rank: int, n: int) -> int:
-    """Rank-based percentile, 1 = best. Best is always 100; n=4 -> 100/75/50/25."""
-    if n <= 0:
-        return 0
-    return round(100 * (n - rank + 1) / n)
+def _apply_percentiles(rows: list[dict], *, score_key: str, higher_better: bool) -> None:
+    """Set each row's 'percentile' relative to the board LEADER: the best row is
+    100, the rest scale by how close their score is to it. Computed over exactly
+    the rows passed (i.e. after any class filter), so the top of whatever is
+    displayed reads 100% and everyone else is measured against that one.
+
+    higher_better=True for DPS/HPS (bigger wins); False for Speed (lower time
+    wins, so percentile = fastest_time / this_time)."""
+    vals = [r[score_key] for r in rows if r.get(score_key)]
+    if not vals:
+        for r in rows:
+            r["percentile"] = 0
+        return
+    if higher_better:
+        top = max(vals)
+        for r in rows:
+            r["percentile"] = round(100 * (r.get(score_key) or 0) / top) if top else 0
+    else:
+        best = min(vals)
+        for r in rows:
+            v = r.get(score_key) or 0
+            r["percentile"] = round(100 * best / v) if v else 0
 
 
 def _scope_for(player_count: int) -> str | None:
@@ -95,16 +115,11 @@ def _build_character_board(
                     "started_at": k["started_at"],
                 }
     entries = list(best.values())
-    by_cls: dict[str, list[dict]] = defaultdict(list)
-    for e in entries:
-        by_cls[e["cls"]].append(e)
-    for cls_rows in by_cls.values():
-        cls_rows.sort(key=lambda e: e["score"], reverse=True)
-        n = len(cls_rows)
-        for i, e in enumerate(cls_rows):
-            e["percentile"] = _percentile(i + 1, n)
     entries.sort(key=lambda e: e["score"], reverse=True)
-    return entries, sorted(by_cls.keys())
+    classes = sorted({e["cls"] for e in entries})
+    # Percentiles are applied by the route via _apply_percentiles, after any
+    # class filter, so the top of the displayed set reads 100%.
+    return entries, classes
 
 
 def _avg_player_ilvl(combatants: list[dict]) -> float | None:
@@ -134,32 +149,147 @@ def _build_speed_board(kills: list[dict], *, size: str, zone: str, boss: str) ->
                 "size": k["player_count"],
                 "started_at": k["started_at"],
             }
-    rows = sorted(best.values(), key=lambda e: e["duration_s"])
-    n = len(rows)
-    for i, e in enumerate(rows):
-        e["percentile"] = _percentile(i + 1, n)
-    return rows
+    return sorted(best.values(), key=lambda e: e["duration_s"])
+
+
+@lru_cache(maxsize=1)
+def _cached_zones_data() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
+    """Authoritative zone/boss data from zones.db, built once per process.
+
+    Returns (boss_index, raid_tree):
+      * boss_index: ``mob_name_lower -> [(canonical_zone, encounter_name), ...]``
+        — the lookup that gates a raid title and maps it to its canonical boss.
+      * raid_tree:  ordered ``[{zone, expansion, bosses:[encounter_name,...]}]``
+        for raid zones that have encounters (newest expansion first, bosses in
+        wing/position order) — drives the dropdowns.
+
+    Empty when zones.db is absent (dev/pre-upload), so everything falls back to
+    the is_boss heuristic and parse-derived dropdowns."""
+    path = zones_db.DB_PATH
+    if not path.exists():
+        return {}, []
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        boss_index: dict[str, list[tuple[str, str]]] = defaultdict(list)
+        for mob_lower, zname, ename in conn.execute(
+            """
+            SELECT m.mob_name_lower, z.name, e.encounter_name
+            FROM zone_encounter_mobs m
+            JOIN zone_encounters e ON e.id = m.encounter_id
+            JOIN zones z ON z.id = e.zone_id
+            """
+        ):
+            boss_index[mob_lower].append((zname, ename))
+        raid_tree: list[dict] = []
+        for zid, zname, exp, exp_name in conn.execute(
+            """
+            SELECT z.id, z.name, z.expansion_short, z.expansion_name
+            FROM zones z
+            WHERE z.id IN (SELECT DISTINCT zone_id FROM zone_encounters)
+            ORDER BY z.expansion_year DESC, z.name
+            """
+        ):
+            bosses = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT encounter_name FROM zone_encounters WHERE zone_id = ? ORDER BY position",
+                    (zid,),
+                )
+            ]
+            raid_tree.append({"zone": zname, "expansion": exp, "expansion_name": exp_name, "bosses": bosses})
+        return dict(boss_index), raid_tree
+    finally:
+        conn.close()
+
+
+def _resolve_boss(title: str, zone: str | None, scope: str) -> tuple[bool, str | None, str | None]:
+    """Whether an encounter is a rankable boss, and its canonical (zone, title).
+
+    RAIDS: zones.db is authoritative — a title matching a known raid encounter
+    mob is a boss, remapped to its canonical zone + encounter name (so ACT
+    zone-name variance collapses to one board). Unpopulated raid content and all
+    group/dungeon content fall back to the is_boss heuristic, keeping the ACT
+    zone/title."""
+    if scope == "raid":
+        boss_index, _ = _cached_zones_data()
+        candidates = boss_index.get(title.lower())
+        if candidates:
+            if len(candidates) > 1 and zone:
+                resolved = zones_db.find_by_name(zone)
+                if resolved:
+                    for cz, ct in candidates:
+                        if cz == resolved["name"]:
+                            return True, cz, ct
+            cz, ct = candidates[0]
+            return True, cz, ct
+    if is_boss(title):
+        return True, zone, title
+    return False, zone, title
 
 
 def _build_filters(kills: list[dict]) -> dict:
-    """Scope -> zone -> boss tree for the dropdowns, populated from the data."""
-    tree: dict[str, dict[str, set]] = {"raid": defaultdict(set), "group": defaultdict(set)}
+    """Scope -> zone -> boss tree for the dropdowns. Raid zones/bosses come from
+    zones.db (authoritative, full structure including bosses with no kills yet),
+    each tagged with its expansion; group/dungeon zones come from the uploaded
+    kills. Heuristic-matched raid kills for zones not yet in zones.db are appended
+    under an "Other" expansion so they still appear.
+
+    Also returns ``raid_expansions`` (newest first) and a ``default_expansion``
+    for the expansion selector — the SERVER_CURRENT_XPAC env var if it has raids,
+    else the most recent expansion that does."""
+    _, raid_tree = _cached_zones_data()
+    raid_zones: dict[str, dict] = {}  # insertion-ordered: zone -> {bosses, expansion}
+    exp_names: dict[str, str] = {}  # short -> display name
+    exp_order: list[str] = []  # distinct expansion shorts, newest first
+    for entry in raid_tree:
+        raid_zones[entry["zone"]] = {"bosses": list(entry["bosses"]), "expansion": entry["expansion"]}
+        short = entry["expansion"]
+        if short and short not in exp_names:
+            exp_names[short] = entry.get("expansion_name") or short
+            exp_order.append(short)
+
+    group_zones: dict[str, set] = defaultdict(set)
+    has_other_raid = False
     for k in kills:
-        scope = k.get("scope")
-        if scope not in tree:
-            continue
-        tree[scope][k.get("zone") or "(unknown zone)"].add(k["title"])
-    return {
-        "scopes": [
+        zone = k.get("zone") or "(unknown zone)"
+        if k.get("scope") == "raid":
+            z = raid_zones.setdefault(zone, {"bosses": [], "expansion": None})
+            if z["expansion"] is None:
+                z["expansion"] = "Other"
+                has_other_raid = True
+            if k["title"] not in z["bosses"]:
+                z["bosses"].append(k["title"])
+        elif k.get("scope") == "group":
+            group_zones[zone].add(k["title"])
+
+    raid_expansions = [{"short": s, "name": exp_names[s]} for s in exp_order]
+    if has_other_raid:
+        raid_expansions.append({"short": "Other", "name": "Other"})
+
+    env_xpac = os.getenv("SERVER_CURRENT_XPAC")
+    valid = {e["short"] for e in raid_expansions}
+    default_expansion = env_xpac if env_xpac in valid else (raid_expansions[0]["short"] if raid_expansions else None)
+
+    scopes: list[dict] = []
+    if raid_zones:
+        scopes.append(
             {
-                "key": scope,
-                "label": _SCOPE_LABELS[scope],
-                "zones": [{"zone": z, "bosses": sorted(bosses)} for z, bosses in sorted(zones.items())],
+                "key": "raid",
+                "label": _SCOPE_LABELS["raid"],
+                "zones": [
+                    {"zone": z, "bosses": v["bosses"], "expansion": v["expansion"]} for z, v in raid_zones.items()
+                ],
             }
-            for scope, zones in tree.items()
-            if zones
-        ]
-    }
+        )
+    if group_zones:
+        scopes.append(
+            {
+                "key": "group",
+                "label": _SCOPE_LABELS["group"],
+                "zones": [{"zone": z, "bosses": sorted(b), "expansion": None} for z, b in sorted(group_zones.items())],
+            }
+        )
+    return {"scopes": scopes, "raid_expansions": raid_expansions, "default_expansion": default_expansion}
 
 
 def _load_primary_boss_kills() -> list[dict]:
@@ -182,7 +312,20 @@ def _load_primary_boss_kills() -> list[dict]:
             ORDER BY e.started_at DESC
             """
         ).fetchall()
-        encs = [dict(r) for r in rows if is_boss(r["title"])]
+        # Gate + canonicalise per row (scope is known from player_count): raid
+        # bosses resolve against zones.db, everything else via the heuristic.
+        encs: list[dict] = []
+        for r in rows:
+            d = dict(r)
+            scope = _scope_for(d.get("player_count") or 0)
+            if scope is None:
+                continue
+            ok, czone, ctitle = _resolve_boss(d["title"], d["zone"], scope)
+            if not ok:
+                continue
+            d["zone"] = czone
+            d["title"] = ctitle
+            encs.append(d)
         kills: list[dict] = []
         for g in _group_into_fights(encs):
             scope = _scope_for(g.get("player_count") or 0)
@@ -213,6 +356,34 @@ def _cached_kills() -> list[dict]:
     kills = _load_primary_boss_kills()
     rankings_cache.set(_KILLS_KEY, kills)
     return kills
+
+
+def benchmarks_for_boss(boss_title: str) -> dict[str, tuple[dict[str, float], float]]:
+    """Best encDPS and encHPS achieved per class, and overall, for a boss across
+    all primary winning kills (the rankings dataset). Lets the parse page colour
+    each combatant's encDPS/encHPS by where it sits among their class for that
+    boss (class leader = 100%), and flag the all-class best. Returns
+    {"dps": ({class: best}, overall), "hps": ({class: best}, overall)}."""
+    dps_by_class: dict[str, float] = {}
+    hps_by_class: dict[str, float] = {}
+    dps_overall = 0.0
+    hps_overall = 0.0
+    for k in _cached_kills():
+        if k["title"] != boss_title:
+            continue
+        for c in k["combatants"]:
+            if not _is_player_combatant(c) or not c.get("cls"):
+                continue
+            cls = c["cls"]
+            dps = c.get("encdps") or 0.0
+            hps = c.get("enchps") or 0.0
+            if dps > dps_by_class.get(cls, 0.0):
+                dps_by_class[cls] = dps
+            dps_overall = max(dps_overall, dps)
+            if hps > hps_by_class.get(cls, 0.0):
+                hps_by_class[cls] = hps
+            hps_overall = max(hps_overall, hps)
+    return {"dps": (dps_by_class, dps_overall), "hps": (hps_by_class, hps_overall)}
 
 
 class RankingRow(BaseModel):
@@ -269,11 +440,13 @@ async def get_rankings(
 
     if metric == "speed":
         rows = _build_speed_board(kills, size=size, zone=zone, boss=boss)
+        _apply_percentiles(rows, score_key="duration_s", higher_better=False)
         classes: list[str] = []
     else:
         rows, classes = _build_character_board(kills, size=size, zone=zone, boss=boss, metric=metric)
         if class_name:
             rows = [r for r in rows if r["cls"] == class_name]
+        _apply_percentiles(rows, score_key="score", higher_better=True)
 
     return RankingsResponse(
         rows=[RankingRow(**r) for r in rows],
