@@ -74,3 +74,24 @@ def test_get_missing_returns_none(tmp_path):
         assert cs.get_character(conn, "Nobody", "Varsoon") is None
     finally:
         conn.close()
+
+
+def test_upsert_guild_then_get(tmp_path):
+    conn = cs.init_db(tmp_path / "census.db")
+    try:
+        blob = {"name": "Exordium", "members": [{"name": "Menludiir", "rank": "Leader"}]}
+        cs.upsert_guild(conn, "Exordium", "Varsoon", blob, now=1000)
+        rec = cs.get_guild(conn, "Exordium", "Varsoon")
+        assert rec is not None
+        assert rec["data"]["members"][0]["name"] == "Menludiir"
+        assert rec["last_resolved_at"] == 1000
+    finally:
+        conn.close()
+
+
+def test_guild_get_missing_returns_none(tmp_path):
+    conn = cs.init_db(tmp_path / "census.db")
+    try:
+        assert cs.get_guild(conn, "Nope", "Varsoon") is None
+    finally:
+        conn.close()

@@ -110,3 +110,30 @@ def get_character(conn: sqlite3.Connection, name: str, world: str) -> dict | Non
     if row is None:
         return None
     return {"data": json.loads(row[0]), "last_resolved_at": row[1]}
+
+
+def upsert_guild(conn: sqlite3.Connection, name: str, world: str, data: dict, *, now: int | None = None) -> None:
+    """Store the guild roster blob (member names+ranks + info). Always replaces —
+    the roster list is reliable from Census regardless of member login recency."""
+    ts = int(time.time()) if now is None else now
+    conn.execute(
+        """
+        INSERT INTO guilds (name_lower, world, name, data_json, last_resolved_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(name_lower, world) DO UPDATE SET
+            name=excluded.name, data_json=excluded.data_json,
+            last_resolved_at=excluded.last_resolved_at, updated_at=excluded.updated_at
+        """,
+        (name.lower(), world, name, json.dumps(data), ts, ts),
+    )
+    conn.commit()
+
+
+def get_guild(conn: sqlite3.Connection, name: str, world: str) -> dict | None:
+    row = conn.execute(
+        "SELECT data_json, last_resolved_at FROM guilds WHERE name_lower=? AND world=?",
+        (name.lower(), world),
+    ).fetchone()
+    if row is None:
+        return None
+    return {"data": json.loads(row[0]), "last_resolved_at": row[1]}
