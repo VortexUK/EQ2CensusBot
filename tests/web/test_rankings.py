@@ -528,3 +528,138 @@ async def test_rankings_default_xpac_per_server(app, monkeypatch, tmp_path):
     body = r.json()
     # Wuoshi's current_xpac is "Echoes of Faydwer" → matches EoF short code.
     assert body["default_expansion"] == "EoF"
+
+
+@pytest.mark.asyncio
+async def test_rankings_leaderboard_is_world_scoped(app, monkeypatch, tmp_path):
+    """The /rankings leaderboard endpoint must return per-world data via the
+    executor call path.
+
+    This is the regression test for the contextvar-in-thread bug:
+    ``_cached_kills`` was called with no args inside run_in_executor, causing
+    it to fall back to default_server().world (Varsoon) regardless of the
+    active-server contextvar, so wuoshi.eq2lexicon.com served Varsoon data.
+
+    The fix: resolve ``world = current_world()`` in the async handler and pass
+    it explicitly to ``_cached_kills`` before the executor call.
+    """
+    from web import db, server_context
+    from web.routes import rankings as rk
+
+    # Register both servers so x-server: wuoshi resolves correctly.
+    p = tmp_path / "users.db"
+    db.init_db(p)
+    monkeypatch.setattr(db, "DB_PATH", p)
+    db.upsert_server_settings_sync("Varsoon", max_level=50, current_xpac=None, launch_dt=None, path=p)
+    db.upsert_server_settings_sync("Wuoshi", max_level=70, current_xpac=None, launch_dt=None, path=p)
+    server_context.load_registry()
+
+    # Seed a Varsoon boss kill and a distinct Wuoshi boss kill.
+    db_file = tmp_path / "parses.db"
+    monkeypatch.setattr(pdb, "DB_PATH", db_file)
+    conn = pdb.init_db(db_file)
+    _ins(conn, "V-WIN", "Tarinax", success=1, players=8, guild="Exordium", duration=60)  # defaults to Varsoon
+    # Wuoshi kill uses a different boss title so results are unambiguous.
+    enc_w = Encounter(
+        encid="W-WIN",
+        title="Wuoshi",
+        zone="Emerald Halls",
+        started_at=None,
+        ended_at=None,
+        duration_s=90,
+        total_damage=1,
+        encdps=1.0,
+        kills=1,
+        deaths=0,
+        success_level=1,
+    )
+    weid = pdb.insert_encounter(
+        conn,
+        enc_w,
+        source_dsn="eq2act",
+        ingested_at=int(_time.time()),
+        uploaded_by="Up",
+        guild_name="DragonSlayers",
+        world="Wuoshi",
+    )
+    pdb.insert_combatants_bulk(
+        conn,
+        weid,
+        [
+            Combatant(
+                encid="W-WIN",
+                name=f"W{i}",
+                ally=True,
+                started_at=None,
+                ended_at=None,
+                duration_s=90,
+                damage=1,
+                damage_perc=0.0,
+                kills=0,
+                healed=0,
+                healed_perc=0.0,
+                crit_heals=0,
+                heals=0,
+                cure_dispels=0,
+                power_drain=0,
+                power_replenish=0,
+                dps=0.0,
+                encdps=float(50 - i),
+                enchps=0.0,
+                hits=0,
+                crit_hits=0,
+                blocked=0,
+                misses=0,
+                swings=0,
+                heals_taken=0,
+                damage_taken=0,
+                deaths=0,
+                to_hit=0.0,
+                crit_dam_perc=0.0,
+                crit_heal_perc=0.0,
+                crit_types=None,
+                threat_str=None,
+                threat_delta=0,
+            )
+            for i in range(8)
+        ],
+        {f"W{i}": CombatantSnapshot(level=95, guild_name="DragonSlayers", cls="Wizard") for i in range(8)},
+    )
+    conn.commit()
+    conn.close()
+
+    # Clear all per-world cache entries so the executor actually loads from DB.
+    for world in ("Varsoon", "Wuoshi"):
+        rk.rankings_cache.delete(f"{rk._KILLS_KEY}:{world}")
+    rk.rankings_cache.delete(rk._KILLS_KEY)
+
+    with (
+        patch("web.routes.rankings._require_user", _fake_user),
+        patch("web.routes.rankings._cached_zones_data", return_value=({}, [])),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            r_v = await c.get(
+                "/api/rankings?size=raid&zone=Vetrovia&boss=Tarinax&metric=dps",
+                headers={"x-server": "varsoon"},
+            )
+            r_w = await c.get(
+                "/api/rankings?size=raid&zone=Emerald+Halls&boss=Wuoshi&metric=dps",
+                headers={"x-server": "wuoshi"},
+            )
+
+    assert r_v.status_code == 200
+    assert r_w.status_code == 200
+
+    varsoon_bosses = {row["name"] for row in r_v.json()["rows"]}
+    wuoshi_bosses = {row["name"] for row in r_w.json()["rows"]}
+
+    # Each server sees only its own players.
+    # Varsoon kill: P0–P7; Wuoshi kill: W0–W7.
+    assert any(n.startswith("P") for n in varsoon_bosses), "Varsoon board missing Varsoon players"
+    assert not any(n.startswith("W") for n in varsoon_bosses), "Varsoon board leaked Wuoshi players"
+    assert any(n.startswith("W") for n in wuoshi_bosses), "Wuoshi board missing Wuoshi players"
+    assert not any(n.startswith("P") for n in wuoshi_bosses), "Wuoshi board leaked Varsoon players"
+
+    # The two boards must differ: before the fix, both returned Varsoon data.
+    assert r_v.json()["total"] > 0, "Varsoon board is empty — Varsoon kill not loaded"
+    assert r_w.json()["total"] > 0, "Wuoshi board is empty — Wuoshi kill not loaded"

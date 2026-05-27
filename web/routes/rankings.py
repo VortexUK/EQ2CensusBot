@@ -26,7 +26,7 @@ from web.auth_deps import require_user_session as _require_user
 from web.cache import TTLCache
 from web.limiter import limiter
 from web.routes.parses import _PLAYER_COUNT_SQL, _group_into_fights
-from web.server_context import current_server
+from web.server_context import current_server, current_world
 
 router = APIRouter(tags=["rankings"])
 
@@ -431,8 +431,11 @@ class RankingsResponse(BaseModel):
 @limiter.limit("60/minute")
 async def get_ranking_filters(request: Request) -> dict:
     _require_user(request)
+    # Resolve world in the async handler (contextvar is set here); do NOT read
+    # current_world() inside the executor thread — contextvars don't cross threads.
+    world = current_world()
     loop = asyncio.get_event_loop()
-    kills = await loop.run_in_executor(None, _cached_kills)
+    kills = await loop.run_in_executor(None, _cached_kills, world)
     return _build_filters(kills)
 
 
@@ -452,8 +455,11 @@ async def get_rankings(
     if metric not in ("dps", "hps", "speed"):
         raise HTTPException(status_code=400, detail="metric must be 'dps', 'hps' or 'speed'")
 
+    # Resolve world in the async handler (contextvar is set here); do NOT read
+    # current_world() inside the executor thread — contextvars don't cross threads.
+    world = current_world()
     loop = asyncio.get_event_loop()
-    kills = await loop.run_in_executor(None, _cached_kills)
+    kills = await loop.run_in_executor(None, _cached_kills, world)
 
     if metric == "speed":
         rows = _build_speed_board(kills, size=size, zone=zone, boss=boss)
