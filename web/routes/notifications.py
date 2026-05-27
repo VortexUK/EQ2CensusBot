@@ -61,7 +61,7 @@ async def get_notifications(request: Request) -> NotificationsResponse:
         pending_users = len(await list_pending_users())
 
     # ── Officer (or admin who is also an officer): find guilds via cache ─────
-    claims_data = await get_active_claims(disc_id)
+    claims_data = await get_active_claims(disc_id, world=current_world())
     approved_chars = [c["character_name"] for c in claims_data["approved"]]
 
     if approved_chars:
@@ -75,7 +75,7 @@ async def get_notifications(request: Request) -> NotificationsResponse:
                 guilds_seen.add(cached.guild_name)
 
         if guilds_seen:
-            all_pending = await list_claims(status="pending")
+            all_pending = await list_claims(status="pending", world=current_world())
             counted_ids: set[int] = set()
 
             for guild_name in guilds_seen:

@@ -165,7 +165,7 @@ async def add_item_watch_entry(
 
     # Use the officer's primary in-game character name as the attribution,
     # falling back to their Discord display name if no primary is set.
-    officer_claims = await get_active_claims(user["id"])
+    officer_claims = await get_active_claims(user["id"], world=current_world())
     primary_claim = next((c for c in officer_claims["approved"] if c.get("is_primary")), None)
     added_by_name = (
         primary_claim["character_name"]

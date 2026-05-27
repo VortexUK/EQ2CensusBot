@@ -340,7 +340,7 @@ async def _officer_chars(discord_id: str, guild_name: str) -> set[str]:
     hold an officer rank (rank_id in _OFFICER_RANKS) in the named guild.
     Empty set means the user is not an officer of this guild.
     """
-    claims_data = await get_active_claims(discord_id)
+    claims_data = await get_active_claims(discord_id, world=current_world())
     approved = {c["character_name"].lower() for c in claims_data["approved"]}
     if not approved:
         return set()

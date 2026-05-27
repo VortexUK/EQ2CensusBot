@@ -61,7 +61,7 @@ async def _build_claims_response(discord_id: str) -> tuple[ClaimsResponse, bool]
     Guild names are sourced from character_cache when available (no Census call
     needed).  Census is only called for characters not already in cache.
     """
-    data = await get_active_claims(discord_id)
+    data = await get_active_claims(discord_id, world=current_world())
     approved_raw = data["approved"]
 
     world_lower = current_world().lower()
@@ -190,7 +190,7 @@ async def create_claim(request: Request, body: SubmitClaimRequest) -> ClaimRespo
         )
 
     try:
-        claim = await submit_claim(user["id"], char.name)
+        claim = await submit_claim(user["id"], char.name, world=current_world())
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
@@ -202,7 +202,7 @@ async def create_claim(request: Request, body: SubmitClaimRequest) -> ClaimRespo
 async def remove_claim(claim_id: int, request: Request) -> dict:
     """Remove a specific approved character or cancel a specific pending claim."""
     user = _require_user(request)
-    if not await withdraw_claim(claim_id, user["id"]):
+    if not await withdraw_claim(claim_id, user["id"], world=current_world()):
         raise HTTPException(status_code=404, detail="Claim not found or already inactive")
     asyncio.create_task(_refresh_claim_cache(user["id"]))
     return {"ok": True}
@@ -212,7 +212,7 @@ async def remove_claim(claim_id: int, request: Request) -> dict:
 async def set_primary_claim(claim_id: int, request: Request) -> dict:
     """Set the specified approved character as the user's primary. No admin approval needed."""
     user = _require_user(request)
-    if not await set_primary(user["id"], claim_id):
+    if not await set_primary(user["id"], claim_id, world=current_world()):
         raise HTTPException(status_code=404, detail="Claim not found, not approved, or not yours")
     asyncio.create_task(_refresh_claim_cache(user["id"]))
     return {"ok": True}

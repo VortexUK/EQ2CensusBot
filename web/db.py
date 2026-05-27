@@ -53,11 +53,13 @@ CREATE TABLE IF NOT EXISTS character_claims (
     requested_at    INTEGER NOT NULL DEFAULT (strftime('%s','now')),
     reviewed_at     INTEGER,
     reviewed_by     TEXT,
-    note            TEXT
+    note            TEXT,
+    world           TEXT    NOT NULL DEFAULT 'Varsoon'
 );
 
 CREATE INDEX IF NOT EXISTS idx_claims_discord ON character_claims(discord_id);
 CREATE INDEX IF NOT EXISTS idx_claims_status  ON character_claims(status);
+CREATE INDEX IF NOT EXISTS idx_claims_world   ON character_claims(world);
 
 CREATE TABLE IF NOT EXISTS item_watch (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -214,6 +216,8 @@ def init_db(path: Path = DB_PATH) -> None:
         claims_cols = {row[1] for row in conn.execute("PRAGMA table_info(character_claims)")}
         if "is_primary" not in claims_cols:
             conn.execute("ALTER TABLE character_claims ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0")
+        if "world" not in claims_cols:
+            conn.execute("ALTER TABLE character_claims ADD COLUMN world TEXT NOT NULL DEFAULT 'Varsoon'")
 
         # Seed role_permissions. INSERT OR IGNORE keeps it idempotent and
         # leaves any admin-edited rows alone if/when a future UI exposes the
@@ -611,22 +615,25 @@ async def list_role_assignments(path: Path = DB_PATH) -> dict[str, list[str]]:
 
 async def get_active_claims(
     discord_id: str,
+    world: str = "Varsoon",
     path: Path = DB_PATH,
 ) -> dict:
     """
-    Return all active claims for this user as:
+    Return all active claims for this user on the given world as:
       { 'approved': [list of approved claim dicts], 'pending': claim dict or None }
     Ignores withdrawn / rejected / superseded.
+    Claims are scoped to (discord_id, world) — a user's Varsoon and Wuoshi
+    primaries are completely independent.
     """
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """
             SELECT * FROM character_claims
-            WHERE discord_id = ? AND status IN ('approved', 'pending')
+            WHERE discord_id = ? AND world = ? AND status IN ('approved', 'pending')
             ORDER BY requested_at ASC
             """,
-            (discord_id,),
+            (discord_id, world),
         ) as cur:
             rows = await cur.fetchall()
     claims = [dict(r) for r in rows]
@@ -639,20 +646,23 @@ async def get_active_claims(
 async def submit_claim(
     discord_id: str,
     character_name: str,
+    world: str = "Varsoon",
     path: Path = DB_PATH,
 ) -> dict:
     """
-    Cancel any current *pending* claim for this user (set to 'withdrawn'),
-    then insert a new pending claim.  Returns the new claim dict.
+    Cancel any current *pending* claim for this user on this world (set to
+    'withdrawn'), then insert a new pending claim.  Returns the new claim dict.
     Already-approved claims for other characters are not affected.
-    Raises ValueError if this character is already approved for this user.
+    Raises ValueError if this character is already claimed on this world.
     """
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
-        # Reject if this character is already claimed (approved or pending) by anyone
+        # Reject if this character name is already claimed (approved or pending)
+        # by anyone *on this world* (EQ2 names are unique only within a server)
         async with db.execute(
-            "SELECT discord_id FROM character_claims WHERE character_name = ? AND status IN ('approved', 'pending')",
-            (character_name,),
+            "SELECT discord_id FROM character_claims "
+            "WHERE character_name = ? AND world = ? AND status IN ('approved', 'pending')",
+            (character_name, world),
         ) as cur:
             existing = await cur.fetchone()
         if existing:
@@ -660,14 +670,14 @@ async def submit_claim(
                 raise ValueError(f"'{character_name}' is already claimed on your account.")
             else:
                 raise ValueError(f"'{character_name}' has already been claimed by another player.")
-        # Cancel any existing pending claim (one pending at a time)
+        # Cancel any existing pending claim on this world (one pending per world at a time)
         await db.execute(
-            "UPDATE character_claims SET status = 'withdrawn' WHERE discord_id = ? AND status = 'pending'",
-            (discord_id,),
+            "UPDATE character_claims SET status = 'withdrawn' WHERE discord_id = ? AND world = ? AND status = 'pending'",
+            (discord_id, world),
         )
         cur = await db.execute(
-            "INSERT INTO character_claims (discord_id, character_name, status) VALUES (?, ?, 'pending')",
-            (discord_id, character_name),
+            "INSERT INTO character_claims (discord_id, character_name, status, world) VALUES (?, ?, 'pending', ?)",
+            (discord_id, character_name, world),
         )
         new_id = cur.lastrowid
         await db.commit()
@@ -680,23 +690,25 @@ async def submit_claim(
 async def withdraw_claim(
     claim_id: int,
     discord_id: str,
+    world: str = "Varsoon",
     path: Path = DB_PATH,
 ) -> bool:
     """
     Withdraw or remove a specific claim belonging to this user.
     Works on both pending and approved claims.
     If the withdrawn claim was the primary, the oldest remaining approved
-    character is automatically promoted to primary.
+    character on the same world is automatically promoted to primary.
     Returns True if something changed.
     """
     async with aiosqlite.connect(path) as db:
-        # Check if this claim is primary before withdrawing
+        # Check if this claim is primary before withdrawing (and capture world from row)
         async with db.execute(
-            "SELECT is_primary FROM character_claims WHERE id = ? AND discord_id = ?",
+            "SELECT is_primary, world FROM character_claims WHERE id = ? AND discord_id = ?",
             (claim_id, discord_id),
         ) as cur:
             row = await cur.fetchone()
         was_primary = row is not None and row[0] == 1
+        claim_world = row[1] if row is not None else world
 
         cur = await db.execute(
             "UPDATE character_claims SET status = 'withdrawn', is_primary = 0 "
@@ -705,19 +717,19 @@ async def withdraw_claim(
         )
         changed = cur.rowcount > 0
 
-        # Promote the oldest remaining approved character to primary
+        # Promote the oldest remaining approved character on the same world to primary
         if changed and was_primary:
             await db.execute(
                 """
                 UPDATE character_claims SET is_primary = 1
                 WHERE id = (
                     SELECT id FROM character_claims
-                    WHERE discord_id = ? AND status = 'approved' AND id != ?
+                    WHERE discord_id = ? AND world = ? AND status = 'approved' AND id != ?
                     ORDER BY requested_at ASC
                     LIMIT 1
                 )
                 """,
-                (discord_id, claim_id),
+                (discord_id, claim_world, claim_id),
             )
 
         await db.commit()
@@ -727,26 +739,28 @@ async def withdraw_claim(
 async def set_primary(
     discord_id: str,
     claim_id: int,
+    world: str = "Varsoon",
     path: Path = DB_PATH,
 ) -> bool:
     """
-    Set a specific approved claim as the user's primary character.
-    Clears is_primary on all other approved claims for this user.
+    Set a specific approved claim as the user's primary character on the given world.
+    Clears is_primary on all other approved claims for this user on the same world.
+    Claims on other worlds are not affected.
     Returns True if the target claim exists and was updated.
     """
     async with aiosqlite.connect(path) as db:
-        # Verify the claim belongs to this user and is approved
+        # Verify the claim belongs to this user, is approved, and is on the right world
         async with db.execute(
-            "SELECT id FROM character_claims WHERE id = ? AND discord_id = ? AND status = 'approved'",
-            (claim_id, discord_id),
+            "SELECT id FROM character_claims WHERE id = ? AND discord_id = ? AND world = ? AND status = 'approved'",
+            (claim_id, discord_id, world),
         ) as cur:
             if not await cur.fetchone():
                 return False
 
-        # Clear primary on all approved claims for this user, then set on target
+        # Clear primary on all approved claims for this user on this world, then set on target
         await db.execute(
-            "UPDATE character_claims SET is_primary = 0 WHERE discord_id = ? AND status = 'approved'",
-            (discord_id,),
+            "UPDATE character_claims SET is_primary = 0 WHERE discord_id = ? AND world = ? AND status = 'approved'",
+            (discord_id, world),
         )
         await db.execute(
             "UPDATE character_claims SET is_primary = 1 WHERE id = ?",
@@ -778,38 +792,39 @@ async def get_claim_by_id(
 
 async def list_claims(
     status: str | None = None,
+    world: str | None = None,
     path: Path = DB_PATH,
 ) -> list[dict]:
     """
-    List claims joined with user info.
+    List claims joined with user info, optionally filtered by status and/or world.
+    world=None returns claims from all worlds (admin overview).
+    world='Varsoon' (or any other) scopes to that server only.
     Pending claims are sorted oldest-first (queue order).
     All other statuses are sorted newest-first.
     """
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
+        where_parts: list[str] = []
+        params: list = []
         if status:
-            order = "ASC" if status == "pending" else "DESC"
-            async with db.execute(
-                f"""
-                SELECT c.*, u.discord_name, u.discord_username, u.avatar
-                FROM character_claims c
-                LEFT JOIN users u ON u.discord_id = c.discord_id
-                WHERE c.status = ?
-                ORDER BY c.requested_at {order}
-                """,
-                (status,),
-            ) as cur:
-                rows = await cur.fetchall()
-        else:
-            async with db.execute(
-                """
-                SELECT c.*, u.discord_name, u.discord_username, u.avatar
-                FROM character_claims c
-                LEFT JOIN users u ON u.discord_id = c.discord_id
-                ORDER BY c.requested_at DESC
-                """
-            ) as cur:
-                rows = await cur.fetchall()
+            where_parts.append("c.status = ?")
+            params.append(status)
+        if world is not None:
+            where_parts.append("c.world = ?")
+            params.append(world)
+        where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+        order = "ASC" if status == "pending" else "DESC"
+        async with db.execute(
+            f"""
+            SELECT c.*, u.discord_name, u.discord_username, u.avatar
+            FROM character_claims c
+            LEFT JOIN users u ON u.discord_id = c.discord_id
+            {where_sql}
+            ORDER BY c.requested_at {order}
+            """,
+            params,
+        ) as cur:
+            rows = await cur.fetchall()
     return [dict(r) for r in rows]
 
 
@@ -822,16 +837,18 @@ async def review_claim(
 ) -> dict | None:
     """
     Approve or reject a claim.
-    On approval, any previously-approved claims for the same user are
-    set to 'superseded' so there is at most one approved claim per user.
+    On approval, auto-assigns is_primary if this is the user's first approved
+    character on this world (scoped to (discord_id, world) so each server has
+    an independent primary).
     Returns the updated claim (with user info) or None if not found.
     """
     async with aiosqlite.connect(path) as db:
-        async with db.execute("SELECT discord_id FROM character_claims WHERE id = ?", (claim_id,)) as cur:
+        async with db.execute("SELECT discord_id, world FROM character_claims WHERE id = ?", (claim_id,)) as cur:
             row = await cur.fetchone()
         if not row:
             return None
         discord_id = row[0]
+        claim_world = row[1]
 
         await db.execute(
             """
@@ -844,12 +861,12 @@ async def review_claim(
             """,
             (status, admin_id, note, claim_id),
         )
-        # Auto-assign primary if this is the user's first approved character
+        # Auto-assign primary if this is the user's first approved character on this world
         if status == "approved":
             async with db.execute(
                 "SELECT id FROM character_claims "
-                "WHERE discord_id = ? AND status = 'approved' AND is_primary = 1 AND id != ?",
-                (discord_id, claim_id),
+                "WHERE discord_id = ? AND world = ? AND status = 'approved' AND is_primary = 1 AND id != ?",
+                (discord_id, claim_world, claim_id),
             ) as cur:
                 has_primary = await cur.fetchone() is not None
             if not has_primary:
