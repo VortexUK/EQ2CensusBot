@@ -212,16 +212,65 @@ def upsert_raid_zone(
 ) -> int:
     """Insert or update a raid_zones row. Returns its id.
 
-    Re-runnable: a second call with the same zone_name UPDATEs the row,
-    setting last_synced_at to now() when source==SOURCE_SCRAPE so
-    callers can see how stale the wiki sync is. Doesn't touch
-    last_edited_at — that's reserved for SOURCE_MANUAL writes via the
-    editor API.
+    Re-runnable. The behaviour depends on the existing row's ``source``:
+
+      * **New row** — inserts as given.
+      * **Existing row, called with SOURCE_SCRAPE** — refreshes the wiki-
+        owned columns (``expansion_short``, ``wiki_url``, level_range,
+        ``zdiff``, ``lockout_*``, ``last_synced_at``) but **never clobbers
+        a human-edited markdown blob**. When the existing source is
+        ``SOURCE_MANUAL``, the markdown columns (access/background/overview)
+        are left as-is. When the existing source is ``SOURCE_SCRAPE``, the
+        markdown is refreshed with the latest scrape (so wiki edits
+        propagate).
+      * **Existing row, called with SOURCE_MANUAL** — this helper isn't the
+        canonical write path for manual edits (the route layer uses targeted
+        UPDATEs that only touch the field the user edited — see
+        ``_write_overview_sync`` in web/routes/raid_strategies.py). Calling
+        this helper with SOURCE_MANUAL upserts every field passed and stamps
+        ``source='manual'`` — useful from migration scripts, not user-facing.
+
+    Doesn't touch ``last_edited_at`` — that's reserved for the route layer's
+    targeted UPDATEs.
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"source must be one of {sorted(VALID_SOURCES)}, got {source!r}")
     now = int(time.time())
     last_synced = now if source == SOURCE_SCRAPE else None
+
+    existing = conn.execute("SELECT id, source FROM raid_zones WHERE zone_name = ?", (zone_name,)).fetchone()
+
+    if existing and source == SOURCE_SCRAPE and existing[1] == SOURCE_MANUAL:
+        # Re-scrape against a human-edited row: refresh the wiki-owned
+        # metadata but leave the markdown blobs + source flag alone. The
+        # revision history (encounters only) doesn't apply at the zone
+        # level for now; future raid_zone_revisions table is the right
+        # home for tracking these.
+        conn.execute(
+            """
+            UPDATE raid_zones SET
+                expansion_short = ?,
+                wiki_url        = ?,
+                level_range     = ?,
+                zdiff           = ?,
+                lockout_min     = ?,
+                lockout_max     = ?,
+                last_synced_at  = ?
+            WHERE id = ?
+            """,
+            (
+                expansion_short,
+                wiki_url,
+                level_range,
+                zdiff,
+                lockout_min,
+                lockout_max,
+                now,
+                existing[0],
+            ),
+        )
+        conn.commit()
+        return int(existing[0])
 
     conn.execute(
         """
