@@ -8,8 +8,10 @@ Mirrors parses/db.py: CENSUS_DB_PATH env override, WAL, idempotent _MIGRATIONS.
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
+import time
 from pathlib import Path
 
 
@@ -67,3 +69,44 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
             pass
     conn.commit()
     return conn
+
+
+def upsert_character(
+    conn: sqlite3.Connection,
+    name: str,
+    world: str,
+    data: dict,
+    *,
+    resolved: bool,
+    now: int | None = None,
+) -> None:
+    """Merge-store a character. When ``resolved`` is False the call is a no-op
+    (keep best-known: never overwrite a good row with a sparse one, and never
+    insert a sparse first-sight row). When True, replace the record + stamp
+    last_resolved_at."""
+    if not resolved:
+        return
+    ts = int(time.time()) if now is None else now
+    conn.execute(
+        """
+        INSERT INTO characters (name_lower, world, name, level, guild_name, data_json, last_resolved_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(name_lower, world) DO UPDATE SET
+            name=excluded.name, level=excluded.level, guild_name=excluded.guild_name,
+            data_json=excluded.data_json, last_resolved_at=excluded.last_resolved_at,
+            updated_at=excluded.updated_at
+        """,
+        (name.lower(), world, name, data.get("level"), data.get("guild_name"), json.dumps(data), ts, ts),
+    )
+    conn.commit()
+
+
+def get_character(conn: sqlite3.Connection, name: str, world: str) -> dict | None:
+    """Return {data, last_resolved_at} or None."""
+    row = conn.execute(
+        "SELECT data_json, last_resolved_at FROM characters WHERE name_lower=? AND world=?",
+        (name.lower(), world),
+    ).fetchone()
+    if row is None:
+        return None
+    return {"data": json.loads(row[0]), "last_resolved_at": row[1]}
