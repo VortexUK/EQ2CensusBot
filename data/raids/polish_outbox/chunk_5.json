@@ -1,0 +1,99 @@
+{
+  "entries": [
+    {
+      "zone_name": "Bloodskull Valley: Maulic's Stronghold",
+      "mob_name": "Overseer Maulic",
+      "polished_md": "- Leader of [The Bloodskull Orcs](https://eq2.fandom.com/wiki/Category:The_Bloodskull_Orcs_(Faction))."
+    },
+    {
+      "zone_name": "Firemyst Gully: Shattered Stillness",
+      "mob_name": "Qeynos",
+      "polished_md": "- If you write 'Qeynos' backwards you get 'Sonyeq', or [Sony](https://eq2.fandom.com/wiki/Daybreak_Game_Company,_LLC) [EQ](https://eq2.fandom.com/wiki/EverQuest)! ''(Source - [Chillispike](https://eq2.fandom.com/wiki/User:Chillispike))"
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Elaani the collector",
+      "polished_md": "## Activating the Encounter\n\nTo make this mob active, you must kill the three named bixies, [Trixie](https://eq2.fandom.com/wiki/Trixie), [Mixie](https://eq2.fandom.com/wiki/Mixie), and [Dixie](https://eq2.fandom.com/wiki/Dixie) at the same time. If you do not kill them within **10 seconds** of each other, they will respawn.\n\n## Strategy\n\n- Pull all three at once, bring each down to **10%** and then AoE.\n- As soon as they die, the collector goes active and immediately aggoes with a few adds.\n- She has a fairly large kickback so fight with your back to the walls.\n\n### Alternate Approach\n\nYou can also pull them from left to right one by one when you burn one down enough, grab the next one. This helps if you're low on heals."
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Galiel Spirithoof",
+      "polished_md": "## Positioning\n\nShe has a kickback so plant against the wall. The **mushroom in the center of the room** works best since it helps avoid Wuoshi.\n\n## Mechanics\n\n- Every **10% HP** she will pop an **x2 add** — it's best to burn it down and then continue on the mob so that you don't become overrun by adds.\n- Galiel has **mana drain** and will occasionally drain mana, so having some mana regen may be necessary.\n- Adds have a total of **2,500,000 HP**."
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Treah Greenroot",
+      "polished_md": "Comes with a bunch of [a knotted guardian](https://eq2.fandom.com/wiki/a_knotted_guardian) adds. The adds are easy to kill and don't do much dps. If you have a lot of **AoE**, just focus on the named. Adds had a total of **790,000 HP**. Make sure you less Wuoshi pass by so she doesn't aggro your raid if it takes too long to burn Treah down."
+    },
+    {
+      "zone_name": "The Fountain of Life",
+      "mob_name": "Captain Graul Anashite",
+      "polished_md": "- Spawns adds throughout the fight."
+    },
+    {
+      "zone_name": "The Laboratory of Lord Vyemm",
+      "mob_name": "Lord Vyemm",
+      "polished_md": "## Strategy 1\n\n### Pull\n\n- **Pet pull** Vyemm to the hallway all the way back at the bottom of the stairs (a rather long pull).\n- The raid group should wait behind the door at the top of the stairs to avoid the **frontal AOE** on pull.\n- **Healers** should wait at the bottom of the stairs.\n- The **MT** waits in the area at the bottom of the stairs to taunt Vyemm while Alzid is distracted. (The goal is to get Alzid to reset after the summoner has run up the stairs, but keep Vyemm with you.)\n\n### Positioning\n\n- Turn Vyemm to be **perpendicular to the hallway**.\n- Once properly turned, send in the forces to rush his side.\n- Everyone needs to fight from his **belly**. He will move you around during the fight, so stay with him and don't get in front or behind him.\n\n## Strategy 2\n\n### Pull\n\n- Have the raid sit at the top of the side stairs going to the upper level.\n- Have a **monk** disband and **FD pull** him to the encounter room. When he resets he will be single pull able. This eliminates the **Heals from the Dracon**.\n- Have everyone move down into the room and stand on one side of the entrance against the wall leading into the arena.\n\n### Positioning\n\n- **Tank** will pull him down the stairs and turn him till his head is facing towards the arena and his back legs and tail are in the room.\n- Everyone will attack him from the **sides**.\n- **Tank healers** will need to fight him under his belly.\n- **Dirges and backup healers** can joust or rotate in on the tank if they are hit with aoe."
+    },
+    {
+      "zone_name": "The Lyceum of Abhorrence",
+      "mob_name": "Essence of Fear",
+      "polished_md": "- The Essence of Fear will AE fear every 20 seconds. (Or more depending on [Fear's Grasp](https://eq2.fandom.com/wiki/Fear's_Grasp))"
+    },
+    {
+      "zone_name": "The Lyceum of Abhorrence",
+      "mob_name": "Gnorbl the Playful",
+      "polished_md": "## Adds\n\nHe comes with two large groups of adds, which will taunt and therefore cause members of the raid to target them (instead of the **MT** or **MA**).\n\n### First Group\n\nThe first set of adds can be killed fairly quickly with **AE**, so if you get taunted, this is not too much of a problem.\n\n### Second Group\n\n> **Do not kill** any of the second group of adds — if you kill one of them, Gnorbl receives a **powerful heal**.\n\nThis means that **nobody** in the raid should AoE, use AoE pets, or dumbfire pets; the adds will taunt your pets.\n\n## Staying on the Named\n\nThe taunt can be overcome by having everybody create the following macro:\n\n```\n/target gnorbl ( this no longer works you need to just keep clicking him or dont attack when the adds spawn ( they despawn after like 10-20 seconds )  )\n```\n\nSpamming this macro will keep you on the named. The adds he spawns every **30 seconds** (Check Special Attacks for info on them).\n\n## Notes\n\nAs long as you don't kill any of the second group of adds, an average raid can take him down in about a minute."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Adkar Vyx",
+      "polished_md": "## Pull\n\nThe encounter will turn aggro as soon as the character with the seal approaches it, meaning it is probably safest to have a character with **feign death** make the approach.\n\n## Haze of Thule (AoE)\n\nMassive **poison/stifle AoE** (**Haze of Thule**) every **45s** (varies slightly) does more damage the closer you are (can be resisted):\n\n- **0 to 9 metres**: 13044-25894 poison damage plus 3069-6093 poison damage every 5 seconds.\n- **10 to 15 metres**: 8017-12025 poison damage plus 2290-3436 every 5 seconds.\n- **15 to 75 metres**: 5154-6299 poison damage and 1546-1890 every 5 seconds.\n\nThe **stifle** will apply to all characters standing between **9 and 75 metres** away. Because the stifle applies equally at 10 to 15 metres as it does at 15 to 75, there is no advantage to be gained by standing in the mid-range. [Sanctuary](https://eq2.fandom.com/wiki/Sanctuary) can avoid the stifle, as can potions and AoE block.\n\n## Strategy\n\n- **MT** pulls to far left corner (with back to corner to avoid knockback).\n- The rest of the raid stays out until **Haze of Thule** is cast.\n- **Joust** all the way out of the room every 45s (before Haze of Thule hits) then back in after.\n- The adds (which **fear and stun**) can be mezzed, or burn them down first with **OT**.\n- Anti-stifle potions, poison and elemental resists, [Sanctuary](https://eq2.fandom.com/wiki/Sanctuary) and AoE block will make the job easier.\n\n## Wipe Recovery\n\nIf the raid wipes but in the process takes down one or both adds, the adds will take a couple of minutes to respawn, making it possible to run in during this time for a slightly easier fight. Once the adds respawn, the entire encounter will reset and the raid needs to start the fight again using the seal."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Doomcoil",
+      "polished_md": "## Preparation\n\n- Make sure all party members have maximized their **noxious and arcane resists**.\n- To activate Doomcoil, you need shards from defeating [Adkar Vyx](https://eq2.fandom.com/wiki/Adkar_Vyx), [Iztapa Vyx](https://eq2.fandom.com/wiki/Iztapa_Vyx), [Wymbulu Vyx](https://eq2.fandom.com/wiki/Wymbulu_Vyx) and [Zykluk Vyx](https://eq2.fandom.com/wiki/Zykluk_Vyx). Whoever has these fragments initiates the sequence by giving them to the NPC **Meldrath**.\n\n## Positioning\n\n- Have the raid force move into the room with the inactive Doomcoil.\n- The whole raid force (apart from the **Fighters**) stands in the corner near the door.\n- **Fighters** stand on the other side of Doomcoil in the far corner so that Doomcoil is between the MT and the rest of the raid.\n\n## Barrier and Wipe Risk\n\n> Once the fight starts, a **barrier** goes up around the room. Every time a member of the raid dies, Doomcoil **heals himself for 138,677 health**. If you revive, you will do so outside the room (and hence be unable to re-enter because of the barrier). This means you only get **one chance** to kill Doomcoil before the whole raid gets locked out. Locked out characters will continue to be hit by the AoE.\n\n## Fight Mechanics\n\n- Once Doomcoil is activated, the **Fighters** need to keep Doomcoil as far away from the raid as possible to avoid having the AoEs kill the rest of the raid.\n- **Melee DPS** should joust the AoEs.\n- After casting **Sonic Burst**, Doomcoil will teleport himself to the door side of the room. He will be immobile for a couple of seconds, during which he will likely target someone other than the tanks. At that point, back off completely until one of the tanks has recovered aggro and moved Doomcoil back to the far corner.\n- Works well to have the tanks coordinate the use of **emergency abilities** — e.g. **Rescue** — so that they are not all spent at once.\n\n### AoE Timers\n\n- **Choking Mist** hits every **60s**\n- **Sonic Burst** hits every **55s**\n\n## Notes\n\nKilling Doomcoil is all about keeping your raid alive through his aoes; between them he does not hit hard on tank.\n\nMake sure everyone has good resists for both **poison and divine**. The aoes will hit you everywhere in room but they hit harder if you are closer, so jousting helps if you can manage to joust both aoes — that will help a lot, but it's also doable without if the melees have good resists.\n\nWe usually do him with **2 tanks** fighting for aggro, and let everyone target mob direct. Then we tell everyone to **stop all dps** when he is on someone other than the tanks, and if you see that he is on you then run over to tanks.\n\nIf people don't die to the aoes then it's a rather easy fight, but if people keep dying he will keep healing and you will wipe in the end."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Iztapa Vyx",
+      "polished_md": "- Mob will cast **Touch of the Faceless** on **MT** every **40s**, which will do between **40K and 80K damage**. If needed, have **OT's Intercede** to absorb Touch of the Faceless.\n- Also has a **Mana Burn** that will instantly drain power of your party."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Ludmila Kystov",
+      "polished_md": "## Encounter Members\n\nThis is a group encounter. The participants are:\n\n### Jracol Binari — Healer\n- ~**1.3 million HP**\n- Will periodically **group heal** for ~**200K**\n\n### Blorgok the Brutal — Fighter\n- ~**1 million HP**\n- Will periodically force you to target him, at which point you are unable to change targets\n\n### Meldrath Kloktik — Mage\n- ~**2.7 million HP**\n- Periodic stifle, **knockback** on melee hit (is a buff, **dispel** if you can)\n\n### 2 Froglok Mercenaries — Fighters\n- ~**200K HP** each\n- Will taunt and force you to switch targets, but you are able to change back to your previous target\n\n### Ludmila Kystov — Scout\n- ~**4.9 million HP**\n- Will periodically change targets and go after someone else in the raid, **charms males** on occasion\n\n## Kill Order\n\n> If you did **not** successfully kill **Doomcoil**, Meldrath will summon him to aid in this fight. To avoid this, you must **kill Meldrath before any of the other named NPCs**.\n\nIf you did kill Doomcoil, the recommended order is **Jracol, Blorgok, Meldrath, and then Ludmila**. The froglok mercenaries can be taken out at any point, or taken out by AoEs.\n\n## Tactics\n\n- **DPS** should target **Jracol** directly as the **MT** (and others) will be taunted to Blorgok and unable to change back.\n- When other members of the raid are targeted by **Ludmila** they should run to the MT to make it easier for the tank to recover aggro.\n\n## Notes\n\nOur usual way on this group is to **offtank Blorgok** a bit away from raid to avoid people getting taunted too much, then **full dps** first on **frogs** (they die fast) and then **healer** (has to die fast too or else his heals will make fight harder).\n\nThe **main tank** has a lot to do keeping aggro on **Ludmila**, so if you get troubles with aggro you can use another tank to keep aggro on the mob you're killing right now. If you have aggro problems then tell people to hold back with aoes.\n\nOverall, it's a rather easy fight — it's just about keeping aggro and healing the tanks. But if your main tank keeps losing aggro on Ludmila you will have a hard time beating it."
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Queen Velazul Dizok",
+      "polished_md": "- Control-immune.\n- Has a knockback — good spot to fight her is behind her throne, right at the wall.\n- Has a charm so it makes it hard to solo."
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Uthtak the Cruel",
+      "polished_md": "See [Aktar the Dark](https://eq2.fandom.com/wiki/Aktar_the_Dark) for more information."
+    },
+    {
+      "zone_name": "The Temple of Scale: Pedestal of the Priestess",
+      "mob_name": "Harla Dar",
+      "polished_md": "## Clearing\n\n- Clear all **drakes** on the lower platform in a clockwise or counterclockwise order, leaving the **droags** for a second clearing, as these have a shorter respawn time.\n- **KILL FAST**, aiming for clearing in **10-15 minutes**!\n\n> If you're not averaging **13k DPS** or better, don't bother do this.\n\n- Move raid to top of stairs and body pull the drakes, again in a clockwise or counterclockwise manner. All can be pulled without aggro'ing Harla Dar.\n\n## Pull\n\nOnce all drakes and droags are clear, pull **Harla Dar** to the blocked wall behind the area where she stands (the zone out) and be careful of **knockback**."
+    },
+    {
+      "zone_name": "Throne of New Tunaria",
+      "mob_name": "Queen Lenya Thex",
+      "polished_md": "- To disable her charm ability, destroy the two statues in [The Garden of Purity](https://eq2.fandom.com/wiki/The_Garden_of_Purity) and [The Garden of Clarity](https://eq2.fandom.com/wiki/The_Garden_of_Clarity)."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Hoshkar",
+      "polished_md": "## Positioning\n\n- Everybody except the **tank** stays on the little island that is circling round Hoshkar's \"main\" isle. You are protected there by an **aura**.\n- The **tank** stays on the main isle kiting Hoshkar in range of the little moving island.\n\n## Notes\n\n- If Hoshkar goes in the **lava** he **stoneskins**.\n- **Pets** are fine in this fight."
+    },
+    {
+      "zone_name": "Venril Sathir's Lair",
+      "mob_name": "Venril Sathir",
+      "polished_md": "## Roles\n\n- **Healers** only heal and cure and **don't do damage of any kind**.\n- **1-2 people** devoted to clicking the statues in his room. Statues must be clicked **constantly** during the fight to prevent the two larger statues in the hallway leading up to his room from spawning.\n\n## Toxic Infusion / Fatalisis\n\nDuring the fight Venril will cast **Toxic Infusion**, which is an AOE that is on a **38s timer**. You have **6 seconds** to cure this **Noxious** effect from your raid.\n\n> **Cure it or die** from a follow-up spell called **Fatalisis**. Bring potions in case you don't have group noxious cures in every group.\n\n## 65% — Soulcube Check\n\nAt **65%** Venril will emote how he will finish the fight. Use the [Mistmyrian Soulcube](https://eq2.fandom.com/wiki/Mistmyrian_Soulcube) from [Tairiza the Widow Mistress](https://eq2.fandom.com/wiki/Tairiza_the_Widow_Mistress) within **5 seconds** or die.\n\n## 60% — Power Management Phase\n\nAt **60%**, with Venril's main ability disabled, he will begin to watch your **power consumption**. Your raid force must keep their power around **30% or higher** (the 70% power ceiling that used to be on the encounter is no longer in place) to be safe.\n\n> A raid member who gets under **30%** for too long will spawn adds that will wipe the raid most likely.\n\n### Power Effects\n\nOn top of just maintaining your power, Venril will also place 2 kinds of effects on 2 random members every **45 seconds**. These effects last for about **10-12 seconds** and make it more challenging to keep your power in the target zone.\n\n- **Mana Sacrifice** — causes you to consume **200% more power** than usual.\n  - Do **not** use any abilities that use power while this effect is on you.\n  - If you can, turn up your particle effects because you will glow **'BLUE'** when Mana Sacrifice is on you.\n  - If you are in the middle of casting anything and the effect lands on you, **cancel it immediately**.\n- **Enhanced Power Regen** — the opposite. It gives the target enhanced power regen. A feed of about **1% power every 2 seconds** for **10-12 seconds**.\n\n## Solo Notes\n\n> **If you are well geared 90+ you can easily solo it using \"tank&spank\" strategy, though you will still need the Mistmyrian Soulcube. If you kill Sathir without the Soulcube, your entire group/raid will be hit for 100,000+ focus damage and Sathir will reset rather than dying.**"
+    }
+  ]
+}

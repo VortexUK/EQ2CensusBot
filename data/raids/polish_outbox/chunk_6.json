@@ -1,0 +1,99 @@
+{
+  "entries": [
+    {
+      "zone_name": "Deathtoll",
+      "mob_name": "Lord Vyemm",
+      "polished_md": "## Strategy 1 — Pet Pull\n\n### Pull\n\n- **Pet pull** Vyemm to the hallway all the way back at the bottom of the stairs (a rather long pull).\n- The raid group should wait behind the door at the top of the stairs to avoid the **frontal AOE** on pull.\n- **Healers** should wait at the bottom of the stairs.\n- The **MT** waits in the area at the bottom of the stairs to taunt Vyemm while **Alzid** is distracted. (The goal is to get Alzid to reset after the summoner has run up the stairs, but keep Vyemm with you.)\n\n### Positioning\n\n- Turn Vyemm to be **perpendicular** to the hallway.\n- Once properly turned, send in the forces to rush his side.\n- Everyone needs to fight from his **belly**. He will move you around during the fight, so stay with him and don't get in front or behind him.\n\n## Strategy 2 — Monk FD Reset\n\n### Pull\n\n- Have the raid sit at the top of the side stairs going to the upper level.\n- Have a **monk** disband and **FD pull** him to the encounter room. When he resets he will be **single pullable**. This eliminates the heals from the Dracon.\n- Have everyone move down into the room and stand on one side of the entrance against the wall leading into the arena.\n\n### Positioning\n\n- **Tank** will pull him down the stairs and turn him until his head is facing towards the arena and his back legs and tail are in the room.\n- Everyone will attack him from the **sides**.\n- **Tank healers** will need to fight him under his belly with dirges, and backup healers can joust or rotate in on the tank if they are hit with AOE."
+    },
+    {
+      "zone_name": "Deathtoll",
+      "mob_name": "Yitzik the Hurler",
+      "polished_md": "- Knockback\n- Low dps\n- Spawns Bone Devil (70^^^) at **10% HP**"
+    },
+    {
+      "zone_name": "Drayek's Chamber",
+      "mob_name": "King Drayek",
+      "polished_md": "- This is a **ring event**. After each wave is cleared, just wait and eventually the next wave spawns.\n- When King Drayek reaches **80% health**, 2x lvl52^^^ and 2x lvl52 ^^ **Kromise Royal Guard** come to his aid."
+    },
+    {
+      "zone_name": "Halls of the Seeing",
+      "mob_name": "Pain",
+      "polished_md": "- Scrutinizing a random weapons rack will deliver [Tolapmuj](https://eq2.fandom.com/wiki/Tolapmuj), who you must speak with to attack Pain and [Suffering](https://eq2.fandom.com/wiki/Suffering).\n- **Frontal AE** with 100% power drain and mental damage."
+    },
+    {
+      "zone_name": "Lockjaw's Lair",
+      "mob_name": "Lockjaw the Ancient",
+      "polished_md": "- **Memwipes** once at about **50% health**. Has a dragon-style **tail lash** if you stand behind him, so don't do that."
+    },
+    {
+      "zone_name": "Spirits of the Lost",
+      "mob_name": "Qzyk the Conqueror",
+      "polished_md": "- Accompanied by **two lizardman chanters** and **four lizardman sentries**."
+    },
+    {
+      "zone_name": "The Firemyst Gully: A Gallant Confrontation",
+      "mob_name": "Qeynos",
+      "polished_md": "- If you write 'Qeynos' backwards you get 'Sonyeq', or [Sony](https://eq2.fandom.com/wiki/Daybreak_Game_Company,_LLC) [EQ](https://eq2.fandom.com/wiki/EverQuest)! ''(Source - [Chillispike](https://eq2.fandom.com/wiki/User:Chillispike))"
+    },
+    {
+      "zone_name": "The Gates of Ahket Aken",
+      "mob_name": "Ahk'Mun Rhoen",
+      "polished_md": "## Mechanics\n\nAhk'Mun Rhoen possesses a strong **knockback** effect and a **long duration stun**.\n\n## Pull & Positioning\n\n- It is highly recommended that you **not fight him on the tower** where he spawns.\n- Choose one person to climb the tower and aggro Ahk'Mun Rhoen.\n- Pull him down and have your **tank put their back against something** to keep Ahk'Mun Rhoen from wandering around while you fight.\n\n> It is entirely possible to **wipe** due to the long duration stun if the knockback is not controlled.\n\n## Notes\n\nOther than that it is a fairly straight forward fight:\n\n- Keep **healers** unstunned.\n- Keep **slow** on the epic monster.\n- Keep **tanks** back to the wall."
+    },
+    {
+      "zone_name": "The Gates of Ahket Aken",
+      "mob_name": "Muleek Mahaja",
+      "polished_md": "- Speak to this NPC to gain the option to enter [The Gates of Ahket Aken](https://eq2.fandom.com/wiki/The_Gates_of_Ahket_Aken) when attempting to enter [The Living Tombs](https://eq2.fandom.com/wiki/The_Living_Tombs)."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Meldrath Kloktik",
+      "polished_md": "Comes grouped with the following as an adventure party that your raid must beat:\n\n- [Jracol Binari](https://eq2.fandom.com/wiki/Jracol_Binari) — **Healer**\n- [Blorgok the Brutal](https://eq2.fandom.com/wiki/Blorgok_the_Brutal) — **Fighter**\n- 2 [Froglok Mercenaries](https://eq2.fandom.com/wiki/a_froglok_mercenary) — **Fighters**\n- [Ludmila Kystov](https://eq2.fandom.com/wiki/Ludmila_Kystov) — **Scout**"
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Venril Sathir",
+      "polished_md": "## Setup\n\n- **Healers** only heal and cure and don't do damage of any kind.\n- **1–2 people** devoted to clicking the statues in his room. Statues must be clicked **constantly** during the fight to prevent the two larger statues in the hallway leading up to his room from spawning.\n\n## Mechanics\n\n### Toxic Infusion (throughout)\n\n- Venril will cast **Toxic Infusion**, an AOE on a **38s timer**.\n- You have **6 seconds** to cure this **Noxious** effect from your raid.\n- Cure it or die from a follow-up spell called **Fatalisis**.\n- Bring potions in case you don't have group noxious cures in every group.\n\n### 65% — Soulcube\n\nAt **65%** Venril will emote how he will finish the fight. Use the [Mistmyrian Soulcube](https://eq2.fandom.com/wiki/Mistmyrian_Soulcube) from [Tairiza the Widow Mistress](https://eq2.fandom.com/wiki/Tairiza_the_Widow_Mistress) within **5 seconds** or die.\n\n### 60% — Power Management\n\nAt **60%**, with Venril's main ability disabled, he will begin to watch your power consumption.\n\n- Your raid force must keep their power around **30% or higher** (the 70% power ceiling that used to be on the encounter is no longer in place) to be safe.\n- A raid member who gets under 30% for too long will spawn adds that will most likely wipe the raid.\n\n### Power Effects (every 45s on 2 random members)\n\nThese effects last for about **10–12 seconds** and make it more challenging to keep your power in the target zone.\n\n**Mana Sacrifice**\n\n- Causes you to consume **200% more power** than usual.\n- Do not use any abilities that use power while this effect is on you.\n- If you can, turn up your particle effects because you will glow **'BLUE'** when Mana Sacrifice is on you.\n- If you are in the middle of casting anything and the effect lands on you, cancel it immediately.\n\n**Enhanced Power Regen**\n\n- The opposite effect — a feed of about **1% power every 2 seconds** for 10–12 seconds.\n\n## Notes\n\n> **If you are well geared 90+ you can easily solo it using \"tank&spank\" strategy, though you will still need the Mistmyrian Soulcube. If you kill Sathir without the Soulcube, your entire group/raid will be hit for 100,000+ focus damage and Sathir will reset rather than dying.**"
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Kunark",
+      "polished_md": "- For the house item, see [Rise of Kunark (House Item)](https://eq2.fandom.com/wiki/Rise_of_Kunark_(House_Item))."
+    },
+    {
+      "zone_name": "The Tomb of Thuuga",
+      "mob_name": "Venril Sathir",
+      "polished_md": "## Setup\n\n- **Healers** only heal and cure and don't do damage of any kind.\n- **1–2 people** devoted to clicking the statues in his room. Statues must be clicked **constantly** during the fight to prevent the two larger statues in the hallway leading up to his room from spawning.\n\n## Mechanics\n\n### Toxic Infusion (throughout)\n\n- Venril will cast **Toxic Infusion**, an AOE on a **38s timer**.\n- You have **6 seconds** to cure this **Noxious** effect from your raid.\n- Cure it or die from a follow-up spell called **Fatalisis**.\n- Bring potions in case you don't have group noxious cures in every group.\n\n### 65% — Soulcube\n\nAt **65%** Venril will emote how he will finish the fight. Use the [Mistmyrian Soulcube](https://eq2.fandom.com/wiki/Mistmyrian_Soulcube) from [Tairiza the Widow Mistress](https://eq2.fandom.com/wiki/Tairiza_the_Widow_Mistress) within **5 seconds** or die.\n\n### 60% — Power Management\n\nAt **60%**, with Venril's main ability disabled, he will begin to watch your power consumption.\n\n- Your raid force must keep their power around **30% or higher** (the 70% power ceiling that used to be on the encounter is no longer in place) to be safe.\n- A raid member who gets under 30% for too long will spawn adds that will most likely wipe the raid.\n\n### Power Effects (every 45s on 2 random members)\n\nThese effects last for about **10–12 seconds** and make it more challenging to keep your power in the target zone.\n\n**Mana Sacrifice**\n\n- Causes you to consume **200% more power** than usual.\n- Do not use any abilities that use power while this effect is on you.\n- If you can, turn up your particle effects because you will glow **'BLUE'** when Mana Sacrifice is on you.\n- If you are in the middle of casting anything and the effect lands on you, cancel it immediately.\n\n**Enhanced Power Regen**\n\n- The opposite effect — a feed of about **1% power every 2 seconds** for 10–12 seconds.\n\n## Notes\n\n> **If you are well geared 90+ you can easily solo it using \"tank&spank\" strategy, though you will still need the Mistmyrian Soulcube. If you kill Sathir without the Soulcube, your entire group/raid will be hit for 100,000+ focus damage and Sathir will reset rather than dying.**"
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Elder Ekron",
+      "polished_md": "## Pull & Positioning\n\n- Have your **Main Tank** pull this mob toward the **wall behind him**.\n- Have the **MT group** stay tight as **LoS issues** will come up from time to time.\n- Rest of the raid will be assisting the **Off Tank**.\n\n## Adds\n\n- At around **75%** or so, a message will pop up warning you that a mob will spawn — a **heroic ^^^ add** which has a pretty nasty AE (**hits harder than the main boss**).\n- Have your **OT group** meet the add and be careful that they turn it **away from the raid** or else it means a wipe.\n- At this time you will notice that a **targetable but non-killable baby dragon** will be running to groups of eggs. This mob will spawn three more adds (down arrows), but they still can wipe you fairly quickly.\n\n## Rotation\n\nOnce those are taken care of, get back on named until next message about add incoming. **Rinse and repeat.**"
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Kluzen the Protector",
+      "polished_md": "## Pull\n\nKluzen is the **easiest** of the named monsters in [Veeshan's Peak](https://eq2.fandom.com/wiki/Veeshan's_Peak). Before the fight, make sure to clear all of the nearby trash mobs, as they are roamers — don't forget the [Drakota](https://eq2.fandom.com/wiki/Drakota) flying overhead.\n\n## Mechanics\n\nKluzen is practically a **straight burn**. He does a large AOE called **wingbeat** (**45 seconds**) that must be **announced and jousted**, but that is all."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Milyex Vioren",
+      "polished_md": "## Overview\n\nAfter the engineer goes down for the first time, **one decent healer can keep one decent MT alive** vs. the Named.\n\n## Pull\n\n- **MT** pulls the named anywhere he wants. Doesn't much matter where, he doesn't do anything.\n- **Raid assists the MA.** On pull, MA should target a **\"generator\"** that has appeared somewhere around the circle that the named is flying around.\n- After the **\"generator\"** is down, take out the **engineer**.\n- After the engineer is down, he's easy to keep dead with a couple of **melee dps'ers** on him. Keep him down.\n\n## Generators\n\n**\"Generators\"** spawn every **~20 seconds**:\n\n- **1** for the first **20%** of the named's health.\n- **2** for the next **20%**.\n- **3** spawn every ~20 seconds for the rest of the fight.\n\n> If any \"generator\" is still standing after **15 seconds** of their appearance, the Named will do a **KB** that will send everyone flying all over the place. The named will also **heal himself** a good amount.\n\n## Notes\n\nThat's it — pretty simple fight as long as you have the dps to take out the generators when they start spawning **3 at a time**."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Phara Dar",
+      "polished_md": "## Overview\n\nIn the same group as [Shade of Khalan Dar](https://eq2.fandom.com/wiki/Shade_of_Khalan_Dar).\n\nThere are **two methods** of pulling and killing Phara Dar. When you approach Phara Dar's room you will notice the [Shade of Khalan Dar](https://eq2.fandom.com/wiki/Shade_of_Khalan_Dar) in the center and a ramp leading up the left side which takes you to Phara Dar. Upon pulling Phara Dar, the Shade of Khalan Dar will immediately fly to wherever Phara Dar is located and assist in the battle. It is imperative to have a **balanced Main and Off Tank group** for this fight as you will need to kill both of these named mobs at once.\n\n## Method 1 — Split at the Ramp\n\nSend two groups (**Main** and an assisting group) up the ramp to Phara Dar and fight the **Shade of Khalan Dar** at the very bottom of the ramp with their back to the wall.\n\n> The drawback: even with snaps and aggro lock, the **Shade of Khalan Dar will still fly up to Phara Dar 2/3 of the time** and have to be dragged back down the ramp to the Off Tank and their assisting group. This can result in a **wipe of the MT group** and a fight reset.\n\nOnce the OT group has killed the [Shade of Khalan Dar](https://eq2.fandom.com/wiki/Shade_of_Khalan_Dar) at the bottom of the ramp, they should run up and assist in DPS on Phara Dar.\n\n## Method 2 — Hallway Pull (easier)\n\nPull Phara Dar and subsequently the Shade of Khalan Dar into the hallway that leads to the main room.\n\n- The **MT group** and their assisting party should be located closest to the room entrance.\n- The **OT group** and their assisting party should be located approximately **40 metres up the stairs**.\n- Positioning **Phara Dar on the bottom far right** and the **Shade of Khalan Dar on the upper far left** corners of the staircase makes it easier for the OT and assisting group to switch over to Phara Dar once the shade is dead.\n\n## Notes\n\n> Please note: The **Shade of Khalan Dar will heal itself to full once during the fight** — this is not a bug."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Qunard Ashenclaw",
+      "polished_md": "## Spawn\n\n- Minor **KB**, minor **AoE** if within **20 meters**.\n- To spawn him, **click the beehive**.\n- **^^ orange heroics** will come — about 4, two sets of them.\n- After they are done, the **Queen Bee** will come. She's a joke.\n- After she is dead, **Ashenclaw** will spawn.\n\n## Fight\n\nAgain, **minor KB** and **minor AoE** — just drag him to one of the hallways and **tank and spank** him."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Taskmaster Nichok",
+      "polished_md": "## Pull\n\n- Entire raid starts by **facing north**, standing far north of the named near the rocks.\n- Have **tank** run up just close enough to bow shot the named, then he needs to run back (get to at least **45 meters** away).\n- The entire raid must then run **north** until everyone is **ported** to the little island the named is standing on.\n\n## Jousting Cycle\n\n- After the raid gets ported to the island, they should continue running **north about 30–45 meters** away from the named (back by the rocks).\n- **10 seconds** after the port a **massive AoE** goes off. This AoE will only hit people closer than that **30–45 meter** range.\n- Once the AoE goes off, the entire raid has about **15 seconds** to run close enough to get some **ranged dps** on the mob.\n- After about 15 seconds of dps'ing, everyone needs to start running **north again** until they are at least **45 meters** away from the named.\n\n> It may be helpful to **cancel your current target** so that you don't get turned around when ported, since you might end up running in the wrong direction.\n\n## Snare\n\n> If anyone is still within **45 meters** of the named when he ports you, those people will get a **snare (incurable -75% run speed)**. This means those people that got snared are not going to get far enough away when his massive AoE goes off.\n\n- **Sprint** can be helpful if you are snared.\n- If you die, **do not wait to be resurrected** — just revive and start heading north so that when he does his zonewide raid port, you will be brought back instantly and can start fighting again.\n\n## Adds & Enslave\n\n- Continue this jousting until the mob is dead.\n- **Adds spawn at 70%, 50% and 30%.**\n- At about **50%** the **2nd person in the first group** will be **enslaved** (teleported away from the raid and unable to attack while doing a mining animation).\n\n## Loot\n\nGratz on your **Mythicals**."
+    }
+  ]
+}

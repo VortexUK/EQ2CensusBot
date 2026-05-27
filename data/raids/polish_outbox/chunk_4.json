@@ -1,0 +1,89 @@
+{
+  "entries": [
+    {
+      "zone_name": "Commune of K'Dal",
+      "mob_name": "Klogg Bindgear III",
+      "polished_md": "- Talk to him to gain entrance to [Maiden's Gulch](https://eq2.fandom.com/wiki/Maiden's_Gulch)"
+    },
+    {
+      "zone_name": "Freethinker Hideout",
+      "mob_name": "Othysis Muravian",
+      "polished_md": "## Mechanics\n\n- Auto attack does **crushing** and **disease** damage.\n- Every **34 seconds** she emotes, *\"Through the portal now\"*, and summons a [D'Morte preserver](https://eq2.fandom.com/wiki/a_D'Morte_preserver) (heroic).\n  - The preserver will heal Othysis Muravian with **Gift of Rejuvenation** and **Superior Gift of Rejuvenation** for **12.3 million HP** if it gets close enough.\n- Every **30 seconds** she emotes, *\"Time for some soul searching\"*, and casts a Disease DD (**Prone to Corruption**) on a random raid member.\n\n> If the target of **Prone to Corruption** does **NOT** die to it, it spawns an add (Epic x2)."
+    },
+    {
+      "zone_name": "Freethinker Hideout",
+      "mob_name": "Treyloth D'Kulvith",
+      "polished_md": "## Mechanics\n\n- **Treyloth D'Kulvith** will mem wipe at **75%**, **50%**, and **25%** health.\n- You need to fight between **10m and 5m** of him to avoid both of his AoEs.\n- He also places an **arcane detrimental** on the raid which causes your spells to reflect."
+    },
+    {
+      "zone_name": "Halls of the Seeing",
+      "mob_name": "Suffering",
+      "polished_md": "## Mechanics\n\n- Fears\n- Heat based power-drain on target\n- Frontal AE **100% power-drain** and Mental damage"
+    },
+    {
+      "zone_name": "Mistmoore's Inner Sanctum",
+      "mob_name": "Mayong Mistmoore",
+      "polished_md": "## Pull & Positioning\n\n- Sneak the main raid force past Mayong and hug one of the corners behind his coffin.\n- Keep the **main tank** at max distance from the raid.\n\n## Mechanics\n\nMayong has two PBAOE spells that he casts every so often that you'll want to avoid.\n\n> One of them, **Blanket of Eternal Night**, heals Mayong the closer you are to him.\n\n- **Melee DPS** should be jousting before either of these two hit — keep an eye on your timers.\n\n### Adds\n\n- Every so often Mayong will spawn two **'a vampiric protector'** adds.\n- These should be picked up and burned down from the raid force, then refocus attention on Mayong.\n\n### Unholy Strike\n\n- Casts an ability called **'Unholy Strike'** that heals him for **11,500,000** damage.\n- Not sure what triggers this or if you can time it to be interrupted, but notice he's done it once on the last few encounters."
+    },
+    {
+      "zone_name": "The Cove of Decay: Epic Angler",
+      "mob_name": "Googegguta",
+      "polished_md": "- Speak with him to obtain access to the raid zone [The Cove of Decay: Epic Angler](https://eq2.fandom.com/wiki/The_Cove_of_Decay:_Epic_Angler)."
+    },
+    {
+      "zone_name": "The Crypt of Vox",
+      "mob_name": "Spirit of Vox",
+      "polished_md": "## Mechanics\n\n- She has a **3k cold AE** attack, and has an amazing health regen rate.\n- Try to have the **tank** turn her away from the raid — her AE can be jousted.\n- If you're quick on the cures (**Elemental**) you should be ok."
+    },
+    {
+      "zone_name": "The Emerald Halls",
+      "mob_name": "Wuoshi",
+      "polished_md": "## Pull\n\n- Clear the entire third level before engaging Wuoshi, otherwise all mobs on the level will aggro.\n\n## Mechanics\n\n- All of Wuoshi's special attacks **drain power** (AE).\n- Wuoshi spawns a **Bloodbeast** at **75%** and **25%** health during the fight. *(Almost the same as An Ancient Bloodbeast from Halls of the Seeing.)*"
+    },
+    {
+      "zone_name": "The Eternal Gorge: A Daring Confrontation",
+      "mob_name": "Qeynos",
+      "polished_md": "- If you write 'Qeynos' backwards you get 'Sonyeq', or [Sony](https://eq2.fandom.com/wiki/Daybreak_Game_Company,_LLC) [EQ](https://eq2.fandom.com/wiki/EverQuest)! ''(Source - [Chillispike](https://eq2.fandom.com/wiki/User:Chillispike))"
+    },
+    {
+      "zone_name": "The Fabled Djinn Master's Prism",
+      "mob_name": "Barakah",
+      "polished_md": "- This is the non-attackable NPC in Maj'Dul that spawns the dragon form of Barakah. Use a **Gold Dragon scale** to trigger the attackable dragon."
+    },
+    {
+      "zone_name": "The Protector's Realm",
+      "mob_name": "Zykluk Vyx",
+      "polished_md": "## Mechanics\n\n- **Judgement of the Faceless**: Disease-based AoE Fear & DoT (every **45s**) — does more damage the closer you are.\n\n## Strategy\n\n- **MT** pulls to the far left corner with **Sanctuary** up.\n- Everyone else stays outside of the room until **Judgement of the Faceless** hits, then rush in.\n- Joust all the way out of the room every **45s** before Judgement hits, then back in after.\n\n### Adds\n\n- Adds can be **mezzed**, or burn them down first."
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Aktar the Dark",
+      "polished_md": "## Overview\n\nThis mob is a **non-loot mob**. The only thing you get from this fight is the device to activate Atrebe. It is best to **duel tank** this mob due to a noxious stun that is also a nasty uncurable dot.\n\n- **Noxious Mist**: a stun and uncurable DoT with a seemingly **50 sec.** recast. Joust this AoE to avoid it.\n\n## Strategy\n\n### Off-tank\n\n- The **offtank** needs to stick **Uthtak the Cruel** with an arrow and pull him and the adds to the corner opposite where the raid force is.\n- The adds will taunt the offtank and force him to stay on that target — best to stay on that target and burn it.\n\n### Main tank\n\n- The **MT** needs to taunt **Aktar the Dark** away from the raid force to avoid the AoE and tank him about where he stands.\n\n> Again, the AoE is nasty and uncurable as well as stuns.\n\n### Uthtak's reflect\n\n> **Uthtak** has a reflect shield on him — be careful with your big nukes and big debuffs, they can be reflected back to you and your group.\n\n### Burn phase\n\n- Once Uthtak is down, have the raid force joust Aktar's AoE and burn him.\n\n## Notes\n\n- Don't be alarmed when a box does not hit the ground after the encounter is over."
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Atrebe's Statue",
+      "polished_md": "## Pull\n\n- One person needs to loot and equip [a cryptic device](https://eq2.fandom.com/wiki/a_cryptic_device) dropped from the Uthtak/Aktar fight.\n- They can then right-click on Atrebe's Statue and select **\"Press Glowing Gem on the Cryptic Device\"** to make Atrebe's Statue attackable.\n\n## Preparation\n\n- Maximize **Poison & Magic resists**.\n\n## Mechanics\n\nJoust the two AoEs, which increase in damage the closer you are to the mob. **Cure immediately** with healers or potions when hit with either one.\n\n### Sebilisian Sporecloud\n\n- At **0 to 10 meters**: 12338-24492 poison damage plus 2903-5763 poison damage every 5 seconds\n- At **10 to 15 meters**: 7583-11374 poison damage plus 2166-3250 poison damage every 5 seconds\n- At **15 to 75 meters**: 4875-5958 poison damage plus 1462-1787 poison damage every 5 seconds\n- For ACT the spell needs to read **\"Statue's Sebilisian Sporecloud\"** and goes off at about the **45 sec.** mark\n\n### Force of Atrebe\n\n- You will be **launched into the air** and hurled toward Atrebe's Statue\n- At **0 to 10 meters**: 7936-23808 magic damage plus 3174-9523 magic damage every 9 seconds\n- At **10 to 15 meters**: 5079-11851 magic damage plus 1905-4444 magic damage every 9 seconds\n- At **15 to 100 meters**: 3809-5714 magic damage plus 1693-2540 magic damage every 9 seconds\n- For ACT the spell needs to read **\"Statue's Force of Atrebe\"** and goes off at about the **40 sec.** mark\n\n> **Force of Atrebe** actually kicks you in the direction you are facing — if you face the mob it will pull you to him; if you face away you will get a standard knockback.\n\n## Notes\n\n- Resists, fast cures for the dots, jousting, and a bit of luck (if both AoEs go off at the same time or very close, it is very likely that it kills MT) are the keys to this fight.\n- If healers cannot cure fast enough then bring potions."
+    },
+    {
+      "zone_name": "The Temple of Kor-Sha",
+      "mob_name": "Selrach Di'Zok",
+      "polished_md": "## Overview\n\nThe Overking is the final mob in the Temple of Kor-Sha.\n\n- Make sure the **assassins** are cleared out of the pools before engaging him, or they will join the fight.\n- Use **elemental resist** gear if you are low, and have the **Troubador** run **Elemental Chorus**.\n\n## Group Setup\n\n### Off-tank group\n\n- Should be a good **AoE setup**. For example a **Paladin** with **amends** on a **Warlock**, a **Shadowknight** or **Berserker**.\n\n### Main tank group\n\n- Can use a **third healer** to deal with the incredible amount of curing required.\n- Ideal setup for your first time: **Guardian, Templar, Defiler, Warden, Coercer, Dirge**.\n- Keeping this group cured is important due to the large amount of stun/stifles caused by the **Mentalist** adds.\n- Have your healers set up `/tell` macros to assigned casters to cure them.\n\n### Tank target macro\n\nThe main tank will be frequently taunted off the Overking, so make a target macro to keep clicking and get your target back:\n\n- `/target Selrach`\n\n## Pull & Positioning\n\n- Everyone should set up just before the two pillars.\n- The fight will start with the tank running to the throne and holding the Overking there.\n- The rest of the raid goes into a tight group **directly in the middle of the two pillars** and starts casting AoEs.\n- The off-tank should pull the adds to the raid and hold them there so AoEs have maximum effect, keeping them away from the main tank.\n\n## Adds Phase\n\n- Once the first set of adds are dead you will get a continuous spawn of weaker adds with stunning casters called **Mentalists**.\n- When these waves spawn, **kill the Mentalists first**.\n- Once you have the waves under control, you can assign more single-target damage to attack the Overking with the main tank. Figuring out just the right number of people you can take off the adds and put on the Overking will speed this fight up.\n\n## AoEs\n\nDuring the fight two AoEs will go off:\n\n- **Concussive Blast**: magic based, hits every **52 seconds**, and is fairly weak.\n- **Heat AoE** (the one of concern): hits every **30 seconds**.\n  - This is the reason the Overking must be kept away from the raid; using a tank with good heat resists like a **Guardian** helps on the healing.\n\n## Mid-fight Repositioning (~80%)\n\n- Once things are under control and the Overking is at about **80%** health, the tank should move the Overking from the throne past the pillars.\n- Wait for the Mentalists to be dead from the current set of adds, and for the **heat AoE** to have gone off.\n- Once the heat DoT has been cured and there are only a couple of adds up, pull the Overking through the raid force and onto the other side. **Thought snap** is useful here.\n- The tank should be far enough from the raid that the heat AoE doesn't do much damage to them.\n\n> **Don't** pull against the wall — you need to be in the center of the left area so when the flame adds come they don't all come around the side.\n\n## Wand Phase (~58%)\n\n- Once you get him to **58%** he is going to start speaking.\n- At this point make sure the person who has the [Wand of Intervention](https://eq2.fandom.com/wiki/Isydryl's_Wand_of_Intervention) from [Pawbuster](https://eq2.fandom.com/wiki/Pawbuster) is cured of all effects so they can use the wand on the Overking. This will disable his brutal AoE.\n- The tank should use any damage prevention (such as **Tower of Stone**) at this point, because the Overking will cast an additional AoE.\n\n## Flame Phase\n\nThe Overking is now upset and will begin calling in the flames from the fire pots around his throne to come help him.\n\n> If the flames reach the Overking he gets to do his AoE again, which will likely kill everyone.\n\n> **Don't** target the flames directly without them getting far enough away from the throne area — they will port you to the Overking and he will kill you.\n\n- The trick is to let them funnel past the pillars to the raid force and use **blue AoEs** to destroy the flames without directly targeting them.\n- There will be a couple of flames that sneak around the pillars on the outer sides. **Call these** and have a **brig** or some other class assigned to go and kill them.\n- Have a few AoE classes continue to kill the flames, and the rest of the raid can focus DPS on the Overking."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Nexona",
+      "polished_md": "## DPS Requirements\n\n- DPS on Nexona must be kept **greater than 10k** at all times in order to avoid a nasty AE.\n- An additional AoE, **Noxious Rot**, can be avoided if DPS is kept **greater than 25k**.\n\n## Pull & Positioning\n\n- Most people pull Nexona down the ramp to the **left corner** (left upon entering the room). **MT** group stays down there.\n- Assign **4 \"shiny\" collectors**:\n  - One at each weapon rack on either side of the room on the main floor.\n  - One outside in the hallway.\n  - One up top where Nexona is — three shinies spawn up there: in the middle back, and **BEHIND** each of the two specimens.\n- Rest of the raid go up the ramp that is to the left when entering the room and stack on the **\"specimen\"**.\n- **MT** cleric hammer pull or pet pull.\n\n## Specimens\n\nOnce Nex is pulled, the entire raid force that is stacked on the **\"specimen\"** starts killing the specimen. Do this as fast as you can.\n\n- Move to the other side up top where another **\"specimen\"** is located and take it out fast.\n- Run down the ramp on the right side and take out the **\"specimen\"** there.\n- By this time one shiny should have been harvested.\n\n> Harvested shinies spawn an **x2 add**, and they do **memwipes**. Whoever harvested that shiny needs to let the raid know where it (the x2 add) is coming from so they can kill it.\n\n- Leave the **\"specimen\"** that is in the middle of the lower section — it's of little concern.\n- Move to where Nexona is being tanked and take out a **4th \"specimen\"**.\n- The **5th \"specimen\"** in the middle will be consumed by Nex when she gets to **90%** health — all it does is heal her to 100%. Not worth wasting time on.\n\n## Main Phase\n\n- Focus on the mobs that spawn when someone harvests a shiny, and DPS on Nex in between.\n\n## 45% — Drake Spawn\n\n- When Nex gets to **45%** two **drake 83^^^ heroics** will spawn from the water in the lower section.\n- These are easily **mezzed** for the remainder of the fight.\n- Drakes should be **mezzed the whole fight** or they will stun and knock back everyone trying to kill shiny adds.\n- Having a **healer** that can joust between the shiny group and the mezzers is very helpful in case one breaks.\n\n## Burn\n\n- Concentrate on the shiny-spawned mobs and Nexona, and gratz on your **Mythicals**."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Travenro the Skygazer",
+      "polished_md": "## Overview\n\nThis mob is a relatively simple **tank and spank** encounter.\n\n## Mechanics\n\n- There is a **small arcane AOE** that can be easily avoided by standing at the edge of the room.\n- You will also find **floating balls of lightning**. These have a **knockback** and can cause your spells to interrupt.\n\n## Strategy\n\n- The best method of avoiding the lightning balls is to have the **ranged DPS** stand at the very edge of the room.\n  - You will notice that the texture of the floor is two different colors — the balls will not affect you if you stand on the **lighter tile**.\n- **Healers** move in to attend to tanks and melee DPS as needed."
+    },
+    {
+      "zone_name": "Veeshan's Peak",
+      "mob_name": "Xygoz",
+      "polished_md": "## Pull\n\n- The **MT** will start by clicking on him — if anyone else does, they will be attacked.\n\n## Mechanics\n\nDuring the fight he will fall asleep **twice** — there are two different dreams that you must deal with. They can happen in any order, and happen at **80%** and **40%**.\n\n> Anyone underneath Xygoz when he falls asleep will be **instantly killed**.\n\n### First Dream — Mini Dragons\n\n- Spawns miniature versions of all the major dragons in the zone.\n- They mock Xygoz for having no pants, so you must kill them.\n- They are all **heroic except for Trakanon**, and not very hard.\n\n### Second Dream — Dolls\n\n- Creates a miniature **doll** of everyone in the raid.\n- They spawn at the bottom of the ramp to the **North** (entrance) of the room.\n- Everyone must pick up the doll of themselves (**double click**).\n- The **last person** to do so will be the one that Xygoz attacks when he wakes up.\n- The **MT** does not necessarily have to pick up their doll — they can simply aggro lock Xygoz when he awakens. Leaving the MT's doll up for the remainder of the fight has no negative consequences for the raid.\n- Once you have double-clicked your doll, jousting back to the rock will keep the area clear for those having a harder time finding the miniature version of their character.\n\n> Note that this step occasionally **bugs**, and may reset the encounter — just keep trying.\n\n## Other\n\n- Aside from the dreams and an **incurable fear**, there are no special tactics to Xygoz.\n- Jousting to the rock will keep the raid from suffering the fear effect."
+    }
+  ]
+}

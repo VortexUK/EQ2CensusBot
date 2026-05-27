@@ -264,6 +264,13 @@ scripts/dev/eq2i_raids.sample.json
 data/raids/raids.db
 data/raids/raids.db-wal
 data/raids/raids.db-shm
+# Polish pipeline (scripts/dev/export_for_polish.py → agents → apply_polish.py):
+#   * polish_inbox/  is regenerated from raids.db on every export run —
+#                    purely transient input for the polish agents.
+#   * polish_outbox/ IS committed below — those are the polished JSON
+#                    artifacts, applied on top of the scraped ingest to
+#                    reach the polished state on a fresh clone.
+data/raids/polish_inbox/
 
 # Parses feature (v1, local-only) — ACT-written export and our normalized DB
 data/parses/act_export.db
