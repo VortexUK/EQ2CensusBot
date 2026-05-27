@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from census import census_store
 from census.models import GuildData, GuildMember
 from web.routes.guild import GuildInfoResponse, GuildMemberResponse, GuildResponse
 
@@ -84,10 +88,17 @@ async def test_guild_roster_not_found(app):
     """404 when Census returns nothing for an unknown guild."""
     with (
         patch("web.routes.guild.guild_cache") as mock_cache,
-        patch("web.routes.guild._fetch_and_cache_guild", new_callable=AsyncMock) as mock_fetch,
+        patch("web.routes.guild.census_store") as mock_cs,
+        patch("web.census_health.is_down", return_value=False),
+        patch("web.routes.guild._persist_and_publish_guild", new_callable=AsyncMock) as mock_persist,
     ):
         mock_cache.get_stale.return_value = (None, False)
-        mock_fetch.return_value = None
+        mock_cs.DB_PATH = census_store.DB_PATH
+        mock_cs.init_db.return_value = MagicMock()
+        mock_cs.get_guild.return_value = None  # not in store
+        mock_persist.return_value = None
+        # After persist, cache is still empty → 404
+        mock_cache.get_stale.return_value = (None, False)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/guild/NoSuchGuild")
@@ -97,28 +108,34 @@ async def test_guild_roster_not_found(app):
 
 @pytest.mark.asyncio
 async def test_guild_roster_stale_triggers_background_refresh(app):
-    """Stale cache hit returns data immediately and schedules a background refresh."""
+    """Stale in-memory hit falls through to the store; a stale stored entry
+    queues a background refresh and returns the stored data (stale=True)."""
     cached_roster = _make_guild_response()
+    # Store blob uses the canonical {"roster": ..., "info": ...} shape written by _persist_and_publish_guild
+    stored_blob = {"roster": cached_roster.model_dump(), "info": None}
 
-    created_coros = []
-
-    def _capture_task(coro):
-        # Immediately close the coroutine so Python doesn't emit a "never awaited" warning.
-        coro.close()
-        created_coros.append(True)
+    refresh_calls: list[str] = []
 
     with (
         patch("web.routes.guild.guild_cache") as mock_cache,
-        patch("web.routes.guild.asyncio") as mock_asyncio,
+        patch("web.routes.guild.census_store") as mock_cs,
+        patch("web.census_health.is_down", return_value=False),
+        patch("web.census_refresh.request_guild_refresh", side_effect=lambda n: refresh_calls.append(n)),
     ):
-        mock_cache.get_stale.return_value = (cached_roster, True)  # stale=True
-        mock_asyncio.create_task = MagicMock(side_effect=_capture_task)
+        mock_cache.get_stale.return_value = (cached_roster, True)  # stale in-memory
+        mock_cs.DB_PATH = census_store.DB_PATH
+        mock_cs.init_db.return_value = MagicMock()
+        # Store has data but it's old (last_resolved_at=1 → very stale)
+        mock_cs.get_guild.return_value = {"data": stored_blob, "last_resolved_at": 1}
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/guild/Exordium")
 
     assert r.status_code == 200
-    assert len(created_coros) == 1, "Expected exactly one background refresh task"
+    body = r.json()
+    assert body["stale"] is True
+    # A background refresh should have been requested
+    assert len(refresh_calls) == 1, "Expected exactly one background refresh request"
 
 
 # ---------------------------------------------------------------------------
@@ -149,10 +166,15 @@ async def test_guild_info_not_found(app):
     """404 when Census returns nothing."""
     with (
         patch("web.routes.guild.guild_cache") as mock_cache,
-        patch("web.routes.guild._fetch_and_cache_guild", new_callable=AsyncMock) as mock_fetch,
+        patch("web.routes.guild.census_store") as mock_cs,
+        patch("web.census_health.is_down", return_value=False),
+        patch("web.routes.guild._persist_and_publish_guild", new_callable=AsyncMock) as mock_persist,
     ):
         mock_cache.get_stale.return_value = (None, False)
-        mock_fetch.return_value = None
+        mock_cs.DB_PATH = census_store.DB_PATH
+        mock_cs.init_db.return_value = MagicMock()
+        mock_cs.get_guild.return_value = None
+        mock_persist.return_value = None
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/guild/NoSuchGuild/info")
@@ -217,9 +239,15 @@ async def test_fetch_and_cache_guild_populates_roster_and_info(app):
         patch("web.routes.guild.guild_cache") as mock_cache,
         patch("web.routes.guild.character_cache"),
         patch("web.routes.guild.CensusClient", return_value=mock_client),
+        patch("web.routes.guild.census_store") as mock_cs,
+        patch("web.census_health.is_down", return_value=False),
     ):
         mock_cache.get_stale.side_effect = _get_stale_side_effect
         mock_cache.set.side_effect = _record_set
+        # Store is empty for this test — exercise the live-fetch path
+        mock_cs.DB_PATH = census_store.DB_PATH
+        mock_cs.init_db.return_value = MagicMock()
+        mock_cs.get_guild.return_value = None
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/api/guild/Exordium")
@@ -228,3 +256,94 @@ async def test_fetch_and_cache_guild_populates_roster_and_info(app):
     written_keys = {k for k, _ in set_calls}
     assert any("roster:" in k for k in written_keys), f"Expected roster key in {written_keys}"
     assert any("info:" in k for k in written_keys), f"Expected info key in {written_keys}"
+
+
+# ---------------------------------------------------------------------------
+# Store-served roster: Census-down + stored guild → 200 with stale=True
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def tmp_census_db(tmp_path, monkeypatch):
+    """Seed a temporary census.db with one guild row and redirect DB_PATH to it."""
+    db_path = tmp_path / "census.db"
+    monkeypatch.setattr(census_store, "DB_PATH", db_path)
+    monkeypatch.setenv("CENSUS_DB_PATH", str(db_path))
+    roster_blob = GuildResponse(
+        name="Exordium",
+        world="Varsoon",
+        members=[
+            GuildMemberResponse(
+                name="Sihtric",
+                level=100,
+                cls="Shadowknight",
+                rank="Officer",
+                rank_id=1,
+            )
+        ],
+        fetched_at=1000,
+        stale=False,
+    ).model_dump()
+    info_blob = GuildInfoResponse(
+        name="Exordium",
+        world="Varsoon",
+        level=300,
+        members=1,
+        accounts=1,
+        achievement_count=5,
+        dateformed=1234567890,
+        description="A test guild",
+        alignment=0,
+        type=0,
+    ).model_dump()
+    combined_blob = {"roster": roster_blob, "info": info_blob}
+    conn = census_store.init_db(db_path)
+    census_store.upsert_guild(conn, "Exordium", "Varsoon", combined_blob, now=1000)
+    conn.close()
+    return db_path
+
+
+@pytest.mark.asyncio
+async def test_guild_roster_served_from_store_when_census_down(app, tmp_census_db, monkeypatch):
+    """Census-down + a stored guild → 200 with stale=True, member present."""
+    import web.census_health as _health_mod
+
+    monkeypatch.setattr(_health_mod, "is_down", lambda: True)
+    # Redirect the module-level DB_PATH so the route's local init_db call uses the tmp db.
+    monkeypatch.setattr(census_store, "DB_PATH", tmp_census_db)
+
+    from web.cache import guild_cache
+
+    guild_cache.delete("roster:exordium:varsoon")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.get("/api/guild/Exordium")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["members"]) == 1
+    assert body["members"][0]["name"] == "Sihtric"
+    assert body["stale"] is True
+
+
+@pytest.mark.asyncio
+async def test_guild_info_served_from_store_when_census_down(app, tmp_census_db, monkeypatch):
+    """Census-down + a stored guild → info endpoint returns full info fields, stale=True."""
+    import web.census_health as _health_mod
+
+    monkeypatch.setattr(_health_mod, "is_down", lambda: True)
+    monkeypatch.setattr(census_store, "DB_PATH", tmp_census_db)
+
+    from web.cache import guild_cache
+
+    guild_cache.delete("info:exordium:varsoon")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.get("/api/guild/Exordium/info")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["stale"] is True
+    # Non-degraded fields from the stored info blob must survive Census-down
+    assert body["level"] == 300
+    assert body["dateformed"] == 1234567890

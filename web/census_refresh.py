@@ -102,7 +102,7 @@ def request_guild_refresh(name: str) -> None:
 
 
 async def _run_guild_refresh(name: str, key: str) -> None:
-    from web.routes.guild import _persist_and_publish_guild  # type: ignore[attr-defined]  # defined in Task 10
+    from web.routes.guild import _persist_and_publish_guild
 
     try:
         await _persist_and_publish_guild(name)
