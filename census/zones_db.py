@@ -827,6 +827,72 @@ def update_encounter(
     return result
 
 
+def reorder_encounters(
+    zone_id: int,
+    ordered_encounter_ids: list[int],
+    path: Path = DB_PATH,
+) -> None:
+    """Atomically renumber the zone's encounters to 1..N matching the given
+    order. The list MUST be a complete permutation of that zone's current
+    encounter ids (no duplicates, no missing ids, no foreign ids) — raises
+    ValueError otherwise. The two-phase write (negative sentinels then
+    1..N) is needed because UNIQUE(zone_id, position) would otherwise
+    reject mid-update collisions. After the zones.db commit, mirrors the
+    new positions onto any matching raids_db.raid_encounters rows."""
+    if len(ordered_encounter_ids) != len(set(ordered_encounter_ids)):
+        raise ValueError("ordered_encounter_ids contains duplicates")
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;")
+        current = {
+            r["id"]: (r["encounter_name"], r["position"])
+            for r in conn.execute(
+                "SELECT id, encounter_name, position FROM zone_encounters WHERE zone_id = ?",
+                (zone_id,),
+            )
+        }
+        if set(ordered_encounter_ids) != set(current.keys()):
+            missing = set(current.keys()) - set(ordered_encounter_ids)
+            extra = set(ordered_encounter_ids) - set(current.keys())
+            raise ValueError(
+                f"reorder_encounters: not a permutation of zone {zone_id}'s "
+                f"encounters (missing={sorted(missing)}, extra={sorted(extra)})"
+            )
+        zone_row = conn.execute("SELECT name FROM zones WHERE id = ?", (zone_id,)).fetchone()
+        zone_name = zone_row["name"] if zone_row else None
+        with conn:  # single transaction
+            # Two-phase write to dodge the UNIQUE(zone_id, position) collision
+            # on mid-update overlap: negative sentinels first, then 1..N.
+            for tmp_neg, enc_id in enumerate(ordered_encounter_ids, start=1):
+                conn.execute(
+                    "UPDATE zone_encounters SET position = ? WHERE id = ?",
+                    (-tmp_neg, enc_id),
+                )
+            for new_pos, enc_id in enumerate(ordered_encounter_ids, start=1):
+                conn.execute(
+                    "UPDATE zone_encounters SET position = ? WHERE id = ?",
+                    (new_pos, enc_id),
+                )
+    # Mirror onto raids_db: for each encounter whose primary mob has a
+    # raid_encounters row, update its position. We look up by the CURRENT
+    # encounter_name (which is the primary mob name post-Task-1 normalization).
+    if zone_name is None:
+        return
+    from census import raids_db as _raids_db
+
+    with sqlite3.connect(_raids_db.DB_PATH) as rconn:
+        rconn.execute("PRAGMA foreign_keys = ON;")
+        for new_pos, enc_id in enumerate(ordered_encounter_ids, start=1):
+            name, _old_pos = current[enc_id]
+            _raids_db.update_raid_encounter_if_exists(
+                rconn,
+                zone_name=zone_name,
+                mob_name=name,
+                position=new_pos,
+            )
+        rconn.commit()
+
+
 def delete_encounter(encounter_id: int, path: Path = DB_PATH) -> bool:
     """Delete an encounter. Cascades zone_encounter_mobs via FK; cascades the
     matching raids_db row (if any) which itself cascades triggers/timers/

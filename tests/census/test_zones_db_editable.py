@@ -149,3 +149,44 @@ def test_delete_encounter_missing_returns_false(tmp_path):
     p = tmp_path / "zones.db"
     zones_db.init_db(p)
     assert zones_db.delete_encounter(99999, path=p) is False
+
+
+def test_reorder_encounters_atomic_permutation(tmp_path):
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    a = zones_db.add_encounter(zid, primary_mob="A", path=p)
+    b = zones_db.add_encounter(zid, primary_mob="B", path=p)
+    c = zones_db.add_encounter(zid, primary_mob="C", path=p)
+    # Reverse order: C, B, A
+    zones_db.reorder_encounters(zid, [c["id"], b["id"], a["id"]], path=p)
+    with sqlite3.connect(p) as conn:
+        positions = {
+            r[0]: r[1] for r in conn.execute("SELECT id, position FROM zone_encounters WHERE zone_id = ?", (zid,))
+        }
+    assert positions[c["id"]] == 1
+    assert positions[b["id"]] == 2
+    assert positions[a["id"]] == 3
+
+
+def test_reorder_encounters_rejects_missing_id(tmp_path):
+    import pytest as _pytest
+
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    a = zones_db.add_encounter(zid, primary_mob="A", path=p)
+    b = zones_db.add_encounter(zid, primary_mob="B", path=p)
+    with _pytest.raises(ValueError):
+        zones_db.reorder_encounters(zid, [a["id"]], path=p)  # missing b
+    with _pytest.raises(ValueError):
+        zones_db.reorder_encounters(zid, [a["id"], b["id"], 9999], path=p)  # extra
+
+
+def test_reorder_encounters_rejects_duplicates(tmp_path):
+    import pytest as _pytest
+
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    a = zones_db.add_encounter(zid, primary_mob="A", path=p)
+    b = zones_db.add_encounter(zid, primary_mob="B", path=p)
+    with _pytest.raises(ValueError):
+        zones_db.reorder_encounters(zid, [a["id"], a["id"], b["id"]], path=p)
