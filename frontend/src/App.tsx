@@ -273,8 +273,11 @@ function Layout() {
           <UserWidget />
         </div>
       </div>
-      {/* Push content below fixed header (~52px) */}
-      <div className="pt-14 flex flex-col min-h-[calc(100vh-3.5rem)]">
+      {/* pt-14 pushes content below the fixed header; min-h-screen makes the
+          wrapper fill the viewport so the footer sits flush against the
+          bottom edge (otherwise min-h = 100vh-header left a strip of the
+          background image showing below the footer). */}
+      <div className="pt-14 flex flex-col min-h-screen">
         {/* key by the *stable* portion of pathname so the fade-up entrance
             replays on real navigation but NOT on in-page URL changes (the
             raid sidebar updates :position to drive boss selection — we
@@ -282,7 +285,7 @@ function Layout() {
         <div className="page-enter flex-1" key={stablePathKey(pathname)}>
           <Outlet />
         </div>
-        <footer className="border-t border-border py-[1.1rem] px-6 flex items-center justify-between flex-wrap gap-2 text-[0.72rem] text-text-muted opacity-70">
+        <footer className="border-t border-border py-2 px-6 flex items-center justify-between flex-wrap gap-x-4 gap-y-1 text-[0.72rem] text-text-muted opacity-70">
           <span>
             © {new Date().getFullYear()}{' '}
             <a
