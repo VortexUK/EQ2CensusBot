@@ -285,6 +285,28 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     conn.execute("DROP TABLE IF EXISTS zone_bosses;")
     for idx in _CREATE_INDEXES:
         conn.execute(idx)
+    # One-time data normalization (idempotent): legacy `encounter_name`
+    # values were the comma-joined display of every mob in the encounter
+    # ("Ire, Malevolence"). The web roster editor treats encounter_name
+    # as the PRIMARY mob's name (kept in sync with the mob at
+    # position 0). Rewrite any comma-containing row to its position-0
+    # mob name; rows without any mobs are left untouched.
+    conn.execute(
+        """
+        UPDATE zone_encounters
+           SET encounter_name = (
+                   SELECT mob_name FROM zone_encounter_mobs m
+                    WHERE m.encounter_id = zone_encounters.id
+                    ORDER BY position ASC
+                    LIMIT 1
+               )
+         WHERE encounter_name LIKE '%,%'
+           AND EXISTS (
+                   SELECT 1 FROM zone_encounter_mobs m
+                    WHERE m.encounter_id = zone_encounters.id
+               )
+        """
+    )
     conn.commit()
     return conn
 
