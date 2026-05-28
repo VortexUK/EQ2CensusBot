@@ -40,18 +40,20 @@ def _fake_zone(name: str = "The Emerald Halls", with_bosses: bool = True) -> dic
         "bosses": (
             [
                 {
+                    "id": 1,
                     "encounter_name": "Prince Thirneg",
                     "position": 1,
                     "stage": "First Floor",
                     "wiki_url": None,
-                    "mobs": [{"mob_name": "Prince Thirneg", "position": 0}],
+                    "mobs": [{"id": 1, "mob_name": "Prince Thirneg", "position": 0}],
                 },
                 {
+                    "id": 2,
                     "encounter_name": "Wuoshi",
                     "position": 13,
                     "stage": "Third Floor",
                     "wiki_url": None,
-                    "mobs": [{"mob_name": "Wuoshi", "position": 0}],
+                    "mobs": [{"id": 2, "mob_name": "Wuoshi", "position": 0}],
                 },
             ]
             if with_bosses
@@ -80,7 +82,7 @@ async def test_get_zone_returns_hydrated_payload(app):
     first = data["bosses"][0]
     assert first["encounter_name"] == "Prince Thirneg"
     assert first["stage"] == "First Floor"
-    assert first["mobs"] == [{"mob_name": "Prince Thirneg", "position": 0}]
+    assert first["mobs"] == [{"id": 1, "mob_name": "Prince Thirneg", "position": 0}]
 
 
 @pytest.mark.asyncio
