@@ -28,6 +28,37 @@ if not _ADMIN_IDS:
     )
 
 
+def _is_allowed_return_host(host: str | None) -> bool:
+    """True if `host` is the configured parent domain or one of its subdomains.
+
+    Discord OAuth requires a single pre-registered ``redirect_uri``, so the
+    callback always lands on the parent domain regardless of which subdomain
+    the user started on. To send them back where they came from we stash the
+    originating host in the session — but only if it's one we trust, to
+    prevent an open-redirect that abuses the post-callback hop.
+
+    In prod, the parent comes from ``SESSION_COOKIE_DOMAIN`` (e.g.
+    ``.eq2lexicon.com``). In dev that env var is unset; we accept localhost
+    so a dev redirect doesn't blank out the test loop."""
+    if not host:
+        return False
+    host = host.split(":")[0].strip().lower()  # strip port
+    parent = os.getenv("SESSION_COOKIE_DOMAIN", "").lstrip(".").lower().strip()
+    if not parent:
+        return host in ("localhost", "127.0.0.1")
+    return host == parent or host.endswith("." + parent)
+
+
+def _post_login_redirect(return_host: str | None, target: str) -> RedirectResponse:
+    """Build the post-callback redirect. If we stashed a valid originating
+    host at login time, redirect to it absolutely so the browser crosses
+    back to the subdomain; otherwise a relative ``/`` keeps the user on
+    whichever domain the callback fired on (parent in prod, localhost in dev)."""
+    if _is_allowed_return_host(return_host):
+        return RedirectResponse(f"https://{return_host}{target}")
+    return RedirectResponse(target)
+
+
 class UserResponse(BaseModel):
     id: str
     username: str
@@ -48,6 +79,14 @@ async def login(request: Request) -> RedirectResponse:
     """Redirect the browser to Discord's OAuth2 authorisation page."""
     state = secrets.token_urlsafe(16)
     request.session["oauth_state"] = state
+    # Remember which subdomain the user started on so the callback can send
+    # them back. The session cookie spans the parent domain (see
+    # SESSION_COOKIE_DOMAIN), so this survives Discord's hop to the
+    # eq2lexicon.com callback. Untrusted hosts (not under our parent) are
+    # ignored — the callback then falls back to a relative redirect.
+    origin_host = request.url.hostname
+    if _is_allowed_return_host(origin_host):
+        request.session["return_host"] = origin_host
     params = urlencode(
         {
             "client_id": DISCORD_CLIENT_ID,
@@ -64,6 +103,7 @@ async def login(request: Request) -> RedirectResponse:
 async def callback(code: str, state: str | None = None, *, request: Request) -> RedirectResponse:
     """Exchange the OAuth2 code for a token, fetch user info, store in session."""
     expected_state = request.session.pop("oauth_state", None)
+    return_host = request.session.pop("return_host", None)
     if not expected_state or state != expected_state:
         raise HTTPException(status_code=400, detail="Invalid OAuth state — please try logging in again")
 
@@ -109,10 +149,10 @@ async def callback(code: str, state: str | None = None, *, request: Request) -> 
     )
 
     # Approved users go straight to the app; others land on an access page
-    # so the frontend can show the appropriate message.
-    if access_status == "approved":
-        return RedirectResponse("/")
-    return RedirectResponse(f"/?access={access_status}")
+    # so the frontend can show the appropriate message. Either way, send them
+    # back to the subdomain they started on (if we stashed one and trust it).
+    target = "/" if access_status == "approved" else f"/?access={access_status}"
+    return _post_login_redirect(return_host, target)
 
 
 @router.get("/auth/me", response_model=UserResponse)
