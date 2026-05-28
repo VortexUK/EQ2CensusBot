@@ -1,10 +1,12 @@
 # Litestream — continuous replication of the SQLite DBs to Cloudflare R2.
 #
-# Three databases are backed up: the parses corpus (parses.db), the
-# Discord/claims/api_tokens store (users.db), and the zone/boss-roster
-# catalogue (zones.db). All live on the persistent Railway volume mounted at
-# /app/data; without off-volume backup, a Railway volume failure or
-# accidental wipe is unrecoverable.
+# Four databases are backed up: the parses corpus (parses.db), the
+# Discord/claims/api_tokens store (users.db), the zone/boss-roster
+# catalogue (zones.db), and the raid strategy/triggers/timers store
+# (raids.db — strategy markdown is hand-edited and revision-tracked, so
+# losing it on a volume wipe would erase audit history). All live on the
+# persistent Railway volume mounted at /app/data; without off-volume
+# backup, a Railway volume failure or accidental wipe is unrecoverable.
 #
 # Configuration via env vars (set in Railway → Variables):
 #   R2_ENDPOINT          https://<account>.r2.cloudflarestorage.com
@@ -51,6 +53,19 @@ dbs:
         endpoint: ${R2_ENDPOINT}
         bucket: ${R2_BUCKET}
         path: zones
+        access-key-id: ${R2_ACCESS_KEY_ID}
+        secret-access-key: ${R2_SECRET_ACCESS_KEY}
+        region: auto
+        retention: 168h
+        retention-check-interval: 24h
+        snapshot-interval: 24h
+
+  - path: /app/data/raids/raids.db
+    replicas:
+      - type: s3
+        endpoint: ${R2_ENDPOINT}
+        bucket: ${R2_BUCKET}
+        path: raids
         access-key-id: ${R2_ACCESS_KEY_ID}
         secret-access-key: ${R2_SECRET_ACCESS_KEY}
         region: auto
