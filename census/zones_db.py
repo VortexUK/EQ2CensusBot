@@ -817,8 +817,10 @@ def update_encounter(
         if zone_name is not None:
             from census import raids_db as _raids_db
 
-            with sqlite3.connect(_raids_db.DB_PATH) as rconn:
-                rconn.execute("PRAGMA foreign_keys = ON;")
+            # init_db is idempotent and ensures the raids_db schema exists
+            # even on a fresh deploy / fresh test env where raids.db has no
+            # tables yet — without this the mirror call hits "no such table".
+            with _raids_db.init_db() as rconn:
                 _raids_db.rename_raid_encounter_if_exists(
                     rconn,
                     zone_name=zone_name,
@@ -882,8 +884,8 @@ def reorder_encounters(
         return
     from census import raids_db as _raids_db
 
-    with sqlite3.connect(_raids_db.DB_PATH) as rconn:
-        rconn.execute("PRAGMA foreign_keys = ON;")
+    # init_db is idempotent and self-heals a fresh raids.db (CI/test env).
+    with _raids_db.init_db() as rconn:
         for new_pos, enc_id in enumerate(ordered_encounter_ids, start=1):
             name, _old_pos = current[enc_id]
             _raids_db.update_raid_encounter_if_exists(
@@ -930,8 +932,8 @@ def _mirror_primary_rename(encounter_id: int, old_name: str, new_name: str, path
         return
     from census import raids_db as _raids_db
 
-    with sqlite3.connect(_raids_db.DB_PATH) as rconn:
-        rconn.execute("PRAGMA foreign_keys = ON;")
+    # init_db is idempotent and self-heals a fresh raids.db (CI/test env).
+    with _raids_db.init_db() as rconn:
         _raids_db.rename_raid_encounter_if_exists(
             rconn,
             zone_name=zone_name,
@@ -1174,8 +1176,8 @@ def delete_encounter(encounter_id: int, path: Path = DB_PATH) -> bool:
     if zone_name is not None:
         from census import raids_db as _raids_db
 
-        with sqlite3.connect(_raids_db.DB_PATH) as rconn:
-            rconn.execute("PRAGMA foreign_keys = ON;")
+        # init_db is idempotent and self-heals a fresh raids.db (CI/test env).
+        with _raids_db.init_db() as rconn:
             _raids_db.delete_raid_encounter_by_zone_mob(rconn, zone_name=zone_name, mob_name=row["encounter_name"])
             rconn.commit()
     return True
