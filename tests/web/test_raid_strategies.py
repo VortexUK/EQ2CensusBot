@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from web import db as users_db
+
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
@@ -510,3 +512,163 @@ async def test_put_strategy_unknown_encounter_is_404(app):
                 json={"markdown": "hello"},
             )
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Editor name enrichment
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_revisions_enriches_edited_by_name_for_known_user(app):
+    """When the editor's discord_id is in the users table, edited_by_name is
+    populated on every RevisionEntry for that user."""
+    # Seed the user into the test DB so get_display_names_for_discord_ids finds them.
+    _path = users_db.DB_PATH
+    await users_db.upsert_user(
+        discord_id="admin-known",
+        discord_name="Knowledgeable Admin",
+        discord_username="kadmin",
+        avatar=None,
+        path=_path,
+    )
+
+    fake_revisions = [
+        {
+            "id": 1,
+            "encounter_id": 1,
+            "edited_at": 1716000000,
+            "edited_by": "admin-known",
+            "before_md": None,
+            "after_md": "v1",
+            "edit_note": "initial",
+        },
+    ]
+    with (
+        patch("web.routes.raid_strategies.zones_db.find_by_name", return_value=_fake_zone()),
+        patch("web.routes.raid_strategies._read_revisions_sync", return_value=fake_revisions),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/zones/The Emerald Halls/encounters/1/strategy/revisions")
+
+    assert r.status_code == 200
+    revs = r.json()["revisions"]
+    assert len(revs) == 1
+    assert revs[0]["edited_by"] == "admin-known"
+    assert revs[0]["edited_by_name"] == "Knowledgeable Admin"
+
+
+@pytest.mark.asyncio
+async def test_get_revisions_edited_by_name_none_for_eq2i_scrape(app):
+    """'eq2i_scrape' is a source token, not a discord_id.
+    edited_by_name must be None — the frontend fmtEditor handles the label."""
+    fake_revisions = [
+        {
+            "id": 1,
+            "encounter_id": 1,
+            "edited_at": 1716000000,
+            "edited_by": "eq2i_scrape",
+            "before_md": None,
+            "after_md": "scraped content",
+            "edit_note": None,
+        },
+    ]
+    with (
+        patch("web.routes.raid_strategies.zones_db.find_by_name", return_value=_fake_zone()),
+        patch("web.routes.raid_strategies._read_revisions_sync", return_value=fake_revisions),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/zones/The Emerald Halls/encounters/1/strategy/revisions")
+
+    assert r.status_code == 200
+    revs = r.json()["revisions"]
+    assert revs[0]["edited_by"] == "eq2i_scrape"
+    assert revs[0]["edited_by_name"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_revisions_edited_by_name_none_for_unknown_id(app):
+    """An id that isn't in the users table → edited_by_name stays None."""
+    fake_revisions = [
+        {
+            "id": 1,
+            "encounter_id": 1,
+            "edited_at": 1716000000,
+            "edited_by": "9999999999999999999",
+            "before_md": None,
+            "after_md": "mystery edit",
+            "edit_note": None,
+        },
+    ]
+    with (
+        patch("web.routes.raid_strategies.zones_db.find_by_name", return_value=_fake_zone()),
+        patch("web.routes.raid_strategies._read_revisions_sync", return_value=fake_revisions),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/zones/The Emerald Halls/encounters/1/strategy/revisions")
+
+    assert r.status_code == 200
+    revs = r.json()["revisions"]
+    assert revs[0]["edited_by_name"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_strategy_response_includes_last_edited_by_name(app):
+    """StrategyResponse now carries last_edited_by_name resolved from users."""
+    _path = users_db.DB_PATH
+    await users_db.upsert_user(
+        discord_id="editor-555",
+        discord_name="Templar Guildmaster",
+        discord_username="tguild",
+        avatar=None,
+        path=_path,
+    )
+    with (
+        patch("web.routes.raid_strategies.zones_db.find_by_name", return_value=_fake_zone()),
+        patch(
+            "web.routes.raid_strategies._read_strategy_sync",
+            return_value={
+                "id": 1,
+                "mob_name": "Prince Thirneg",
+                "position": 1,
+                "strategy_md": "## Tactics\n\nDPS race.",
+                "source": "manual",
+                "last_edited_at": 1716000000,
+                "last_edited_by": "editor-555",
+            },
+        ),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/zones/The Emerald Halls/encounters/1/strategy")
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["last_edited_by"] == "editor-555"
+    assert data["last_edited_by_name"] == "Templar Guildmaster"
+
+
+@pytest.mark.asyncio
+async def test_get_strategy_last_edited_by_name_none_for_scrape(app):
+    """'eq2i_scrape' in last_edited_by → last_edited_by_name is None."""
+    with (
+        patch("web.routes.raid_strategies.zones_db.find_by_name", return_value=_fake_zone()),
+        patch(
+            "web.routes.raid_strategies._read_strategy_sync",
+            return_value={
+                "id": 1,
+                "mob_name": "Prince Thirneg",
+                "position": 1,
+                "strategy_md": "scraped content",
+                "source": "scrape",
+                "last_edited_at": 1716000000,
+                "last_edited_by": "eq2i_scrape",
+            },
+        ),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            r = await client.get("/api/zones/The Emerald Halls/encounters/1/strategy")
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["last_edited_by"] == "eq2i_scrape"
+    assert data["last_edited_by_name"] is None

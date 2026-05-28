@@ -40,6 +40,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from census import raids_db, zones_db
+from web import db as users_db
 from web.auth_deps import require_editor
 from web.cache import character_cache
 from web.db import get_active_claims
@@ -87,6 +88,7 @@ class StrategyResponse(BaseModel):
     markdown: str
     last_edited_at: int | None = None
     last_edited_by: str | None = None
+    last_edited_by_name: str | None = None
     source: str  # SOURCE_SCRAPE / SOURCE_MANUAL
 
 
@@ -105,6 +107,7 @@ class RevisionEntry(BaseModel):
     id: int
     edited_at: int
     edited_by: str
+    edited_by_name: str | None = None
     before_md: str | None
     after_md: str
     edit_note: str | None
@@ -128,6 +131,7 @@ class ZoneOverviewResponse(BaseModel):
     markdown: str
     last_edited_at: int | None = None
     last_edited_by: str | None = None
+    last_edited_by_name: str | None = None
     source: str  # SOURCE_SCRAPE / SOURCE_MANUAL
 
 
@@ -339,6 +343,23 @@ def _write_strategy_sync(
 
 
 # ---------------------------------------------------------------------------
+# Editor name resolution
+# ---------------------------------------------------------------------------
+
+
+async def _resolve_editor_name(edited_by: str | None) -> str | None:
+    """Look up the display name for a single ``edited_by`` value.
+
+    Returns None for falsy input or non-discord-id tokens (e.g.
+    ``'eq2i_scrape'``, ``'unknown'``) — the frontend formatter handles those
+    as special-cased labels."""
+    if not edited_by:
+        return None
+    names = await users_db.get_display_names_for_discord_ids([edited_by])
+    return names.get(edited_by)
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -362,6 +383,7 @@ async def get_strategy(zone_name: str, position: int) -> StrategyResponse:
     if row is None:
         raise HTTPException(status_code=404, detail="No strategy yet")
 
+    editor_name = await _resolve_editor_name(row["last_edited_by"])
     return StrategyResponse(
         zone_name=canonical_zone,
         encounter_name=encounter_name,
@@ -369,6 +391,7 @@ async def get_strategy(zone_name: str, position: int) -> StrategyResponse:
         markdown=row["strategy_md"] or "",
         last_edited_at=row["last_edited_at"],
         last_edited_by=row["last_edited_by"],
+        last_edited_by_name=editor_name,
         source=row["source"],
     )
 
@@ -415,13 +438,16 @@ async def put_strategy(
         ),
     )
 
+    last_edited_by = row.get("last_edited_by")
+    editor_name = await _resolve_editor_name(last_edited_by)
     return StrategyResponse(
         zone_name=canonical_zone,
         encounter_name=encounter_name,
         position=position,
         markdown=row.get("strategy_md") or body.markdown,
         last_edited_at=row.get("last_edited_at"),
-        last_edited_by=row.get("last_edited_by"),
+        last_edited_by=last_edited_by,
+        last_edited_by_name=editor_name,
         source=row.get("source") or raids_db.SOURCE_MANUAL,
     )
 
@@ -444,6 +470,11 @@ async def get_strategy_revisions(zone_name: str, position: int) -> RevisionListR
     canonical_zone, encounter_name = resolved
 
     rows = await loop.run_in_executor(None, _read_revisions_sync, canonical_zone, encounter_name)
+
+    # Batch-resolve display names for all unique editor ids in one DB call.
+    unique_ids = list({r["edited_by"] for r in rows if r.get("edited_by")})
+    names = await users_db.get_display_names_for_discord_ids(unique_ids)
+
     return RevisionListResponse(
         zone_name=canonical_zone,
         encounter_name=encounter_name,
@@ -453,6 +484,7 @@ async def get_strategy_revisions(zone_name: str, position: int) -> RevisionListR
                 id=r["id"],
                 edited_at=r["edited_at"],
                 edited_by=r["edited_by"],
+                edited_by_name=names.get(r["edited_by"]),
                 before_md=r["before_md"],
                 after_md=r["after_md"],
                 edit_note=r["edit_note"],
@@ -486,11 +518,13 @@ async def get_zone_overview(zone_name: str) -> ZoneOverviewResponse:
     if row is None:
         raise HTTPException(status_code=404, detail="No overview yet")
 
+    editor_name = await _resolve_editor_name(row["last_edited_by"])
     return ZoneOverviewResponse(
         zone_name=canonical,
         markdown=row["overview_md"] or "",
         last_edited_at=row["last_edited_at"],
         last_edited_by=row["last_edited_by"],
+        last_edited_by_name=editor_name,
         source=row["source"],
     )
 
@@ -525,10 +559,13 @@ async def put_zone_overview(
         ),
     )
 
+    last_edited_by = row.get("last_edited_by")
+    editor_name = await _resolve_editor_name(last_edited_by)
     return ZoneOverviewResponse(
         zone_name=canonical,
         markdown=row.get("overview_md") or body.markdown,
         last_edited_at=row.get("last_edited_at"),
-        last_edited_by=row.get("last_edited_by"),
+        last_edited_by=last_edited_by,
+        last_edited_by_name=editor_name,
         source=row.get("source") or raids_db.SOURCE_MANUAL,
     )

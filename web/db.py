@@ -381,6 +381,25 @@ async def get_user_access_status(discord_id: str, path: Path = DB_PATH) -> str:
     return row["access_status"] if row else "pending"
 
 
+async def get_display_names_for_discord_ids(ids: list[str], path: Path = DB_PATH) -> dict[str, str]:
+    """Return {discord_id: discord_name} for every id present in users.
+
+    Missing/empty input returns {}. Non-discord-id tokens (e.g.
+    'eq2i_scrape', 'unknown') are silently absent from the result —
+    callers handle the fallback display."""
+    if not ids:
+        return {}
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        placeholders = ",".join("?" for _ in ids)
+        async with db.execute(
+            f"SELECT discord_id, discord_name FROM users WHERE discord_id IN ({placeholders})",
+            ids,
+        ) as cur:
+            rows = await cur.fetchall()
+    return {r["discord_id"]: r["discord_name"] for r in rows}
+
+
 async def list_pending_users(path: Path = DB_PATH) -> list[dict]:
     """Return all users with access_status = 'pending', newest first."""
     async with aiosqlite.connect(path) as db:

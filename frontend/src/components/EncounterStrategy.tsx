@@ -15,6 +15,7 @@ interface StrategyResponse {
   markdown: string
   last_edited_at: number | null
   last_edited_by: string | null
+  last_edited_by_name?: string | null
   source: string
 }
 
@@ -22,6 +23,7 @@ interface RevisionEntry {
   id: number
   edited_at: number
   edited_by: string
+  edited_by_name?: string | null
   before_md: string | null
   after_md: string
   edit_note: string | null
@@ -39,6 +41,14 @@ interface Props {
   position: number
   /** Fallback wiki URL surfaced in the empty-state copy when there's no strategy. */
   wikiUrl: string | null
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmtEditor(name: string | null | undefined, raw: string): string {
+  if (raw === 'eq2i_scrape') return 'EQ2i Wiki Scrape'
+  if (raw === 'unknown') return 'Unknown'
+  return name && name.trim() ? name : raw
 }
 
 // ── Markdown styling ──────────────────────────────────────────────────────────
@@ -245,7 +255,7 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
             {data.last_edited_at ? (
               <p className="text-text-muted">
                 Edited {fmtRelative(data.last_edited_at)}
-                {data.last_edited_by ? ` · ${data.last_edited_by}` : ''}
+                {data.last_edited_by ? ` · ${fmtEditor(data.last_edited_by_name, data.last_edited_by)}` : ''}
               </p>
             ) : <span />}
             <button
@@ -437,7 +447,9 @@ function RevisionRow({ revision, isCurrent }: RevisionRowProps) {
             <span className="text-text-muted"> · {revision.edit_note}</span>
           )}
         </span>
-        <span className="text-text-muted text-[0.72rem] shrink-0">{revision.edited_by}</span>
+        <span className="text-text-muted text-[0.72rem] shrink-0">
+          {fmtEditor(revision.edited_by_name, revision.edited_by)}
+        </span>
       </button>
       {open && (
         <div className="px-3 pb-3 pt-1 border-t border-border/60 bg-bg/40 text-text text-[0.92rem]">
