@@ -190,3 +190,128 @@ def test_reorder_encounters_rejects_duplicates(tmp_path):
     b = zones_db.add_encounter(zid, primary_mob="B", path=p)
     with _pytest.raises(ValueError):
         zones_db.reorder_encounters(zid, [a["id"], a["id"], b["id"]], path=p)
+
+
+def test_add_mob_appends_sibling(tmp_path):
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    enc = zones_db.add_encounter(zid, primary_mob="Primary", path=p)
+    sib = zones_db.add_mob(enc["id"], mob_name="Sibling", path=p)
+    assert sib["position"] == 1
+    enc2 = zones_db.add_mob(enc["id"], mob_name="Third", path=p)
+    assert enc2["position"] == 2
+
+
+def test_add_mob_make_primary_shifts_old_primary(tmp_path):
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    enc = zones_db.add_encounter(zid, primary_mob="OldPrimary", path=p)
+    zones_db.add_mob(enc["id"], mob_name="NewPrimary", make_primary=True, path=p)
+    with sqlite3.connect(p) as conn:
+        mobs = [
+            (r[0], r[1])
+            for r in conn.execute(
+                "SELECT mob_name, position FROM zone_encounter_mobs WHERE encounter_id = ? ORDER BY position",
+                (enc["id"],),
+            )
+        ]
+    assert mobs[0] == ("NewPrimary", 0)
+    assert ("OldPrimary", 1) in mobs
+    with sqlite3.connect(p) as conn:
+        name = conn.execute("SELECT encounter_name FROM zone_encounters WHERE id = ?", (enc["id"],)).fetchone()[0]
+    assert name == "NewPrimary"
+
+
+def test_update_mob_renames_primary_updates_encounter_name(tmp_path):
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    enc = zones_db.add_encounter(zid, primary_mob="Primary", path=p)
+    sib = zones_db.add_mob(enc["id"], mob_name="Sibling", path=p)
+    primary_id = next(m["id"] for m in zones_db.list_mobs(enc["id"], path=p) if m["position"] == 0)
+    zones_db.update_mob(primary_id, mob_name="Renamed", path=p)
+    with sqlite3.connect(p) as conn:
+        assert (
+            conn.execute(
+                "SELECT encounter_name FROM zone_encounters WHERE id = ?",
+                (enc["id"],),
+            ).fetchone()[0]
+            == "Renamed"
+        )
+    # Renaming a sibling must NOT touch encounter_name
+    zones_db.update_mob(sib["id"], mob_name="SibRenamed", path=p)
+    with sqlite3.connect(p) as conn:
+        assert (
+            conn.execute(
+                "SELECT encounter_name FROM zone_encounters WHERE id = ?",
+                (enc["id"],),
+            ).fetchone()[0]
+            == "Renamed"
+        )
+
+
+def test_promote_mob_swaps_with_primary(tmp_path):
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    enc = zones_db.add_encounter(zid, primary_mob="Primary", path=p)
+    sib = zones_db.add_mob(enc["id"], mob_name="Sibling", path=p)
+    zones_db.promote_mob(sib["id"], path=p)
+    with sqlite3.connect(p) as conn:
+        mobs = [
+            (r[0], r[1])
+            for r in conn.execute(
+                "SELECT mob_name, position FROM zone_encounter_mobs WHERE encounter_id = ? ORDER BY position",
+                (enc["id"],),
+            )
+        ]
+        name = conn.execute("SELECT encounter_name FROM zone_encounters WHERE id = ?", (enc["id"],)).fetchone()[0]
+    assert mobs == [("Sibling", 0), ("Primary", 1)]
+    assert name == "Sibling"
+
+
+def test_promote_mob_noop_when_already_primary(tmp_path):
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    enc = zones_db.add_encounter(zid, primary_mob="OnlyOne", path=p)
+    primary_id = next(m["id"] for m in zones_db.list_mobs(enc["id"], path=p) if m["position"] == 0)
+    result = zones_db.promote_mob(primary_id, path=p)
+    assert result["position"] == 0
+    assert result["mob_name"] == "OnlyOne"
+
+
+def test_delete_mob_refuses_last_mob(tmp_path):
+    import pytest as _pytest
+
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    enc = zones_db.add_encounter(zid, primary_mob="Only", path=p)
+    only_id = next(m["id"] for m in zones_db.list_mobs(enc["id"], path=p) if m["position"] == 0)
+    with _pytest.raises(ValueError, match="last mob"):
+        zones_db.delete_mob(only_id, path=p)
+
+
+def test_delete_mob_refuses_primary_while_siblings_exist(tmp_path):
+    import pytest as _pytest
+
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    enc = zones_db.add_encounter(zid, primary_mob="Primary", path=p)
+    zones_db.add_mob(enc["id"], mob_name="Sibling", path=p)
+    primary_id = next(m["id"] for m in zones_db.list_mobs(enc["id"], path=p) if m["position"] == 0)
+    with _pytest.raises(ValueError, match="primary"):
+        zones_db.delete_mob(primary_id, path=p)
+
+
+def test_delete_mob_sibling_succeeds(tmp_path):
+    p = tmp_path / "zones.db"
+    zid = _bootstrap_zone(p)
+    enc = zones_db.add_encounter(zid, primary_mob="Primary", path=p)
+    sib = zones_db.add_mob(enc["id"], mob_name="Sibling", path=p)
+    assert zones_db.delete_mob(sib["id"], path=p) is True
+    mobs = zones_db.list_mobs(enc["id"], path=p)
+    assert [m["mob_name"] for m in mobs] == ["Primary"]
+
+
+def test_delete_mob_missing_returns_false(tmp_path):
+    p = tmp_path / "zones.db"
+    zones_db.init_db(p)
+    assert zones_db.delete_mob(99999, path=p) is False

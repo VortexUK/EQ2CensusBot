@@ -893,6 +893,266 @@ def reorder_encounters(
         rconn.commit()
 
 
+# ---------------------------------------------------------------------------
+# Mob helpers (position 0 = primary; positions 1..N = siblings)
+# ---------------------------------------------------------------------------
+
+
+def list_mobs(encounter_id: int, path: Path = DB_PATH) -> list[dict]:
+    """All mobs for an encounter, ordered by position. Each row is
+    {id, mob_name, position}."""
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        return [
+            {"id": r["id"], "mob_name": r["mob_name"], "position": r["position"]}
+            for r in conn.execute(
+                "SELECT id, mob_name, position FROM zone_encounter_mobs WHERE encounter_id = ? ORDER BY position ASC",
+                (encounter_id,),
+            )
+        ]
+
+
+def _mirror_primary_rename(encounter_id: int, old_name: str, new_name: str, path: Path) -> None:
+    """If the parent encounter's zone has a raid_encounters mirror row
+    keyed by (zone_name, old_name), rename it to new_name. Looks up the
+    zone from the encounter row."""
+    if old_name == new_name:
+        return
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT zone_id FROM zone_encounters WHERE id = ?", (encounter_id,)).fetchone()
+        if row is None:
+            return
+        zone_name, _exp = _zone_name_and_expansion(row["zone_id"], path)
+    if zone_name is None:
+        return
+    from census import raids_db as _raids_db
+
+    with sqlite3.connect(_raids_db.DB_PATH) as rconn:
+        rconn.execute("PRAGMA foreign_keys = ON;")
+        _raids_db.rename_raid_encounter_if_exists(
+            rconn,
+            zone_name=zone_name,
+            old_mob_name=old_name,
+            new_mob_name=new_name,
+        )
+        rconn.commit()
+
+
+def add_mob(
+    encounter_id: int,
+    *,
+    mob_name: str,
+    make_primary: bool = False,
+    path: Path = DB_PATH,
+) -> dict:
+    """Add a mob to an encounter. By default appends as a sibling at the
+    next available position. With make_primary=True, shifts every existing
+    mob down by 1 and inserts the new mob at position 0, then updates the
+    parent encounter_name to the new primary (mirrored to raids_db)."""
+    old_primary_name: str | None = None
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;")
+        with conn:
+            if make_primary:
+                # Capture the current primary's name BEFORE the shift, so
+                # we know what to rename in raids_db.
+                primary = conn.execute(
+                    "SELECT mob_name FROM zone_encounter_mobs WHERE encounter_id = ? AND position = 0",
+                    (encounter_id,),
+                ).fetchone()
+                if primary is not None:
+                    old_primary_name = primary["mob_name"]
+                # Two-phase shift of existing mobs down by 1 (negative
+                # sentinels avoid the would-be UNIQUE collision if we ever
+                # add one on (encounter_id, position); harmless either way).
+                conn.execute(
+                    "UPDATE zone_encounter_mobs SET position = -position - 1 WHERE encounter_id = ?",
+                    (encounter_id,),
+                )
+                conn.execute(
+                    "UPDATE zone_encounter_mobs SET position = -position WHERE encounter_id = ?",
+                    (encounter_id,),
+                )
+                cur = conn.execute(
+                    "INSERT INTO zone_encounter_mobs "
+                    "(encounter_id, mob_name, mob_name_lower, position) "
+                    "VALUES (?, ?, ?, 0)",
+                    (encounter_id, mob_name, mob_name.lower()),
+                )
+                new_id = cur.lastrowid
+                conn.execute(
+                    "UPDATE zone_encounters SET encounter_name = ? WHERE id = ?",
+                    (mob_name, encounter_id),
+                )
+            else:
+                next_pos = conn.execute(
+                    "SELECT COALESCE(MAX(position), -1) + 1 FROM zone_encounter_mobs WHERE encounter_id = ?",
+                    (encounter_id,),
+                ).fetchone()[0]
+                cur = conn.execute(
+                    "INSERT INTO zone_encounter_mobs "
+                    "(encounter_id, mob_name, mob_name_lower, position) "
+                    "VALUES (?, ?, ?, ?)",
+                    (encounter_id, mob_name, mob_name.lower(), next_pos),
+                )
+                new_id = cur.lastrowid
+        row = conn.execute(
+            "SELECT id, mob_name, position FROM zone_encounter_mobs WHERE id = ?",
+            (new_id,),
+        ).fetchone()
+        result = {
+            "id": row["id"],
+            "mob_name": row["mob_name"],
+            "position": row["position"],
+        }
+    if make_primary and old_primary_name is not None:
+        _mirror_primary_rename(encounter_id, old_primary_name, mob_name, path)
+    return result
+
+
+def update_mob(mob_id: int, *, mob_name: str, path: Path = DB_PATH) -> dict:
+    """Rename a mob. If it's at position 0 (the primary), also updates the
+    parent encounter_name so the two stay in sync, and mirrors the rename
+    onto raids_db.raid_encounters (if a row exists there)."""
+    encounter_id_for_mirror: int | None = None
+    old_name: str | None = None
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;")
+        row = conn.execute(
+            "SELECT encounter_id, mob_name, position FROM zone_encounter_mobs WHERE id = ?",
+            (mob_id,),
+        ).fetchone()
+        if row is None:
+            raise LookupError(f"zone_encounter_mob {mob_id} not found")
+        if row["position"] == 0:
+            encounter_id_for_mirror = row["encounter_id"]
+            old_name = row["mob_name"]
+        with conn:
+            conn.execute(
+                "UPDATE zone_encounter_mobs SET mob_name = ?, mob_name_lower = ? WHERE id = ?",
+                (mob_name, mob_name.lower(), mob_id),
+            )
+            if row["position"] == 0:
+                conn.execute(
+                    "UPDATE zone_encounters SET encounter_name = ? WHERE id = ?",
+                    (mob_name, row["encounter_id"]),
+                )
+        out = conn.execute(
+            "SELECT id, mob_name, position FROM zone_encounter_mobs WHERE id = ?",
+            (mob_id,),
+        ).fetchone()
+        result = {
+            "id": out["id"],
+            "mob_name": out["mob_name"],
+            "position": out["position"],
+        }
+    if encounter_id_for_mirror is not None and old_name is not None:
+        _mirror_primary_rename(encounter_id_for_mirror, old_name, mob_name, path)
+    return result
+
+
+def promote_mob(mob_id: int, path: Path = DB_PATH) -> dict:
+    """Swap a sibling with the current primary (position 0). No-op if the
+    mob is already primary. Updates the parent encounter_name to the new
+    primary and mirrors the rename onto raids_db."""
+    encounter_id_for_mirror: int | None = None
+    old_name: str | None = None
+    new_name: str | None = None
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;")
+        row = conn.execute(
+            "SELECT id, encounter_id, mob_name, position FROM zone_encounter_mobs WHERE id = ?",
+            (mob_id,),
+        ).fetchone()
+        if row is None:
+            raise LookupError(f"zone_encounter_mob {mob_id} not found")
+        if row["position"] == 0:
+            return {"id": row["id"], "mob_name": row["mob_name"], "position": 0}
+        primary = conn.execute(
+            "SELECT id, mob_name FROM zone_encounter_mobs WHERE encounter_id = ? AND position = 0",
+            (row["encounter_id"],),
+        ).fetchone()
+        if primary is None:
+            # Shouldn't happen if invariants hold, but defensively: just move
+            # this mob to position 0 with no swap.
+            with conn:
+                conn.execute(
+                    "UPDATE zone_encounter_mobs SET position = 0 WHERE id = ?",
+                    (mob_id,),
+                )
+                conn.execute(
+                    "UPDATE zone_encounters SET encounter_name = ? WHERE id = ?",
+                    (row["mob_name"], row["encounter_id"]),
+                )
+            return {"id": row["id"], "mob_name": row["mob_name"], "position": 0}
+        encounter_id_for_mirror = row["encounter_id"]
+        old_name = primary["mob_name"]
+        new_name = row["mob_name"]
+        with conn:
+            # Park the old primary at -1 (sentinel), promote the sibling
+            # to 0, then move the old primary into the sibling's old slot.
+            conn.execute(
+                "UPDATE zone_encounter_mobs SET position = -1 WHERE id = ?",
+                (primary["id"],),
+            )
+            conn.execute(
+                "UPDATE zone_encounter_mobs SET position = 0 WHERE id = ?",
+                (mob_id,),
+            )
+            conn.execute(
+                "UPDATE zone_encounter_mobs SET position = ? WHERE id = ?",
+                (row["position"], primary["id"]),
+            )
+            conn.execute(
+                "UPDATE zone_encounters SET encounter_name = ? WHERE id = ?",
+                (row["mob_name"], row["encounter_id"]),
+            )
+        out = conn.execute(
+            "SELECT id, mob_name, position FROM zone_encounter_mobs WHERE id = ?",
+            (mob_id,),
+        ).fetchone()
+        result = {
+            "id": out["id"],
+            "mob_name": out["mob_name"],
+            "position": out["position"],
+        }
+    if encounter_id_for_mirror is not None and old_name is not None and new_name is not None:
+        _mirror_primary_rename(encounter_id_for_mirror, old_name, new_name, path)
+    return result
+
+
+def delete_mob(mob_id: int, path: Path = DB_PATH) -> bool:
+    """Delete a mob. Refuses with ValueError when it's the only mob in the
+    encounter (an encounter needs >= 1 mob) or when it's the primary while
+    siblings exist (the user must promote a sibling first so encounter_name
+    has somewhere to point). Returns False if the mob_id is not found, True
+    on successful delete."""
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;")
+        row = conn.execute(
+            "SELECT id, encounter_id, position FROM zone_encounter_mobs WHERE id = ?",
+            (mob_id,),
+        ).fetchone()
+        if row is None:
+            return False
+        total = conn.execute(
+            "SELECT COUNT(*) FROM zone_encounter_mobs WHERE encounter_id = ?",
+            (row["encounter_id"],),
+        ).fetchone()[0]
+        if total <= 1:
+            raise ValueError("cannot delete the last mob of an encounter")
+        if row["position"] == 0:
+            raise ValueError("cannot delete the primary mob while siblings exist; promote a sibling to primary first")
+        conn.execute("DELETE FROM zone_encounter_mobs WHERE id = ?", (mob_id,))
+        conn.commit()
+        return True
+
+
 def delete_encounter(encounter_id: int, path: Path = DB_PATH) -> bool:
     """Delete an encounter. Cascades zone_encounter_mobs via FK; cascades the
     matching raids_db row (if any) which itself cascades triggers/timers/
