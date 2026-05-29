@@ -723,9 +723,9 @@ function GeneralBanner({ char }: { char: Character }) {
   ]
 
   return (
-    <Card className="rounded-[6px] px-4 py-2 flex items-stretch">
+    <Card className="rounded-[6px] px-4 py-2 flex flex-wrap items-stretch gap-y-2">
       {/* Identity: name + subtitle, separated by a divider */}
-      <div className="pr-5 mr-5 border-r border-border flex flex-col justify-center shrink-0">
+      <div className="w-full md:w-auto md:pr-5 md:mr-5 md:border-r border-border flex flex-col justify-center shrink-0">
         <div
           className="font-heading text-[1.6rem] font-bold leading-[1.2] tracking-[0.04em] inline-block"
           style={{
@@ -957,6 +957,17 @@ function SlotRow({ label, item, iconSide, onShow, onHide, highlight }: {
                  : highlight === 'adorn'  ? 'rgba(34,255,34,0.22)'
                  : undefined
 
+  // Shared show handler: extracted so onMouseOver AND onClick can both fire it.
+  // onClick gives touch users a tap-to-open path since touch doesn't fire hover.
+  const showHandler = item?.item_id ? (e: React.MouseEvent) => {
+    const adornEl = (e.target as HTMLElement).closest('[data-adorn-id]')
+    if (adornEl) {
+      const adornId = adornEl.getAttribute('data-adorn-id')
+      if (adornId) { onShow(adornId, e); return }
+    }
+    onShow(item.item_id!, e, item.adorn_slots.map(a => ({ color: a.color, bonus: a.ilvl_bonus })))
+  } : undefined
+
   return (
     <div
       className="flex items-center gap-2 border rounded-sm px-[6px] py-1 min-w-0 h-auto min-h-[50px] transition-[background,border-color] duration-[120ms] ease"
@@ -965,14 +976,8 @@ function SlotRow({ label, item, iconSide, onShow, onHide, highlight }: {
         background:   hlBg     ?? 'var(--surface)',
         borderColor:  hlBorder ?? 'var(--border)',
       }}
-      onMouseOver={item?.item_id ? e => {
-        const adornEl = (e.target as HTMLElement).closest('[data-adorn-id]')
-        if (adornEl) {
-          const adornId = adornEl.getAttribute('data-adorn-id')
-          if (adornId) { onShow(adornId, e); return }
-        }
-        onShow(item.item_id!, e, item.adorn_slots.map(a => ({ color: a.color, bonus: a.ilvl_bonus })))
-      } : undefined}
+      onMouseOver={showHandler}
+      onClick={showHandler}
       onMouseLeave={item?.item_id ? onHide : undefined}
     >
       {iconEl}{textEl}

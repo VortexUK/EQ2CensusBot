@@ -344,6 +344,7 @@ export function AATree({ tree, spent }: AATreeProps) {
               onMouseEnter={e => setHovered({ node, tier, mx: e.clientX, my: e.clientY })}
               onMouseMove={e  => setHovered(h => h ? { ...h, mx: e.clientX, my: e.clientY } : null)}
               onMouseLeave={() => setHovered(null)}
+              onClick={e => setHovered({ node, tier, mx: e.clientX, my: e.clientY })}
             >
               {/* Icon circle */}
               <div style={{

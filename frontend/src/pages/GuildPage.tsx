@@ -408,6 +408,7 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
                     key={t}
                     onMouseEnter={count > 0 ? e => showTooltip(e, t, names) : undefined}
                     onMouseLeave={count > 0 ? () => setTooltip(null) : undefined}
+                    onClick={count > 0 ? e => showTooltip(e, t, names) : undefined}
                     className={`${TD_CLS} text-right`}
                     style={{
                       color: count > 0 ? (tc?.text ?? 'var(--text)') : 'var(--text-muted)',
@@ -596,6 +597,7 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
                     key={c}
                     onMouseEnter={missingSlots.length > 0 ? e => showTooltip(e, c, missingSlots) : undefined}
                     onMouseLeave={missingSlots.length > 0 ? () => setTooltip(null) : undefined}
+                    onClick={missingSlots.length > 0 ? e => showTooltip(e, c, missingSlots) : undefined}
                     className={`${TD_CLS} text-right font-medium`}
                     style={{
                       cursor: missingSlots.length > 0 ? 'default' : undefined,

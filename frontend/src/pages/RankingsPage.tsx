@@ -185,7 +185,7 @@ export default function RankingsPage() {
         <p className="text-text-muted">No ranked kills recorded for this boss yet.</p>
       )}
       {!loading && board && board.rows.length > 0 && size && zone && boss && (
-        <Card className="p-0 overflow-hidden">
+        <Card className="p-0 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-text-muted text-left text-[0.72rem] uppercase tracking-wide border-b border-border">

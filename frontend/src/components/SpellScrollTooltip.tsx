@@ -270,6 +270,12 @@ export function SpellTierPip({
     setShowTooltip(false)
   }
 
+  // Touch path: tap opens immediately (no 150ms hover delay).
+  function handleClick(e: MouseEvent<HTMLImageElement>) {
+    setMousePos({ x: e.clientX, y: e.clientY })
+    setShowTooltip(true)
+  }
+
   return (
     <>
       <img
@@ -280,6 +286,7 @@ export function SpellTierPip({
         onMouseEnter={handleMouseEnter}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
       />
       {showTooltip && (
         <SpellScrollTooltipPortal

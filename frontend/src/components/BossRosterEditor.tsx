@@ -11,6 +11,7 @@ import {
   DndContext,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -64,6 +65,9 @@ export function BossRosterEditor({ zoneName, encounters, onReload }: Props) {
 
   const sensors = useSensors(
     useSensor(PointerSensor),
+    // TouchSensor with a 250 ms long-press activation so a tap-and-drag is
+    // unambiguously a reorder and a quick swipe still scrolls the page on iOS.
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 

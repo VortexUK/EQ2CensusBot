@@ -593,7 +593,7 @@ function RoleRequestRow({ request, onAction }: { request: RoleRequest; onAction:
       </td>
       <td className={`${TD_CLS} whitespace-nowrap`}>
         {noteOpen ? (
-          <div className="flex flex-col gap-1 min-w-[18rem]">
+          <div className="flex flex-col gap-1 w-full min-w-[12rem]">
             <textarea
               value={adminNote}
               onChange={e => setAdminNote(e.target.value)}

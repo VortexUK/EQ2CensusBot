@@ -153,7 +153,7 @@ function GuildsSidebar({ approved }: { approved: Claim[] }) {
   if (guilds.length === 0) return null
 
   return (
-    <aside className="w-[210px] shrink-0">
+    <aside className="w-full md:w-[210px] md:shrink-0">
       <h2 className="font-heading text-[0.88rem] font-semibold tracking-[0.1em] uppercase text-gold/70 mt-0 mx-0 mb-[0.85rem]">
         My Guilds
       </h2>
@@ -250,7 +250,7 @@ function MyCharacters() {
   }
 
   return (
-    <div className="flex gap-8 items-start">
+    <div className="flex flex-col-reverse md:flex-row gap-8 md:items-start">
 
       {/* Left: character cards */}
       <div className="flex-1 min-w-0">

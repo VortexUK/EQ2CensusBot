@@ -302,7 +302,7 @@ function Badge({ label, tone }: { label: string; tone: 'success' | 'gold' | 'dan
 
 function RequestHistoryTable({ requests }: { requests: RoleRequest[] }) {
   return (
-    <Card className="p-0 overflow-hidden">
+    <Card className="p-0 overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-text-muted text-left text-[0.7rem] uppercase tracking-wide border-b border-border">
