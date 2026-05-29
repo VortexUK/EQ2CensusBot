@@ -122,6 +122,208 @@ def test_ilvl_from_gear_folds_adorn_into_host_item():
     assert _ilvl_from_gear(equip, gear) == expected
 
 
+# ---------------------------------------------------------------------------
+# Equipment self-heal: legacy "Item #<id>" placeholders → resolved names
+# ---------------------------------------------------------------------------
+# Pre-fix, a cold items.db at character-fetch time meant the equipment slot
+# got cached with item_name="Item #12345". The persistent census_store
+# refactor (PR #21) then served that placeholder forever. The fix has two
+# halves: (a) census/client._resolve_item_meta does a Census fallback so
+# new cache rows are born resolved, and (b) the route's
+# _heal_equipment_placeholders re-resolves leftover placeholders from
+# items.db on the serve path.
+
+
+@pytest.mark.asyncio
+async def test_heal_equipment_placeholders_resolves_from_items_db(monkeypatch):
+    """Placeholder name + items.db hit → name/tier/icon all replaced."""
+    import web.routes.character as charmodule
+    from web.routes.character import (
+        AdornSlotResponse,
+        EquipmentSlotResponse,
+        _heal_equipment_placeholders,
+    )
+
+    async def _fake_find(item_id, *args, **kwargs):
+        return {
+            "displayname": "Helm of Diagnosis",
+            "tier": "FABLED",
+            "iconid": 4242,
+        }
+
+    monkeypatch.setattr(charmodule, "_item_find_by_id", _fake_find)
+
+    slot = EquipmentSlotResponse(
+        slot="Head",
+        name="Item #12345",
+        item_id="12345",
+        icon_id=None,
+        tier=None,
+        adorn_slots=[],
+    )
+    await _heal_equipment_placeholders([slot])
+    assert slot.name == "Helm of Diagnosis"
+    assert slot.tier == "FABLED"
+    assert slot.icon_id == "4242"
+
+
+@pytest.mark.asyncio
+async def test_heal_equipment_placeholders_skips_real_names(monkeypatch):
+    """Already-resolved slot → untouched, items.db never consulted."""
+    import web.routes.character as charmodule
+    from web.routes.character import EquipmentSlotResponse, _heal_equipment_placeholders
+
+    calls: list[int] = []
+
+    async def _fake_find(item_id, *args, **kwargs):
+        calls.append(item_id)
+        return {"displayname": "REPLACED", "tier": "MYTHICAL", "iconid": 1}
+
+    monkeypatch.setattr(charmodule, "_item_find_by_id", _fake_find)
+
+    slot = EquipmentSlotResponse(
+        slot="Chest",
+        name="Robe of the Wise",
+        item_id="999",
+        icon_id="111",
+        tier="LEGENDARY",
+        adorn_slots=[],
+    )
+    await _heal_equipment_placeholders([slot])
+    # Untouched — slot already had a real name.
+    assert slot.name == "Robe of the Wise"
+    assert slot.tier == "LEGENDARY"
+    assert slot.icon_id == "111"
+    # No items.db lookup should have happened.
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_heal_equipment_placeholders_keeps_placeholder_on_db_miss(monkeypatch):
+    """Items.db still doesn't know this ID → leave the placeholder so the
+    frontend still renders the slot. The next character refresh (via the
+    new Census fallback in _parse_equipment) will resolve it for real."""
+    import web.routes.character as charmodule
+    from web.routes.character import EquipmentSlotResponse, _heal_equipment_placeholders
+
+    async def _fake_find(item_id, *args, **kwargs):
+        return None  # cold items.db
+
+    monkeypatch.setattr(charmodule, "_item_find_by_id", _fake_find)
+
+    slot = EquipmentSlotResponse(
+        slot="Feet",
+        name="Item #777",
+        item_id="777",
+        adorn_slots=[],
+    )
+    await _heal_equipment_placeholders([slot])
+    assert slot.name == "Item #777"  # unchanged
+
+
+@pytest.mark.asyncio
+async def test_heal_equipment_placeholders_fills_empty_adorn_names(monkeypatch):
+    """Adornments with adorn_id set but adorn_name=None (the items.db-cold
+    shape) get resolved from items.db too. Adornments with a name already
+    set are left alone."""
+    import web.routes.character as charmodule
+    from web.routes.character import (
+        AdornSlotResponse,
+        EquipmentSlotResponse,
+        _heal_equipment_placeholders,
+    )
+
+    resolved_ids: list[int] = []
+
+    async def _fake_find(item_id, *args, **kwargs):
+        resolved_ids.append(item_id)
+        # Only ID 500 is known.
+        if item_id == 500:
+            return {"displayname": "Adornment of Things", "tier": None, "iconid": None}
+        return None
+
+    monkeypatch.setattr(charmodule, "_item_find_by_id", _fake_find)
+
+    slot = EquipmentSlotResponse(
+        slot="Chest",
+        name="Real Item",  # real name → host slot skipped
+        item_id="999",
+        icon_id="1",
+        tier="FABLED",
+        adorn_slots=[
+            AdornSlotResponse(color="white", adorn_name=None, adorn_id="500"),
+            AdornSlotResponse(color="yellow", adorn_name="Already Named", adorn_id="600"),
+            AdornSlotResponse(color="red", adorn_name=None, adorn_id=None),  # empty slot
+        ],
+    )
+    await _heal_equipment_placeholders([slot])
+    assert slot.adorn_slots[0].adorn_name == "Adornment of Things"
+    assert slot.adorn_slots[1].adorn_name == "Already Named"  # untouched
+    assert slot.adorn_slots[2].adorn_name is None  # nothing to look up
+    # Only the named-missing adorn should have been queried; the empty slot
+    # and the already-named one must NOT trigger items.db lookups.
+    assert resolved_ids == [500, 600] or resolved_ids == [500]
+
+
+@pytest.mark.asyncio
+async def test_serve_path_self_heals_stored_placeholder(app, tmp_path, monkeypatch):
+    """End-to-end: stored character with 'Item #<id>' in equipment →
+    response carries the resolved name + tier + icon from items.db."""
+    import web.routes.character as charmodule
+    from census import census_store
+    from web.cache import character_cache
+    from web.config import WORLD as _WORLD
+
+    stored = dict(_STORED_CHAR_DATA)
+    stored["equipment"] = [
+        {
+            "slot": "Head",
+            "name": "Item #99999",
+            "item_id": "99999",
+            "icon_id": None,
+            "tier": None,
+            "adorn_slots": [],
+        }
+    ]
+    db_path = tmp_path / "census.db"
+    conn = census_store.init_db(db_path)
+    try:
+        census_store.upsert_character(
+            conn,
+            "HealMe",
+            _WORLD,
+            stored,
+            resolved=True,
+            now=int(__import__("time").time()),
+        )
+    finally:
+        conn.close()
+    monkeypatch.setattr(census_store, "DB_PATH", db_path)
+    character_cache.delete(f"healme:{_WORLD.lower()}")
+
+    async def _fake_find(item_id, *args, **kwargs):
+        assert item_id == 99999
+        return {"displayname": "Cowl of Repair", "tier": "MYTHICAL", "iconid": 7777}
+
+    monkeypatch.setattr(charmodule, "_item_find_by_id", _fake_find)
+
+    # CensusClient must not be touched on the cached-serve path.
+    monkeypatch.setattr(
+        charmodule,
+        "CensusClient",
+        lambda *a, **kw: pytest.fail("CensusClient must NOT fire when serving from cache"),
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/api/character/HealMe")
+
+    assert response.status_code == 200
+    equip = response.json()["equipment"]
+    assert equip[0]["name"] == "Cowl of Repair"
+    assert equip[0]["tier"] == "MYTHICAL"
+    assert equip[0]["icon_id"] == "7777"
+
+
 @pytest.mark.asyncio
 async def test_stored_data_served_without_census(app, tmp_path, monkeypatch):
     """census_store hit + Census unreachable → 200 with stale=True, CensusClient never called."""

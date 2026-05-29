@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import sqlite3
 import time
 from collections import Counter, defaultdict
@@ -13,6 +14,7 @@ from census.client import CensusClient
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.db import DB_PATH as _ITEMS_DB
 from census.db import GearRow, gear_for_ids
+from census.db import find_by_id as _item_find_by_id
 from census.item_level import adorn_bonus, character_ilvl
 from census.recipes_db import (
     DB_PATH as _RECIPES_DB,
@@ -71,6 +73,63 @@ class EquipmentSlotResponse(BaseModel):
     icon_id: str | None = None
     tier: str | None = None
     adorn_slots: list[AdornSlotResponse] = []
+
+
+# ---------------------------------------------------------------------------
+# Equipment self-heal
+# ---------------------------------------------------------------------------
+# When a character was fetched while items.db was cold for some item ID, the
+# census client's _parse_equipment fell back to the literal "Item #<id>"
+# placeholder and that placeholder got baked into the cached character row
+# inside census_store (PR #21). The fix in census.client._resolve_item_meta
+# prevents NEW cache rows from being born stale, but existing rows hold the
+# placeholder until they next refresh. Most of those items have since been
+# resolved into items.db (every tooltip click upserts), so a fast items.db
+# lookup at serve time will recover the correct display values without
+# needing a Census round-trip. Items still missing from items.db stay as
+# the placeholder; the next character refresh (≥ STALE_S seconds later)
+# will resolve them via the new Census fallback path.
+
+_ITEM_PLACEHOLDER_RE = re.compile(r"^Item #(-?\d+)$")
+
+
+async def _heal_equipment_placeholders(slots: list[EquipmentSlotResponse]) -> None:
+    """Replace any ``Item #<id>`` placeholder names + missing icons in-place,
+    using items.db as the only source (no Census call — keeps the serve
+    path fast). Adornment names get the same treatment. No-op for slots
+    that already carry a real name."""
+    for slot in slots:
+        m = _ITEM_PLACEHOLDER_RE.match(slot.name or "")
+        if m:
+            try:
+                item_id = int(m.group(1))
+            except ValueError:
+                continue
+            row = await _item_find_by_id(item_id)
+            if row:
+                resolved = row.get("displayname")
+                if resolved:
+                    slot.name = resolved
+                    slot.tier = str(row.get("tier") or "") or None
+                    if row.get("iconid"):
+                        slot.icon_id = str(row["iconid"])
+
+        # Same lookup for adornments — they suffered the same items.db-cold
+        # bug, just stored as None instead of a placeholder string. Re-
+        # resolving anything missing is cheap and helps the gear tooltip
+        # render adornment names where it currently shows nothing.
+        for adorn in slot.adorn_slots:
+            if adorn.adorn_name or not adorn.adorn_id:
+                continue
+            try:
+                adorn_id = int(adorn.adorn_id)
+            except ValueError:
+                continue
+            row = await _item_find_by_id(adorn_id)
+            if row:
+                name = row.get("displayname")
+                if name:
+                    adorn.adorn_name = name
 
 
 class CharacterStats(BaseModel):
@@ -408,6 +467,35 @@ async def get_character(request: Request, name: str) -> CharacterResponse:
         if stale:
             request_character_refresh(name)  # throttled/health-gated background refresh
         resp = CharacterResponse(**{**rec["data"], "fetched_at": rec["last_resolved_at"], "stale": stale})
+        # Self-heal any "Item #<id>" placeholders left over from a cold
+        # items.db at fetch time (see _heal_equipment_placeholders above
+        # for the full backstory). items.db-only lookup so this stays
+        # fast on the hot serve path; the new client-side Census fallback
+        # in census/client.py handles whatever items.db still doesn't
+        # know on the next refresh.
+        await _heal_equipment_placeholders(resp.equipment)
+        # Write the healed response back to the durable store so the
+        # next request (and every other process / worker) sees the
+        # resolved names immediately, without paying the items.db
+        # lookups again. Preserves last_resolved_at so the staleness
+        # window doesn't reset — this is a name-fixup, not a refresh.
+        # Best-effort; the user already has a correct response in hand
+        # so a write failure doesn't degrade the visible behaviour.
+        try:
+            conn2 = census_store.init_db(census_store.DB_PATH)
+            try:
+                census_store.upsert_character(
+                    conn2,
+                    name,
+                    current_world(),
+                    resp.model_dump(),
+                    resolved=True,
+                    now=rec["last_resolved_at"],
+                )
+            finally:
+                conn2.close()
+        except Exception as exc:
+            _log.debug("[character] self-heal cache write skipped: %s", exc)
         character_cache.set(cache_key, resp)
         return resp
 

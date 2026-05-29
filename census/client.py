@@ -228,6 +228,46 @@ class CensusClient:
     # Slots to exclude from the equipment display
     _SKIP_SLOTS = frozenset({"ammo", "event slot", "mount adornment", "mount armor"})
 
+    async def _resolve_item_meta(self, item_id: int) -> dict | None:
+        """Look up an item's raw Census dict — local items.db first, Census
+        API on miss, persisting any miss-then-hit back into items.db.
+
+        Mirrors :meth:`get_item`'s flow but specialised to equipment-slot
+        resolution: caller wants the raw dict (so it can read
+        displayname/tier/iconid directly) rather than a parsed ItemData,
+        which is what equipment rendering needs.
+
+        Returns None when neither items.db nor Census knows the item —
+        leaves the caller free to fall back to the ``"Item #<id>"``
+        placeholder.
+
+        Why this exists: pre-fix, :meth:`_parse_equipment` consulted only
+        items.db. A cold items.db meant every equipped slot fell through
+        to the ``"Item #<id>"`` placeholder, which the persistent census
+        store (PR #21) then cached as if it were the canonical answer —
+        meaning the character page kept rendering placeholders for the
+        full STALE_S window even after items.db warmed up. Doing the
+        Census fallback here means the cached character data is born
+        already-resolved.
+        """
+        db_row = await item_db.find_by_id(item_id)
+        if db_row:
+            return db_row
+        # Cold items.db lookup for this ID → fall back to Census exactly
+        # like :meth:`get_item` does. Single-ID query so the response is
+        # ``item_list[0]`` (or empty if the ID is truly unknown).
+        data = await self._fetch(self._build_params(str(item_id)))
+        if not data:
+            return None
+        item_list = data.get("item_list", [])
+        if not item_list:
+            return None
+        raw_item = item_list[0]
+        # Persist so the next character lookup (this one or any other)
+        # is items.db-only and zero Census traffic.
+        self._cache_item(raw_item)
+        return raw_item
+
     async def _parse_equipment(self, raw_slots: list) -> list[EquipmentSlot]:
         """Parse a Census equipmentslot_list into EquipmentSlot dataclass objects."""
         equipment: list[EquipmentSlot] = []
@@ -243,12 +283,15 @@ class CensusClient:
             item_id = _int(item_data.get("id"))
             if item_id is None:
                 continue
-            db_row = await item_db.find_by_id(item_id)
-            if db_row:
-                item_name = db_row.get("displayname") or f"Item #{item_id}"
-                item_tier = str(db_row.get("tier") or "")
-                icon_id = str(db_row["iconid"]) if db_row.get("iconid") else None
+            meta = await self._resolve_item_meta(item_id)
+            if meta:
+                item_name = meta.get("displayname") or f"Item #{item_id}"
+                item_tier = str(meta.get("tier") or "")
+                icon_id = str(meta["iconid"]) if meta.get("iconid") else None
             else:
+                # Even Census doesn't know this ID (deleted item,
+                # garbage data) — keep the placeholder so the frontend
+                # still renders the row.
                 item_name = f"Item #{item_id}"
                 item_tier = ""
                 icon_id = None
@@ -259,8 +302,8 @@ class CensusClient:
                 color = adorn.get("color", "").capitalize()
                 adorn_id = _int(adorn.get("id"))
                 if adorn_id is not None:
-                    adorn_db = await item_db.find_by_id(adorn_id)
-                    adorn_name = adorn_db.get("displayname") if adorn_db else None
+                    adorn_meta = await self._resolve_item_meta(adorn_id)
+                    adorn_name = adorn_meta.get("displayname") if adorn_meta else None
                 else:
                     adorn_name = None
                 adorn_slots.append(
