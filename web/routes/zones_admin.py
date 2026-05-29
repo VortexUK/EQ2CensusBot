@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from census import zones_db
 from web.auth_deps import require_editor
+from web.routes.rankings import invalidate_zones_cache
 
 router = APIRouter(tags=["zones-admin"])
 
@@ -68,7 +69,7 @@ class MobUpdateBody(BaseModel):
 async def create_encounter(zone_name: str, body: EncounterCreateBody) -> dict:
     zone_id = await _resolve_zone_id(zone_name)
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
+    result = await loop.run_in_executor(
         None,
         lambda: zones_db.add_encounter(
             zone_id=zone_id,
@@ -78,6 +79,8 @@ async def create_encounter(zone_name: str, body: EncounterCreateBody) -> dict:
             wiki_url=body.wiki_url,
         ),
     )
+    invalidate_zones_cache()
+    return result
 
 
 @router.put(
@@ -96,6 +99,7 @@ async def reorder_zone_encounters(zone_name: str, body: ReorderBody) -> dict:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    invalidate_zones_cache()
     z = await loop.run_in_executor(None, zones_db.find_by_name, zone_name)
     return z or {}
 
@@ -118,12 +122,14 @@ async def edit_encounter(zone_name: str, encounter_id: int, body: EncounterUpdat
     merged: dict[str, str | None] = {**kw_pm, **kw_st, **kw_wu}
     loop = asyncio.get_event_loop()
     try:
-        return await loop.run_in_executor(
+        result = await loop.run_in_executor(
             None,
             lambda: zones_db.update_encounter(encounter_id, **merged),  # type: ignore[arg-type]
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    invalidate_zones_cache()
+    return result
 
 
 @router.delete(
@@ -137,6 +143,7 @@ async def remove_encounter(zone_name: str, encounter_id: int) -> None:
     ok = await loop.run_in_executor(None, zones_db.delete_encounter, encounter_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Encounter not found")
+    invalidate_zones_cache()
 
 
 @router.post(
@@ -146,7 +153,7 @@ async def remove_encounter(zone_name: str, encounter_id: int) -> None:
 async def create_mob(zone_name: str, encounter_id: int, body: MobCreateBody) -> dict:
     await _resolve_zone_id(zone_name)
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
+    result = await loop.run_in_executor(
         None,
         lambda: zones_db.add_mob(
             encounter_id,
@@ -154,6 +161,8 @@ async def create_mob(zone_name: str, encounter_id: int, body: MobCreateBody) -> 
             make_primary=body.make_primary,
         ),
     )
+    invalidate_zones_cache()
+    return result
 
 
 @router.put(
@@ -164,9 +173,11 @@ async def edit_mob(zone_name: str, encounter_id: int, mob_id: int, body: MobUpda
     await _resolve_zone_id(zone_name)
     loop = asyncio.get_event_loop()
     try:
-        return await loop.run_in_executor(None, lambda: zones_db.update_mob(mob_id, mob_name=body.mob_name))
+        result = await loop.run_in_executor(None, lambda: zones_db.update_mob(mob_id, mob_name=body.mob_name))
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    invalidate_zones_cache()
+    return result
 
 
 @router.post(
@@ -177,9 +188,11 @@ async def promote_mob_route(zone_name: str, encounter_id: int, mob_id: int) -> d
     await _resolve_zone_id(zone_name)
     loop = asyncio.get_event_loop()
     try:
-        return await loop.run_in_executor(None, zones_db.promote_mob, mob_id)
+        result = await loop.run_in_executor(None, zones_db.promote_mob, mob_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    invalidate_zones_cache()
+    return result
 
 
 @router.delete(
@@ -196,3 +209,4 @@ async def remove_mob(zone_name: str, encounter_id: int, mob_id: int) -> None:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not ok:
         raise HTTPException(status_code=404, detail="Mob not found")
+    invalidate_zones_cache()
