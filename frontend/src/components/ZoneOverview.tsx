@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 
 import { fmtRelative } from '../formatters'
 import { useAuth, isContributor } from '../hooks/useAuth'
+import { SupporterBadge, useSupporters } from './SupporterBadge'
 import { Button, Card, SectionLabel } from './ui'
 import { Textarea } from './ui/Textarea'
 import { toErrorMessage } from '../lib/errors'
@@ -16,11 +17,51 @@ interface ZoneOverviewResponse {
   markdown: string
   last_edited_at: number | null
   last_edited_by: string | null
+  last_edited_by_name?: string | null
   source: string
+}
+
+interface RevisionEntry {
+  id: number
+  edited_at: number
+  edited_by: string
+  edited_by_name?: string | null
+  before_md: string | null
+  after_md: string
+  edit_note: string | null
+}
+
+interface RevisionListResponse {
+  zone_name: string
+  revisions: RevisionEntry[]
 }
 
 interface Props {
   zoneName: string
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmtEditor(name: string | null | undefined, raw: string): string {
+  if (raw === 'eq2i_scrape') return 'EQ2i Wiki Scrape'
+  if (raw === 'unknown') return 'Unknown'
+  return name && name.trim() ? name : raw
+}
+
+// JSX wrapper around fmtEditor that also renders the 👑 SupporterBadge
+// when the editor's Discord ID is in the supporter set. Synthetic editor
+// IDs (eq2i_scrape, unknown) are skipped — they're not real Discord
+// identities so the badge would be meaningless.
+function EditorName({ name, raw }: { name: string | null | undefined; raw: string }) {
+  const supporters = useSupporters()
+  const isSynthetic = raw === 'eq2i_scrape' || raw === 'unknown'
+  const isSupporter = !isSynthetic && supporters.has(raw)
+  return (
+    <>
+      {fmtEditor(name, raw)}
+      {isSupporter && <SupporterBadge />}
+    </>
+  )
 }
 
 // ── Markdown styling ──────────────────────────────────────────────────────────
@@ -101,13 +142,50 @@ export function ZoneOverview({ zoneName }: Props) {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  // History disclosure state. Lazy-loaded — we don't fetch revisions until the
+  // user actually opens the disclosure, since most viewers never will.
+  const [revisions, setRevisions] = useState<RevisionEntry[] | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+
   // Reset editing state when the zone changes (url change → new fetch).
   useEffect(() => {
     setEditing(false)
     setDraft('')
     setSavedData(undefined)
+    setRevisions(null)
+    setHistoryOpen(false)
+    setHistoryError(null)
     setSaveError(null)
   }, [zoneName])
+
+  async function toggleHistory() {
+    // Close-on-second-click. Cached after first fetch unless invalidated (a
+    // successful save below clears `revisions` so the next open re-fetches).
+    if (historyOpen) {
+      setHistoryOpen(false)
+      return
+    }
+    setHistoryOpen(true)
+    if (revisions !== null) return  // already loaded
+
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      const r = await fetch(
+        `/api/zones/${encodeURIComponent(zoneName)}/overview/revisions`,
+        { credentials: 'include' }
+      )
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
+      const j = (await r.json()) as RevisionListResponse
+      setRevisions(j.revisions)
+    } catch (err) {
+      setHistoryError(toErrorMessage(err))
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
 
   function startEdit() {
     setDraft(effectiveData?.markdown ?? '')
@@ -141,6 +219,9 @@ export function ZoneOverview({ zoneName }: Props) {
       setSavedData(fresh)
       setEditing(false)
       setDraft('')
+      // The save just appended a new revision row server-side; drop the cache
+      // so the next history-open fetches fresh.
+      setRevisions(null)
     } catch (err) {
       setSaveError(toErrorMessage(err))
     } finally {
@@ -173,11 +254,33 @@ export function ZoneOverview({ zoneName }: Props) {
               {effectiveData.markdown}
             </ReactMarkdown>
           </div>
-          {effectiveData.last_edited_at && (
-            <p className="text-text-muted text-[0.72rem]">
-              Edited {fmtRelative(effectiveData.last_edited_at)}
-              {effectiveData.last_edited_by ? ` · ${effectiveData.last_edited_by}` : ''}
-            </p>
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mt-2 text-[0.72rem]">
+            {effectiveData.last_edited_at ? (
+              <p className="text-text-muted">
+                Edited {fmtRelative(effectiveData.last_edited_at)}
+                {effectiveData.last_edited_by ? (
+                  <>
+                    {' · '}
+                    <EditorName name={effectiveData.last_edited_by_name} raw={effectiveData.last_edited_by} />
+                  </>
+                ) : ''}
+              </p>
+            ) : <span />}
+            <button
+              type="button"
+              onClick={toggleHistory}
+              className="text-gold-dim hover:text-gold underline decoration-dotted underline-offset-2"
+              aria-expanded={historyOpen}
+            >
+              {historyOpen ? 'Hide history' : 'Show history'}
+            </button>
+          </div>
+          {historyOpen && (
+            <RevisionsPanel
+              revisions={revisions}
+              loading={historyLoading}
+              error={historyError}
+            />
           )}
         </>
       )}
@@ -283,5 +386,73 @@ function Editor({ draft, onDraft, preview, onPreview, saving, error, onSave, onC
         </Button>
       </div>
     </div>
+  )
+}
+
+// ── Revisions panel ───────────────────────────────────────────────────────────
+
+interface RevisionsPanelProps {
+  revisions: RevisionEntry[] | null
+  loading: boolean
+  error: string | null
+}
+
+function RevisionsPanel({ revisions, loading, error }: RevisionsPanelProps) {
+  if (loading) return <p className="text-text-muted text-sm mt-2">Loading history…</p>
+  if (error) return <p className="text-danger text-sm mt-2">Couldn't load history: {error}</p>
+  if (revisions === null) return null
+  if (revisions.length === 0) {
+    return <p className="text-text-muted text-sm mt-2">No history yet for this overview.</p>
+  }
+  return (
+    <ol className="mt-3 border border-border rounded-md divide-y divide-border/60 overflow-hidden">
+      {revisions.map((rev, i) => (
+        <RevisionRow key={rev.id} revision={rev} isCurrent={i === 0} />
+      ))}
+    </ol>
+  )
+}
+
+interface RevisionRowProps {
+  revision: RevisionEntry
+  /** True for index 0 — newest revision == what's currently rendered above. */
+  isCurrent: boolean
+}
+
+function RevisionRow({ revision, isCurrent }: RevisionRowProps) {
+  // Per-row open state — multiple revisions can be expanded at once so a user
+  // can compare two manually without losing context.
+  const [open, setOpen] = useState(false)
+  const absoluteTime = new Date(revision.edited_at * 1000).toLocaleString()
+  return (
+    <li className="bg-surface-raised/30">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-baseline gap-3 px-3 py-2 text-left hover:bg-surface-raised/60"
+        aria-expanded={open}
+      >
+        <span className="text-[0.72rem] text-gold-dim w-4 shrink-0">
+          {open ? '▾' : '▸'}
+        </span>
+        <span className="flex-1 min-w-0 text-[0.85rem] text-text" title={absoluteTime}>
+          {fmtRelative(revision.edited_at)}
+          {isCurrent && <span className="ml-2 text-success text-[0.7rem] uppercase tracking-[0.08em]">current</span>}
+          {revision.edit_note && (
+            <span className="text-text-muted"> · {revision.edit_note}</span>
+          )}
+        </span>
+        <span className="text-text-muted text-[0.72rem] shrink-0">
+          <EditorName name={revision.edited_by_name} raw={revision.edited_by} />
+        </span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 pt-1 border-t border-border/60 bg-bg/40 text-text text-[0.92rem]">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+            {revision.after_md}
+          </ReactMarkdown>
+        </div>
+      )}
+    </li>
   )
 }
