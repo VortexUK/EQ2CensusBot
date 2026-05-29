@@ -1,6 +1,7 @@
 ﻿import type { CSSProperties } from 'react'
 import { Routes, Route, Outlet, NavLink, useLocation } from 'react-router-dom'
 import HomePage from './pages/HomePage'
+import SupportPage from './pages/SupportPage'
 import CharacterPage from './pages/CharacterPage'
 import ClaimPage from './pages/ClaimPage'
 import AdminPage from './pages/AdminPage'
@@ -317,6 +318,14 @@ function Layout() {
               Daybreak Games Census API
             </a>
           </span>
+          <span>
+            <Link
+              to="/support"
+              className="text-[color:inherit] underline underline-offset-[3px] inline-block py-1 -my-1"
+            >
+              Support the site
+            </Link>
+          </span>
           <CensusStatus />
         </footer>
       </div>
@@ -348,6 +357,7 @@ function App() {
         <Route path="/parse/:id"   element={<ParsePage />} />
         <Route path="/settings/tokens" element={<TokensPage />} />
         <Route path="/settings/roles" element={<RolesSettingsPage />} />
+        <Route path="/support" element={<SupportPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

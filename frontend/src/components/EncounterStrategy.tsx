@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 
 import { fmtRelative } from '../formatters'
 import { useAuth } from '../hooks/useAuth'
+import { SupporterBadge, useSupporters } from './SupporterBadge'
 import { Button, SectionLabel } from './ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -49,6 +50,22 @@ function fmtEditor(name: string | null | undefined, raw: string): string {
   if (raw === 'eq2i_scrape') return 'EQ2i Wiki Scrape'
   if (raw === 'unknown') return 'Unknown'
   return name && name.trim() ? name : raw
+}
+
+// JSX wrapper around fmtEditor that also renders the 👑 SupporterBadge
+// when the editor's Discord ID is in the supporter set. Synthetic editor
+// IDs (eq2i_scrape, unknown) are skipped — they're not real Discord
+// identities so the badge would be meaningless.
+function EditorName({ name, raw }: { name: string | null | undefined; raw: string }) {
+  const supporters = useSupporters()
+  const isSynthetic = raw === 'eq2i_scrape' || raw === 'unknown'
+  const isSupporter = !isSynthetic && supporters.has(raw)
+  return (
+    <>
+      {fmtEditor(name, raw)}
+      {isSupporter && <SupporterBadge />}
+    </>
+  )
 }
 
 // ── Markdown styling ──────────────────────────────────────────────────────────
@@ -255,7 +272,12 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
             {data.last_edited_at ? (
               <p className="text-text-muted">
                 Edited {fmtRelative(data.last_edited_at)}
-                {data.last_edited_by ? ` · ${fmtEditor(data.last_edited_by_name, data.last_edited_by)}` : ''}
+                {data.last_edited_by ? (
+                  <>
+                    {' · '}
+                    <EditorName name={data.last_edited_by_name} raw={data.last_edited_by} />
+                  </>
+                ) : ''}
               </p>
             ) : <span />}
             <button
@@ -448,7 +470,7 @@ function RevisionRow({ revision, isCurrent }: RevisionRowProps) {
           )}
         </span>
         <span className="text-text-muted text-[0.72rem] shrink-0">
-          {fmtEditor(revision.edited_by_name, revision.edited_by)}
+          <EditorName name={revision.edited_by_name} raw={revision.edited_by} />
         </span>
       </button>
       {open && (

@@ -209,6 +209,14 @@ async def grant_user_role(discord_id: str, role: str, request: Request) -> dict:
             detail=f"Unknown role {role!r}. Known roles: {sorted(KNOWN_ROLES)}",
         )
     inserted = await grant_role(discord_id, role, admin["id"])
+    # Bust the public /api/supporters cache so the new badge appears
+    # without waiting for a process restart. Only fires for the
+    # supporter role since the cache only tracks that one — keeps
+    # contributor grants from doing useless work.
+    if role == "supporter":
+        from web.routes.supporters import invalidate as _invalidate_supporters
+
+        _invalidate_supporters()
     return {"ok": True, "granted": inserted}
 
 
@@ -224,6 +232,10 @@ async def revoke_user_role(discord_id: str, role: str, request: Request) -> dict
     removed = await revoke_role(discord_id, role)
     if not removed:
         raise HTTPException(status_code=404, detail="User does not have this role")
+    if role == "supporter":
+        from web.routes.supporters import invalidate as _invalidate_supporters
+
+        _invalidate_supporters()
     return {"ok": True}
 
 

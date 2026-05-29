@@ -140,8 +140,16 @@ def require_admin(request: Request) -> dict:
 # Allowlist for grant/revoke routes. Routes reject unknown role names with a
 # 400 — keeps the table free of typo'd "Contibutor" rows that'd silently grant
 # nothing. Add a new role here AND seed its role_permissions rows in
-# web/db.py:init_db before exposing it in the admin UI.
-KNOWN_ROLES: frozenset[str] = frozenset({"contributor"})
+# web/db.py:init_db (only if the role gates a capability — purely cosmetic
+# roles like "supporter" don't need role_permissions entries).
+#
+# Roles:
+#   contributor — grants edit_content capability (raid strategies, etc.).
+#   supporter   — cosmetic role surfaced as a 👑 badge next to the
+#                 holder's name everywhere it renders. No capability;
+#                 awarded manually by admin in recognition of site
+#                 donations (see /support page + /api/supporters).
+KNOWN_ROLES: frozenset[str] = frozenset({"contributor", "supporter"})
 
 # Programmer-facing capability allowlist. `require_capability` raises at
 # route-definition time if a typo'd string is used, so a misnamed capability
