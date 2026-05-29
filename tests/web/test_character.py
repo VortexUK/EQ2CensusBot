@@ -37,7 +37,7 @@ _STORED_CHAR_DATA = {
 @pytest.mark.asyncio
 async def test_character_not_found(app):
     """Census returns nothing → 404."""
-    with patch("web.routes.character.CensusClient") as MockClient:
+    with patch("web.routes.character.views.CensusClient") as MockClient:
         instance = MockClient.return_value
         instance.get_character = AsyncMock(return_value=None)
         instance.close = AsyncMock()
@@ -68,7 +68,7 @@ async def test_character_returns_data(app):
         equipment=[],
     )
 
-    with patch("web.routes.character.CensusClient") as MockClient:
+    with patch("web.routes.character.views.CensusClient") as MockClient:
         instance = MockClient.return_value
         instance.get_character = AsyncMock(return_value=fake_char)
         instance.close = AsyncMock()
@@ -137,7 +137,7 @@ def test_ilvl_from_gear_folds_adorn_into_host_item():
 @pytest.mark.asyncio
 async def test_heal_equipment_placeholders_resolves_from_items_db(monkeypatch):
     """Placeholder name + items.db hit → name/tier/icon all replaced."""
-    import web.routes.character as charmodule
+    import web.routes.character.views as charmodule
     from web.routes.character import (
         AdornSlotResponse,
         EquipmentSlotResponse,
@@ -170,7 +170,7 @@ async def test_heal_equipment_placeholders_resolves_from_items_db(monkeypatch):
 @pytest.mark.asyncio
 async def test_heal_equipment_placeholders_skips_real_names(monkeypatch):
     """Already-resolved slot → untouched, items.db never consulted."""
-    import web.routes.character as charmodule
+    import web.routes.character.views as charmodule
     from web.routes.character import EquipmentSlotResponse, _heal_equipment_placeholders
 
     calls: list[int] = []
@@ -203,7 +203,7 @@ async def test_heal_equipment_placeholders_keeps_placeholder_on_db_miss(monkeypa
     """Items.db still doesn't know this ID → leave the placeholder so the
     frontend still renders the slot. The next character refresh (via the
     new Census fallback in _parse_equipment) will resolve it for real."""
-    import web.routes.character as charmodule
+    import web.routes.character.views as charmodule
     from web.routes.character import EquipmentSlotResponse, _heal_equipment_placeholders
 
     async def _fake_find(item_id, *args, **kwargs):
@@ -226,7 +226,7 @@ async def test_heal_equipment_placeholders_fills_empty_adorn_names(monkeypatch):
     """Adornments with adorn_id set but adorn_name=None (the items.db-cold
     shape) get resolved from items.db too. Adornments with a name already
     set are left alone."""
-    import web.routes.character as charmodule
+    import web.routes.character.views as charmodule
     from web.routes.character import (
         AdornSlotResponse,
         EquipmentSlotResponse,
@@ -269,7 +269,7 @@ async def test_heal_equipment_placeholders_fills_empty_adorn_names(monkeypatch):
 async def test_serve_path_self_heals_stored_placeholder(app, tmp_path, monkeypatch):
     """End-to-end: stored character with 'Item #<id>' in equipment →
     response carries the resolved name + tier + icon from items.db."""
-    import web.routes.character as charmodule
+    import web.routes.character.views as charmodule
     from census import census_store
     from web.cache import character_cache
     from web.config import WORLD as _WORLD
@@ -327,7 +327,7 @@ async def test_serve_path_self_heals_stored_placeholder(app, tmp_path, monkeypat
 @pytest.mark.asyncio
 async def test_stored_data_served_without_census(app, tmp_path, monkeypatch):
     """census_store hit + Census unreachable → 200 with stale=True, CensusClient never called."""
-    import web.routes.character as charmodule
+    import web.routes.character.views as charmodule
     from census import census_store
     from web.cache import character_cache
     from web.config import WORLD as _WORLD

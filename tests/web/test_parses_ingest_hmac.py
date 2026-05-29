@@ -121,10 +121,10 @@ async def test_hmac_validation_survives_body_reading_middleware(app) -> None:
 
     sync_result = ("inserted", 42, 2, 0, 0)
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
-        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             res = await client.post(

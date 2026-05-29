@@ -212,11 +212,11 @@ async def test_ingest_inserts_encounter(app):
     sync_result = ("inserted", 42, 2, 1, 2)  # (status, eid, n_c, n_dt, n_at)
 
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
         patch(
-            "web.routes.parses._ingest_payload_sync",
+            "web.routes.parses.ingest._ingest_payload_sync",
             new=MagicMock(return_value=sync_result),
         ),
     ):
@@ -242,12 +242,12 @@ async def test_ingest_does_not_block_on_census_and_schedules_background(app):
     resolve_mock = AsyncMock(return_value={})  # background resolver
     cached_mock = MagicMock(return_value={})  # cache-only sync path
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
-        patch("web.routes.parses._cached_snapshots", cached_mock),
-        patch("web.routes.parses._resolve_combatant_snapshots", resolve_mock),
-        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
-        patch("web.routes.parses._update_snapshots_sync", new=MagicMock()),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses.ingest._cached_snapshots", cached_mock),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", resolve_mock),
+        patch("web.routes.parses.ingest._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses.ingest._update_snapshots_sync", new=MagicMock()),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(_minimal_payload()))
@@ -261,11 +261,11 @@ async def test_ingest_returns_skipped_on_duplicate(app):
     sync_result = ("skipped", 7, 0, 0, 0)
 
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
         patch(
-            "web.routes.parses._ingest_payload_sync",
+            "web.routes.parses.ingest._ingest_payload_sync",
             new=MagicMock(return_value=sync_result),
         ),
     ):
@@ -287,12 +287,12 @@ async def test_ingest_revived_status_schedules_background(app):
     resolve_mock = AsyncMock(return_value={})  # background resolver
     cached_mock = MagicMock(return_value={})  # cache-only sync path
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
-        patch("web.routes.parses._cached_snapshots", cached_mock),
-        patch("web.routes.parses._resolve_combatant_snapshots", resolve_mock),
-        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
-        patch("web.routes.parses._update_snapshots_sync", new=MagicMock()),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses.ingest._cached_snapshots", cached_mock),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", resolve_mock),
+        patch("web.routes.parses.ingest._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses.ingest._update_snapshots_sync", new=MagicMock()),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(_minimal_payload()))
@@ -304,7 +304,8 @@ async def test_ingest_revived_status_schedules_background(app):
 @pytest.mark.asyncio
 async def test_reupload_of_soft_deleted_parse_revives_it(tmp_path, monkeypatch):
     from parses import db as pdb
-    from web.routes.parses import IngestRequest, _ingest_payload_sync
+    from web.routes.parses import IngestRequest
+    from web.routes.parses.ingest import _ingest_payload_sync
 
     db_file = tmp_path / "parses.db"
     monkeypatch.setattr(pdb, "DB_PATH", db_file)
@@ -341,9 +342,9 @@ async def test_ingest_rejects_empty_logger_name(app):
     payload["logger_name"] = "   "
 
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
@@ -357,7 +358,7 @@ async def test_ingest_validates_payload_shape(app):
     """Missing required encounter field → 422 from Pydantic."""
     payload = {"logger_name": "Menludiir"}  # no `encounter`
 
-    with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
+    with patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
     assert r.status_code == 422
@@ -395,10 +396,10 @@ async def test_bearer_token_path_resolves_to_user(app):
             "web.auth_deps.users_db.lookup_api_token",
             new=AsyncMock(return_value=fake_lookup_row),
         ),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
         patch(
-            "web.routes.parses._ingest_payload_sync",
+            "web.routes.parses.ingest._ingest_payload_sync",
             new=MagicMock(return_value=sync_result),
         ),
     ):
@@ -485,10 +486,10 @@ async def test_signature_accepted_when_correct(app):
 
     sync_result = ("inserted", 42, 2, 1, 2)
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
-        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Send raw content (not json=) so we control the exact bytes
@@ -521,9 +522,9 @@ async def test_signature_rejected_when_body_tampered(app):
     tampered_bytes = json.dumps(tampered).encode("utf-8")
 
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post(
@@ -548,9 +549,9 @@ async def test_signature_rejected_when_wrong_key(app):
     sig_with_wrong_key = _sign(body_bytes, "wrong-token")
 
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post(
@@ -570,7 +571,7 @@ async def test_signature_required_on_token_auth(app):
     """v0.1.7 and earlier plugins don't send X-Lexicon-Signature. In
     STRICT mode they must be rejected with a 401 that names the update
     path, so the user knows what to do."""
-    with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
+    with patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post(
                 "/api/parses/ingest",
@@ -609,7 +610,7 @@ async def test_ingest_rejects_malformed_logger_name(app, bad_name):
     and against weird payloads in Census URLs / parses-DB rows."""
     payload = _minimal_payload()
     payload["logger_name"] = bad_name
-    with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
+    with patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
     # Either Pydantic-level (422) or our explicit shape check (400).
@@ -635,10 +636,10 @@ async def test_ingest_accepts_valid_logger_name_shape(app, good_name):
     payload["logger_name"] = good_name
     sync_result = ("inserted", 1, 1, 0, 0)
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
-        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
@@ -650,7 +651,7 @@ def test_sanitize_world_predicate():
     must be passed through unchanged when they look like a real EQ2
     server name, or collapsed to None for the caller to fall back to
     EQ2_WORLD. Covers the v0.1.13 audit L2 defence."""
-    from web.routes.parses import _sanitize_world
+    from web.routes.parses.ingest import _sanitize_world
 
     # Legit EQ2 server names — all pass through unchanged.
     for ok in ("Varsoon", "Kaladim", "Antonia Bayle", "Lucan D'Lere", "Maj'Dul"):
@@ -703,9 +704,9 @@ async def test_logger_server_overrides_world_for_census(app):
 
     sync_result = ("inserted", 1, 1, 0, 0)
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=_spy),
-        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=_spy),
+        patch("web.routes.parses.ingest._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
@@ -734,10 +735,10 @@ async def test_signature_absent_with_session_auth_is_allowed(app):
 
     sync_result = ("inserted", 42, 2, 1, 2)
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_session_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
-        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_session_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value=None)),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post(
@@ -759,7 +760,7 @@ async def test_signature_with_session_auth_is_rejected(app):
         return {"id": "discord-123", "username": "alice", "auth_source": "session"}
 
     body_bytes = json.dumps(_minimal_payload()).encode("utf-8")
-    with patch("web.routes.parses.require_user_session_or_token", _fake_session_user):
+    with patch("web.routes.parses.ingest.require_user_session_or_token", _fake_session_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post(
                 "/api/parses/ingest",
@@ -781,7 +782,7 @@ async def test_signature_with_session_auth_is_rejected(app):
 async def test_resolve_snapshots_cache_hit_skips_census():
     """A character already in character_cache is snapshotted with zero Census
     traffic — no CensusClient is even constructed."""
-    from web.routes import parses as parses_mod
+    from web.routes.parses import ingest as parses_mod
 
     # A COMPLETE cache hit (ilvl present) skips Census entirely.
     cached = SimpleNamespace(level=90, guild_name="Exordium", cls="Templar", ilvl=372.2)
@@ -804,7 +805,7 @@ async def test_resolve_snapshots_cache_hit_skips_census():
 async def test_resolve_snapshots_backfills_missing_ilvl():
     """A cache hit with a class but no ilvl (guild resolve omitted equipment)
     triggers a direct get_character to fill the ilvl."""
-    from web.routes import parses as parses_mod
+    from web.routes.parses import ingest as parses_mod
 
     cached = SimpleNamespace(level=92, guild_name="Exordium", cls="Wizard", ilvl=None)
     fake_cache = MagicMock()
@@ -832,7 +833,7 @@ async def test_resolve_snapshots_miss_warms_roster_then_hits():
     """On a cache miss: one Census guild lookup, an awaited roster prewarm,
     then a re-check that now hits. This is the path that lets the first
     raider's lookup cover the rest of the (same-guild) raid."""
-    from web.routes import parses as parses_mod
+    from web.routes.parses import ingest as parses_mod
 
     cached = SimpleNamespace(level=88, guild_name="Exordium", cls="Fury", ilvl=410.0)
     fake_cache = MagicMock()
@@ -859,7 +860,7 @@ async def test_resolve_snapshots_miss_warms_roster_then_hits():
 async def test_resolve_snapshots_unguilded_miss_is_absent():
     """A character with no resolvable guild (pug / Census miss) is simply
     omitted from the result — its combatant row stores NULLs."""
-    from web.routes import parses as parses_mod
+    from web.routes.parses import ingest as parses_mod
 
     fake_cache = MagicMock()
     fake_cache.get_stale.return_value = (None, 0)  # always a miss
@@ -894,7 +895,7 @@ async def test_ingest_rejects_missing_logger_server(app):
     couldn't pass the X-Lexicon-Signature gate anyway, so this is
     just adding a clearer error message."""
     payload = _minimal_payload(logger_server=None)
-    with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
+    with patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
     assert r.status_code == 400
@@ -905,7 +906,7 @@ async def test_ingest_rejects_missing_logger_server(app):
 async def test_ingest_rejects_empty_logger_server(app):
     """Whitespace-only string → same outcome as null."""
     payload = _minimal_payload(logger_server="   ")
-    with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
+    with patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
     assert r.status_code == 400
@@ -917,7 +918,7 @@ async def test_ingest_rejects_malformed_logger_server(app):
     not the allowlist-rejection 403 — distinguishes 'your plugin sent
     garbage' from 'your server isn't allowed'."""
     payload = _minimal_payload(logger_server="../etc/passwd")
-    with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
+    with patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
     assert r.status_code == 400
@@ -932,7 +933,7 @@ async def test_ingest_rejects_disallowed_server(app):
     # "Halls of Fate" passes _VALID_WORLD_RE (letters + space) but
     # isn't in the default ALLOWED_SERVERS={Varsoon,Wuoshi}.
     payload = _minimal_payload(logger_server="Halls of Fate")
-    with patch("web.routes.parses.require_user_session_or_token", _fake_require_user):
+    with patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
     assert r.status_code == 403
@@ -949,10 +950,10 @@ async def test_ingest_accepts_allowed_server_case_insensitive(app):
     sync_result = ("inserted", 99, 2, 1, 2)
     payload = _minimal_payload(logger_server="varsoon")  # lowercase
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
-        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))
@@ -966,10 +967,10 @@ async def test_ingest_accepts_wuoshi(app):
     sync_result = ("inserted", 100, 2, 1, 2)
     payload = _minimal_payload(logger_server="Wuoshi")
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_require_user),
-        patch("web.routes.parses._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
-        patch("web.routes.parses._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
-        patch("web.routes.parses._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_require_user),
+        patch("web.routes.parses.ingest._resolve_uploader_guild_async", new=AsyncMock(return_value="Exordium")),
+        patch("web.routes.parses.ingest._resolve_combatant_snapshots", new=AsyncMock(return_value={})),
+        patch("web.routes.parses.ingest._ingest_payload_sync", new=MagicMock(return_value=sync_result)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/parses/ingest", **_signed_post_kwargs(payload))

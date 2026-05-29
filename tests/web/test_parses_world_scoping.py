@@ -21,7 +21,8 @@ from httpx import ASGITransport, AsyncClient
 
 from parses import db as parses_db
 from parses.models import Encounter
-from web.routes.parses import IngestRequest, _ingest_payload_sync
+from web.routes.parses import IngestRequest
+from web.routes.parses.ingest import _ingest_payload_sync
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -182,7 +183,7 @@ class TestListEncountersSyncWorldScoping:
         _ingest_payload_sync(payload_v, "Menludiir", "Exordium", "plugin:123", {}, world="Varsoon")
         _ingest_payload_sync(payload_w, "Menludiir", "Exordium", "plugin:456", {}, world="Wuoshi")
 
-        from web.routes.parses import _list_encounters_sync
+        from web.routes.parses.list import _list_encounters_sync
 
         v_rows = _list_encounters_sync(100, None, None, world="Varsoon")
         w_rows = _list_encounters_sync(100, None, None, world="Wuoshi")
@@ -224,9 +225,9 @@ class TestDeleteCrossServerIsolation:
         _, id_b, *_ = _ingest_payload_sync(payload_b, "Menludiir", "Exordium", "plugin:admin1", {}, world="Wuoshi")
 
         with (
-            patch("web.routes.parses._require_user", self._fake_admin),
-            patch("web.routes.parses._is_admin", return_value=True),
-            patch("web.routes.parses.current_world", return_value="Varsoon"),
+            patch("web.routes.parses.delete._require_user", self._fake_admin),
+            patch("web.routes.parses.delete._is_admin", return_value=True),
+            patch("web.routes.parses.delete.current_world", return_value="Varsoon"),
         ):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 # Cross-server: should be 404 and B must survive.
@@ -346,17 +347,17 @@ async def test_http_ingest_attributes_encounter_world_from_logger_server(tmp_pat
     body_bytes = json.dumps(payload).encode("utf-8")
 
     with (
-        patch("web.routes.parses.require_user_session_or_token", _fake_user),
+        patch("web.routes.parses.ingest.require_user_session_or_token", _fake_user),
         patch(
-            "web.routes.parses._resolve_uploader_guild_async",
+            "web.routes.parses.ingest._resolve_uploader_guild_async",
             new=AsyncMock(return_value="Exordium"),
         ),
         patch(
-            "web.routes.parses._cached_snapshots",
+            "web.routes.parses.ingest._cached_snapshots",
             new=MagicMock(return_value={}),
         ),
         patch(
-            "web.routes.parses._resolve_and_update_snapshots",
+            "web.routes.parses.ingest._resolve_and_update_snapshots",
             new=AsyncMock(),
         ),
     ):

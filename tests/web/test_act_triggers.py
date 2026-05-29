@@ -104,7 +104,7 @@ def _writer_client(app):
 @pytest.mark.asyncio
 async def test_list_triggers_unknown_encounter_is_404(app):
     """When ``_resolve_encounter_sync`` returns None, every route 404s."""
-    with patch("web.routes.act_triggers._resolve_encounter_sync", return_value=None):
+    with patch("web.routes.act._shared._resolve_encounter_sync", return_value=None):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/zones/Nowhere/encounters/1/triggers")
     assert r.status_code == 404
@@ -112,7 +112,7 @@ async def test_list_triggers_unknown_encounter_is_404(app):
 
 @pytest.mark.asyncio
 async def test_list_spell_timers_unknown_encounter_is_404(app):
-    with patch("web.routes.act_triggers._resolve_encounter_sync", return_value=None):
+    with patch("web.routes.act._shared._resolve_encounter_sync", return_value=None):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/zones/Nowhere/encounters/1/spell-timers")
     assert r.status_code == 404
@@ -127,9 +127,9 @@ async def test_list_spell_timers_unknown_encounter_is_404(app):
 async def test_list_triggers_returns_rows(app):
     """Resolved encounter + one trigger row → 200 with the entry shape."""
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_triggers_for_encounter",
+            "web.routes.act.triggers.raids_db.list_act_triggers_for_encounter",
             return_value=[_TRIGGER_ROW],
         ),
     ):
@@ -153,8 +153,8 @@ async def test_get_trigger_belongs_to_encounter(app):
     encounter (someone guessing IDs)."""
     other_encounter = {**_TRIGGER_ROW, "raid_encounter_id": 999}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=other_encounter),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=other_encounter),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/zones/The Emerald Halls/encounters/1/triggers/11")
@@ -164,8 +164,8 @@ async def test_get_trigger_belongs_to_encounter(app):
 @pytest.mark.asyncio
 async def test_get_trigger_happy_path(app):
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/zones/The Emerald Halls/encounters/1/triggers/11")
@@ -192,7 +192,7 @@ async def test_create_trigger_requires_auth(app):
 @pytest.mark.asyncio
 async def test_create_trigger_rejects_empty_regex(app):
     """Pydantic min_length=1 on regex → 422."""
-    with patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()):
+    with patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()):
         async with _writer_client(app) as client:
             r = await client.post(
                 "/api/zones/The Emerald Halls/encounters/1/triggers",
@@ -207,10 +207,10 @@ async def test_create_trigger_defaults_category_to_mob_name(app):
     on save (so ACT groups it under the boss)."""
     new_row = {**_TRIGGER_ROW, "category": "Prince Thirneg"}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers.raids_db.upsert_act_trigger", return_value=11) as m_upsert,
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=new_row),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act.triggers.raids_db.upsert_act_trigger", return_value=11) as m_upsert,
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=new_row),
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -230,8 +230,8 @@ async def test_update_trigger_belongs_to_encounter(app):
     """Updating a trigger that belongs to a *different* encounter → 404."""
     other = {**_TRIGGER_ROW, "raid_encounter_id": 999}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=other),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=other),
     ):
         async with _writer_client(app) as client:
             r = await client.put(
@@ -245,13 +245,13 @@ async def test_update_trigger_belongs_to_encounter(app):
 async def test_update_trigger_writes_and_returns_row(app):
     updated = {**_TRIGGER_ROW, "regex": "^new regex$"}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
         patch(
-            "web.routes.act_triggers.raids_db.get_act_trigger",
+            "web.routes.act.triggers.raids_db.get_act_trigger",
             side_effect=[_TRIGGER_ROW, updated],  # ownership check, then re-read
         ),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers.raids_db.upsert_act_trigger", return_value=11),
+        patch("web.routes.act.triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act.triggers.raids_db.upsert_act_trigger", return_value=11),
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -266,10 +266,10 @@ async def test_update_trigger_writes_and_returns_row(app):
 @pytest.mark.asyncio
 async def test_delete_trigger_happy_path(app):
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers.raids_db.delete_act_trigger", return_value=True),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
+        patch("web.routes.act.triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act.triggers.raids_db.delete_act_trigger", return_value=True),
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -282,8 +282,8 @@ async def test_delete_trigger_happy_path(app):
 async def test_delete_trigger_belongs_to_encounter(app):
     other = {**_TRIGGER_ROW, "raid_encounter_id": 999}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=other),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=other),
     ):
         async with _writer_client(app) as client:
             r = await client.delete("/api/zones/The Emerald Halls/encounters/1/triggers/11")
@@ -298,9 +298,9 @@ async def test_delete_trigger_belongs_to_encounter(app):
 @pytest.mark.asyncio
 async def test_list_spell_timers_returns_rows(app):
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_spell_timers_for_encounter",
+            "web.routes.act.spell_timers.raids_db.list_act_spell_timers_for_encounter",
             return_value=[_SPELL_ROW],
         ),
     ):
@@ -329,7 +329,7 @@ async def test_create_spell_timer_requires_auth(app):
 @pytest.mark.asyncio
 async def test_create_spell_timer_rejects_zero_duration(app):
     """Pydantic gt=0 → 422."""
-    with patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()):
+    with patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()):
         async with _writer_client(app) as client:
             r = await client.post(
                 "/api/zones/The Emerald Halls/encounters/1/spell-timers",
@@ -343,10 +343,10 @@ async def test_create_spell_timer_writes_and_returns_row(app):
     """Body without category → uses mob name. ``absolute=true`` on the API
     side maps to ``absolute_=True`` for the DB helper."""
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers.raids_db.upsert_act_spell_timer", return_value=7) as m_upsert,
-        patch("web.routes.act_triggers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.spell_timers.raids_db.init_db") as m_init,
+        patch("web.routes.act.spell_timers.raids_db.upsert_act_spell_timer", return_value=7) as m_upsert,
+        patch("web.routes.act.spell_timers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -365,10 +365,10 @@ async def test_create_spell_timer_writes_and_returns_row(app):
 async def test_create_spell_timer_name_collision_is_409(app):
     """UNIQUE (encounter_id, name_lower) violation should surface as 409."""
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.spell_timers.raids_db.init_db") as m_init,
         patch(
-            "web.routes.act_triggers.raids_db.upsert_act_spell_timer",
+            "web.routes.act.spell_timers.raids_db.upsert_act_spell_timer",
             side_effect=sqlite3.IntegrityError("UNIQUE constraint failed"),
         ),
     ):
@@ -385,8 +385,8 @@ async def test_create_spell_timer_name_collision_is_409(app):
 async def test_update_spell_timer_belongs_to_encounter(app):
     other = {**_SPELL_ROW, "raid_encounter_id": 999}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_spell_timer", return_value=other),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.spell_timers.raids_db.get_act_spell_timer", return_value=other),
     ):
         async with _writer_client(app) as client:
             r = await client.put(
@@ -399,10 +399,10 @@ async def test_update_spell_timer_belongs_to_encounter(app):
 @pytest.mark.asyncio
 async def test_delete_spell_timer_happy_path(app):
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers.raids_db.delete_act_spell_timer", return_value=True),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.spell_timers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
+        patch("web.routes.act.spell_timers.raids_db.init_db") as m_init,
+        patch("web.routes.act.spell_timers.raids_db.delete_act_spell_timer", return_value=True),
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -420,10 +420,10 @@ async def test_delete_spell_timer_happy_path(app):
 async def test_export_single_trigger_includes_referenced_spell_timer(app):
     """Single-trigger export bundles the spell timer the trigger references."""
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_spell_timers_for_encounter",
+            "web.routes.act.triggers.raids_db.list_act_spell_timers_for_encounter",
             return_value=[_SPELL_ROW],
         ),
     ):
@@ -454,8 +454,8 @@ async def test_export_single_trigger_without_timer_omits_spell_section(app):
     """A trigger with ``timer=False`` shouldn't pull in any <Spell> rows."""
     no_timer = {**_TRIGGER_ROW, "timer": 0, "timer_name": None}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=no_timer),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=no_timer),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/zones/The Emerald Halls/encounters/1/triggers/11/export.xml")
@@ -475,13 +475,13 @@ async def test_export_all_triggers_dedupes_spell_timers(app):
     t1 = {**_TRIGGER_ROW, "id": 11}
     t2 = {**_TRIGGER_ROW, "id": 12, "label": "Second match"}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_triggers_for_encounter",
+            "web.routes.act.triggers.raids_db.list_act_triggers_for_encounter",
             return_value=[t1, t2],
         ),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_spell_timers_for_encounter",
+            "web.routes.act.triggers.raids_db.list_act_spell_timers_for_encounter",
             return_value=[_SPELL_ROW],
         ),
     ):
@@ -497,13 +497,13 @@ async def test_export_all_triggers_dedupes_spell_timers(app):
 async def test_export_all_triggers_empty_encounter(app):
     """Encounter with zero triggers still gives a valid (empty) document."""
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_triggers_for_encounter",
+            "web.routes.act.triggers.raids_db.list_act_triggers_for_encounter",
             return_value=[],
         ),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_spell_timers_for_encounter",
+            "web.routes.act.triggers.raids_db.list_act_spell_timers_for_encounter",
             return_value=[],
         ),
     ):
@@ -523,8 +523,8 @@ async def test_export_single_trigger_wrong_encounter_is_404(app):
     trigger that lives under a different encounter."""
     other = {**_TRIGGER_ROW, "raid_encounter_id": 999}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=other),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=other),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/zones/The Emerald Halls/encounters/1/triggers/11/export.xml")
@@ -569,11 +569,11 @@ async def test_import_xml_short_form(app):
         )
     }
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers._trigger_already_exists_sync", return_value=None),
-        patch("web.routes.act_triggers.raids_db.upsert_act_trigger", return_value=99) as m_upsert,
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=fresh_row),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act.triggers._trigger_already_exists_sync", return_value=None),
+        patch("web.routes.act.triggers.raids_db.upsert_act_trigger", return_value=99) as m_upsert,
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=fresh_row),
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -615,11 +615,11 @@ async def test_import_xml_long_form(app):
         )
     }
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers._trigger_already_exists_sync", return_value=None),
-        patch("web.routes.act_triggers.raids_db.upsert_act_trigger", return_value=99) as m_upsert,
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act.triggers._trigger_already_exists_sync", return_value=None),
+        patch("web.routes.act.triggers.raids_db.upsert_act_trigger", return_value=99) as m_upsert,
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -640,10 +640,10 @@ async def test_import_xml_skips_duplicates(app):
     the import path skips it rather than 409'ing or duplicating."""
     payload = {"xml": '<Trigger R="x" SD="y" />'}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers._trigger_already_exists_sync", return_value=11),
-        patch("web.routes.act_triggers.raids_db.upsert_act_trigger") as m_upsert,
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act.triggers._trigger_already_exists_sync", return_value=11),
+        patch("web.routes.act.triggers.raids_db.upsert_act_trigger") as m_upsert,
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -664,12 +664,12 @@ async def test_import_xml_multiple_elements(app):
     container) should still parse — the route synthesises a root."""
     payload = {"xml": ('<Trigger R="a" SD="alpha" /><Trigger R="b" SD="beta" />')}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers._trigger_already_exists_sync", return_value=None),
-        patch("web.routes.act_triggers.raids_db.upsert_act_trigger", side_effect=[101, 102]),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act.triggers._trigger_already_exists_sync", return_value=None),
+        patch("web.routes.act.triggers.raids_db.upsert_act_trigger", side_effect=[101, 102]),
         patch(
-            "web.routes.act_triggers.raids_db.get_act_trigger",
+            "web.routes.act.triggers.raids_db.get_act_trigger",
             side_effect=[{**_TRIGGER_ROW, "id": 101}, {**_TRIGGER_ROW, "id": 102}],
         ),
     ):
@@ -697,11 +697,11 @@ async def test_import_xml_spell_short_form(app):
         )
     }
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers._spell_timer_id_for_name_sync", return_value=None),
-        patch("web.routes.act_triggers.raids_db.upsert_act_spell_timer", return_value=7) as m_spell,
-        patch("web.routes.act_triggers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act.triggers._spell_timer_id_for_name_sync", return_value=None),
+        patch("web.routes.act.triggers.raids_db.upsert_act_spell_timer", return_value=7) as m_spell,
+        patch("web.routes.act.triggers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -745,14 +745,14 @@ async def test_import_xml_with_spell_sibling(app):
         )
     }
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.init_db") as m_init,
-        patch("web.routes.act_triggers._trigger_already_exists_sync", return_value=None),
-        patch("web.routes.act_triggers._spell_timer_id_for_name_sync", return_value=None),
-        patch("web.routes.act_triggers.raids_db.upsert_act_trigger", return_value=99),
-        patch("web.routes.act_triggers.raids_db.upsert_act_spell_timer", return_value=7) as m_spell,
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
-        patch("web.routes.act_triggers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.init_db") as m_init,
+        patch("web.routes.act.triggers._trigger_already_exists_sync", return_value=None),
+        patch("web.routes.act.triggers._spell_timer_id_for_name_sync", return_value=None),
+        patch("web.routes.act.triggers.raids_db.upsert_act_trigger", return_value=99),
+        patch("web.routes.act.triggers.raids_db.upsert_act_spell_timer", return_value=7) as m_spell,
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=_TRIGGER_ROW),
+        patch("web.routes.act.triggers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
     ):
         m_init.return_value.close = lambda: None
         async with _writer_client(app) as client:
@@ -771,7 +771,7 @@ async def test_import_xml_with_spell_sibling(app):
 @pytest.mark.asyncio
 async def test_import_xml_malformed_is_400(app):
     """Unparseable XML → 400, not a 500."""
-    with patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()):
+    with patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()):
         async with _writer_client(app) as client:
             r = await client.post(
                 "/api/zones/The Emerald Halls/encounters/1/triggers/import-xml",
@@ -784,7 +784,7 @@ async def test_import_xml_malformed_is_400(app):
 async def test_import_xml_no_recognisable_elements_is_400(app):
     """Valid XML but no `<Trigger>` or `<Spell>` → 400 so the UI can
     surface a clear error rather than silently succeed with 0 changes."""
-    with patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()):
+    with patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()):
         async with _writer_client(app) as client:
             r = await client.post(
                 "/api/zones/The Emerald Halls/encounters/1/triggers/import-xml",
@@ -799,7 +799,7 @@ async def test_import_xml_empty_body_is_400(app):
     outcome, different message. We also exercise Pydantic min_length=1
     here: an empty string is a 422 by validation; whitespace-only would be
     a 400 from our parser. Pick the validator path."""
-    with patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()):
+    with patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()):
         async with _writer_client(app) as client:
             r = await client.post(
                 "/api/zones/The Emerald Halls/encounters/1/triggers/import-xml",
@@ -811,7 +811,7 @@ async def test_import_xml_empty_body_is_400(app):
 
 @pytest.mark.asyncio
 async def test_import_xml_unknown_encounter_is_404(app):
-    with patch("web.routes.act_triggers._resolve_encounter_sync", return_value=None):
+    with patch("web.routes.act._shared._resolve_encounter_sync", return_value=None):
         async with _writer_client(app) as client:
             r = await client.post(
                 "/api/zones/Nowhere/encounters/1/triggers/import-xml",
@@ -827,13 +827,13 @@ async def test_export_all_triggers_includes_standalone_spell_timer(app):
     trigger_no_timer = {**_TRIGGER_ROW, "id": 11, "timer": 0, "timer_name": None}
     standalone = {**_SPELL_ROW, "id": 99, "name": "Manaward Reuse", "name_lower": "manaward reuse"}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_triggers_for_encounter",
+            "web.routes.act.triggers.raids_db.list_act_triggers_for_encounter",
             return_value=[trigger_no_timer],
         ),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_spell_timers_for_encounter",
+            "web.routes.act.triggers.raids_db.list_act_spell_timers_for_encounter",
             return_value=[standalone],
         ),
     ):
@@ -855,8 +855,8 @@ async def test_export_all_triggers_includes_standalone_spell_timer(app):
 async def test_export_spell_timer_happy_path(app):
     """Single-timer export returns valid XML with the <Spell> row."""
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.spell_timers.raids_db.get_act_spell_timer", return_value=_SPELL_ROW),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/zones/The Emerald Halls/encounters/1/spell-timers/7/export.xml")
@@ -875,8 +875,8 @@ async def test_export_spell_timer_happy_path(app):
 async def test_export_spell_timer_404_when_missing(app):
     """Unknown timer_id → 404."""
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_spell_timer", return_value=None),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.spell_timers.raids_db.get_act_spell_timer", return_value=None),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/zones/The Emerald Halls/encounters/1/spell-timers/9999/export.xml")
@@ -888,8 +888,8 @@ async def test_export_spell_timer_404_when_wrong_encounter(app):
     """Timer exists but belongs to a different encounter → 404 (ownership check)."""
     wrong_encounter = {**_SPELL_ROW, "raid_encounter_id": 999}
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_spell_timer", return_value=wrong_encounter),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.spell_timers.raids_db.get_act_spell_timer", return_value=wrong_encounter),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/zones/The Emerald Halls/encounters/1/spell-timers/7/export.xml")
@@ -906,10 +906,10 @@ async def test_export_trigger_quotes_attributes_safely(app):
         "sound_data": 'say "danger"',
     }
     with (
-        patch("web.routes.act_triggers._resolve_encounter_sync", return_value=_resolved()),
-        patch("web.routes.act_triggers.raids_db.get_act_trigger", return_value=dangerous),
+        patch("web.routes.act._shared._resolve_encounter_sync", return_value=_resolved()),
+        patch("web.routes.act.triggers.raids_db.get_act_trigger", return_value=dangerous),
         patch(
-            "web.routes.act_triggers.raids_db.list_act_spell_timers_for_encounter",
+            "web.routes.act.triggers.raids_db.list_act_spell_timers_for_encounter",
             return_value=[_SPELL_ROW],
         ),
     ):

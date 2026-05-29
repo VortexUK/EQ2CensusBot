@@ -74,7 +74,7 @@ async def test_spells_db_not_available(app):
     mock_db = MagicMock()
     mock_db.exists.return_value = False
 
-    with patch("web.routes.character._SPELLS_DB", mock_db):
+    with patch("web.routes.character.spells._SPELLS_DB", mock_db):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/character/Sihtric/spells")
 
@@ -92,9 +92,9 @@ async def test_spells_character_not_found(app):
     mock_census.close = AsyncMock()
 
     with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
-        patch("web.routes.character.CensusClient", return_value=mock_census),
+        patch("web.routes.character.spells._SPELLS_DB", mock_db),
+        patch("web.routes.character.spells.character_cache") as mock_cache,
+        patch("web.routes.character.spells.CensusClient", return_value=mock_census),
     ):
         # Cache miss
         mock_cache.get_stale.return_value = (None, False)
@@ -114,8 +114,8 @@ async def test_spells_returns_empty_for_no_spell_ids(app):
     char = _fake_char(spell_ids=[])
 
     with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
+        patch("web.routes.character.spells._SPELLS_DB", mock_db),
+        patch("web.routes.character.spells.character_cache") as mock_cache,
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -141,10 +141,10 @@ async def test_spells_returns_data(app):
     }
 
     with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
-        patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
+        patch("web.routes.character.spells._SPELLS_DB", mock_db),
+        patch("web.routes.character.spells.character_cache") as mock_cache,
+        patch("web.routes.character.spells._spell_find_by_ids", return_value=spell_rows),
+        patch("web.routes.character.spells._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -180,10 +180,10 @@ async def test_spells_blocklist_applied(app):
     blocklist = Blocklist(frozenset({"fighting chance"}), [])
 
     with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
-        patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=blocklist),
+        patch("web.routes.character.spells._SPELLS_DB", mock_db),
+        patch("web.routes.character.spells.character_cache") as mock_cache,
+        patch("web.routes.character.spells._spell_find_by_ids", return_value=spell_rows),
+        patch("web.routes.character.spells._load_spell_blocklist", return_value=blocklist),
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -213,10 +213,10 @@ async def test_spells_only_includes_spellscroll(app):
     }
 
     with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
-        patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
+        patch("web.routes.character.spells._SPELLS_DB", mock_db),
+        patch("web.routes.character.spells.character_cache") as mock_cache,
+        patch("web.routes.character.spells._spell_find_by_ids", return_value=spell_rows),
+        patch("web.routes.character.spells._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -244,10 +244,10 @@ async def test_spells_excludes_zero_level(app):
     }
 
     with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
-        patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
+        patch("web.routes.character.spells._SPELLS_DB", mock_db),
+        patch("web.routes.character.spells.character_cache") as mock_cache,
+        patch("web.routes.character.spells._spell_find_by_ids", return_value=spell_rows),
+        patch("web.routes.character.spells._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -275,10 +275,10 @@ async def test_spells_deduplication_keeps_highest_level(app):
     }
 
     with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
-        patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
+        patch("web.routes.character.spells._SPELLS_DB", mock_db),
+        patch("web.routes.character.spells.character_cache") as mock_cache,
+        patch("web.routes.character.spells._spell_find_by_ids", return_value=spell_rows),
+        patch("web.routes.character.spells._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 
@@ -319,9 +319,9 @@ async def test_spells_fetches_from_census_on_cache_miss(app):
     mock_census.close = AsyncMock()
 
     with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
-        patch("web.routes.character.CensusClient", return_value=mock_census),
+        patch("web.routes.character.spells._SPELLS_DB", mock_db),
+        patch("web.routes.character.spells.character_cache") as mock_cache,
+        patch("web.routes.character.spells.CensusClient", return_value=mock_census),
     ):
         # Cache miss
         mock_cache.get_stale.return_value = (None, False)
@@ -350,10 +350,10 @@ async def test_spells_response_structure(app):
     }
 
     with (
-        patch("web.routes.character._SPELLS_DB", mock_db),
-        patch("web.routes.character.character_cache") as mock_cache,
-        patch("web.routes.character._spell_find_by_ids", return_value=spell_rows),
-        patch("web.routes.character._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
+        patch("web.routes.character.spells._SPELLS_DB", mock_db),
+        patch("web.routes.character.spells.character_cache") as mock_cache,
+        patch("web.routes.character.spells._spell_find_by_ids", return_value=spell_rows),
+        patch("web.routes.character.spells._load_spell_blocklist", return_value=_EMPTY_BLOCKLIST),
     ):
         mock_cache.get_stale.return_value = (char, False)
 

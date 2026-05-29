@@ -116,7 +116,7 @@ def request_guild_refresh(name: str) -> None:
 
 
 async def _run_guild_refresh(name: str, key: str, world: str) -> None:
-    from web.routes.guild import _persist_and_publish_guild
+    from web.guild_cache import _persist_and_publish_guild  # noqa: PLC0415 — avoid startup cycle
 
     try:
         await _persist_and_publish_guild(name, world)

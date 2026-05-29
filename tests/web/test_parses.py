@@ -219,8 +219,8 @@ async def test_list_parses_returns_results(app):
     fake_list_sync = MagicMock(return_value=[dict(_FAKE_ENCOUNTER, combatant_count=2, player_count=1)])
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses")
@@ -265,8 +265,8 @@ async def test_list_parses_groups_mirror_uploads(app):
     fake_list_sync = MagicMock(return_value=[raider_b, raider_a])  # arbitrary order
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses")
@@ -291,8 +291,8 @@ async def test_list_parses_does_not_group_same_uploader(app):
     second = dict(_FAKE_ENCOUNTER, id=2, uploaded_by="Menludiir", started_at=base_started + 5)
     fake_list_sync = MagicMock(return_value=[first, second])
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses")
@@ -309,8 +309,8 @@ async def test_list_parses_does_not_group_different_titles(app):
     b = dict(_FAKE_ENCOUNTER, id=2, title="Boss B", started_at=1716561120)
     fake_list_sync = MagicMock(return_value=[a, b])
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses")
@@ -327,8 +327,8 @@ async def test_list_parses_does_not_group_outside_window(app):
     b = dict(_FAKE_ENCOUNTER, id=2, started_at=1716561116 + 600)  # 10 minutes later
     fake_list_sync = MagicMock(return_value=[a, b])
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses")
@@ -343,8 +343,8 @@ async def test_list_parses_does_not_group_across_guilds(app):
     b = dict(_FAKE_ENCOUNTER, id=2, guild_name="OtherGuild")
     fake_list_sync = MagicMock(return_value=[a, b])
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses")
@@ -364,8 +364,8 @@ async def test_list_parses_clamps_fight_limit(app):
         return []
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", side_effect=fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", side_effect=fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # Asking for 9999 should clamp the fight cap to 500 → inner=15000.
@@ -385,8 +385,8 @@ async def test_list_parses_passes_zone_filter(app):
         return []
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", side_effect=fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", side_effect=fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/api/parses?zone=Great+Divide")
@@ -402,8 +402,8 @@ async def test_list_parses_passes_size_filter(app):
         return []
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", side_effect=fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", side_effect=fake_list_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/api/parses?size=raid24")
@@ -417,7 +417,7 @@ async def test_list_parses_passes_size_filter(app):
 @pytest.mark.asyncio
 async def test_size_buckets_defined():
     """Sanity-check the bucket ranges so the frontend can rely on them."""
-    from web.routes.parses import SIZE_BUCKETS
+    from web.routes.parses.list import SIZE_BUCKETS
 
     assert SIZE_BUCKETS["individual"] == (1, 1)
     assert SIZE_BUCKETS["group"] == (2, 6)
@@ -449,8 +449,8 @@ async def test_get_parse_returns_detail(app):
     fake_detail_sync = MagicMock(return_value=fake_enc)
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._encounter_detail_sync", fake_detail_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._encounter_detail_sync", fake_detail_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses/1")
@@ -507,8 +507,8 @@ async def test_get_parse_returns_detail(app):
 @pytest.mark.asyncio
 async def test_get_parse_missing_returns_404(app):
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._encounter_detail_sync", return_value=None),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._encounter_detail_sync", return_value=None),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses/9999")
@@ -524,8 +524,8 @@ async def test_get_parse_clamps_top_attacks(app):
         return None  # 404 — we just want to inspect the captured arg
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._encounter_detail_sync", side_effect=fake_detail_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._encounter_detail_sync", side_effect=fake_detail_sync),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.get("/api/parses/1?top_attacks=999")
@@ -541,23 +541,23 @@ async def test_get_parse_clamps_top_attacks(app):
 
 class TestUploaderDiscordId:
     def test_plugin_prefix_returns_id(self):
-        from web.routes.parses import _uploader_discord_id
+        from web.routes.parses.list import _uploader_discord_id
 
         assert _uploader_discord_id("plugin:12345") == "12345"
 
     def test_eq2act_returns_none(self):
-        from web.routes.parses import _uploader_discord_id
+        from web.routes.parses.list import _uploader_discord_id
 
         assert _uploader_discord_id("eq2act") is None
 
     def test_empty_returns_none(self):
-        from web.routes.parses import _uploader_discord_id
+        from web.routes.parses.list import _uploader_discord_id
 
         assert _uploader_discord_id("") is None
         assert _uploader_discord_id(None) is None
 
     def test_plugin_with_no_id_returns_none(self):
-        from web.routes.parses import _uploader_discord_id
+        from web.routes.parses.list import _uploader_discord_id
 
         assert _uploader_discord_id("plugin:") is None
 
@@ -600,8 +600,8 @@ async def test_delete_parse_requires_auth(app):
 @pytest.mark.asyncio
 async def test_delete_parse_404_when_missing(app):
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_for_fetch(None)),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_for_fetch(None)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1")
@@ -619,10 +619,10 @@ async def test_delete_parse_admin_can_delete(app):
     }
     delete_mock = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
-        patch("web.routes.parses.parses_db.delete_encounter", delete_mock),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", delete_mock),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1")
@@ -643,10 +643,10 @@ async def test_delete_parse_uploader_can_delete(app):
     }
     delete_mock = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
-        patch("web.routes.parses.parses_db.delete_encounter", delete_mock),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", delete_mock),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1")
@@ -669,11 +669,11 @@ async def test_delete_parse_officer_can_delete(app):
         return {"menludiir"} if guild == "Exordium" else set()
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
         patch("web.routes.guild._officer_chars", fake_officer_chars),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
-        patch("web.routes.parses.parses_db.delete_encounter", delete_mock),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", delete_mock),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1")
@@ -695,10 +695,10 @@ async def test_delete_parse_random_user_403(app):
         return set()
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
         patch("web.routes.guild._officer_chars", fake_officer_chars),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1")
@@ -743,11 +743,11 @@ async def test_delete_batch_officer_deletes_all_uploads(app):
         return {"menludiir"} if guild == "Exordium" else set()
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
         patch("web.routes.guild._officer_chars", fake_officer_chars),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
-        patch("web.routes.parses.parses_db.delete_encounter", delete_mock),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", delete_mock),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/batch?ids=1,2")
@@ -770,10 +770,10 @@ async def test_delete_batch_admin_deletes_all_uploads(app):
     ]
     delete_mock = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
-        patch("web.routes.parses.parses_db.delete_encounter", delete_mock),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", delete_mock),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/batch?ids=5,6")
@@ -807,11 +807,11 @@ async def test_delete_batch_skips_unauthorised_ids(app):
         return set()
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
         patch("web.routes.guild._officer_chars", fake_officer_chars),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
-        patch("web.routes.parses.parses_db.delete_encounter", delete_mock),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", delete_mock),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/batch?ids=1,2")
@@ -836,10 +836,10 @@ async def test_delete_batch_none_allowed_403(app):
         return set()
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
         patch("web.routes.guild._officer_chars", fake_officer_chars),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_multi(rows)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/batch?ids=1")
@@ -849,8 +849,8 @@ async def test_delete_batch_none_allowed_403(app):
 @pytest.mark.asyncio
 async def test_delete_batch_404_when_no_rows(app):
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi([])),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_multi([])),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/batch?ids=999")
@@ -859,7 +859,7 @@ async def test_delete_batch_404_when_no_rows(app):
 
 @pytest.mark.asyncio
 async def test_delete_batch_rejects_bad_ids(app):
-    with patch("web.routes.parses._require_user", _fake_user):
+    with patch("web.routes.parses.delete._require_user", _fake_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             empty = await client.delete("/api/parses/batch?ids=")
             bad = await client.delete("/api/parses/batch?ids=abc")
@@ -881,7 +881,7 @@ async def test_delete_bulk_requires_auth(app):
 
 @pytest.mark.asyncio
 async def test_delete_bulk_requires_guild(app):
-    with patch("web.routes.parses._require_user", _fake_user):
+    with patch("web.routes.parses.delete._require_user", _fake_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses")
     assert r.status_code == 422  # FastAPI validation: missing required query param
@@ -899,11 +899,11 @@ async def test_delete_bulk_admin_passes_filters(app):
         ]
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=MagicMock()),
-        patch("web.routes.parses.parses_db.find_encounters_by_filter", fake_find),
-        patch("web.routes.parses.parses_db.delete_encounter", MagicMock(return_value=True)),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=MagicMock()),
+        patch("web.routes.parses.delete.parses_db.find_encounters_by_filter", fake_find),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", MagicMock(return_value=True)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses?guild=Exordium&zone=Great+Divide&date=2026-05-24&uploader=Menludiir")
@@ -923,19 +923,19 @@ async def test_delete_bulk_officer_allowed(app):
         return {"menludiir"} if guild == "Exordium" else set()
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
         patch("web.routes.guild._officer_chars", fake_officer_chars),
-        patch("web.routes.parses.parses_db.init_db", return_value=MagicMock()),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=MagicMock()),
         patch(
-            "web.routes.parses.parses_db.find_encounters_by_filter",
+            "web.routes.parses.delete.parses_db.find_encounters_by_filter",
             MagicMock(
                 return_value=[
                     {"id": 1, "title": "a krait patriarch", "guild_name": "Exordium", "source_dsn": "plugin:X"},
                 ]
             ),
         ),
-        patch("web.routes.parses.parses_db.delete_encounter", MagicMock(return_value=True)),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", MagicMock(return_value=True)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses?guild=Exordium")
@@ -949,8 +949,8 @@ async def test_delete_bulk_random_user_403(app):
         return set()
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
         patch("web.routes.guild._officer_chars", fake_officer_chars),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -993,7 +993,7 @@ async def test_list_excludes_hidden_rows(app, tmp_path, monkeypatch):
             pdb.soft_delete_encounter(conn, eid, hidden_at=int(_t.time()))
     conn.close()
 
-    with patch("web.routes.parses._require_user", _fake_user):
+    with patch("web.routes.parses.list._require_user", _fake_user):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses")
     titles = {f["title"] for f in r.json()["results"]}
@@ -1020,8 +1020,8 @@ async def test_detail_reports_hidden_flag(app):
         "combatants": [],
     }
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._encounter_detail_sync", MagicMock(return_value=enc)),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._encounter_detail_sync", MagicMock(return_value=enc)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses/1")
@@ -1040,11 +1040,11 @@ async def test_delete_boss_soft_deletes(app):
     soft = MagicMock(return_value=True)
     hard = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
-        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
-        patch("web.routes.parses.parses_db.delete_encounter", hard),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
+        patch("web.routes.parses.delete.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", hard),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1")
@@ -1065,11 +1065,11 @@ async def test_delete_trash_hard_deletes(app):
     soft = MagicMock(return_value=True)
     hard = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
-        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
-        patch("web.routes.parses.parses_db.delete_encounter", hard),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
+        patch("web.routes.parses.delete.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", hard),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1")
@@ -1084,11 +1084,11 @@ async def test_admin_purge_hard_deletes_boss(app):
     soft = MagicMock(return_value=True)
     hard = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
-        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
-        patch("web.routes.parses.parses_db.delete_encounter", hard),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
+        patch("web.routes.parses.delete.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", hard),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1?purge=1")
@@ -1101,9 +1101,9 @@ async def test_admin_purge_hard_deletes_boss(app):
 async def test_purge_forbidden_for_non_admin(app):
     enc = {"id": 1, "guild_name": "Exordium", "source_dsn": "plugin:123456789", "title": "Tarinax", "hidden_at": None}
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_for_fetch(enc)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/1?purge=1")
@@ -1119,11 +1119,11 @@ async def test_delete_batch_boss_soft_deletes_each(app):
     soft = MagicMock(return_value=True)
     hard = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
-        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
-        patch("web.routes.parses.parses_db.delete_encounter", hard),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.delete.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", hard),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/batch?ids=1,2")
@@ -1141,11 +1141,11 @@ async def test_delete_batch_purge_hard_deletes_each(app):
     soft = MagicMock(return_value=True)
     hard = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=_fake_conn_multi(rows)),
-        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
-        patch("web.routes.parses.parses_db.delete_encounter", hard),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=_fake_conn_multi(rows)),
+        patch("web.routes.parses.delete.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", hard),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses/batch?ids=1,2&purge=1")
@@ -1168,12 +1168,12 @@ async def test_bulk_delete_soft_deletes_bosses(app):
     soft = MagicMock(return_value=True)
     hard = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=MagicMock()),
-        patch("web.routes.parses.parses_db.find_encounters_by_filter", MagicMock(return_value=matches)),
-        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
-        patch("web.routes.parses.parses_db.delete_encounter", hard),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=MagicMock()),
+        patch("web.routes.parses.delete.parses_db.find_encounters_by_filter", MagicMock(return_value=matches)),
+        patch("web.routes.parses.delete.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", hard),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses?guild=Exordium")
@@ -1188,12 +1188,12 @@ async def test_bulk_delete_purge_hard_deletes_boss(app):
     soft = MagicMock(return_value=True)
     hard = MagicMock(return_value=True)
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=True),
-        patch("web.routes.parses.parses_db.init_db", return_value=MagicMock()),
-        patch("web.routes.parses.parses_db.find_encounters_by_filter", MagicMock(return_value=matches)),
-        patch("web.routes.parses.parses_db.soft_delete_encounter", soft),
-        patch("web.routes.parses.parses_db.delete_encounter", hard),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=True),
+        patch("web.routes.parses.delete.parses_db.init_db", return_value=MagicMock()),
+        patch("web.routes.parses.delete.parses_db.find_encounters_by_filter", MagicMock(return_value=matches)),
+        patch("web.routes.parses.delete.parses_db.soft_delete_encounter", soft),
+        patch("web.routes.parses.delete.parses_db.delete_encounter", hard),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.delete("/api/parses?guild=Exordium&purge=1")
@@ -1208,8 +1208,8 @@ async def test_bulk_delete_purge_forbidden_for_non_admin(app):
         return {"menludiir"}  # officer, but NOT admin
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._is_admin", return_value=False),
+        patch("web.routes.parses.delete._require_user", _fake_user),
+        patch("web.routes.parses.delete._is_admin", return_value=False),
         patch("web.routes.guild._officer_chars", fake_officer_chars),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -1249,10 +1249,10 @@ async def test_list_parses_resolves_uploader_discord_identity(app):
         return {"discord-1234": "Alice"}
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", fake_list_sync),
         patch(
-            "web.routes.parses.users_db.get_display_names_for_discord_ids",
+            "web.routes.parses.list.users_db.get_display_names_for_discord_ids",
             fake_resolve,
         ),
     ):
@@ -1286,9 +1286,9 @@ async def test_list_parses_non_plugin_upload_has_null_uploader_identity(app):
         return {}
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
-        patch("web.routes.parses.users_db.get_display_names_for_discord_ids", fake_resolve),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", fake_list_sync),
+        patch("web.routes.parses.list.users_db.get_display_names_for_discord_ids", fake_resolve),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses")
@@ -1338,9 +1338,9 @@ async def test_list_parses_batches_unique_uploader_ids(app):
         return {did: f"Name-{did[-1]}" for did in ids}
 
     with (
-        patch("web.routes.parses._require_user", _fake_user),
-        patch("web.routes.parses._list_encounters_sync", fake_list_sync),
-        patch("web.routes.parses.users_db.get_display_names_for_discord_ids", fake_resolve),
+        patch("web.routes.parses.list._require_user", _fake_user),
+        patch("web.routes.parses.list._list_encounters_sync", fake_list_sync),
+        patch("web.routes.parses.list.users_db.get_display_names_for_discord_ids", fake_resolve),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.get("/api/parses")

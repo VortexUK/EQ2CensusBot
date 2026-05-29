@@ -1,0 +1,505 @@
+"""GET /parses + GET /parses/{id} — paginated list + detail of recent encounters.
+
+Carved out of the original 1687-line web/routes/parses.py. All helpers used
+ONLY by the read paths live here. Helpers shared with ingest live in
+ingest.py (and the read paths import them).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import sqlite3
+
+from fastapi import HTTPException, Request
+
+from parses import db as parses_db
+from web import db as users_db
+from web.auth_deps import (
+    is_admin as _is_admin,
+)
+from web.auth_deps import (
+    require_user_session as _require_user,
+)
+from web.constants import PARSE_MIRROR_WINDOW_S
+from web.limiter import limiter
+from web.routes.parses import router  # the package-level router
+from web.routes.parses.models import (
+    AttackSummary,
+    CombatantSummary,
+    CureSummary,
+    DamageTypeBreakdown,
+    HealSummary,
+    ParseDetailResponse,
+    ParseEncounterSummary,
+    ParsePermissions,
+    ParsesListResponse,
+    ParseUploadSummary,
+    ThreatSummary,
+)
+from web.server_context import current_world
+
+_log = logging.getLogger(__name__)
+
+
+def _uploader_discord_id(source_dsn: str | None) -> str | None:
+    """At ingest, plugin uploads stamp source_dsn as 'plugin:<discord_id>'.
+    Returns the discord ID for plugin-uploaded rows, None for local ingests
+    or malformed values."""
+    if not source_dsn or not source_dsn.startswith("plugin:"):
+        return None
+    return source_dsn[len("plugin:") :] or None
+
+
+# Encounter "size" buckets — mapped to a (min_players, max_players) range
+# inclusive on both ends. Used to filter the list endpoint via ?size=...
+SIZE_BUCKETS: dict[str, tuple[int, int]] = {
+    "individual": (1, 1),
+    "group": (2, 6),
+    "raid12": (7, 12),
+    "raid24": (13, 24),
+}
+
+# Player detection: ally combatants whose name is one word and isn't the
+# 'Unknown' fallback row ACT writes for un-attributed damage. Pets nearly
+# always either consolidate into the owner or have multi-word descriptive
+# names, so this catches real player count without false positives.
+_PLAYER_COUNT_SQL = (
+    "SELECT COUNT(*) FROM combatants c "
+    "WHERE c.encounter_id = e.id "
+    "  AND c.ally = 1 "
+    "  AND c.name != '' "
+    "  AND c.name != 'Unknown' "
+    "  AND instr(c.name, ' ') = 0"
+)
+
+
+def _list_encounters_sync(
+    inner_cap: int,
+    zone: str | None,
+    size: str | None,
+    world: str = "Varsoon",
+) -> list[dict]:
+    """Return matching encounter rows most-recent-first, capped at
+    ``inner_cap`` raw uploads (not fights). Mirror grouping happens after
+    this call — inner_cap must be generous enough to cover the requested
+    fight limit × the worst-case mirror count per fight.
+
+    ``world`` scopes results to the active server so a Varsoon viewer only
+    sees Varsoon parses."""
+    if not parses_db.DB_PATH.exists():
+        return []
+
+    # Soft-deleted parses are hidden from the list (but still feed rankings).
+    # Note: the WHERE clause operates on the outer query's columns (no alias).
+    where_clauses: list[str] = ["hidden_at IS NULL", "world = ?"]
+    params: list = [world]
+    if zone:
+        where_clauses.append("zone = ?")
+        params.append(zone)
+    if size and size in SIZE_BUCKETS:
+        lo, hi = SIZE_BUCKETS[size]
+        where_clauses.append("player_count BETWEEN ? AND ?")
+        params.extend([lo, hi])
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+    list_sql = f"""
+        SELECT * FROM (
+            SELECT e.*,
+                ({_PLAYER_COUNT_SQL}) AS player_count,
+                (SELECT COUNT(*) FROM combatants c2 WHERE c2.encounter_id = e.id) AS combatant_count
+            FROM encounters e
+        )
+        {where_sql}
+        ORDER BY started_at DESC
+        LIMIT ?
+    """
+
+    conn = parses_db.init_db(parses_db.DB_PATH)
+    try:
+        conn.row_factory = sqlite3.Row
+        return [dict(r) for r in conn.execute(list_sql, [*params, inner_cap]).fetchall()]
+    finally:
+        conn.close()
+
+
+def _group_into_fights(encounters: list[dict]) -> list[dict]:
+    """Greedy mirror-grouping. Two uploads are the same fight when they come
+    from *different* uploaders, their guild + title match, and any pair of
+    start times falls within ``PARSE_MIRROR_WINDOW_S``. Same-uploader uploads are
+    never merged — one raider can't mirror their own fight, so two of their
+    uploads are two real fights. The canonical upload (carried as the top-level
+    fields on the returned dict) is the longest-duration upload in the
+    group — the raider whose ACT captured the most fight time.
+
+    Each returned group dict looks like::
+
+        {
+            # ...all fields of the canonical upload row...
+            "uploads": [<every upload dict, including the canonical>],
+        }
+
+    Stable behaviour: the previous client-side ``detectMirrors`` in
+    ParsesPage used the same rule; this is a faithful Python port."""
+    if not encounters:
+        return []
+    # Sort by started_at ASC so we attach in chronological order — late
+    # stragglers reach the group whose existing members include their
+    # closest neighbour.
+    sorted_encs = sorted(encounters, key=lambda e: e["started_at"])
+    groups: list[dict] = []
+    for e in sorted_encs:
+        attached = False
+        for g in groups:
+            if g["title"] != e["title"]:
+                continue
+            if g.get("guild_name") != e.get("guild_name"):
+                continue
+            # A mirror is the SAME fight captured by a DIFFERENT raider. Two
+            # uploads from the same uploader are always distinct fights (a
+            # same-encid re-upload is deduped at ingest), so never merge
+            # them — even if title/guild/start-time all line up (e.g. the
+            # same boss pulled twice within the window).
+            if any((u.get("uploaded_by") or "local") == (e.get("uploaded_by") or "local") for u in g["uploads"]):
+                continue
+            # Compare against every member so a late straggler still attaches
+            # even if the first uploader's start time drifted out of window.
+            if not any(abs(u["started_at"] - e["started_at"]) <= PARSE_MIRROR_WINDOW_S for u in g["uploads"]):
+                continue
+            g["uploads"].append(e)
+            # Promote to canonical if this upload captured a longer fight.
+            if e["duration_s"] > g["duration_s"]:
+                kept_uploads = g["uploads"]
+                g.clear()
+                g.update(e)
+                g["uploads"] = kept_uploads
+            attached = True
+            break
+        if not attached:
+            new_group = dict(e)
+            new_group["uploads"] = [e]
+            groups.append(new_group)
+
+    # Render order: most-recent fight first.
+    groups.sort(key=lambda g: g["started_at"], reverse=True)
+    return groups
+
+
+def _encounter_detail_sync(encounter_id: int, top_attacks_per_combatant: int, world: str = "Varsoon") -> dict | None:
+    """Return the encounter + its combatants + top attacks per combatant.
+
+    ``world`` is used to scope the lookup so a viewer on one server can't
+    read another server's encounter by guessing its integer id."""
+    if not parses_db.DB_PATH.exists():
+        return None
+    conn = parses_db.init_db()
+    try:
+        conn.row_factory = sqlite3.Row
+        enc_row = conn.execute("SELECT * FROM encounters WHERE id = ? AND world = ?", (encounter_id, world)).fetchone()
+        if enc_row is None:
+            return None
+        enc = dict(enc_row)
+
+        combatants = parses_db.get_combatants_for_encounter(conn, enc["id"])
+        for c in combatants:
+            c["top_attacks"] = parses_db.get_top_attacks_for_combatant(conn, c["id"], limit=top_attacks_per_combatant)
+            c["top_heals"] = parses_db.get_top_heals_for_combatant(conn, c["id"], limit=top_attacks_per_combatant)
+            c["top_cures"] = parses_db.get_top_cures_for_combatant(conn, c["id"], limit=top_attacks_per_combatant)
+            c["top_threats"] = parses_db.get_top_threats_for_combatant(conn, c["id"], limit=top_attacks_per_combatant)
+            c["damage_types"] = parses_db.get_damage_types_for_combatant(conn, c["id"])
+            c["ally"] = bool(c["ally"])
+        enc["combatants"] = combatants
+        return enc
+    finally:
+        conn.close()
+
+
+async def _compute_permissions(
+    request: Request,
+    encounters: list[dict],
+) -> dict[int, ParsePermissions]:
+    """Return {encounter_id: ParsePermissions} for the rendered list. Admin
+    short-circuits all-true; otherwise we run one cached officer check per
+    unique guild that appears in the result set, then combine with the
+    uploader match."""
+    user = request.session.get("user")
+    if not user:
+        return {e["id"]: ParsePermissions() for e in encounters}
+
+    if _is_admin(user):
+        return {e["id"]: ParsePermissions(can_delete=True) for e in encounters}
+
+    # Local import to dodge any circular dependency through web.routes.guild.
+    from web.routes.guild import _officer_chars
+
+    user_id = user["id"]
+    # Filter→str-cast keeps pyright happy: `e.get("guild_name")` is `Any | None`
+    # and a comprehension `if` doesn't narrow the type through the set→list.
+    guild_list: list[str] = sorted({str(e["guild_name"]) for e in encounters if e.get("guild_name")})
+    officer_results = await asyncio.gather(*(_officer_chars(user_id, g) for g in guild_list))
+    officer_of = {g for g, chars in zip(guild_list, officer_results, strict=True) if chars}
+
+    out: dict[int, ParsePermissions] = {}
+    for e in encounters:
+        gname = e.get("guild_name")
+        is_uploader = _uploader_discord_id(e.get("source_dsn")) == user_id
+        out[e["id"]] = ParsePermissions(
+            can_delete=is_uploader or (gname in officer_of),
+        )
+    return out
+
+
+@router.get("/parses", response_model=ParsesListResponse)
+@limiter.limit("30/minute")
+async def list_parses(
+    request: Request,
+    limit: int = 200,
+    zone: str | None = None,
+    size: str | None = None,
+) -> ParsesListResponse:
+    _require_user(request)
+
+    # `limit` is now a FIGHT cap, not an upload cap. Clamp to 500 — the
+    # whole page is rendered client-side; bigger pages stall the browser
+    # before they stall the server.
+    limit = max(1, min(limit, 500))
+
+    # Unknown `size` value is silently dropped (no filter applied) — same
+    # forgiving behaviour as the recipes route's bench filter.
+    if size and size not in SIZE_BUCKETS:
+        size = None
+
+    # Inner SQL cap: generous enough that even a worst-case 24-mirror raid
+    # would yield well over `limit` fights after grouping. 30x is the magic
+    # number — for limit=500, inner=15000 uploads covers 625 fights at the
+    # 24-mirror worst case, or 15000 unique fights at one-upload-per-fight.
+    inner_cap = max(limit * 30, 2000)
+
+    loop = asyncio.get_event_loop()
+    encounters = await loop.run_in_executor(None, _list_encounters_sync, inner_cap, zone, size, current_world())
+
+    # Group uploads into fights, then apply the user-facing limit to the
+    # FIGHT list. `total` reports total fights (pre-limit) so the UI can
+    # surface "showing X of Y" if it ever wants to.
+    fights = _group_into_fights(encounters)
+    total_fights = len(fights)
+    fights = fights[:limit]
+
+    # Permission compute needs the flat upload list (perms are per-upload,
+    # not per-fight) because trash buttons on the expanded uploader rows
+    # need their own per-row can_delete.
+    all_uploads_in_view: list[dict] = [u for f in fights for u in f["uploads"]]
+    permissions = await _compute_permissions(request, all_uploads_in_view)
+
+    # Batch-resolve Discord display names for every unique uploader in the
+    # current view (one DB query for the whole page, no N+1). The
+    # canonical-upload fight rows live in ``fights``; the per-uploader
+    # rows live in ``all_uploads_in_view``. Both can carry plugin
+    # source_dsns so feed both into the unique-ID set.
+    uploader_ids = {
+        did
+        for source in (all_uploads_in_view, fights)
+        for row in source
+        if (did := _uploader_discord_id(row.get("source_dsn"))) is not None
+    }
+    uploader_names = await users_db.get_display_names_for_discord_ids(list(uploader_ids))
+
+    def _upload_summary(u: dict) -> ParseUploadSummary:
+        did = _uploader_discord_id(u.get("source_dsn"))
+        return ParseUploadSummary(
+            id=u["id"],
+            uploaded_by=u.get("uploaded_by") or "local",
+            uploader_discord_id=did,
+            uploader_display_name=uploader_names.get(did) if did else None,
+            started_at=u["started_at"],
+            duration_s=u["duration_s"],
+            total_damage=u["total_damage"],
+            encdps=u["encdps"],
+            success_level=u.get("success_level", 0) or 0,
+            permissions=permissions.get(u["id"], ParsePermissions()),
+        )
+
+    def _encounter_summary(f: dict) -> ParseEncounterSummary:
+        did = _uploader_discord_id(f.get("source_dsn"))
+        return ParseEncounterSummary(
+            id=f["id"],
+            act_encid=f["act_encid"],
+            title=f["title"],
+            zone=f["zone"],
+            started_at=f["started_at"],
+            ended_at=f["ended_at"],
+            duration_s=f["duration_s"],
+            total_damage=f["total_damage"],
+            encdps=f["encdps"],
+            kills=f["kills"],
+            deaths=f["deaths"],
+            success_level=f.get("success_level", 0) or 0,
+            combatant_count=f.get("combatant_count", 0),
+            player_count=f.get("player_count", 0),
+            uploaded_by=f.get("uploaded_by") or "local",
+            uploader_discord_id=did,
+            uploader_display_name=uploader_names.get(did) if did else None,
+            guild_name=f.get("guild_name"),
+            permissions=permissions.get(f["id"], ParsePermissions()),
+            uploads=[_upload_summary(u) for u in f["uploads"]],
+        )
+
+    results = [_encounter_summary(f) for f in fights]
+    return ParsesListResponse(results=results, total=total_fights)
+
+
+@router.get("/parses/{encounter_id}", response_model=ParseDetailResponse)
+@limiter.limit("60/minute")
+async def get_parse(
+    request: Request,
+    encounter_id: int,
+    top_attacks: int = 15,
+) -> ParseDetailResponse:
+    _require_user(request)
+
+    top_attacks = max(1, min(top_attacks, 50))
+
+    loop = asyncio.get_event_loop()
+    enc = await loop.run_in_executor(None, _encounter_detail_sync, encounter_id, top_attacks, current_world())
+    if enc is None:
+        raise HTTPException(status_code=404, detail="Parse not found")
+
+    # encDPS percentile colouring: rank each combatant's encDPS against their
+    # class's best for this boss (class leader = 100%), and flag the all-class
+    # best with a star. Empty for non-boss encounters (no matching kills).
+    from web.routes.rankings import benchmarks_for_boss  # noqa: PLC0415 — local, avoid import cycle
+
+    # Pass the encounter's own world so benchmarks use the same server's
+    # leaderboard data, regardless of the active request context.
+    enc_world = enc.get("world") or current_world()
+    bench = await loop.run_in_executor(None, benchmarks_for_boss, enc["title"], enc_world)
+
+    def _pct(c: dict, metric: str, value_key: str) -> int | None:
+        cls = c.get("cls")
+        if not cls:
+            return None
+        best = bench[metric][0].get(cls, 0.0)
+        if best <= 0:
+            return None
+        return min(100, round(100 * (c.get(value_key) or 0.0) / best))
+
+    def _best_overall(c: dict, metric: str, value_key: str) -> bool:
+        overall = bench[metric][1]
+        return bool(c.get("cls") and overall > 0 and (c.get(value_key) or 0.0) >= overall)
+
+    combatants = [
+        CombatantSummary(
+            id=c["id"],
+            name=c["name"],
+            ally=c["ally"],
+            level=c.get("level"),
+            guild_name=c.get("guild_name"),
+            cls=c.get("cls"),
+            duration_s=c["duration_s"],
+            damage=c["damage"],
+            damage_perc=c["damage_perc"],
+            dps=c["dps"],
+            encdps=c["encdps"],
+            dps_percentile=_pct(c, "dps", "encdps"),
+            dps_best_overall=_best_overall(c, "dps", "encdps"),
+            hps_percentile=_pct(c, "hps", "enchps"),
+            hps_best_overall=_best_overall(c, "hps", "enchps"),
+            healed=c["healed"],
+            enchps=c["enchps"],
+            heals=c["heals"],
+            crit_heals=c["crit_heals"],
+            cure_dispels=c["cure_dispels"],
+            power_drain=c["power_drain"],
+            power_replenish=c["power_replenish"],
+            heals_taken=c["heals_taken"],
+            damage_taken=c["damage_taken"],
+            threat_delta=c["threat_delta"],
+            deaths=c["deaths"],
+            kills=c["kills"],
+            crit_hits=c["crit_hits"],
+            crit_dam_perc=c["crit_dam_perc"],
+            top_attacks=[
+                AttackSummary(
+                    attack_name=a["attack_name"],
+                    damage=a["damage"],
+                    hits=a["hits"],
+                    swings=a["swings"],
+                    crit_perc=a["crit_perc"],
+                    max_hit=a["max_hit"],
+                )
+                for a in c["top_attacks"]
+            ],
+            top_heals=[
+                HealSummary(
+                    heal_name=h["attack_name"],
+                    healed=h["damage"],  # `damage` column = amount healed for swing_type=3
+                    hits=h["hits"],
+                    swings=h["swings"],
+                    crit_perc=h["crit_perc"],
+                    max_hit=h["max_hit"],
+                    heal_type=h["resist"],
+                )
+                for h in c["top_heals"]
+            ],
+            top_cures=[
+                CureSummary(
+                    cure_name=cu["attack_name"],
+                    effects_removed=cu["damage"],
+                    times_cast=cu["hits"],
+                    max_at_once=cu["max_hit"],
+                )
+                for cu in c["top_cures"]
+            ],
+            top_threats=[
+                ThreatSummary(
+                    ability_name=t["attack_name"],
+                    value=t["damage"],
+                    procs=t["hits"],
+                    max_proc=t["max_hit"],
+                    kind=t["resist"],
+                )
+                for t in c["top_threats"]
+            ],
+            damage_types=[
+                DamageTypeBreakdown(
+                    damage_type=d["damage_type"],
+                    damage=d["damage"],
+                    dps=d["dps"],
+                    hits=d["hits"],
+                    swings=d["swings"],
+                    max_hit=d["max_hit"],
+                    crit_perc=d["crit_perc"],
+                )
+                for d in c["damage_types"]
+            ],
+        )
+        for c in enc["combatants"]
+    ]
+    # Resolve the uploader's Discord identity for badge rendering on the
+    # detail page. Single-row lookup since this is one parse — the list
+    # endpoint batches across the whole page.
+    uploader_discord_id = _uploader_discord_id(enc.get("source_dsn"))
+    uploader_display_name: str | None = None
+    if uploader_discord_id:
+        name_map = await users_db.get_display_names_for_discord_ids([uploader_discord_id])
+        uploader_display_name = name_map.get(uploader_discord_id)
+
+    return ParseDetailResponse(
+        id=enc["id"],
+        act_encid=enc["act_encid"],
+        title=enc["title"],
+        zone=enc["zone"],
+        started_at=enc["started_at"],
+        ended_at=enc["ended_at"],
+        duration_s=enc["duration_s"],
+        total_damage=enc["total_damage"],
+        encdps=enc["encdps"],
+        kills=enc["kills"],
+        deaths=enc["deaths"],
+        success_level=enc.get("success_level", 0) or 0,
+        uploaded_by=enc.get("uploaded_by") or "local",
+        uploader_discord_id=uploader_discord_id,
+        uploader_display_name=uploader_display_name,
+        hidden=bool(enc.get("hidden_at")),
+        combatants=combatants,
+    )

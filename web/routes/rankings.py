@@ -26,7 +26,7 @@ from parses.boss import is_boss
 from web.auth_deps import require_user_session as _require_user
 from web.cache import TTLCache
 from web.limiter import limiter
-from web.routes.parses import _PLAYER_COUNT_SQL, _group_into_fights
+from web.routes.parses.list import _PLAYER_COUNT_SQL, _group_into_fights
 from web.server_context import current_server, current_world
 
 router = APIRouter(tags=["rankings"])
