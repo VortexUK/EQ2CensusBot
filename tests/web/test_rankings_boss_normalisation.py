@@ -33,3 +33,25 @@ def test_idempotent() -> None:
 
 def test_no_apostrophe() -> None:
     assert _normalise_boss_key("Vyemm") == "vyemm"
+
+
+def test_modifier_letter_double_prime_normalised() -> None:
+    assert _normalise_boss_key("Vʺtekla") == "v'tekla"
+
+
+def test_nbsp_folded_to_space() -> None:
+    # NBSP between words → ASCII space
+    assert _normalise_boss_key("V'Tekla K'Zalk") == "v'tekla k'zalk"
+
+
+def test_nfc_composed_form() -> None:
+    # Decomposed e + acute → composed é (NFC); confirm a known-decomposed input collapses
+    assert _normalise_boss_key("é") == "é"
+
+
+def test_strip_trailing_whitespace() -> None:
+    assert _normalise_boss_key("D'Lizta Cheroon  ") == "d'lizta cheroon"
+
+
+def test_fullwidth_apostrophe() -> None:
+    assert _normalise_boss_key("D＇Lizta") == "d'lizta"

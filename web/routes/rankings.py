@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
+import unicodedata
 from collections import defaultdict
 from functools import lru_cache
 
@@ -30,30 +31,43 @@ from web.server_context import current_server, current_world
 
 router = APIRouter(tags=["rankings"])
 
-# Apostrophe variants seen in EQ2 mob names — straight ASCII apostrophe (U+0027),
-# right single quote (U+2019), modifier letter apostrophe (U+02BC),
-# left single quote (U+2018), backtick (U+0060), acute (U+00B4).
-# ACT log files and the in-game client are inconsistent about which one
-# they emit, and the curator-entered roster in zones.db may use yet another.
-# Normalise both sides to the ASCII straight quote at lookup time so apostrophe
-# codepoint mismatches don't cause silent rankings-board misses.
+# Mirror of frontend normaliseBossName in RankingsPage.tsx — keep in sync.
+# Folds the full set of apostrophe-like and space-like Unicode codepoints
+# we've seen in ACT logs and curator-entered roster data so the boss_index
+# lookup doesn't silently miss on codepoint mismatches.
 _APOSTROPHE_VARIANTS = str.maketrans(
     {
-        "’": "'",  # ' right single quote
-        "‘": "'",  # ' left single quote
-        "ʼ": "'",  # ʼ modifier letter apostrophe
-        "`": "'",  # ` backtick
-        "´": "'",  # ´ acute accent
+        "`": "'",  # U+0060 GRAVE ACCENT
+        "´": "'",  # U+00B4 ACUTE ACCENT
+        "ʹ": "'",  # U+02B9 MODIFIER LETTER PRIME
+        "ʺ": "'",  # U+02BA MODIFIER LETTER DOUBLE PRIME
+        "ʻ": "'",  # U+02BB MODIFIER LETTER TURNED COMMA
+        "ʼ": "'",  # U+02BC MODIFIER LETTER APOSTROPHE
+        "ʽ": "'",  # U+02BD MODIFIER LETTER REVERSED COMMA
+        "ʾ": "'",  # U+02BE MODIFIER LETTER RIGHT HALF RING
+        "ʿ": "'",  # U+02BF MODIFIER LETTER LEFT HALF RING
+        "ˈ": "'",  # U+02C8 MODIFIER LETTER VERTICAL LINE
+        "‘": "'",  # U+2018 LEFT SINGLE QUOTATION MARK
+        "’": "'",  # U+2019 RIGHT SINGLE QUOTATION MARK
+        "‛": "'",  # U+201B SINGLE HIGH-REVERSED-9 QUOTATION MARK
+        "′": "'",  # U+2032 PRIME
+        "＇": "'",  # U+FF07 FULLWIDTH APOSTROPHE
+        " ": " ",  # U+00A0 NO-BREAK SPACE
+        " ": " ",  # U+2009 THIN SPACE
+        " ": " ",  # U+200A HAIR SPACE
+        " ": " ",  # U+202F NARROW NO-BREAK SPACE
+        " ": " ",  # U+205F MEDIUM MATHEMATICAL SPACE
+        "　": " ",  # U+3000 IDEOGRAPHIC SPACE
     }
 )
 
 
 def _normalise_boss_key(s: str) -> str:
-    """Lowercase + collapse apostrophe variants. Used as the cache-key shape
-    for boss_index lookups so curator-entered and parse-shipped apostrophes
-    can never silently miss each other. Mirrors the frontend
-    `normaliseBossName` in RankingsPage.tsx — keep the two in sync."""
-    return s.lower().translate(_APOSTROPHE_VARIANTS)
+    """Lowercase + Unicode NFC + collapse apostrophe/space variants. Used
+    as the cache-key shape for boss_index lookups so curator-entered and
+    parse-shipped codepoint variants can never silently miss each other.
+    Frontend mirror: normaliseBossName in RankingsPage.tsx."""
+    return unicodedata.normalize("NFC", s).lower().translate(_APOSTROPHE_VARIANTS).strip()
 
 
 # Valid ?size= keys + the GROUP player-count range. Raid is deliberately
