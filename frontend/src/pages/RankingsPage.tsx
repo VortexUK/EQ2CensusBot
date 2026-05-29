@@ -33,10 +33,13 @@ interface RankingsResponse { rows: RankingRow[]; classes: string[]; total: numbe
 // inconsistent about which apostrophe codepoint they use (U+0027 vs U+2019
 // vs U+02BC and others) — and similarly for whitespace (NBSP creeps in from
 // copy-paste). Backend mirror: _normalise_boss_key in web/routes/rankings.py.
+// Codepoints written as explicit \uXXXX escapes so editor/tool re-encoding
+// can't silently collapse them to ASCII (which would leave the regex a no-op).
+// All apostrophe-like / space-like variants seen in ACT logs or curator data:
 const APOSTROPHE_VARIANTS = /[`´ʹʺʻʼʽʾʿˈ‘’‛′＇]/g
-const SPACE_VARIANTS = /[     　]/g
+const SPACE_VARIANTS = /[     　]/g
 
-function normaliseBossName(s: string): string {
+export function normaliseBossName(s: string): string {
   return s
     .normalize('NFC')
     .replace(APOSTROPHE_VARIANTS, "'")
@@ -60,7 +63,7 @@ const METRICS: DropdownOption[] = [
 // and silently fails. We catch + retry-after-quota-reset so the URL eventually
 // catches up to React state. State is the source of truth (see RankingsPage);
 // URL sync is best-effort — if it never lands, the page still works fine.
-function safeSetParams(
+export function safeSetParams(
   setParams: (...args: unknown[]) => void,
   args: unknown[],
 ): void {

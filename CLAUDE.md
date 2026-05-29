@@ -167,6 +167,12 @@ Shared types + className constants for a split page go in a sibling `types.ts`. 
 - **`<Button>` doesn't fit** — sometimes a raw `<button>` with `appearance-none border-0 bg-transparent` is the right primitive (icon-only drag handles, hamburger triggers). Use raw + the Preflight-reset utilities.
 - **`useFetch` doesn't fit** — for chained / dependent fetches that need to read each other's result mid-flight, keep a hand-rolled `useEffect`. Just remember `credentials: 'include'` + `res.ok` + cleanup.
 
+### Mandatory testing rules
+
+- **Module-load side effects need a no-throw vitest.** Any frontend module with top-level code that mutates globals (monkey-patches History/Location/etc., installs event listeners, runs heavy init work) needs at minimum `await expect(import('./mod')).resolves.toBeDefined()` in jsdom. The v5 historyTrace disaster shipped because this check was missing — `window.location.assign = fn` throws TypeError ("assign is read-only") at import time and broke the entire site. Reference pattern: the (now-deleted) `historyTrace.test.ts` from the 2026-05-29 diagnostic.
+
+- **URL filter state needs a "setSearchParams can throw" test.** Browser extensions (ClearURLs, Privacy Badger, uBlock) and Firefox tracking-protection internals share the per-Document History API throttle quota. When depleted, `setSearchParams` throws `DOMException SecurityError`. Any component that uses `useSearchParams` for actively-clicked filter state should have a vitest that mocks setSearchParams to throw and asserts the UI still responds. RankingsPage uses the "React state as source of truth, URL as best-effort mirror via `safeSetParams`" pattern — copy from there; don't rebuild the URL-first pattern.
+
 ## Environment variables
 
 | Variable | Description |
