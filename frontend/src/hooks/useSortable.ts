@@ -31,16 +31,22 @@ export function useSortable<T, K extends string>(
   getValue: (row: T, key: K) => unknown,
   initialKey: K,
   initialDir: SortDir = 'asc',
+  defaultDirFor?: (key: K) => SortDir,
 ): UseSortableResult<T, K> {
   const [sortKey, setSortKey] = useState<K>(initialKey)
   const [sortDir, setSortDir] = useState<SortDir>(initialDir)
+
+  // Hold defaultDirFor in a ref so callers can pass inline arrows without
+  // triggering spurious re-renders (same pattern as getValueRef below).
+  const defaultDirForRef = useRef(defaultDirFor)
+  defaultDirForRef.current = defaultDirFor
 
   function handleSort(key: K) {
     if (key === sortKey) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     } else {
       setSortKey(key)
-      setSortDir('asc')
+      setSortDir(defaultDirForRef.current ? defaultDirForRef.current(key) : 'asc')
     }
   }
 

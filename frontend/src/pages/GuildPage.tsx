@@ -1,40 +1,26 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLazyFetch } from '../hooks/useFetch'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
 import { FilterPill } from '../components/FilterPill'
 import { useClaim } from '../hooks/useClaim'
 import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
-import { useClasses } from '../useClasses'
-import { SPELL_TIER_COLOURS as TIER_COLOURS } from '../spellConstants'
 import { Button, Card } from '../components/ui'
 import { FreshnessBadge } from '../components/FreshnessBadge'
 import { useCensusStream } from '../hooks/useCensusStream'
 import { fmtRelative } from '../formatters'
+import { GuildRosterTab } from './guild/GuildRosterTab'
+import { GuildSpellCheckTab } from './guild/GuildSpellCheckTab'
+import { GuildAdornCheckTab } from './guild/GuildAdornCheckTab'
+import type {
+  GuildData,
+  GuildSpellCheck,
+  GuildAdornCheck,
+  Tab,
+} from './guild/types'
+import { TH_CLS, TD_CLS } from './guild/types'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface GuildMember {
-  name: string
-  level: number | null
-  cls: string | null
-  ts_class: string | null
-  ts_level: number | null
-  aa_level: number | null
-  ilvl: number | null
-  deity: string | null
-  rank: string | null
-  rank_id: number | null
-  guild_status: number | null
-}
-
-interface GuildData {
-  name: string
-  world: string
-  members: GuildMember[]
-  fetched_at?: number | null
-  stale?: boolean
-}
+// ── Local types (not shared with sub-tabs) ───────────────────────────────────
 
 interface GuildInfo {
   name: string
@@ -47,42 +33,6 @@ interface GuildInfo {
   members: number | null
   accounts: number | null
   achievement_count: number
-}
-
-interface MemberSpellTiers {
-  name: string
-  rank: string | null
-  rank_id: number | null
-  tiers: Record<string, number>
-  total: number
-  spell_names: Record<string, string[]>
-}
-
-interface GuildSpellCheck {
-  guild_name: string
-  world: string
-  tiers: string[]
-  members: MemberSpellTiers[]
-}
-
-interface AdornColorStats {
-  filled: number
-  total: number
-}
-
-interface MemberAdornStats {
-  name: string
-  rank: string | null
-  rank_id: number | null
-  adorns: Record<string, AdornColorStats>
-  missing: Record<string, string[]>
-}
-
-interface GuildAdornCheck {
-  guild_name: string
-  world: string
-  colors: string[]
-  members: MemberAdornStats[]
 }
 
 interface GuildClaimItem {
@@ -107,27 +57,7 @@ interface ItemWatchEntry {
   last_checked_at: number | null
 }
 
-type Tab = 'roster' | 'spells' | 'adorns' | 'claims' | 'watch'
-
 // ── Style helpers ─────────────────────────────────────────────────────────────
-
-// Adorn fill rate → colour
-function adornCellStyle(filled: number, total: number): React.CSSProperties {
-  if (total === 0) return { color: 'var(--text-muted)' }
-  const pct = filled / total
-  if (pct === 1)   return { color: 'var(--success)' }
-  if (pct >= 0.75) return { color: '#84cc16' }
-  if (pct >= 0.5)  return { color: '#eab308' }
-  if (pct >= 0.25) return { color: '#f97316' }
-  return { color: 'var(--danger)' }
-}
-
-// ── Shared table styles ───────────────────────────────────────────────────────
-
-// Invariant table-cell utilities. Dynamic bits (active colour, alignment,
-// per-cell colour/background) stay inline at each call site.
-const TH_CLS = 'px-[0.6rem] py-2 text-[0.72rem] uppercase tracking-[0.05em] font-semibold whitespace-nowrap'
-const TD_CLS = 'px-[0.6rem] py-[0.42rem] text-[0.88rem] whitespace-nowrap'
 
 // ── Guild info stat chip ──────────────────────────────────────────────────────
 
@@ -163,489 +93,7 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
   )
 }
 
-// ── Roster table ──────────────────────────────────────────────────────────────
-
-function fmtGuildStatus(pts: number | null): string {
-  if (pts == null) return '—'
-  return pts.toLocaleString()
-}
-
-type RosterSortKey = 'rank' | 'name' | 'level' | 'aa' | 'ilvl' | 'ts_level' | 'deity' | 'guild_status'
-
-const ROSTER_COLS: { label: string; key: RosterSortKey; align?: 'right' }[] = [
-  { label: 'Name',             key: 'name'         },
-  { label: 'Rank',             key: 'rank'         },
-  { label: 'Class (Level)',    key: 'level'        },
-  { label: 'AA',               key: 'aa',          align: 'right' },
-  { label: 'iLvl',             key: 'ilvl',        align: 'right' },
-  { label: 'Tradeskill (Lvl)', key: 'ts_level'     },
-  { label: 'Deity',            key: 'deity'        },
-  { label: 'Guild Status',     key: 'guild_status', align: 'right' },
-]
-
-function rosterSortValue(m: GuildMember, key: RosterSortKey): string | number {
-  switch (key) {
-    case 'rank':         return m.rank_id ?? 9999
-    case 'name':         return m.name.toLowerCase()
-    case 'level':        return m.level ?? -1
-    case 'aa':           return m.aa_level ?? -1
-    case 'ilvl':         return m.ilvl ?? -1
-    case 'ts_level':     return m.ts_level ?? -1
-    case 'deity':        return (m.deity ?? '').toLowerCase()
-    case 'guild_status': return m.guild_status ?? -1
-  }
-}
-
-function RosterTable({ members, filter, hiddenRanks, myChars }: { members: GuildMember[]; filter: string; hiddenRanks: Set<string>; myChars: Set<string> }) {
-  const { colourFor } = useClasses()
-  const [sortKey, setSortKey] = useState<RosterSortKey>('rank')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-
-  function handleSort(key: RosterSortKey) {
-    if (key === sortKey) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortKey(key)
-      // Numeric columns default to descending (highest first); others ascending
-      setSortDir(['level', 'aa', 'ilvl', 'ts_level', 'guild_status'].includes(key) ? 'desc' : 'asc')
-    }
-  }
-
-  const sorted = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    const base = members.filter(m => {
-      if (m.rank && hiddenRanks.has(m.rank)) return false
-      if (!q) return true
-      return m.name.toLowerCase().includes(q) ||
-        (m.cls ?? '').toLowerCase().includes(q) ||
-        (m.rank ?? '').toLowerCase().includes(q)
-    })
-
-    base.sort((a, b) => {
-      const av = rosterSortValue(a, sortKey)
-      const bv = rosterSortValue(b, sortKey)
-      const cmp = av < bv ? -1 : av > bv ? 1 : 0
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-    return base
-  }, [members, filter, hiddenRanks, sortKey, sortDir])
-
-  return (
-    <table className="w-full border-collapse">
-      <thead>
-        <tr className="border-b-2 border-border bg-surface-raised">
-          {ROSTER_COLS.map(col => {
-            const active = sortKey === col.key
-            return (
-              <th
-                key={col.key}
-                onClick={() => handleSort(col.key)}
-                className={`${TH_CLS} cursor-pointer select-none`}
-                style={{
-                  textAlign: col.align ?? 'left',
-                  color: active ? 'var(--accent)' : 'var(--text-muted)',
-                }}
-              >
-                {col.label}
-                <span className="ml-[0.3rem] text-[0.65rem]" style={{ opacity: active ? 1 : 0.3 }}>
-                  {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
-                </span>
-              </th>
-            )
-          })}
-        </tr>
-      </thead>
-      <tbody>
-        {sorted.length === 0 ? (
-          <tr><td colSpan={8} className={`${TD_CLS} text-center text-text-muted`}>No members match your filter.</td></tr>
-        ) : sorted.map(m => {
-          const clsLabel = m.cls
-            ? m.level != null ? `${m.cls} (${m.level})` : m.cls
-            : '—'
-          const tsLabel = m.ts_class
-            ? m.ts_level != null
-              ? `${m.ts_class.charAt(0).toUpperCase()}${m.ts_class.slice(1)} (${m.ts_level})`
-              : m.ts_class
-            : '—'
-          return (
-            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(var(--gold-rgb), 0.06)' : undefined }}>
-              <td className={TD_CLS}>
-                <Link to={`/character/${encodeURIComponent(m.name)}`}
-                  className="text-gold no-underline font-medium">
-                  {m.name}
-                </Link>
-                {myChars.has(m.name.toLowerCase()) && (
-                  <span className="ml-[0.4rem] text-[0.65rem] text-gold align-middle">★</span>
-                )}
-              </td>
-              <td className={`${TD_CLS} text-text-muted text-[0.85rem]`}>{m.rank ?? '—'}</td>
-              <td className={TD_CLS} style={{ color: m.cls ? colourFor(m.cls, 'var(--text)') : 'var(--text-muted)' }}>{clsLabel}</td>
-              <td className={`${TD_CLS} text-right text-text-muted`}>{m.aa_level ?? '—'}</td>
-              <td className={`${TD_CLS} text-right tabular-nums text-gold`}>{m.ilvl != null ? Math.round(m.ilvl).toLocaleString() : '—'}</td>
-              <td className={`${TD_CLS} text-text-muted`}>{tsLabel}</td>
-              <td className={`${TD_CLS} text-text-muted text-[0.82rem]`}>{m.deity ?? '—'}</td>
-              <td className={`${TD_CLS} text-right text-text-muted text-[0.82rem]`}>{fmtGuildStatus(m.guild_status)}</td>
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
-  )
-}
-
-// ── Spell check table ─────────────────────────────────────────────────────────
-
-const TIER_SHORT: Record<string, string> = {
-  Apprentice: 'App', Journeyman: 'Journ', Adept: 'Adept',
-  Expert: 'Expert', Master: 'Master', Grandmaster: 'GM',
-}
-
-interface SpellTooltip {
-  x: number
-  y: number
-  tier: string
-  names: string[]
-}
-
-function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSpellCheck; filter: string; hiddenRanks: Set<string>; myChars: Set<string> }) {
-  const [sortKey, setSortKey] = useState<string>('rank')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [tooltip, setTooltip] = useState<SpellTooltip | null>(null)
-
-  function handleSort(key: string) {
-    if (key === sortKey) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortKey(key)
-      setSortDir(key === 'name' || key === 'rank' ? 'asc' : 'desc')
-    }
-  }
-
-  function sortValue(m: MemberSpellTiers): string | number {
-    if (sortKey === 'rank')  return m.rank_id ?? 9999
-    if (sortKey === 'name')  return m.name.toLowerCase()
-    if (sortKey === 'total') return m.total
-    return m.tiers[sortKey] ?? 0
-  }
-
-  const sorted = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    const base = data.members.filter(m => {
-      if (m.rank && hiddenRanks.has(m.rank)) return false
-      if (!q) return true
-      return m.name.toLowerCase().includes(q) || (m.rank ?? '').toLowerCase().includes(q)
-    })
-
-    base.sort((a, b) => {
-      const av = sortValue(a), bv = sortValue(b)
-      const cmp = av < bv ? -1 : av > bv ? 1 : 0
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-    return base
-  }, [data.members, filter, hiddenRanks, sortKey, sortDir])
-
-  function SortTh({ label, colKey, align, color }: { label: string; colKey: string; align?: 'right'; color?: string }) {
-    const active = sortKey === colKey
-    return (
-      <th
-        onClick={() => handleSort(colKey)}
-        className={`${TH_CLS} cursor-pointer select-none`}
-        style={{
-          textAlign: align ?? 'left',
-          color: active ? 'var(--accent)' : (color ?? 'var(--text-muted)'),
-        }}
-      >
-        {label}
-        <span className="ml-[0.3rem] text-[0.65rem]" style={{ opacity: active ? 1 : 0.3 }}>
-          {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
-        </span>
-      </th>
-    )
-  }
-
-  function showTooltip(e: React.MouseEvent<HTMLTableCellElement>, tier: string, names: string[]) {
-    if (names.length === 0) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    // Position above the cell, centred horizontally
-    setTooltip({
-      x: Math.min(rect.left + rect.width / 2, window.innerWidth - 160),
-      y: rect.top - 6,
-      tier,
-      names,
-    })
-  }
-
-  return (
-    <>
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-b-2 border-border bg-surface-raised">
-            <SortTh label="Name"  colKey="name" />
-            <SortTh label="Rank"  colKey="rank" />
-            {data.tiers.map(t => (
-              <SortTh key={t} label={TIER_SHORT[t] ?? t} colKey={t} align="right" color={TIER_COLOURS[t]?.text} />
-            ))}
-            <SortTh label="Total" colKey="total" align="right" />
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map(m => (
-            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(var(--gold-rgb), 0.06)' : undefined }}>
-              <td className={TD_CLS}>
-                <Link to={`/character/${encodeURIComponent(m.name)}`}
-                  className="text-gold no-underline font-medium">
-                  {m.name}
-                </Link>
-                {myChars.has(m.name.toLowerCase()) && (
-                  <span className="ml-[0.4rem] text-[0.65rem] text-gold align-middle">★</span>
-                )}
-              </td>
-              <td className={`${TD_CLS} text-text-muted text-[0.85rem]`}>{m.rank ?? '—'}</td>
-              {data.tiers.map(t => {
-                const count = m.tiers[t] ?? 0
-                const tc = TIER_COLOURS[t]
-                const names = m.spell_names?.[t] ?? []
-                return (
-                  <td
-                    key={t}
-                    onMouseEnter={count > 0 ? e => showTooltip(e, t, names) : undefined}
-                    onMouseLeave={count > 0 ? () => setTooltip(null) : undefined}
-                    onClick={count > 0 ? e => showTooltip(e, t, names) : undefined}
-                    className={`${TD_CLS} text-right`}
-                    style={{
-                      color: count > 0 ? (tc?.text ?? 'var(--text)') : 'var(--text-muted)',
-                      background: count > 0 ? (tc?.bg ?? 'transparent') : 'transparent',
-                      fontWeight: count > 0 ? 500 : 400,
-                      cursor: count > 0 ? 'default' : undefined,
-                    }}
-                  >
-                    {count > 0 ? count : '—'}
-                  </td>
-                )
-              })}
-              <td className={`${TD_CLS} text-right font-semibold text-text`}>
-                {m.total}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Spell name tooltip — fixed so it escapes the scrollable table container */}
-      {tooltip && (
-        <div
-          className="fixed -translate-x-1/2 -translate-y-full rounded-[6px] px-[0.8rem] py-2 z-[9999] pointer-events-none max-w-[280px]"
-          style={{
-            left: tooltip.x,
-            top: tooltip.y,
-            background: '#1a1d26',
-            border: `1px solid ${TIER_COLOURS[tooltip.tier]?.text ?? 'var(--border)'}`,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-          }}
-        >
-          <div
-            className="text-[0.68rem] uppercase tracking-[0.06em] font-bold mb-[0.35rem]"
-            style={{ color: TIER_COLOURS[tooltip.tier]?.text ?? 'var(--text-muted)' }}
-          >
-            {tooltip.tier} · {tooltip.names.length}
-          </div>
-          {tooltip.names.map((name, i) => (
-            <div key={i} className="text-[0.83rem] text-text leading-[1.65]">
-              {name}
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  )
-}
-
-// ── Adorn check table ─────────────────────────────────────────────────────────
-
-// Colour name → a display colour for the tooltip border/header
-const ADORN_COLOURS: Record<string, string> = {
-  White:     '#e2e8f0',
-  Yellow:    '#eab308',
-  Red:       '#ef4444',
-  Blue:      '#60a5fa',
-  Turquoise: '#2dd4bf',
-  Green:     '#22c55e',
-  Orange:    '#f97316',
-  Purple:    '#a855f7',
-}
-
-/** Consolidate repeated slot names: ["Ring", "Ring", "Ear"] → ["Ring x2", "Ear"] */
-function consolidateSlots(slots: string[]): string[] {
-  const counts: Record<string, number> = {}
-  for (const s of slots) counts[s] = (counts[s] ?? 0) + 1
-  return Object.entries(counts).map(([s, n]) => n > 1 ? `${s} ×${n}` : s)
-}
-
-interface AdornTooltip {
-  x: number
-  y: number
-  colour: string
-  slots: string[]   // already consolidated
-}
-
-function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAdornCheck; filter: string; hiddenRanks: Set<string>; myChars: Set<string> }) {
-  const [sortKey, setSortKey] = useState<string>('rank')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [tooltip, setTooltip] = useState<AdornTooltip | null>(null)
-
-  function handleSort(key: string) {
-    if (key === sortKey) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortKey(key)
-      setSortDir(key === 'name' || key === 'rank' ? 'asc' : 'desc')
-    }
-  }
-
-  // Only show colour columns where at least one member has a filled adorn of that colour
-  const activeColors = useMemo(() =>
-    data.colors.filter(c =>
-      data.members.some(m => (m.adorns[c]?.filled ?? 0) > 0)
-    ),
-  [data])
-
-  function sortValue(m: MemberAdornStats): string | number {
-    if (sortKey === 'rank') return m.rank_id ?? 9999
-    if (sortKey === 'name') return m.name.toLowerCase()
-    const s = m.adorns[sortKey]
-    if (!s || s.total === 0) return -1
-    return s.filled / s.total
-  }
-
-  const sorted = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    const base = data.members.filter(m => {
-      if (m.rank && hiddenRanks.has(m.rank)) return false
-      if (!q) return true
-      return m.name.toLowerCase().includes(q) || (m.rank ?? '').toLowerCase().includes(q)
-    })
-
-    base.sort((a, b) => {
-      const av = sortValue(a), bv = sortValue(b)
-      const cmp = av < bv ? -1 : av > bv ? 1 : 0
-      return sortDir === 'asc' ? cmp : -cmp
-    })
-    return base
-  }, [data.members, filter, hiddenRanks, sortKey, sortDir])
-
-  function SortTh({ label, colKey, align }: { label: string; colKey: string; align?: 'right' }) {
-    const active = sortKey === colKey
-    return (
-      <th
-        onClick={() => handleSort(colKey)}
-        className={`${TH_CLS} cursor-pointer select-none`}
-        style={{
-          textAlign: align ?? 'left',
-          color: active ? 'var(--accent)' : 'var(--text-muted)',
-        }}
-      >
-        {label}
-        <span className="ml-[0.3rem] text-[0.65rem]" style={{ opacity: active ? 1 : 0.3 }}>
-          {active ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
-        </span>
-      </th>
-    )
-  }
-
-  function showTooltip(e: React.MouseEvent<HTMLTableCellElement>, colour: string, rawSlots: string[]) {
-    if (rawSlots.length === 0) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    setTooltip({
-      x: Math.min(rect.left + rect.width / 2, window.innerWidth - 160),
-      y: rect.top - 6,
-      colour,
-      slots: consolidateSlots(rawSlots),
-    })
-  }
-
-  return (
-    <>
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-b-2 border-border bg-surface-raised">
-            <SortTh label="Name" colKey="name" />
-            <SortTh label="Rank" colKey="rank" />
-            {activeColors.map(c => (
-              <SortTh key={c} label={c} colKey={c} align="right" />
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map(m => (
-            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(var(--gold-rgb), 0.06)' : undefined }}>
-              <td className={TD_CLS}>
-                <Link to={`/character/${encodeURIComponent(m.name)}`}
-                  className="text-gold no-underline font-medium">
-                  {m.name}
-                </Link>
-                {myChars.has(m.name.toLowerCase()) && (
-                  <span className="ml-[0.4rem] text-[0.65rem] text-gold align-middle">★</span>
-                )}
-              </td>
-              <td className={`${TD_CLS} text-text-muted text-[0.85rem]`}>{m.rank ?? '—'}</td>
-              {activeColors.map(c => {
-                const stats = m.adorns[c]
-                const missingSlots = m.missing?.[c] ?? []
-                if (!stats) return (
-                  <td key={c} className={`${TD_CLS} text-right text-text-muted`}>—</td>
-                )
-                return (
-                  <td
-                    key={c}
-                    onMouseEnter={missingSlots.length > 0 ? e => showTooltip(e, c, missingSlots) : undefined}
-                    onMouseLeave={missingSlots.length > 0 ? () => setTooltip(null) : undefined}
-                    onClick={missingSlots.length > 0 ? e => showTooltip(e, c, missingSlots) : undefined}
-                    className={`${TD_CLS} text-right font-medium`}
-                    style={{
-                      cursor: missingSlots.length > 0 ? 'default' : undefined,
-                      ...adornCellStyle(stats.filled, stats.total),
-                    }}
-                  >
-                    {stats.filled}/{stats.total}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Missing adorn tooltip — fixed so it escapes the scrollable container */}
-      {tooltip && (
-        <div
-          className="fixed -translate-x-1/2 -translate-y-full rounded-[6px] px-[0.8rem] py-2 z-[9999] pointer-events-none max-w-[220px]"
-          style={{
-            left: tooltip.x,
-            top: tooltip.y,
-            background: '#1a1d26',
-            border: `1px solid ${ADORN_COLOURS[tooltip.colour] ?? 'var(--border)'}`,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-          }}
-        >
-          <div
-            className="text-[0.68rem] uppercase tracking-[0.06em] font-bold mb-[0.35rem]"
-            style={{ color: ADORN_COLOURS[tooltip.colour] ?? 'var(--text-muted)' }}
-          >
-            Missing {tooltip.colour}
-          </div>
-          {tooltip.slots.map((s, i) => (
-            <div key={i} className="text-[0.83rem] text-text leading-[1.65]">
-              {s}
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  )
-}
-
 // ── Claim requests tab (officers only) ───────────────────────────────────────
-
 
 function ClaimRequestsTab({
   guildName,
@@ -1063,9 +511,6 @@ export default function GuildPage() {
   }, [guildName])
 
   // SSE live-swap: replace roster state when the server pushes a fresh record.
-  // Deps use stable primitives (roster name/world strings + the stable subscribe
-  // callback) — the effect re-runs only when the guild identity changes, never
-  // on every roster state update, so there is no render loop risk.
   const rosterName  = roster?.name
   const rosterWorld = roster?.world
   useEffect(() => {
@@ -1246,13 +691,13 @@ export default function GuildPage() {
       {tab !== 'claims' && tab !== 'watch' && !isLoading && !error && (
         <Card className="p-0 overflow-x-auto">
           {tab === 'roster' && roster && (
-            <RosterTable members={roster.members} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
+            <GuildRosterTab members={roster.members} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
           {tab === 'spells' && spells && (
-            <SpellCheckTable data={spells} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
+            <GuildSpellCheckTab data={spells} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
           {tab === 'adorns' && adorns && (
-            <AdornCheckTable data={adorns} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
+            <GuildAdornCheckTab data={adorns} filter={filter} hiddenRanks={hiddenRanks} myChars={myChars} />
           )}
         </Card>
       )}

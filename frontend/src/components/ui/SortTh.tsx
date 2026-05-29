@@ -4,7 +4,7 @@
  * Renders the label + a small ▲ / ▼ caret when active. Click to toggle the
  * sort key + direction (handled by the useSortable handleSort callback).
  */
-import type { ReactNode, MouseEvent } from 'react'
+import type { CSSProperties, ReactNode, MouseEvent } from 'react'
 
 interface SortThProps<K extends string> {
   /** The key this header sorts on. */
@@ -17,11 +17,13 @@ interface SortThProps<K extends string> {
   onSort: (key: K) => void
   /** Extra th classes (e.g. text-right for numeric columns). */
   className?: string
+  /** Inline styles — use only for runtime-computed values (e.g. data-driven colours). */
+  style?: CSSProperties
   children: ReactNode
 }
 
 export function SortTh<K extends string>({
-  sortKey, active, dir, onSort, className = '', children,
+  sortKey, active, dir, onSort, className = '', style, children,
 }: SortThProps<K>) {
   const isActive = active === sortKey
   const caret = isActive ? (dir === 'asc' ? '▲' : '▼') : ''
@@ -31,6 +33,7 @@ export function SortTh<K extends string>({
   return (
     <th
       onClick={handleClick}
+      style={style}
       className={[
         'cursor-pointer select-none',
         isActive ? 'text-gold' : '',

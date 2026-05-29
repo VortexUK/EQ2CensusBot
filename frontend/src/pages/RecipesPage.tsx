@@ -1,247 +1,27 @@
-﻿import type { ReactNode } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLazyFetch } from '../hooks/useFetch'
 import { useSearchParams } from 'react-router-dom'
-import { Button, Card } from '../components/ui'
+import { Button } from '../components/ui'
 import { FilterDropdown, groupedFromHeaders } from '../components/FilterDropdown'
-import { recipeTierColor } from '../rarityColors'
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface Ingredient {
-  description: string
-  quantity: number
-}
-
-interface RecipeResult {
-  id: number
-  name: string
-  bench: string | null
-  bench_label: string | null
-  craft_tier: string | null      // T1 … T14
-  crafted_tier: string | null    // spell-scroll quality (Expert, etc.)
-  primary_comp: string | null
-  primary_qty: number | null
-  secondary_comps: Ingredient[]
-  fuel_comp: string | null
-  fuel_qty: number | null
-  out_formed_id: number | null
-  out_formed_count: number | null
-  class_label: string | null
-  craft_classes: string[]        // tradeskill classes that can make it
-}
-
-interface RecipeSearchResponse {
-  results: RecipeResult[]
-  total: number
-  page: number
-  per_page: number
-}
-
-interface ShoppingEntry {
-  recipeId: number
-  recipeName: string
-  qty: number              // number of crafting runs
-  primary_comp: string | null
-  primary_qty: number | null
-  secondary_comps: Ingredient[]
-  fuel_comp: string | null
-  fuel_qty: number | null
-}
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-// T1 = levels 1-9, T2 = 10-19, … derived from the fuel component prefix
-const CRAFT_TIERS = [
-  'T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12','T13','T14',
-]
-
-const CRAFT_TIER_LABELS: Record<string, string> = {
-  T1: 'T1  (1–9)',   T2: 'T2  (10–19)', T3: 'T3  (20–29)',
-  T4: 'T4  (30–39)', T5: 'T5  (40–49)', T6: 'T6  (50–59)',
-  T7: 'T7  (60–69)', T8: 'T8  (70–79)', T9: 'T9  (80–89)',
-  T10:'T10 (90–99)', T11:'T11 (100+)',   T12:'T12',
-  T13:'T13',         T14:'T14',
-}
-
-// Tradeskill class filter — driven by the recipe_classes mapping (a recipe can
-// belong to more than one class). Values are the class display names stored in
-// recipe_classes. Replaces the old bench-based filter, which merged Armorer +
-// Weaponsmith (shared forge) and had no Jeweler. Secondary tradeskills
-// (Tinkering/Adorning) are open to every class and grouped separately.
-const PRIMARY_CRAFT_CLASSES = [
-  'Alchemist', 'Armorer', 'Carpenter', 'Jeweler', 'Provisioner',
-  'Sage', 'Tailor', 'Weaponsmith', 'Woodworker',
-]
-const SECONDARY_CRAFT_CLASSES = ['Adorner', 'Tinkerer']
-
-const CLASS_OPTIONS: { label: string; value: string }[] = [
-  { label: 'All Classes',    value: '' },
-  { label: '── Fighter ──',  value: '__hdr' },
-  { label: '  Guardian',     value: 'guardian' },
-  { label: '  Berserker',    value: 'berserker' },
-  { label: '  Monk',         value: 'monk' },
-  { label: '  Bruiser',      value: 'bruiser' },
-  { label: '  Shadowknight', value: 'shadowknight' },
-  { label: '  Paladin',      value: 'paladin' },
-  { label: '── Priest ──',   value: '__hdr' },
-  { label: '  Templar',      value: 'templar' },
-  { label: '  Inquisitor',   value: 'inquisitor' },
-  { label: '  Warden',       value: 'warden' },
-  { label: '  Fury',         value: 'fury' },
-  { label: '  Mystic',       value: 'mystic' },
-  { label: '  Defiler',      value: 'defiler' },
-  { label: '  Channeler',    value: 'channeler' },
-  { label: '── Mage ──',     value: '__hdr' },
-  { label: '  Wizard',       value: 'wizard' },
-  { label: '  Warlock',      value: 'warlock' },
-  { label: '  Illusionist',  value: 'illusionist' },
-  { label: '  Coercer',      value: 'coercer' },
-  { label: '  Conjuror',     value: 'conjuror' },
-  { label: '  Necromancer',  value: 'necromancer' },
-  { label: '── Scout ──',    value: '__hdr' },
-  { label: '  Swashbuckler', value: 'swashbuckler' },
-  { label: '  Brigand',      value: 'brigand' },
-  { label: '  Troubador',    value: 'troubador' },
-  { label: '  Dirge',        value: 'dirge' },
-  { label: '  Ranger',       value: 'ranger' },
-  { label: '  Assassin',     value: 'assassin' },
-  { label: '  Beastlord',    value: 'beastlord' },
-]
-
-const CTRL_CLS = 'bg-surface border border-border rounded-[6px] text-text text-[0.88rem] py-[0.35rem] px-[0.6rem] outline-none w-full box-border'
-
-const STORAGE_KEY = 'eq2-shopping-list'
-
-// ── XML download ──────────────────────────────────────────────────────────────
-
-function _xmlEsc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-function downloadShoppingListXml(list: ShoppingEntry[], summary: IngredientSummary): void {
-  const lines: string[] = [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<shoppinglist>',
-    '  <spells>',
-    ...list.map(e => `    <spell Name="${_xmlEsc(e.recipeName)}">${e.qty}</spell>`),
-    '  </spells>',
-    '  <materials>',
-    ...summary.regular.map(m => `    <material Name="${_xmlEsc(m.name)}">${m.total}</material>`),
-    '  </materials>',
-    '  <fuels>',
-    ...summary.fuel.map(f => `    <fuel Name="${_xmlEsc(f.name)}">${f.total}</fuel>`),
-    '  </fuels>',
-    '</shoppinglist>',
-  ]
-  const blob = new Blob([lines.join('\n')], { type: 'application/xml' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url
-  a.download = 'shopping-list.xml'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
-// ── localStorage helpers ───────────────────────────────────────────────────────
-
-function loadList(): ShoppingEntry[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-function saveList(list: ShoppingEntry[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
-  } catch { /* storage full / private browsing */ }
-}
-
-// ── Ingredient aggregation ────────────────────────────────────────────────────
-
-interface IngredientSummary {
-  regular: { name: string; total: number }[]
-  fuel:    { name: string; total: number }[]
-}
-
-function aggregateList(list: ShoppingEntry[]): IngredientSummary {
-  const regular: Record<string, number> = {}
-  const fuel:    Record<string, number> = {}
-
-  for (const entry of list) {
-    const n = entry.qty
-    if (entry.primary_comp && entry.primary_qty) {
-      regular[entry.primary_comp] = (regular[entry.primary_comp] ?? 0) + entry.primary_qty * n
-    }
-    for (const sc of entry.secondary_comps) {
-      if (sc.description && sc.quantity) {
-        regular[sc.description] = (regular[sc.description] ?? 0) + sc.quantity * n
-      }
-    }
-    if (entry.fuel_comp && entry.fuel_qty) {
-      fuel[entry.fuel_comp] = (fuel[entry.fuel_comp] ?? 0) + entry.fuel_qty * n
-    }
-  }
-
-  return {
-    regular: Object.entries(regular)
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => a.name.localeCompare(b.name)),
-    fuel: Object.entries(fuel)
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => a.name.localeCompare(b.name)),
-  }
-}
-
-// ── Tier badge colour ─────────────────────────────────────────────────────────
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function TierBadge({ tier }: { tier: string | null }) {
-  if (!tier) return null
-  const colour = recipeTierColor(tier)
-  return (
-    <span
-      className="text-[0.72rem] font-semibold border rounded-sm px-[5px] py-px leading-none whitespace-nowrap"
-      style={{ color: colour, borderColor: colour }}
-    >
-      {tier}
-    </span>
-  )
-}
-
-function IngredientList({ comps, compact }: { comps: Ingredient[]; compact?: boolean }) {
-  if (!comps.length) return null
-  return (
-    <ul className="m-0 pl-[1.1rem] list-disc">
-      {comps.map((c, i) => (
-        <li key={i} className="text-text-muted leading-[1.5]" style={{ fontSize: compact ? '0.78rem' : '0.83rem' }}>
-          {c.description} ×{c.quantity}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-// ── Main page ─────────────────────────────────────────────────────────────────
+import {
+  CRAFT_TIERS, CRAFT_TIER_LABELS,
+  PRIMARY_CRAFT_CLASSES, SECONDARY_CRAFT_CLASSES,
+  CLASS_OPTIONS, CTRL_CLS,
+  STORAGE_KEY,
+  loadList, saveList, aggregateList,
+  type RecipeResult, type RecipeSearchResponse, type ShoppingEntry,
+} from './recipes/types'
+import { RecipeCard } from './recipes/RecipeCard'
+import { ShoppingListPanel } from './recipes/ShoppingListPanel'
 
 export default function RecipesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   // ── Filter state (URL-synced) ────────────────────────────────────────────────
-  const [q,         setQ]         = useState(searchParams.get('q')     ?? '')
-  const [tier,      setTier]      = useState(searchParams.get('tier')   ?? '')
+  const [q,          setQ]          = useState(searchParams.get('q')           ?? '')
+  const [tier,       setTier]       = useState(searchParams.get('tier')        ?? '')
   const [craftClass, setCraftClass] = useState(searchParams.get('craft_class') ?? '')
-  const [className, setClassName] = useState(searchParams.get('cls')    ?? '')
+  const [className,  setClassName]  = useState(searchParams.get('cls')         ?? '')
 
   // ── Results state ────────────────────────────────────────────────────────────
   const {
@@ -334,14 +114,14 @@ export default function RecipesPage() {
         return next
       }
       return [...prev, {
-        recipeId:       recipe.id,
-        recipeName:     recipe.name,
-        qty:            1,
-        primary_comp:   recipe.primary_comp,
-        primary_qty:    recipe.primary_qty,
-        secondary_comps:recipe.secondary_comps,
-        fuel_comp:      recipe.fuel_comp,
-        fuel_qty:       recipe.fuel_qty,
+        recipeId:        recipe.id,
+        recipeName:      recipe.name,
+        qty:             1,
+        primary_comp:    recipe.primary_comp,
+        primary_qty:     recipe.primary_qty,
+        secondary_comps: recipe.secondary_comps,
+        fuel_comp:       recipe.fuel_comp,
+        fuel_qty:        recipe.fuel_qty,
       }]
     })
   }, [])
@@ -351,9 +131,7 @@ export default function RecipesPage() {
       const idx = prev.findIndex(e => e.recipeId === recipeId)
       if (idx < 0) return prev
       const newQty = prev[idx].qty + delta
-      if (newQty <= 0) {
-        return prev.filter((_, i) => i !== idx)
-      }
+      if (newQty <= 0) return prev.filter((_, i) => i !== idx)
       const next = [...prev]
       next[idx] = { ...next[idx], qty: newQty }
       return next
@@ -362,8 +140,7 @@ export default function RecipesPage() {
 
   const clearList = useCallback(() => { setList([]) }, [])
 
-  const summary = aggregateList(list)
-
+  const summary    = aggregateList(list)
   const totalPages = Math.ceil(total / perPage)
 
   return (
@@ -461,13 +238,14 @@ export default function RecipesPage() {
             <p className="text-danger text-[0.9rem] mt-0 mx-0 mb-3">{error}</p>
           )}
 
-          {/* Results */}
+          {/* Results count */}
           {searched && !loading && (
             <p className="text-[0.8rem] text-text-muted mt-0 mx-0 mb-[0.6rem]">
               {total === 0 ? 'No results.' : `${total.toLocaleString()} recipe${total !== 1 ? 's' : ''} found`}
             </p>
           )}
 
+          {/* Recipe cards */}
           {results.length > 0 && (
             <>
               <div className="flex flex-col gap-2">
@@ -506,261 +284,20 @@ export default function RecipesPage() {
           )}
         </div>
 
-        {/* ── Right column: shopping list (always shown) ─────────────────────── */}
-        <Card className="p-4 self-start sticky top-16 max-h-[calc(100vh-5rem)] overflow-y-auto">
-            <div className="flex justify-between items-center mb-[0.8rem]">
-              <h2 className="m-0 text-base font-heading text-gold">
-                Shopping List
-              </h2>
-              <div className="flex gap-2 items-center">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => downloadShoppingListXml(list, summary)}
-                  title="Download as XML"
-                  className="bg-none text-gold"
-                >
-                  ⬇ XML
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={clearList}
-                  title="Clear list"
-                  className="border-none"
-                >
-                  Clear
-                </Button>
-              </div>
-            </div>
-
-            {/* View options */}
-            {list.length > 0 && (
-              <label className="flex items-center gap-[0.4rem] text-[0.76rem] text-text-muted cursor-pointer mb-[0.6rem] select-none">
-                <input
-                  type="checkbox"
-                  checked={showMats}
-                  onChange={e => setShowMats(e.target.checked)}
-                  className="cursor-pointer accent-gold"
-                />
-                Show materials per spell
-              </label>
-            )}
-
-            {/* List entries */}
-            {list.map(entry => (
-              <div key={entry.recipeId} className="border-b border-border pb-[0.55rem] mb-[0.55rem]">
-                <div className="flex items-center gap-2" style={{ marginBottom: showMats ? '0.2rem' : 0 }}>
-                  <span className="text-[0.85rem] flex-1 leading-[1.3]">{entry.recipeName}</span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <QtyBtn onClick={() => changeQty(entry.recipeId, -1)}>−</QtyBtn>
-                    <span className="text-[0.82rem] min-w-[20px] text-center text-gold font-semibold">
-                      {entry.qty}
-                    </span>
-                    <QtyBtn onClick={() => changeQty(entry.recipeId, +1)}>+</QtyBtn>
-                  </div>
-                </div>
-                {showMats && <IngredientList comps={buildIngredientList(entry)} compact />}
-              </div>
-            ))}
-
-            {/* Ingredient Summary */}
-            {list.length > 0 && (
-              <div className="mt-2">
-                <h3 className="text-[0.82rem] text-text-muted mt-0 mx-0 mb-[0.4rem] uppercase tracking-[0.06em]">
-                  Ingredient Summary
-                </h3>
-
-                {summary.regular.length > 0 && (
-                  <>
-                    <p className="text-[0.72rem] text-text-muted mt-[0.4rem] mx-0 mb-[0.2rem] font-semibold">Materials</p>
-                    {summary.regular.map(row => (
-                      <div key={row.name} className="flex justify-between text-[0.8rem] py-px px-0">
-                        <span className="text-text">{row.name}</span>
-                        <span className="text-gold font-semibold ml-2">×{row.total}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
-
-                {summary.fuel.length > 0 && (
-                  <>
-                    <p className="text-[0.72rem] text-text-muted mt-[0.7rem] mx-0 mb-[0.2rem] font-semibold">
-                      Fuel
-                    </p>
-                    {summary.fuel.map(row => (
-                      <div key={row.name} className="flex justify-between text-[0.8rem] py-px px-0">
-                        <span className="text-text-muted">{row.name}</span>
-                        <span className="text-gold-dim font-semibold ml-2">×{row.total}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-
-            {list.length === 0 && (
-              <p className="text-[0.83rem] text-text-muted text-center mt-4">
-                Use + on a recipe to add it.
-              </p>
-            )}
-          </Card>
+        {/* ── Right column: shopping list ─────────────────────────────────────── */}
+        <ShoppingListPanel
+          list={list}
+          summary={summary}
+          showMats={showMats}
+          onShowMatsChange={setShowMats}
+          onChangeQty={changeQty}
+          onClear={clearList}
+        />
       </div>
     </main>
   )
 }
 
-// ── RecipeCard ────────────────────────────────────────────────────────────────
-
-function RecipeCard({
-  recipe,
-  onAdd,
-  inList,
-  onDec,
-}: {
-  recipe:  RecipeResult
-  onAdd:   () => void
-  inList:  number
-  onDec:   () => void
-}) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <Card className="p-0 overflow-hidden">
-      {/* Header row */}
-      <div
-        className="flex items-center gap-[0.6rem] px-3 py-[0.55rem] cursor-pointer select-none"
-        onClick={() => setOpen(v => !v)}
-      >
-        <span
-          className="text-[0.7rem] text-text-muted inline-block transition-transform duration-150"
-          style={{ transform: `rotate(${open ? 90 : 0}deg)` }}
-        >
-          ▶
-        </span>
-        <span className="flex-1 text-[0.92rem] font-medium">{recipe.name}</span>
-        {recipe.craft_tier && (
-          <span className="text-[0.72rem] text-text-muted whitespace-nowrap">
-            {recipe.craft_tier}
-          </span>
-        )}
-        {recipe.crafted_tier && <TierBadge tier={recipe.crafted_tier} />}
-        {recipe.craft_classes.length > 0 && (
-          <span className="text-[0.72rem] text-text-muted whitespace-nowrap">
-            {recipe.craft_classes.length >= 9 ? 'All artisans' : recipe.craft_classes.join(' / ')}
-          </span>
-        )}
-        {recipe.class_label && (
-          <span className="text-[0.72rem] text-rarity-treasured whitespace-nowrap">
-            {recipe.class_label}
-          </span>
-        )}
-        {/* +/- controls */}
-        <div
-          onClick={e => e.stopPropagation()}
-          className="flex items-center gap-1 shrink-0"
-        >
-          {inList > 0 && (
-            <>
-              <QtyBtn onClick={onDec}>−</QtyBtn>
-              <span className="text-[0.82rem] min-w-[20px] text-center text-gold font-semibold">
-                {inList}
-              </span>
-            </>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onAdd}
-            title="Add to shopping list"
-            className="border border-gold text-gold"
-          >
-            +
-          </Button>
-        </div>
-      </div>
-
-      {/* Expandable ingredient detail */}
-      {open && (
-        <div className="border-t border-border pt-[0.6rem] px-3 pb-3 grid grid-cols-2 gap-x-4 gap-y-2">
-          {/* Materials */}
-          <div>
-            <p className="mt-0 mx-0 mb-1 text-[0.72rem] text-text-muted font-semibold uppercase tracking-[0.05em]">
-              Materials
-            </p>
-            {recipe.primary_comp && (
-              <div className="text-[0.83rem] text-text">
-                {recipe.primary_comp} ×{recipe.primary_qty ?? 1}
-              </div>
-            )}
-            {recipe.secondary_comps.map((sc, i) => (
-              <div key={i} className="text-[0.83rem] text-text">
-                {sc.description} ×{sc.quantity}
-              </div>
-            ))}
-            {!recipe.primary_comp && !recipe.secondary_comps.length && (
-              <span className="text-[0.8rem] text-text-muted">—</span>
-            )}
-          </div>
-
-          {/* Fuel */}
-          <div>
-            <p className="mt-0 mx-0 mb-1 text-[0.72rem] text-text-muted font-semibold uppercase tracking-[0.05em]">
-              Fuel
-            </p>
-            {recipe.fuel_comp ? (
-              <div className="text-[0.83rem] text-text-muted">
-                {recipe.fuel_comp} ×{recipe.fuel_qty ?? 1}
-              </div>
-            ) : (
-              <span className="text-[0.8rem] text-text-muted">—</span>
-            )}
-          </div>
-        </div>
-      )}
-    </Card>
-  )
-}
-
-// ── QtyBtn ────────────────────────────────────────────────────────────────────
-
-function QtyBtn({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: 'none',
-        border: '1px solid var(--border)',
-        borderRadius: 4,
-        color: 'var(--text)',
-        fontSize: '0.8rem',
-        width: 20,
-        height: 20,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        lineHeight: 1,
-        padding: 0,
-        flexShrink: 0,
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildIngredientList(entry: ShoppingEntry): Ingredient[] {
-  const result: Ingredient[] = []
-  if (entry.primary_comp && entry.primary_qty) {
-    result.push({ description: entry.primary_comp, quantity: entry.primary_qty * entry.qty })
-  }
-  for (const sc of entry.secondary_comps) {
-    if (sc.description && sc.quantity) {
-      result.push({ description: sc.description, quantity: sc.quantity * entry.qty })
-    }
-  }
-  return result
-}
+// Re-export STORAGE_KEY so any other module that needs it can find it here
+// (keeps the import path stable if external code ever referenced it from this file)
+export { STORAGE_KEY }

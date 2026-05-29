@@ -1,0 +1,118 @@
+// ── Types (mirror the route's Pydantic models) ────────────────────────────────
+
+export interface Trigger {
+  id: number
+  raid_encounter_id: number
+  position: number
+  label: string | null
+  notes: string | null
+  active: boolean
+  regex: string
+  sound_data: string
+  sound_type: number
+  category_restrict: boolean
+  category: string | null
+  timer: boolean
+  timer_name: string | null
+  tabbed: boolean
+  last_edited_at: number | null
+  last_edited_by: string | null
+  created_at: number
+}
+
+export interface SpellTimer {
+  id: number
+  raid_encounter_id: number
+  name: string
+  checked: boolean
+  timer_duration_s: number
+  only_master_ticks: boolean
+  restrict: boolean
+  absolute: boolean
+  start_wav: string
+  warning_wav: string
+  warning_value: number
+  radial_display: boolean
+  modable: boolean
+  tooltip: string
+  fill_color: number
+  panel1: boolean
+  panel2: boolean
+  remove_value: number
+  category: string | null
+  restrict_category: boolean
+  last_edited_at: number | null
+  last_edited_by: string | null
+  created_at: number
+}
+
+export interface SpellTimerDraft {
+  name: string
+  timer_duration_s: number
+  warning_value: number
+  fill_color_hex: string
+  fill_color_packed: number
+  panel1: boolean
+  panel2: boolean
+  absolute: boolean
+  only_master_ticks: boolean
+  tooltip: string
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * ACT stores FillColor as a .NET ARGB packed signed int. Convert to a CSS
+ * `#rrggbb` (alpha dropped for the swatch — the contributor cares about hue,
+ * not the rarely-used opacity).
+ */
+export function argbToHex(packed: number): string {
+  // Convert signed-int → unsigned 32-bit, then take the bottom 24 bits.
+  const unsigned = packed >>> 0
+  const rgb = unsigned & 0xffffff
+  return '#' + rgb.toString(16).padStart(6, '0')
+}
+
+export function hexToArgb(hex: string, existing: number): number {
+  // Keep the existing alpha byte so a user editing the colour swatch doesn't
+  // accidentally flip the timer to fully-transparent.
+  const trimmed = hex.replace(/^#/, '')
+  if (trimmed.length !== 6) return existing
+  const rgb = Number.parseInt(trimmed, 16)
+  if (Number.isNaN(rgb)) return existing
+  const alpha = (existing >>> 24) & 0xff || 0xff
+  // .NET ARGB packed int — produce as signed 32-bit so it round-trips back
+  // into the same negative numbers ACT writes natively.
+  const packed = ((alpha << 24) | rgb) | 0
+  return packed
+}
+
+export function defaultSpellTimerDraft(s?: SpellTimer | null, nameHint?: string): SpellTimerDraft {
+  const packed = s?.fill_color ?? -16776961
+  return {
+    name: s?.name ?? nameHint ?? '',
+    timer_duration_s: s?.timer_duration_s ?? 30,
+    warning_value: s?.warning_value ?? 10,
+    fill_color_hex: argbToHex(packed),
+    fill_color_packed: packed,
+    panel1: s?.panel1 ?? true,
+    panel2: s?.panel2 ?? false,
+    absolute: s?.absolute ?? false,
+    only_master_ticks: s?.only_master_ticks ?? false,
+    tooltip: s?.tooltip ?? '',
+  }
+}
+
+export function buildTimerBody(d: SpellTimerDraft) {
+  return {
+    name: d.name.trim(),
+    timer_duration_s: d.timer_duration_s,
+    warning_value: d.warning_value,
+    fill_color: d.fill_color_packed,
+    panel1: d.panel1,
+    panel2: d.panel2,
+    absolute: d.absolute,
+    only_master_ticks: d.only_master_ticks,
+    tooltip: d.tooltip,
+  }
+}
