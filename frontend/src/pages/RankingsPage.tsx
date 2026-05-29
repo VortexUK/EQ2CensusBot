@@ -65,11 +65,30 @@ export default function RankingsPage() {
   const metric = params.get('metric') || 'dps'
   const cls = params.get('class') || ''
 
+  // TEMP PROD DIAG v3 — log every URL change with a stack trace so we can
+  // see WHO is calling setParams in a loop (user reports MIS zone select
+  // alone triggers Firefox 'Too many calls to History API' throttle).
+  // Revert once root cause is identified.
+  useEffect(() => {
+    console.warn(
+      `[RankingsPage v2026-05-29-prod-diag-v3] params changed → ` +
+      `?${params.toString()}`,
+      new Error('stack trace').stack,
+    )
+  }, [params])
+
   function update(patch: Record<string, string>) {
     const next = new URLSearchParams(params)
     for (const [k, v] of Object.entries(patch)) {
       if (v) next.set(k, v); else next.delete(k)
     }
+    // TEMP PROD DIAG v3 — log every update() call with site so we can see
+    // which code path is firing setParams.
+    console.warn(
+      `[RankingsPage v2026-05-29-prod-diag-v3] update(${JSON.stringify(patch)}) → ` +
+      `?${next.toString()}`,
+      new Error('update-call-site').stack,
+    )
     setParams(next)
   }
 
