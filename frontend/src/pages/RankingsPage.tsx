@@ -65,30 +65,11 @@ export default function RankingsPage() {
   const metric = params.get('metric') || 'dps'
   const cls = params.get('class') || ''
 
-  // TEMP PROD DIAG v3 — log every URL change with a stack trace so we can
-  // see WHO is calling setParams in a loop (user reports MIS zone select
-  // alone triggers Firefox 'Too many calls to History API' throttle).
-  // Revert once root cause is identified.
-  useEffect(() => {
-    console.warn(
-      `[RankingsPage v2026-05-29-prod-diag-v3] params changed → ` +
-      `?${params.toString()}`,
-      new Error('stack trace').stack,
-    )
-  }, [params])
-
   function update(patch: Record<string, string>) {
     const next = new URLSearchParams(params)
     for (const [k, v] of Object.entries(patch)) {
       if (v) next.set(k, v); else next.delete(k)
     }
-    // TEMP PROD DIAG v3 — log every update() call with site so we can see
-    // which code path is firing setParams.
-    console.warn(
-      `[RankingsPage v2026-05-29-prod-diag-v3] update(${JSON.stringify(patch)}) → ` +
-      `?${next.toString()}`,
-      new Error('update-call-site').stack,
-    )
     setParams(next)
   }
 
@@ -159,28 +140,33 @@ export default function RankingsPage() {
       return
     }
 
-    // TEMP prod diagnostic — capture every effect fire so we can see whether
-    // the loop-breaker is actually limiting calls. Revert once V'Tekla K'Zalk
-    // codepoint is identified + added to normaliseBossName regex.
-    const cps = (s: string) =>
-      [...s].map(c => `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`).join(' ')
-    console.warn(
-      `[RankingsPage v2026-05-29-prod-diag-v2] effect-fire #${resetCountRef.current + 1} ` +
-      `(zone="${zone}", boss="${boss}", inList=${inList})`,
-      `\n  URL boss codepoints: ${cps(boss)}`,
-      `\n  Normalised URL boss: "${normBoss}"`,
-      `\n  resetCountRef.current = ${resetCountRef.current}`,
-      `\n  lastZoneRef.current = "${lastZoneRef.current}"`,
-      `\n  Zone bosses (count=${zoneObj.bosses.length}):`,
-      ...zoneObj.bosses.map(b => `\n    "${b}" → "${normaliseBossName(b)}" [${cps(b)}]`),
-    )
-
     if (resetCountRef.current >= 2) {
-      console.warn(
-        `[RankingsPage v2026-05-29-prod-diag-v2] BAIL — already reset twice for zone="${zone}". ` +
-        `URL round-trip is mutating codepoints. NOT calling setParams.`,
-      )
+      // We've already tried to auto-reset twice for this zone. If we're here
+      // a third time, the URL round-trip is mutating our reset value and
+      // further setParams calls will just feed the loop. Bail out — the user
+      // sees whatever the URL currently holds; the board may render empty
+      // until they pick a different boss. Better than browser-throttle
+      // SecurityError storms.
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[RankingsPage] suppressed auto-reset loop (zone="${zone}", boss="${boss}"). ` +
+          `URL round-trip is likely mutating codepoints — see prior diagnostic for codepoints.`,
+        )
+      }
       return
+    }
+
+    if (import.meta.env.DEV && boss) {
+      // Dev-only: surface the codepoints when normalisation still misses,
+      // so a remaining flicker can be diagnosed in the browser console.
+      const cps = (s: string) => [...s].map(c => `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`).join(' ')
+      console.warn(
+        `[RankingsPage] boss "${boss}" not in zone "${zone}" boss list — resetting.`,
+        `\n  URL boss codepoints: ${cps(boss)}`,
+        `\n  Normalised URL boss: "${normBoss}"`,
+        `\n  Zone bosses (count=${zoneObj.bosses.length}):`,
+        ...zoneObj.bosses.map(b => `\n    "${b}" → "${normaliseBossName(b)}" [${cps(b)}]`),
+      )
     }
 
     resetCountRef.current += 1
