@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFetch } from '../hooks/useFetch'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -28,13 +28,23 @@ interface RankingRow {
 }
 interface RankingsResponse { rows: RankingRow[]; classes: string[]; total: number }
 
-// Normalise apostrophe variants to a plain straight apostrophe (U+0027) for
-// boss-name comparison. ACT/game data uses curly right-single-quote (U+2019);
-// URLSearchParams encodes %27 and decodes back to U+0027 — so the two strings
-// fail Array#includes without this step. All EQ2 boss names use only these
-// forms; the regex covers the full set of visually similar codepoints.
+// Normalise boss-name codepoint variants for membership/equality checks.
+// ACT log files, the in-game client, and curator-entered roster data are
+// inconsistent about which apostrophe codepoint they use (U+0027 vs U+2019
+// vs U+02BC and others) — and similarly for whitespace (NBSP creeps in from
+// copy-paste). Without this fold the strict-equality check in the boss-default
+// useEffect misses, and the URL flickers as it resets to the first boss.
+// Backend mirror: _normalise_boss_key in web/routes/rankings.py — keep in sync.
+const APOSTROPHE_VARIANTS = /[`´ʹʺʻʼʽʾʿˈ‘’‛′＇]/g
+const SPACE_VARIANTS = /[     　]/g
+
 function normaliseBossName(s: string): string {
-  return s.replace(/[''ʼ`´]/g, "'").trim()
+  return s
+    .normalize('NFC')
+    .replace(APOSTROPHE_VARIANTS, "'")
+    .replace(SPACE_VARIANTS, ' ')
+    .trim()
+    .toLowerCase()
 }
 
 // Metric options grouped Character vs Guild (à la Warcraft Logs).
@@ -100,20 +110,73 @@ export default function RankingsPage() {
     update({ size: scopeKey, zone: zoneName, boss: z?.bosses[0] ?? '' })
   }
 
+  // Hard cap on consecutive boss auto-resets per zone. Above this count we
+  // stop trying — protects against an infinite loop if a future apostrophe /
+  // whitespace variant slips through normaliseBossName AND the browser's URL
+  // parser is mutating the codepoint on round-trip (we observed exactly this
+  // in Firefox: rate-limited history.pushState eventually throws SecurityError
+  // and the URL flickers between the clicked value and bosses[0]).
+  const resetCountRef = useRef(0)
+  const lastZoneRef = useRef<string>('')
+
   // Default to the first boss when a zone is set without a valid boss (e.g. URL load).
   useEffect(() => {
     if (!size || !zone || !zoneObj || !zoneObj.bosses.length) return
+
+    // Reset the consecutive-reset counter when the zone changes — each zone
+    // gets its own fresh allowance.
+    if (lastZoneRef.current !== zone) {
+      lastZoneRef.current = zone
+      resetCountRef.current = 0
+    }
+
     const normBoss = normaliseBossName(boss)
     const inList = zoneObj.bosses.some(b => normaliseBossName(b) === normBoss)
-    if (!boss || !inList) {
-      // Use setParams directly (not update) so we can pass replace:true and
-      // avoid polluting browser history with the auto-selection.
-      setParams(prev => {
-        const next = new URLSearchParams(prev)
-        next.set('boss', zoneObj.bosses[0])
-        return next
-      }, { replace: true })
+    if (boss && inList) {
+      // Healthy state — drop the counter so future legitimate mismatches
+      // (e.g. user navigates to a different boss via URL) get the full
+      // retry budget again.
+      resetCountRef.current = 0
+      return
     }
+
+    if (resetCountRef.current >= 2) {
+      // We've already tried to auto-reset twice for this zone. If we're here
+      // a third time, the URL round-trip is mutating our reset value and
+      // further setParams calls will just feed the loop. Bail out — the user
+      // sees whatever the URL currently holds; the board may render empty
+      // until they pick a different boss. Better than browser-throttle
+      // SecurityError storms.
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[RankingsPage] suppressed auto-reset loop (zone="${zone}", boss="${boss}"). ` +
+          `URL round-trip is likely mutating codepoints — see prior diagnostic for codepoints.`,
+        )
+      }
+      return
+    }
+
+    if (import.meta.env.DEV && boss) {
+      // Dev-only: surface the codepoints when normalisation still misses,
+      // so a remaining flicker can be diagnosed in the browser console.
+      const cps = (s: string) => [...s].map(c => `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`).join(' ')
+      console.warn(
+        `[RankingsPage] boss "${boss}" not in zone "${zone}" boss list — resetting.`,
+        `\n  URL boss codepoints: ${cps(boss)}`,
+        `\n  Normalised URL boss: "${normBoss}"`,
+        `\n  Zone bosses (count=${zoneObj.bosses.length}):`,
+        ...zoneObj.bosses.map(b => `\n    "${b}" → "${normaliseBossName(b)}" [${cps(b)}]`),
+      )
+    }
+
+    resetCountRef.current += 1
+    // Use setParams directly (not update) so we can pass replace:true and
+    // avoid polluting browser history with the auto-selection.
+    setParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('boss', zoneObj.bosses[0])
+      return next
+    }, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size, zone, zoneObj, boss])
 
