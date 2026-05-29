@@ -4,7 +4,7 @@ import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import { fmtRelative } from '../formatters'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth, isContributor } from '../hooks/useAuth'
 import { SupporterBadge, useSupporters } from './SupporterBadge'
 import { Button, SectionLabel } from './ui'
 
@@ -128,9 +128,7 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
   // also pass the backend gate but aren't surfaced here (dynamic check; would
   // need a Census round-trip on every page load — see useAuth's static_roles
   // doc-comment for the trade-off).
-  const isAdmin =
-    auth.status === 'authenticated' &&
-    (auth.user.is_admin || auth.user.static_roles.includes('contributor'))
+  const canEdit = isContributor(auth)
 
   const strategyUrl = `/api/zones/${encodeURIComponent(zoneName)}/encounters/${position}/strategy`
   const {
@@ -249,7 +247,7 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
     <section>
       <header className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
         <SectionLabel>Strategy</SectionLabel>
-        {isAdmin && !editing && (
+        {canEdit && !editing && (
           <Button size="sm" variant="secondary" onClick={startEdit}>
             {effectiveData ? 'Edit' : 'Write strategy'}
           </Button>
@@ -299,7 +297,7 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
       {!loading && !editing && !effectiveData && (
         <p className="text-text-muted text-sm leading-relaxed">
           No strategy written yet for this encounter.{' '}
-          {isAdmin ? (
+          {canEdit ? (
             <>Click <em>Write strategy</em> above to add one.</>
           ) : wikiUrl ? (
             <>

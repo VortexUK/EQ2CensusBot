@@ -4,7 +4,7 @@ import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import { fmtRelative } from '../formatters'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth, isContributor } from '../hooks/useAuth'
 import { Button, Card, SectionLabel } from './ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -75,9 +75,7 @@ export function ZoneOverview({ zoneName }: Props) {
   // also pass the backend gate but aren't surfaced here (dynamic check; would
   // need a Census round-trip on every page load — see useAuth's static_roles
   // doc-comment for the trade-off).
-  const canEdit =
-    auth.status === 'authenticated' &&
-    (auth.user.is_admin || auth.user.static_roles.includes('contributor'))
+  const canEdit = isContributor(auth)
 
   const {
     data: fetchedData,

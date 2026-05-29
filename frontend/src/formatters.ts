@@ -54,3 +54,8 @@ export function fmtRelative(unixSeconds: number, now: number = Date.now() / 1000
   if (diff < 60 * 60 * 24 * 56) return `${Math.floor(diff / (86400 * 7))}w ago`
   return fmtLocalDate(unixSeconds)
 }
+
+/** Same as fmtNum, but returns an em-dash for null/undefined. */
+export function fmtNumOrDash(n: number | null | undefined): string {
+  return n != null ? fmtNum(n) : '—'
+}

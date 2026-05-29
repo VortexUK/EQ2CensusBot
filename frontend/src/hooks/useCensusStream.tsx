@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
 export type CensusHealth = 'up' | 'down' | 'unknown'
-type Listener = (data: unknown, fetchedAt: number) => void
+type Listener<T = unknown> = (data: T, fetchedAt: number) => void
 
 interface CensusStream {
   health: CensusHealth
-  /** Subscribe to refresh records for a given key (`<name_lower>:<world>` or `guild:<g>:<w>`). */
-  subscribe: (key: string, cb: Listener) => () => void
+  /** Subscribe to refresh records for a given key (`<name_lower>:<world>` or `guild:<g>:<w>`).
+   *  The type parameter `T` is a TS-only hint — the runtime still delivers JSON-parsed `unknown`. */
+  subscribe: <T = unknown>(key: string, cb: Listener<T>) => () => void
 }
 
 type StreamMessage =
@@ -41,11 +42,11 @@ export function CensusStreamProvider({ children }: { children: ReactNode }) {
     return () => es.close()
   }, [])
 
-  const subscribe = useCallback((key: string, cb: Listener) => {
+  const subscribe = useCallback(<T = unknown>(key: string, cb: Listener<T>) => {
     let set = listeners.current.get(key)
     if (!set) { set = new Set(); listeners.current.set(key, set) }
-    set.add(cb)
-    return () => set!.delete(cb)
+    set.add(cb as Listener)
+    return () => set!.delete(cb as Listener)
   }, [])
 
   return <Ctx.Provider value={{ health, subscribe }}>{children}</Ctx.Provider>

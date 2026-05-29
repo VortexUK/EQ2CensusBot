@@ -221,7 +221,7 @@ function GearRating({ equipment, ready, maxLevel, ratingConfig, ilvl }: {
     <div className="mb-4">
       <SectionLabel>Raid Ready</SectionLabel>
       <div
-        className="bg-surface border rounded-[5px] px-[10px] py-2"
+        className="bg-surface border rounded-[5px] px-2.5 py-2"
         style={{
           borderColor: raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)',
         }}
@@ -534,8 +534,7 @@ export default function CharacterPage() {
   useEffect(() => {
     if (!charName || !charWorld) return
     const key = `${charName.toLowerCase()}:${charWorld.toLowerCase()}`
-    return subscribe(key, (data) => {
-      const updated = data as Character
+    return subscribe<Character>(key, (updated) => {
       _charCache.set(updated.name.toLowerCase(), updated)
       setState({ status: 'ok', char: updated })
     })

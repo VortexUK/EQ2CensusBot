@@ -70,7 +70,7 @@ function AARaidReady({ spent, cap }: { spent: number; cap: number }) {
     <div className="mb-3">
       <SectionLabel>Raid Ready</SectionLabel>
       <div
-        className="bg-surface border rounded-[5px] py-2 px-[10px]"
+        className="bg-surface border rounded-[5px] py-2 px-2.5"
         style={{ borderColor: raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)' }}
       >
         <div className="flex items-center gap-[0.6rem]">

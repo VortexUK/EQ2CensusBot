@@ -638,7 +638,7 @@ function HealsTable({ heals, totalHealed }: { heals: HealSummary[]; totalHealed:
             <div className={CELL_RIGHT_CLS}>{fmtNum(h.max_hit)}</div>
             <div
               className="text-[0.7rem]"
-              style={{ color: isWard ? '#93d9ff' : 'var(--text-muted)' }}
+              style={{ color: isWard ? 'var(--rarity-treasured)' : 'var(--text-muted)' }}
             >
               {h.heal_type ?? '—'}
             </div>

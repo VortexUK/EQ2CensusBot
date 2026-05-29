@@ -66,7 +66,7 @@ function CharacterCard({ claim, detail, isPrimary }: {
         <div
           className="font-heading text-[1.25rem] font-bold tracking-[0.04em] leading-[1.15] mb-[0.2rem]"
           style={{
-            color: isPrimary ? '#ffc993' : '#93d9ff',
+            color: isPrimary ? 'var(--rarity-legendary)' : 'var(--rarity-treasured)',
             textShadow: isPrimary
               ? '0 0 10px rgba(213,105,0,0.4)'
               : '0 0 8px rgba(0,120,180,0.35)',

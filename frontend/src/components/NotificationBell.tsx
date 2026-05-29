@@ -122,13 +122,13 @@ export default function NotificationBell() {
         onClick={() => setOpen(v => !v)}
         title="Pending notifications"
         className="flex items-center gap-[0.35rem] bg-none rounded-[6px] py-[0.3rem] px-[0.55rem] cursor-pointer text-gold text-[0.82rem] leading-none transition-colors"
-        style={{ border: '1px solid rgba(200,169,110,0.35)' }}
+        style={{ border: '1px solid rgba(var(--gold-rgb), 0.35)' }}
         onMouseEnter={e => {
-          e.currentTarget.style.borderColor = 'rgba(200,169,110,0.7)'
+          e.currentTarget.style.borderColor = 'rgba(var(--gold-rgb), 0.7)'
           e.currentTarget.style.color = '#e8d5a3'
         }}
         onMouseLeave={e => {
-          e.currentTarget.style.borderColor = 'rgba(200,169,110,0.35)'
+          e.currentTarget.style.borderColor = 'rgba(var(--gold-rgb), 0.35)'
           e.currentTarget.style.color = 'var(--gold)'
         }}
       >

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useFetch } from '../hooks/useFetch'
 
 import { fmtRelative } from '../formatters'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth, isContributor } from '../hooks/useAuth'
 import { Button, LinkButton, SectionLabel } from './ui'
 
 // ── Types (mirror the route's Pydantic models) ────────────────────────────────
@@ -97,9 +97,7 @@ function summarise(t: Trigger): string {
 
 export function ActTriggers({ zoneName, position }: Props) {
   const auth = useAuth()
-  const canEdit =
-    auth.status === 'authenticated' &&
-    (auth.user.is_admin || auth.user.static_roles.includes('contributor'))
+  const canEdit = isContributor(auth)
 
   const base = `/api/zones/${encodeURIComponent(zoneName)}/encounters/${position}`
 

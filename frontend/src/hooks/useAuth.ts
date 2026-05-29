@@ -6,7 +6,7 @@ export interface User {
   global_name: string | null
   avatar: string | null
   is_admin: boolean
-  access_status: string   // 'approved' | 'pending' | 'denied'
+  access_status: 'approved' | 'pending' | 'denied'
   /**
    * DB-granted roles (currently `'contributor'`). Excludes `'admin'`
    * (exposed separately via `is_admin`) and `'officer'` (dynamic,
@@ -35,7 +35,11 @@ export function useAuth(): AuthState {
         return res.json()
       })
       .then(data => {
-        if (data) setState({ status: 'authenticated', user: data as User })
+        if (isUser(data)) {
+          setState({ status: 'authenticated', user: data })
+        } else {
+          setState({ status: 'unauthenticated' })
+        }
       })
       .catch(() => setState({ status: 'unauthenticated' }))
   }, [])
@@ -58,4 +62,20 @@ export function discordAvatarUrl(id: string, avatar: string | null): string {
 /** Convenience wrapper for a full User object. */
 export function avatarUrl(user: User): string {
   return discordAvatarUrl(user.id, user.avatar)
+}
+
+/** Runtime type guard — narrows `unknown` SSE/API data to `User`. */
+export function isUser(data: unknown): data is User {
+  if (!data || typeof data !== 'object') return false
+  const d = data as Record<string, unknown>
+  return typeof d.id === 'string' &&
+         typeof d.is_admin === 'boolean' &&
+         Array.isArray(d.static_roles)
+}
+
+/** True if the authed user is either an admin or has the 'contributor' role.
+ *  Used to gate the Edit buttons on raid strategy / triggers / boss editor. */
+export function isContributor(auth: AuthState): boolean {
+  return auth.status === 'authenticated' &&
+    (auth.user.is_admin || auth.user.static_roles.includes('contributor'))
 }

@@ -241,7 +241,7 @@ export default function ClaimPage() {
 
             {/* Pending claim */}
             {pending && (
-              <Card className={CARD_CLS} style={{ borderColor: 'rgba(234,179,8,0.4)' }}>
+              <Card className={CARD_CLS} style={{ borderColor: 'rgba(var(--gold-rgb), 0.5)' }}>
                 <div className="flex items-center gap-2">
                   <span className="text-[1.2rem]">⏳</span>
                   <div>

@@ -60,7 +60,7 @@ function SpellRaidReady({ expertOrBetter, totalSpells }: { expertOrBetter: numbe
     <div className="mb-3">
       <SectionLabel>Raid Ready</SectionLabel>
       <div
-        className="bg-surface border rounded-[5px] py-2 px-[10px]"
+        className="bg-surface border rounded-[5px] py-2 px-2.5"
         style={{ borderColor: raidReady ? 'rgba(74,222,128,0.25)' : 'var(--border)' }}
       >
         <div className="flex items-center gap-[0.6rem]">
@@ -241,7 +241,6 @@ function MaterialsSection({ charName }: { charName: string }) {
       })
       .catch(err => {
         if (!cancelled) {
-          console.error('[upgrade-materials] fetch failed:', err)
           setError(String(err))
           setLoading(false)
         }

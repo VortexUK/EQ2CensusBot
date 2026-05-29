@@ -8,7 +8,7 @@ import { EncounterStrategy } from '../components/EncounterStrategy'
 import { ZoneOverview } from '../components/ZoneOverview'
 import { Card, SectionLabel } from '../components/ui'
 import { fmtRelative } from '../formatters'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth, isContributor } from '../hooks/useAuth'
 import { useFetch } from '../hooks/useFetch'
 import { useRaidProgress, type KilledEncounter } from '../hooks/useRaidProgress'
 
@@ -52,9 +52,7 @@ export default function RaidZonePage() {
   const navigate = useNavigate()
   const auth = useAuth()
 
-  const canEdit =
-    auth.status === 'authenticated' &&
-    (auth.user.is_admin || auth.user.static_roles.includes('contributor'))
+  const canEdit = isContributor(auth)
 
   const { data: zone, loading, error, statusCode, refetch: fetchZone } = useFetch<Zone>(
     name ? `/api/zones/${encodeURIComponent(name)}` : null,

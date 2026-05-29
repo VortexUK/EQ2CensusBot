@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
 import { Button } from '../components/ui'
@@ -720,7 +720,7 @@ function ParsesAdminTable() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function load(signal?: AbortSignal) {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError(null)
     try {
@@ -740,14 +740,13 @@ function ParsesAdminTable() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [query])
 
   useEffect(() => {
     const controller = new AbortController()
     load(controller.signal)
     return () => controller.abort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query])
+  }, [load])
 
   function toggleRow(id: number) {
     setSelected(prev => {
@@ -1151,7 +1150,7 @@ function ServersSection() {
   // truth while the user has changed the radio but not yet saved)
   const [defaultWorld, setDefaultWorld] = useState<string>('')
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -1177,12 +1176,11 @@ function ServersSection() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [fetchData])
 
   return (
     <div>

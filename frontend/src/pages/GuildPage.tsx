@@ -268,7 +268,7 @@ function RosterTable({ members, filter, hiddenRanks, myChars }: { members: Guild
               : m.ts_class
             : '—'
           return (
-            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
+            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(var(--gold-rgb), 0.06)' : undefined }}>
               <td className={TD_CLS}>
                 <Link to={`/character/${encodeURIComponent(m.name)}`}
                   className="text-gold no-underline font-medium">
@@ -390,7 +390,7 @@ function SpellCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildSp
         </thead>
         <tbody>
           {sorted.map(m => (
-            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
+            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(var(--gold-rgb), 0.06)' : undefined }}>
               <td className={TD_CLS}>
                 <Link to={`/character/${encodeURIComponent(m.name)}`}
                   className="text-gold no-underline font-medium">
@@ -577,7 +577,7 @@ function AdornCheckTable({ data, filter, hiddenRanks, myChars }: { data: GuildAd
         </thead>
         <tbody>
           {sorted.map(m => (
-            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(200,169,110,0.06)' : undefined }}>
+            <tr key={m.name} className="border-b border-border" style={{ background: myChars.has(m.name.toLowerCase()) ? 'rgba(var(--gold-rgb), 0.06)' : undefined }}>
               <td className={TD_CLS}>
                 <Link to={`/character/${encodeURIComponent(m.name)}`}
                   className="text-gold no-underline font-medium">
@@ -739,7 +739,7 @@ function ClaimRequestsTab({
                 {isOwn && (
                   <span
                     className="text-[0.68rem] font-bold px-[0.4rem] py-[0.1rem] rounded-sm text-gold uppercase tracking-[0.05em]"
-                    style={{ background: 'rgba(200,169,110,0.15)', border: '1px solid rgba(200,169,110,0.3)' }}
+                    style={{ background: 'rgba(var(--gold-rgb), 0.15)', border: '1px solid rgba(var(--gold-rgb), 0.3)' }}
                   >Your claim</span>
                 )}
               </div>
@@ -1071,8 +1071,8 @@ export default function GuildPage() {
   useEffect(() => {
     if (!rosterName || !rosterWorld) return
     const key = `guild:${rosterName.toLowerCase()}:${rosterWorld.toLowerCase()}`
-    return subscribe(key, (data) => {
-      setRoster(data as GuildData)
+    return subscribe<GuildData>(key, (data) => {
+      setRoster(data)
     })
   }, [rosterName, rosterWorld, subscribe])
 

@@ -128,10 +128,10 @@ export default function ItemPage() {
                 key={s.display_name}
                 className="flex justify-between items-baseline py-[0.12rem] border-b border-border text-[0.88rem]"
               >
-                <span style={{ color: s.stat_group === 'primary' ? '#22ff22' : '#00e5ff' }}>
+                <span style={{ color: s.stat_group === 'primary' ? 'var(--color-stat-primary)' : 'var(--color-stat-secondary)' }}>
                   {s.display_name}
                 </span>
-                <span className="font-semibold" style={{ color: s.stat_group === 'primary' ? '#22ff22' : '#00e5ff' }}>
+                <span className="font-semibold" style={{ color: s.stat_group === 'primary' ? 'var(--color-stat-primary)' : 'var(--color-stat-secondary)' }}>
                   {s.value > 0 ? '+' : ''}{s.value}
                 </span>
               </div>
