@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import threading
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -26,6 +29,8 @@ from web.cache import aa_cache, character_cache, claim_cache, guild_cache
 from web.config import CORS_ORIGINS as _CORS_ORIGINS
 from web.config import SESSION_COOKIE_DOMAIN as _SESSION_COOKIE_DOMAIN
 from web.config import WORLD as _WORLD
+from web.constants import CACHE_SWEEP_INTERVAL_S
+from web.lib import census_lifecycle
 from web.limiter import limiter
 from web.metrics import (
     APP_ERRORS,
@@ -221,7 +226,9 @@ _SHOW_DOCS = os.getenv("SHOW_API_DOCS", "false").lower() in ("1", "true", "yes")
 
 
 def create_app(session_secret: str | None = None) -> FastAPI:
-    def _startup() -> None:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        # ---- startup (sync) ----
         # Assert the single-process assumption baked into:
         #   - web/census_events.py — SSE pub/sub uses an in-process asyncio
         #     queue; cross-worker fan-out would need Redis.
@@ -251,38 +258,47 @@ def create_app(session_secret: str | None = None) -> FastAPI:
         # startup or Railway health checks.  On a fresh deployment the backfill
         # may take ~60–90 s; stat-filter searches will return 0 results until it
         # finishes, but name/tier/slot/class/level searches work immediately.
-        t = threading.Thread(target=_ensure_item_stats, daemon=True, name="item-stats-backfill")
-        t.start()
-
-    async def _prewarm() -> None:
-        # Fire-and-forget: pre-warm the character cache in the background so the
-        # home page loads instantly even immediately after a redeploy.
-        import asyncio as _asyncio
-
-        _asyncio.create_task(prewarm_character_cache())
-        _asyncio.create_task(_cache_sweep_loop())
-        from web import census_health
-
-        _asyncio.create_task(census_health.poll_loop())
-
-    async def _cache_sweep_loop() -> None:
-        """Periodically evict max_age-expired entries from all caches.
-        Without this, entries for keys that are never accessed again stay in
-        memory until the process restarts."""
-        import asyncio as _asyncio
-
-        while True:
-            await _asyncio.sleep(600)  # run every 10 minutes
-            for cache in (character_cache, guild_cache, claim_cache, aa_cache):
-                cache.sweep()
-
-    def _init_metrics() -> None:
+        threading.Thread(target=_ensure_item_stats, daemon=True, name="item-stats-backfill").start()
         # Register the DB gauge collector and set static app info.
         _register_db_collector()
         APP_INFO.info({"world": _WORLD, "version": "0.1.0"})
 
+        # ---- async background tasks (tracked so shutdown can cancel) ----
+        from web import census_health
+
+        tasks: list[asyncio.Task] = [
+            asyncio.create_task(prewarm_character_cache(), name="prewarm-character-cache"),
+            asyncio.create_task(_cache_sweep_loop(), name="cache-sweep-loop"),
+            asyncio.create_task(census_health.poll_loop(), name="census-health-poll"),
+        ]
+
+        try:
+            yield
+        finally:
+            # ---- shutdown ----
+            for task in tasks:
+                task.cancel()
+            # Collect cancellation acknowledgements; swallow CancelledError
+            # because that's exactly what we asked for.
+            await asyncio.gather(*tasks, return_exceptions=True)
+            # Close the shared aiohttp session(s) so the process exits
+            # without aiohttp's "Unclosed client session" warning.
+            await census_lifecycle.aclose_all()
+
+    async def _cache_sweep_loop() -> None:
+        """Periodically evict max_age-expired entries from all caches.
+
+        CancelledError propagates out of asyncio.sleep — letting it bubble
+        gives the lifespan cleanup deterministic shutdown. No try/except
+        around the sleep.
+        """
+        while True:
+            await asyncio.sleep(CACHE_SWEEP_INTERVAL_S)
+            for cache in (character_cache, guild_cache, claim_cache, aa_cache):
+                cache.sweep()
+
     app = FastAPI(
-        on_startup=[_startup, _prewarm, _init_metrics],
+        lifespan=lifespan,
         title="EQ2 Lexicon",
         version="0.1.0",
         docs_url="/api/docs" if _SHOW_DOCS else None,
