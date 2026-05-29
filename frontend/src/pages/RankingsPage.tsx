@@ -54,6 +54,56 @@ const METRICS: DropdownOption[] = [
   { value: 'speed', label: 'Speed', group: 'Guild' },
 ]
 
+// TEMP PROD DIAG v4 — one-shot monkeypatch of history.pushState/replaceState
+// to log every caller (with stack) so we can identify what's depleting the
+// Firefox History API throttle quota. Our code only fires 1 setParams/click
+// (confirmed by v3) but something else is hitting the quota. Suspects:
+// Cloudflare's cdn-cgi/challenge-platform/jsd bot-detection script (loaded
+// on every page on *.eq2lexicon.com), or react-router internal book-keeping.
+// Module-level + guard so it only installs ONCE per session.
+if (typeof window !== 'undefined' && !(window as unknown as { __historyTraced?: boolean }).__historyTraced) {
+  ;(window as unknown as { __historyTraced?: boolean }).__historyTraced = true
+  const origPush = window.history.pushState.bind(window.history)
+  const origReplace = window.history.replaceState.bind(window.history)
+  window.history.pushState = function (...args: Parameters<typeof window.history.pushState>) {
+    console.warn(`[history.pushState v2026-05-29-prod-diag-v4] →`, args[2], new Error().stack)
+    return origPush(...args)
+  }
+  window.history.replaceState = function (...args: Parameters<typeof window.history.replaceState>) {
+    console.warn(`[history.replaceState v2026-05-29-prod-diag-v4] →`, args[2], new Error().stack)
+    return origReplace(...args)
+  }
+}
+
+// Wrap a setParams call in a DOMException-resilient retry. Firefox throttles
+// history.pushState calls per-Document (~50/10s); if something OUTSIDE our
+// code (CF challenge scripts, browser extensions, etc.) depletes the quota,
+// our setParams throws and the page locks. Catch + retry-after-quota-reset
+// keeps the UI working under any external pressure.
+function safeSetParams(
+  setParams: (...args: unknown[]) => void,
+  args: unknown[],
+): void {
+  try {
+    setParams(...args)
+  } catch (e) {
+    if (e instanceof DOMException && (e.name === 'SecurityError' || e.name === 'InvalidStateError')) {
+      console.warn(`[RankingsPage] history API throttled — retrying in 1.2s`, e)
+      // Firefox's throttle window is ~10s. Retry after 1.2s in case quota recovers fast.
+      // If it still fails, give up silently — user can click again.
+      setTimeout(() => {
+        try {
+          setParams(...args)
+        } catch (e2) {
+          console.warn(`[RankingsPage] history API still throttled, giving up`, e2)
+        }
+      }, 1200)
+    } else {
+      throw e
+    }
+  }
+}
+
 export default function RankingsPage() {
   const [filters, setFilters] = useState<FiltersResponse>({ scopes: [] })
   const [params, setParams] = useSearchParams()
@@ -70,7 +120,7 @@ export default function RankingsPage() {
     for (const [k, v] of Object.entries(patch)) {
       if (v) next.set(k, v); else next.delete(k)
     }
-    setParams(next)
+    safeSetParams(setParams as (...args: unknown[]) => void, [next])
   }
 
   useEffect(() => {
@@ -171,12 +221,16 @@ export default function RankingsPage() {
 
     resetCountRef.current += 1
     // Use setParams directly (not update) so we can pass replace:true and
-    // avoid polluting browser history with the auto-selection.
-    setParams(prev => {
-      const next = new URLSearchParams(prev)
-      next.set('boss', zoneObj.bosses[0])
-      return next
-    }, { replace: true })
+    // avoid polluting browser history with the auto-selection. Wrapped in
+    // safeSetParams to survive Firefox's History API throttle.
+    safeSetParams(setParams as (...args: unknown[]) => void, [
+      (prev: URLSearchParams) => {
+        const next = new URLSearchParams(prev)
+        next.set('boss', zoneObj.bosses[0])
+        return next
+      },
+      { replace: true },
+    ])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size, zone, zoneObj, boss])
 
