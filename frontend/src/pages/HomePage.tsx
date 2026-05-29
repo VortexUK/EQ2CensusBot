@@ -239,8 +239,8 @@ function MyCharacters() {
           to="/claim"
           className="inline-block py-2 px-[1.4rem] text-gold rounded-md no-underline text-[0.9rem] font-semibold"
           style={{
-            background: 'rgba(var(--accent-rgb,99,210,130),0.12)',
-            border: '1px solid rgba(var(--accent-rgb,99,210,130),0.35)',
+            background: 'rgba(var(--accent-rgb),0.12)',
+            border: '1px solid rgba(var(--accent-rgb),0.35)',
           }}
         >
           Claim a character

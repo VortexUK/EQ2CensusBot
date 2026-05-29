@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
+import { useLazyFetch } from '../hooks/useFetch'
 import { Link, useParams } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
 import { FilterPill } from '../components/FilterPill'
@@ -9,6 +10,7 @@ import { SPELL_TIER_COLOURS as TIER_COLOURS } from '../spellConstants'
 import { Button, Card } from '../components/ui'
 import { FreshnessBadge } from '../components/FreshnessBadge'
 import { useCensusStream } from '../hooks/useCensusStream'
+import { fmtRelative } from '../formatters'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -113,11 +115,11 @@ type Tab = 'roster' | 'spells' | 'adorns' | 'claims' | 'watch'
 function adornCellStyle(filled: number, total: number): React.CSSProperties {
   if (total === 0) return { color: 'var(--text-muted)' }
   const pct = filled / total
-  if (pct === 1)   return { color: '#22c55e' }
+  if (pct === 1)   return { color: 'var(--success)' }
   if (pct >= 0.75) return { color: '#84cc16' }
   if (pct >= 0.5)  return { color: '#eab308' }
   if (pct >= 0.25) return { color: '#f97316' }
-  return { color: '#ef4444' }
+  return { color: 'var(--danger)' }
 }
 
 // ── Shared table styles ───────────────────────────────────────────────────────
@@ -151,7 +153,7 @@ function TabBtn({ label, active, onClick }: { label: string; active: boolean; on
       className="px-4 py-[0.4rem] rounded-[6px] border cursor-pointer text-[0.88rem]"
       style={{
         borderColor: active ? 'var(--accent)' : 'var(--border)',
-        background: active ? 'rgba(var(--accent-rgb,99,210,130),0.12)' : 'var(--surface)',
+        background: active ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface)',
         color: active ? 'var(--accent)' : 'var(--text-muted)',
         fontWeight: active ? 600 : 400,
       }}
@@ -783,8 +785,8 @@ function ClaimRequestsTab({
                   disabled={isBusy}
                   className="px-[0.85rem] py-[0.3rem] rounded-[5px] cursor-pointer text-[0.85rem] font-semibold"
                   style={{
-                    background: 'rgba(34,197,94,0.15)', color: '#22c55e',
-                    border: '1px solid rgba(34,197,94,0.35)',
+                    background: 'rgba(var(--success-rgb), 0.15)', color: 'var(--success)',
+                    border: '1px solid rgba(var(--success-rgb), 0.35)',
                   }}
                 >
                   {isBusy ? '…' : 'Approve'}
@@ -813,21 +815,14 @@ function watchStatus(w: ItemWatchEntry): { icon: string; label: string; colour: 
     return { icon: '⏳', label: 'Not yet checked', colour: 'var(--text-muted)' }
   }
   if (w.last_seen_at !== null && w.last_seen_at === w.last_checked_at) {
-    return { icon: '🟢', label: 'Currently wearing', colour: '#22c55e' }
+    return { icon: '🟢', label: 'Currently wearing', colour: 'var(--success)' }
   }
   if (w.last_seen_at !== null) {
     const ago = Math.floor((Date.now() / 1000 - w.last_seen_at) / 3600)
     const label = ago < 1 ? 'last seen just now' : ago < 24 ? `last seen ${ago}h ago` : `last seen ${Math.floor(ago / 24)}d ago`
     return { icon: '🟡', label, colour: '#eab308' }
   }
-  return { icon: '🔴', label: 'Never seen wearing it', colour: '#ef4444' }
-}
-
-function relativeTime(unix: number): string {
-  const diff = Math.floor((Date.now() / 1000 - unix) / 3600)
-  if (diff < 1)  return 'just now'
-  if (diff < 24) return `${diff}h ago`
-  return `${Math.floor(diff / 24)}d ago`
+  return { icon: '🔴', label: 'Never seen wearing it', colour: 'var(--danger)' }
 }
 
 function ItemWatchTab({ guildName }: { guildName: string }) {
@@ -928,9 +923,9 @@ function ItemWatchTab({ guildName }: { guildName: string }) {
             disabled={adding || !charInput.trim() || !itemInput.trim()}
             className="px-4 py-[0.42rem] rounded-[6px] cursor-pointer text-[0.88rem] font-semibold"
             style={{
-              background: 'rgba(var(--accent-rgb,99,210,130),0.15)',
+              background: 'rgba(var(--accent-rgb),0.15)',
               color: 'var(--accent)',
-              border: '1px solid rgba(var(--accent-rgb,99,210,130),0.35)',
+              border: '1px solid rgba(var(--accent-rgb),0.35)',
               opacity: adding || !charInput.trim() || !itemInput.trim() ? 0.5 : 1,
             }}
           >
@@ -969,7 +964,7 @@ function ItemWatchTab({ guildName }: { guildName: string }) {
                   <td className={`${TD_CLS} font-medium text-text`}>{w.item_name}</td>
                   <td className={`${TD_CLS} text-gold`}>{w.character_name}</td>
                   <td className={`${TD_CLS} text-text-muted text-[0.82rem]`}>{w.added_by_name}</td>
-                  <td className={`${TD_CLS} text-text-muted text-[0.82rem]`}>{relativeTime(w.added_at)}</td>
+                  <td className={`${TD_CLS} text-text-muted text-[0.82rem]`}>{fmtRelative(w.added_at)}</td>
                   <td className={`${TD_CLS} text-[0.85rem] whitespace-nowrap`} style={{ color: colour }}>
                     {icon} {label}
                   </td>
@@ -1022,14 +1017,20 @@ export default function GuildPage() {
   const [rosterLoading, setRosterLoading] = useState(true)
 
   // Spell check state
-  const [spells, setSpells] = useState<GuildSpellCheck | null>(null)
-  const [spellsError, setSpellsError] = useState<string | null>(null)
-  const [spellsLoading, setSpellsLoading] = useState(false)
+  const {
+    data: spells,
+    loading: spellsLoading,
+    error: spellsError,
+    run: runSpells,
+  } = useLazyFetch<GuildSpellCheck>()
 
   // Adorn check state
-  const [adorns, setAdorns] = useState<GuildAdornCheck | null>(null)
-  const [adornsError, setAdornsError] = useState<string | null>(null)
-  const [adornsLoading, setAdornsLoading] = useState(false)
+  const {
+    data: adorns,
+    loading: adornsLoading,
+    error: adornsError,
+    run: runAdorns,
+  } = useLazyFetch<GuildAdornCheck>()
 
   // Load roster + info + officer status on mount
   useEffect(() => {
@@ -1078,29 +1079,13 @@ export default function GuildPage() {
   // Load spell check when tab first selected
   function loadSpells() {
     if (spells || spellsLoading || !guildName) return
-    setSpellsLoading(true)
-    setSpellsError(null)
-    fetch(`/api/guild/${encodeURIComponent(guildName)}/spell-check`)
-      .then(async res => {
-        if (!res.ok) { setSpellsError((await res.json().catch(() => ({}))).detail ?? `Error ${res.status}`); return }
-        setSpells(await res.json())
-      })
-      .catch(() => setSpellsError('Network error — please try again.'))
-      .finally(() => setSpellsLoading(false))
+    runSpells(`/api/guild/${encodeURIComponent(guildName)}/spell-check`)
   }
 
   // Load adorn check when tab first selected
   function loadAdorns() {
     if (adorns || adornsLoading || !guildName) return
-    setAdornsLoading(true)
-    setAdornsError(null)
-    fetch(`/api/guild/${encodeURIComponent(guildName)}/adorn-check`)
-      .then(async res => {
-        if (!res.ok) { setAdornsError((await res.json().catch(() => ({}))).detail ?? `Error ${res.status}`); return }
-        setAdorns(await res.json())
-      })
-      .catch(() => setAdornsError('Network error — please try again.'))
-      .finally(() => setAdornsLoading(false))
+    runAdorns(`/api/guild/${encodeURIComponent(guildName)}/adorn-check`)
   }
 
   function switchTab(t: Tab) {

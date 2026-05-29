@@ -61,5 +61,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core + router — loaded on every page, biggest single dep group.
+          'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
+          // Drag-and-drop — only needed by the boss-roster editor (admin-only).
+          // Splits ~50KB out of the main bundle for non-editor users.
+          'vendor-dnd':      ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+          // Markdown — used by encounter strategy + zone overview.
+          'vendor-markdown': ['react-markdown', 'remark-gfm'],
+        },
+      },
+    },
   },
 })

@@ -1,5 +1,6 @@
 ﻿import type { ReactNode } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useLazyFetch } from '../hooks/useFetch'
 import { useSearchParams } from 'react-router-dom'
 import { Button, Card } from '../components/ui'
 import { FilterDropdown, groupedFromHeaders } from '../components/FilterDropdown'
@@ -243,13 +244,17 @@ export default function RecipesPage() {
   const [className, setClassName] = useState(searchParams.get('cls')    ?? '')
 
   // ── Results state ────────────────────────────────────────────────────────────
-  const [results,  setResults]  = useState<RecipeResult[]>([])
-  const [total,    setTotal]    = useState(0)
-  const [page,     setPage]     = useState(1)
-  const [perPage,  setPerPage]  = useState(25)
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState<string | null>(null)
-  const [searched, setSearched] = useState(false)
+  const {
+    data: searchResult,
+    loading,
+    error,
+    run: runSearch,
+  } = useLazyFetch<RecipeSearchResponse>()
+  const results  = searchResult?.results  ?? []
+  const total    = searchResult?.total    ?? 0
+  const page     = searchResult?.page     ?? 1
+  const perPage  = searchResult?.per_page ?? 25
+  const searched = searchResult !== null
 
   // ── Shopping list state (localStorage) ───────────────────────────────────────
   const [list,     setList]     = useState<ShoppingEntry[]>(() => loadList())
@@ -295,7 +300,7 @@ export default function RecipesPage() {
   }, [])
 
   // ── Search function ───────────────────────────────────────────────────────────
-  const doSearch = useCallback(async (
+  const doSearch = useCallback((
     p: number,
     overrides?: { q?: string; tier?: string; craftClass?: string; className?: string }
   ) => {
@@ -313,23 +318,8 @@ export default function RecipesPage() {
 
     if (!fq && !ftier && !fcraft && !fcls) return
 
-    setLoading(true)
-    setError(null)
-    try {
-      const resp = await fetch(`/api/recipes/search?${params}`, { credentials: 'include' })
-      if (!resp.ok) throw new Error(`Server error ${resp.status}`)
-      const data: RecipeSearchResponse = await resp.json()
-      setResults(data.results)
-      setTotal(data.total)
-      setPage(data.page)
-      setPerPage(data.per_page)
-      setSearched(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [q, tier, craftClass, className])
+    runSearch(`/api/recipes/search?${params}`)
+  }, [q, tier, craftClass, className, runSearch])
 
   const handleSearch = useCallback(() => { doSearch(1) }, [doSearch])
   const handlePage   = useCallback((p: number) => { doSearch(p) }, [doSearch])

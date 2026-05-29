@@ -1,7 +1,7 @@
-﻿import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+﻿import { useParams, Link } from 'react-router-dom'
 import { Card, SectionLabel } from '../components/ui'
 import { itemRarityColor } from '../rarityColors'
+import { useFetch } from '../hooks/useFetch'
 
 interface ItemStat   { display_name: string; value: number; stat_group: string }
 interface EffectLine { indentation: number; text: string }
@@ -31,22 +31,9 @@ interface ItemDetail {
 
 export default function ItemPage() {
   const { itemId } = useParams<{ itemId: string }>()
-  const [item,    setItem]    = useState<ItemDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!itemId) return
-    setLoading(true)
-    fetch(`/api/item/${itemId}`, { credentials: 'include' })
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(setItem)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [itemId])
+  const { data: item, loading, error } = useFetch<ItemDetail>(
+    itemId ? `/api/item/${itemId}` : null,
+  )
 
   if (loading) return <LoadingShell />
   if (error || !item) return (

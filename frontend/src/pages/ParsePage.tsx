@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useFetch } from '../hooks/useFetch'
 import { useParams, Link } from 'react-router-dom'
 
 import Breadcrumb from '../components/Breadcrumb'
@@ -149,32 +150,14 @@ function rowTintFor(colour: string | null | undefined): string | null {
 
 export default function ParsePage() {
   const { id } = useParams<{ id: string }>()
-  const [data, setData] = useState<ParseDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data, loading, error } = useFetch<ParseDetail>(
+    id ? `/api/parses/${encodeURIComponent(id)}` : null,
+  )
   const [lookup, setLookup] = useState<Record<string, BulkLookupEntry>>({})
   // Canonical zone name from zones.db when the parse's `zone` field matches a
   // curated raid zone (incl. via alias). Null when it doesn't — header then
   // renders the zone text as plain (no cross-link).
   const [raidZoneCanonical, setRaidZoneCanonical] = useState<string | null>(null)
-
-  // Fetch parse detail
-  useEffect(() => {
-    if (!id) return
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    fetch(`/api/parses/${encodeURIComponent(id)}`, { credentials: 'include' })
-      .then(r => {
-        if (r.status === 404) throw new Error('Parse not found.')
-        if (!r.ok) throw new Error(`Server error ${r.status}`)
-        return r.json()
-      })
-      .then((json: ParseDetail) => { if (!cancelled) setData(json) })
-      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Unknown error') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [id])
 
   // Resolve the parse's zone against the curated raid roster. 200 + a `name`
   // field means it's a known raid zone (find_by_name handles aliases too); the

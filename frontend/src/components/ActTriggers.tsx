@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useFetch } from '../hooks/useFetch'
 
 import { fmtRelative } from '../formatters'
 import { useAuth } from '../hooks/useAuth'
@@ -100,16 +101,37 @@ export function ActTriggers({ zoneName, position }: Props) {
     auth.status === 'authenticated' &&
     (auth.user.is_admin || auth.user.static_roles.includes('contributor'))
 
-  const [triggers, setTriggers] = useState<Trigger[]>([])
-  const [spellTimers, setSpellTimers] = useState<SpellTimer[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const base = `/api/zones/${encodeURIComponent(zoneName)}/encounters/${position}`
+
+  const {
+    data: triggersData,
+    loading: triggersLoading,
+    error: triggersError,
+    refetch: refetchTriggers,
+  } = useFetch<Trigger[]>(`${base}/triggers`)
+
+  const {
+    data: spellTimersData,
+    loading: spellTimersLoading,
+    error: spellTimersError,
+    refetch: refetchSpellTimers,
+  } = useFetch<SpellTimer[]>(`${base}/spell-timers`)
+
+  const triggers = triggersData ?? []
+  const spellTimers = spellTimersData ?? []
+  const loading = triggersLoading || spellTimersLoading
+  const error = triggersError ?? spellTimersError ?? null
 
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const [importing, setImporting] = useState(false)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
 
-  const base = `/api/zones/${encodeURIComponent(zoneName)}/encounters/${position}`
+  // Reset UI state when the encounter changes.
+  useEffect(() => {
+    setEditingId(null)
+    setImporting(false)
+    setExpanded(new Set())
+  }, [base])
 
   // Spell timers indexed by lowercase name for the "is this timer real?"
   // affordance on each trigger row.
@@ -132,34 +154,6 @@ export function ActTriggers({ zoneName, position }: Props) {
     return m
   }, [triggers])
 
-  // Fetch on encounter change. Both endpoints are public-GET; failures
-  // surface as a single error banner (the trigger list is the primary view).
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    setTriggers([])
-    setSpellTimers([])
-    setEditingId(null)
-    setImporting(false)
-    setExpanded(new Set())
-
-    Promise.all([
-      fetch(`${base}/triggers`, { credentials: 'include' }).then(handle<Trigger[]>),
-      fetch(`${base}/spell-timers`, { credentials: 'include' }).then(handle<SpellTimer[]>),
-    ])
-      .then(([ts, ss]) => {
-        if (cancelled) return
-        setTriggers(ts)
-        setSpellTimers(ss)
-      })
-      .catch(err => { if (!cancelled) setError(String((err as Error).message ?? err)) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-
-    return () => { cancelled = true }
-    // base captures zoneName/position; using it directly avoids the deps lint trip-up.
-  }, [base])
-
   function toggleExpand(id: number) {
     setExpanded(prev => {
       const next = new Set(prev)
@@ -169,13 +163,9 @@ export function ActTriggers({ zoneName, position }: Props) {
     })
   }
 
-  async function refresh() {
-    const [ts, ss] = await Promise.all([
-      fetch(`${base}/triggers`, { credentials: 'include' }).then(handle<Trigger[]>),
-      fetch(`${base}/spell-timers`, { credentials: 'include' }).then(handle<SpellTimer[]>),
-    ])
-    setTriggers(ts)
-    setSpellTimers(ss)
+  function refresh() {
+    refetchTriggers()
+    refetchSpellTimers()
   }
 
   async function deleteTrigger(id: number) {
@@ -185,7 +175,7 @@ export function ActTriggers({ zoneName, position }: Props) {
       alert(`Failed: ${r.status} ${r.statusText}`)
       return
     }
-    await refresh()
+    refresh()
   }
 
   return (
@@ -884,7 +874,7 @@ interface SpellTimersSectionProps {
   spellTimers: SpellTimer[]
   triggerUsageByTimer: Map<string, number>
   canEdit: boolean
-  onReload: () => Promise<void>
+  onReload: () => void | Promise<void>
 }
 
 function SpellTimersSection({
@@ -1240,9 +1230,3 @@ function XmlImporter({ base, onCancel, onImported }: XmlImporterProps) {
   )
 }
 
-// ── Generic JSON-fetch helper ─────────────────────────────────────────────────
-
-async function handle<T>(r: Response): Promise<T> {
-  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
-  return (await r.json()) as T
-}

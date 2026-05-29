@@ -64,7 +64,7 @@ function AARaidReady({ spent, cap }: { spent: number; cap: number }) {
   if (cap <= 0) return null
   const pct       = Math.min(100, Math.round(spent / cap * 100))
   const raidReady = pct >= 90
-  const color     = raidReady ? 'var(--success)' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
+  const color     = raidReady ? 'var(--success)' : pct >= 70 ? 'var(--warning)' : 'var(--danger)'
 
   return (
     <div className="mb-3">

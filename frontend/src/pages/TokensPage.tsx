@@ -1,9 +1,10 @@
 import type { CSSProperties } from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import Breadcrumb from '../components/Breadcrumb'
 import { Button, Card } from '../components/ui'
 import { fmtLocalDateTime } from '../formatters'
+import { useFetch } from '../hooks/useFetch'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -27,12 +28,17 @@ function fmtTs(unix: number | null): string {
   return unix ? fmtLocalDateTime(unix) : '—'
 }
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface TokensResponse {
+  tokens: TokenRow[]
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TokensPage() {
-  const [tokens, setTokens] = useState<TokenRow[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data: fetched, loading, error, refetch } = useFetch<TokensResponse>('/api/auth/tokens')
+  const tokens = fetched?.tokens ?? null
 
   // Modal state for minting + showing the new raw token once
   const [mintOpen, setMintOpen] = useState(false)
@@ -41,28 +47,13 @@ export default function TokensPage() {
   const [mintedToken, setMintedToken] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
 
-  const fetchTokens = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const r = await fetch('/api/auth/tokens', { credentials: 'include' })
-      if (!r.ok) throw new Error(`Server error ${r.status}`)
-      const data = await r.json()
-      setTokens(data.tokens)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { fetchTokens() }, [fetchTokens])
+  const [mintError, setMintError] = useState<string | null>(null)
 
   const onMint = useCallback(async () => {
     const name = mintName.trim()
     if (!name) return
     setMinting(true)
-    setError(null)
+    setMintError(null)
     try {
       const r = await fetch('/api/auth/tokens', {
         method: 'POST',
@@ -74,13 +65,13 @@ export default function TokensPage() {
       const data: MintResponse = await r.json()
       setMintedToken(data.token)
       setMintName('')
-      setTokens(prev => prev ? [data.row, ...prev] : [data.row])
+      refetch()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setMintError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setMinting(false)
     }
-  }, [mintName])
+  }, [mintName, refetch])
 
   const onRevoke = useCallback(async (id: number, name: string) => {
     if (!confirm(`Revoke token "${name}"? Any plugin using it will stop working immediately.`)) return
@@ -90,15 +81,11 @@ export default function TokensPage() {
         credentials: 'include',
       })
       if (!r.ok && r.status !== 204) throw new Error(`Server error ${r.status}`)
-      // Mark locally as revoked (server-side gives no body) for instant UI feedback.
-      setTokens(prev => prev
-        ? prev.map(t => t.id === id ? { ...t, revoked_at: Math.floor(Date.now() / 1000) } : t)
-        : prev,
-      )
+      refetch()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setMintError(err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [])
+  }, [refetch])
 
   const onCopy = useCallback(async () => {
     if (!mintedToken) return
@@ -115,7 +102,7 @@ export default function TokensPage() {
     setMintOpen(false)
     setMintedToken(null)
     setMintName('')
-    setError(null)
+    setMintError(null)
   }, [])
 
   return (
@@ -136,8 +123,9 @@ export default function TokensPage() {
         Treat them like passwords — anyone with the raw token can post parses under your account.
       </p>
 
-      {loading && <p className="text-text-muted">Loading…</p>}
+      {loading && !tokens && <p className="text-text-muted">Loading…</p>}
       {error && <p className="text-danger">{error}</p>}
+      {mintError && <p className="text-danger">{mintError}</p>}
 
       {!loading && tokens && tokens.length === 0 && (
         <p className="text-text-muted">
@@ -145,7 +133,7 @@ export default function TokensPage() {
         </p>
       )}
 
-      {!loading && tokens && tokens.length > 0 && (
+      {tokens && tokens.length > 0 && (
         <Card className="p-0 overflow-hidden">
           <div style={tableHeaderRow}>
             <div>Name</div>

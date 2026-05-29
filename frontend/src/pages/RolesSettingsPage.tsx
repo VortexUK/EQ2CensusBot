@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import Breadcrumb from '../components/Breadcrumb'
 import { Button, Card, SectionLabel } from '../components/ui'
 import { fmtLocalDateTime, fmtRelative } from '../formatters'
 import { useAuth } from '../hooks/useAuth'
+import { useFetch } from '../hooks/useFetch'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -44,33 +45,8 @@ const STATUS_LABELS: Record<RoleRequest['status'], string> = {
 
 export default function RolesSettingsPage() {
   const auth = useAuth()
-  const [requests, setRequests] = useState<RoleRequest[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  async function refresh() {
-    setLoading(true)
-    setError(null)
-    try {
-      const r = await fetch('/api/me/role-requests', { credentials: 'include' })
-      if (r.status === 401) {
-        // The Layout already guards unauthenticated viewers — surfacing
-        // anything here would just be noise.
-        setRequests([])
-        return
-      }
-      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
-      setRequests((await r.json()) as RoleRequest[])
-    } catch (err) {
-      setError(String((err as Error).message ?? err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void refresh()
-  }, [])
+  const { data, loading, error, refetch: refresh } = useFetch<RoleRequest[]>('/api/me/role-requests')
+  const requests = data ?? []
 
   // Latest request per role, used by the role cards to decide which CTA to
   // render. Sort is newest-first courtesy of the backend, so the first match

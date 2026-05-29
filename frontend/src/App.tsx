@@ -1,25 +1,29 @@
-﻿import type { CSSProperties } from 'react'
+﻿import { lazy, Suspense } from 'react'
+import type { CSSProperties } from 'react'
 import { Routes, Route, Outlet, NavLink, useLocation } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import SupportPage from './pages/SupportPage'
 import CharacterPage from './pages/CharacterPage'
 import ClaimPage from './pages/ClaimPage'
-import AdminPage from './pages/AdminPage'
 import GuildPage from './pages/GuildPage'
 import ItemPage from './pages/ItemPage'
 import ItemSearchPage from './pages/ItemSearchPage'
-import ParsePage from './pages/ParsePage'
-import ParsesPage from './pages/ParsesPage'
-import RaidZonePage from './pages/RaidZonePage'
-import RaidZonesPage from './pages/RaidZonesPage'
 import RankingsPage from './pages/RankingsPage'
 import RecipesPage from './pages/RecipesPage'
-import RolesSettingsPage from './pages/RolesSettingsPage'
-import TokensPage from './pages/TokensPage'
 import { CharacterSearchPage, GuildSearchPage } from './pages/SearchPage'
 import UserWidget from './components/UserWidget'
 import NotFoundPage from './pages/NotFoundPage'
 import NotificationBell from './components/NotificationBell'
+
+// Lazy-loaded: low-traffic pages or heavy-deps pages (admin, parse detail, raid editor).
+// Each becomes a separate chunk fetched on first navigation.
+const AdminPage         = lazy(() => import('./pages/AdminPage'))
+const TokensPage        = lazy(() => import('./pages/TokensPage'))
+const RolesSettingsPage = lazy(() => import('./pages/RolesSettingsPage'))
+const ParsePage         = lazy(() => import('./pages/ParsePage'))
+const ParsesPage        = lazy(() => import('./pages/ParsesPage'))
+const RaidZonePage      = lazy(() => import('./pages/RaidZonePage'))
+const RaidZonesPage     = lazy(() => import('./pages/RaidZonesPage'))
 import { useAuth } from './hooks/useAuth'
 import { CensusStreamProvider } from './hooks/useCensusStream'
 import { ServerProvider, useServer } from './hooks/useServer'
@@ -299,7 +303,9 @@ function Layout() {
             raid sidebar updates :position to drive boss selection — we
             don't want that to remount the page + reset scroll). */}
         <div className="page-enter flex-1" key={stablePathKey(pathname)}>
-          <Outlet />
+          <Suspense fallback={<div className="p-8 text-text-muted">Loading…</div>}>
+            <Outlet />
+          </Suspense>
         </div>
         <footer className="border-t border-border py-2 px-6 flex items-center justify-between flex-wrap gap-x-4 gap-y-1 text-[0.72rem] text-text-muted opacity-70">
           <span>

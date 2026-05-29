@@ -4,8 +4,12 @@ import { Link } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
 import { Card } from '../components/ui'
 import { fmtRelative } from '../formatters'
+import { useFetch } from '../hooks/useFetch'
 import { useRaidProgress, type KilledEncounter } from '../hooks/useRaidProgress'
 import { useServer } from '../hooks/useServer'
+
+// Data fetch uses useFetch (hooks/useFetch.ts) — canonical pattern.
+// See P0-13 in docs/superpowers/specs/2026-05-29-frontend-cleanliness-audit.md.
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +49,9 @@ interface ExpansionDef { short: string; name: string }
 
 const EXPANSIONS: ExpansionDef[] = [
   // Newest first — extend as raid rosters are curated.
+  // ⚠ If you add a 3rd entry, also add a 3rd useFetch + byExpansion key
+  // in the component body OR refactor to a sub-component-per-expansion
+  // (Rules of Hooks forbids a dynamic-length useFetch loop).
   { short: 'RoK', name: 'Rise of Kunark' },
   { short: 'EoF', name: 'Echoes of Faydwer' },
 ]
@@ -52,47 +59,26 @@ const EXPANSIONS: ExpansionDef[] = [
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function RaidZonesPage() {
-  // One fetch per expansion, in parallel. Keyed by expansion short for cheap
-  // re-render-free lookups when we render the sections below.
-  const [byExpansion, setByExpansion] = useState<Record<string, Zone[]>>({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // One fetch per expansion, in parallel. EXPANSIONS is a fixed-length static
+  // array so calling useFetch once per entry is safe (hook call count is
+  // constant across renders). Keyed by expansion short for cheap lookups.
+  const rokFetch = useFetch<ZoneListResponse>(`/api/zones?expansion=${encodeURIComponent(EXPANSIONS[0].short)}&type=raid_x4`)
+  const eofFetch = useFetch<ZoneListResponse>(`/api/zones?expansion=${encodeURIComponent(EXPANSIONS[1].short)}&type=raid_x4`)
+
+  const loading = rokFetch.loading || eofFetch.loading
+  const error = rokFetch.error ?? eofFetch.error ?? null
+
+  const byExpansion = useMemo<Record<string, Zone[]>>(() => ({
+    [EXPANSIONS[0].short]: rokFetch.data?.zones ?? [],
+    [EXPANSIONS[1].short]: eofFetch.data?.zones ?? [],
+  }), [rokFetch.data, eofFetch.data])
+
   const progress = useRaidProgress()
   const server = useServer()
   // Per-section open/closed. Initialised once data + server settings are in:
   // the server's current_xpac is opened by default, everything else closed.
   // After that, the user toggles freely — we don't re-collapse on re-render.
   const [openExpansions, setOpenExpansions] = useState<Set<string> | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-
-    Promise.all(
-      EXPANSIONS.map(exp =>
-        fetch(`/api/zones?expansion=${encodeURIComponent(exp.short)}&type=raid_x4`, { credentials: 'include' })
-          .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-          .then((j: ZoneListResponse) => [exp.short, j.zones] as const)
-      )
-    )
-      .then(pairs => {
-        if (cancelled) return
-        const next: Record<string, Zone[]> = {}
-        for (const [short, zones] of pairs) next[short] = zones
-        setByExpansion(next)
-      })
-      .catch(err => {
-        if (!cancelled) setError(err.message)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   // Drop empty expansions so the page doesn't show a hollow "RoR" header before
   // its roster has been curated.

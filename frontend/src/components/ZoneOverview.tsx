@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useFetch } from '../hooks/useFetch'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -78,55 +79,56 @@ export function ZoneOverview({ zoneName }: Props) {
     auth.status === 'authenticated' &&
     (auth.user.is_admin || auth.user.static_roles.includes('contributor'))
 
-  const [data, setData] = useState<ZoneOverviewResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const {
+    data: fetchedData,
+    loading,
+    error: fetchError,
+    statusCode,
+  } = useFetch<ZoneOverviewResponse>(`/api/zones/${encodeURIComponent(zoneName)}/overview`)
+
+  // 404 = "no overview yet" — expected state, not a real error.
+  // Suppress the error so non-editors see nothing and editors see the placeholder.
+  const data = statusCode === 404 ? null : fetchedData
+  const error = statusCode === 404 ? null : fetchError
+
+  // Local override after a successful save so the UI updates instantly.
+  const [savedData, setSavedData] = useState<ZoneOverviewResponse | null | undefined>(undefined)
+  const effectiveData = savedData !== undefined ? savedData : data
+
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [preview, setPreview] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
+  // Reset editing state when the zone changes (url change → new fetch).
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    setData(null)
     setEditing(false)
     setDraft('')
-
-    fetch(`/api/zones/${encodeURIComponent(zoneName)}/overview`, { credentials: 'include' })
-      .then(async r => {
-        if (r.status === 404) return null
-        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
-        return r.json() as Promise<ZoneOverviewResponse>
-      })
-      .then(j => { if (!cancelled) setData(j) })
-      .catch(err => { if (!cancelled) setError(String(err.message ?? err)) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-
-    return () => { cancelled = true }
+    setSavedData(undefined)
+    setSaveError(null)
   }, [zoneName])
 
   function startEdit() {
-    setDraft(data?.markdown ?? '')
+    setDraft(effectiveData?.markdown ?? '')
     setPreview(false)
     setEditing(true)
-    setError(null)
+    setSaveError(null)
   }
 
   function cancelEdit() {
     setEditing(false)
     setDraft('')
-    setError(null)
+    setSaveError(null)
   }
 
   async function save() {
     if (!draft.trim()) {
-      setError('Overview body is empty.')
+      setSaveError('Overview body is empty.')
       return
     }
     setSaving(true)
-    setError(null)
+    setSaveError(null)
     try {
       const r = await fetch(`/api/zones/${encodeURIComponent(zoneName)}/overview`, {
         method: 'PUT',
@@ -136,11 +138,11 @@ export function ZoneOverview({ zoneName }: Props) {
       })
       if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
       const fresh = (await r.json()) as ZoneOverviewResponse
-      setData(fresh)
+      setSavedData(fresh)
       setEditing(false)
       setDraft('')
     } catch (err) {
-      setError(String((err as Error).message ?? err))
+      setSaveError(String((err as Error).message ?? err))
     } finally {
       setSaving(false)
     }
@@ -149,7 +151,7 @@ export function ZoneOverview({ zoneName }: Props) {
   // Hide the whole card when there's nothing to show and the viewer can't
   // create one — keeps the zone page free of empty scaffolding for ordinary
   // users while still surfacing the editor entry point for admins.
-  if (!loading && !data && !canEdit && !editing) return null
+  if (!loading && !effectiveData && !canEdit && !editing) return null
 
   return (
     <Card className="flex flex-col gap-3">
@@ -157,30 +159,30 @@ export function ZoneOverview({ zoneName }: Props) {
         <SectionLabel>Zone overview</SectionLabel>
         {canEdit && !editing && (
           <Button size="sm" variant="secondary" onClick={startEdit}>
-            {data ? 'Edit' : 'Write overview'}
+            {effectiveData ? 'Edit' : 'Write overview'}
           </Button>
         )}
       </header>
 
       {loading && <p className="text-text-muted text-sm">Loading…</p>}
 
-      {!loading && !editing && data && (
+      {!loading && !editing && effectiveData && (
         <>
           <div className="text-text text-[0.95rem]">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-              {data.markdown}
+              {effectiveData.markdown}
             </ReactMarkdown>
           </div>
-          {data.last_edited_at && (
+          {effectiveData.last_edited_at && (
             <p className="text-text-muted text-[0.72rem]">
-              Edited {fmtRelative(data.last_edited_at)}
-              {data.last_edited_by ? ` · ${data.last_edited_by}` : ''}
+              Edited {fmtRelative(effectiveData.last_edited_at)}
+              {effectiveData.last_edited_by ? ` · ${effectiveData.last_edited_by}` : ''}
             </p>
           )}
         </>
       )}
 
-      {!loading && !editing && !data && canEdit && (
+      {!loading && !editing && !effectiveData && canEdit && (
         <p className="text-text-muted text-sm leading-relaxed">
           No zone-level overview written yet. Click <em>Write overview</em> to add
           tactics that apply across the whole raid (raid composition, cure
@@ -195,7 +197,7 @@ export function ZoneOverview({ zoneName }: Props) {
           preview={preview}
           onPreview={setPreview}
           saving={saving}
-          error={error}
+          error={saveError}
           onSave={save}
           onCancel={cancelEdit}
         />

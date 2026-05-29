@@ -118,9 +118,9 @@ function ApprovedRow({ claim, onUpdate }: { claim: Claim; onUpdate: () => void }
       <span
         className="text-[0.68rem] font-bold tracking-[0.05em] py-[0.15rem] px-[0.45rem] rounded-sm border shrink-0 uppercase"
         style={{
-          background: isPrimary ? 'rgba(99,210,130,0.18)' : 'var(--surface-raised)',
+          background: isPrimary ? 'rgba(var(--accent-rgb), 0.18)' : 'var(--surface-raised)',
           color: isPrimary ? '#4ade80' : 'var(--text-muted)',
-          borderColor: isPrimary ? 'rgba(99,210,130,0.35)' : 'var(--border)',
+          borderColor: isPrimary ? 'rgba(var(--accent-rgb), 0.35)' : 'var(--border)',
         }}
       >
         {isPrimary ? 'Primary' : 'Alt'}

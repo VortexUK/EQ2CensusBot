@@ -691,13 +691,13 @@ function StatPills({ stats, highlight }: { stats: string[]; highlight: string[] 
           className="inline-block px-[0.35rem] py-[0.1rem] rounded-[3px] text-[0.72rem] border"
           style={{
             background:   highlightSet.has(s)
-              ? 'rgba(var(--accent-rgb,99,210,130),0.18)'
+              ? 'rgba(var(--accent-rgb),0.18)'
               : 'var(--surface-raised)',
             color: highlightSet.has(s)
               ? 'var(--accent)'
               : 'var(--text-muted)',
             borderColor: highlightSet.has(s)
-              ? 'rgba(var(--accent-rgb,99,210,130),0.35)'
+              ? 'rgba(var(--accent-rgb),0.35)'
               : 'var(--border)',
           }}
         >

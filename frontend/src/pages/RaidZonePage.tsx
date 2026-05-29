@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { ActTriggers } from '../components/ActTriggers'
@@ -9,6 +9,7 @@ import { ZoneOverview } from '../components/ZoneOverview'
 import { Card, SectionLabel } from '../components/ui'
 import { fmtRelative } from '../formatters'
 import { useAuth } from '../hooks/useAuth'
+import { useFetch } from '../hooks/useFetch'
 import { useRaidProgress, type KilledEncounter } from '../hooks/useRaidProgress'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -55,38 +56,11 @@ export default function RaidZonePage() {
     auth.status === 'authenticated' &&
     (auth.user.is_admin || auth.user.static_roles.includes('contributor'))
 
-  const [zone, setZone] = useState<Zone | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: zone, loading, error, statusCode, refetch: fetchZone } = useFetch<Zone>(
+    name ? `/api/zones/${encodeURIComponent(name)}` : null,
+  )
   const [editingRoster, setEditingRoster] = useState(false)
   const progress = useRaidProgress()
-
-  const fetchZone = useCallback((signal?: AbortSignal) => {
-    setLoading(true)
-    setError(null)
-    return fetch(`/api/zones/${encodeURIComponent(name)}`, { credentials: 'include', signal })
-      .then(r => {
-        if (r.status === 404) return Promise.reject(new Error('not found'))
-        return r.ok ? r.json() : Promise.reject(new Error(String(r.status)))
-      })
-      .then((z: Zone) => {
-        if (!signal?.aborted) setZone(z)
-      })
-      .catch(err => {
-        // Ignore abort errors — they're intentional cancellations, not real failures.
-        if (!signal?.aborted) setError((err as Error).message)
-      })
-      .finally(() => {
-        if (!signal?.aborted) setLoading(false)
-      })
-  }, [name])
-
-  useEffect(() => {
-    const ctrl = new AbortController()
-    setZone(null)
-    void fetchZone(ctrl.signal)
-    return () => ctrl.abort()
-  }, [fetchZone])
 
   // Group encounters by stage in curator order. Memoise both for cheap
   // re-renders when only the selected position changes.
@@ -128,12 +102,14 @@ export default function RaidZonePage() {
       <Breadcrumb items={[{ label: 'Raids', to: '/raids' }, { label: name }]} />
 
       {loading && <p className="text-text-muted">Loading…</p>}
-      {error === 'not found' && (
+      {statusCode === 404 && (
         <p className="text-text-muted">
           No raid zone known as <span className="text-text">{name}</span>.
         </p>
       )}
-      {error && error !== 'not found' && <p className="text-danger">Failed to load zone: {error}</p>}
+      {error && statusCode !== 404 && (
+        <p className="text-danger">Failed to load zone: {error}</p>
+      )}
 
       {!loading && zone && (
         <>

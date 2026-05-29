@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth, discordAvatarUrl } from '../hooks/useAuth'
 import { Button } from '../components/ui'
 import { FilterPill } from '../components/FilterPill'
-import { fmtLocalDate } from '../formatters'
+import { fmtLocalDate, fmtRelative } from '../formatters'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -97,22 +97,14 @@ function resultLabel(successLevel: number): string {
   }
 }
 
-function relativeTime(unix: number): string {
-  const diff = Math.floor(Date.now() / 1000) - unix
-  if (diff < 60)    return 'just now'
-  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
-}
-
 const ACCESS_BADGE: Record<string, React.CSSProperties> = {
-  pending:  { background: 'rgba(234,179,8,0.18)',   color: '#fbbf24', border: '1px solid rgba(234,179,8,0.4)'  },
+  pending:  { background: 'rgba(var(--warning-rgb), 0.18)',   color: 'var(--warning)', border: '1px solid rgba(var(--warning-rgb), 0.4)'  },
   approved: { background: 'rgba(34,197,94,0.13)',   color: 'var(--success)', border: '1px solid rgba(34,197,94,0.35)' },
   denied:   { background: 'rgba(239,68,68,0.13)',   color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.35)' },
 }
 
 const CLAIM_BADGE: Record<string, React.CSSProperties> = {
-  pending:    { background: 'rgba(234,179,8,0.18)',    color: '#fbbf24', border: '1px solid rgba(234,179,8,0.4)'    },
+  pending:    { background: 'rgba(var(--warning-rgb), 0.18)',    color: 'var(--warning)', border: '1px solid rgba(var(--warning-rgb), 0.4)'    },
   approved:   { background: 'rgba(34,197,94,0.13)',    color: 'var(--success)', border: '1px solid rgba(34,197,94,0.35)'   },
   rejected:   { background: 'rgba(239,68,68,0.13)',    color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.35)'   },
   withdrawn:  { background: 'rgba(100,116,139,0.13)',  color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)'  },
@@ -142,14 +134,21 @@ const TD_CLS = 'px-3 py-2 border-b border-white/5 align-middle'
 function UserRow({ user, onAction }: { user: UserItem; onAction: () => void }) {
   const [busy, setBusy] = useState(false)
   const [kickConfirm, setKickConfirm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function doAccess(action: 'approve' | 'deny' | 'kick') {
     setBusy(true)
+    setError(null)
     try {
       const url = action === 'kick'
         ? `/api/admin/users/${user.discord_id}/kick`
         : `/api/admin/users/${user.discord_id}/${action}`
-      await fetch(url, { method: 'POST', credentials: 'include' })
+      const res = await fetch(url, { method: 'POST', credentials: 'include' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError(body.detail ?? `HTTP ${res.status}`)
+        return
+      }
       onAction()
     } finally {
       setBusy(false)
@@ -162,11 +161,17 @@ function UserRow({ user, onAction }: { user: UserItem; onAction: () => void }) {
   // (POST to grant, DELETE to revoke) extends to future roles unchanged.
   async function toggleRole(role: string, grant: boolean) {
     setBusy(true)
+    setError(null)
     try {
-      await fetch(`/api/admin/users/${user.discord_id}/roles/${role}`, {
+      const res = await fetch(`/api/admin/users/${user.discord_id}/roles/${role}`, {
         method: grant ? 'POST' : 'DELETE',
         credentials: 'include',
       })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError(body.detail ?? `HTTP ${res.status}`)
+        return
+      }
       onAction()
     } finally {
       setBusy(false)
@@ -202,7 +207,7 @@ function UserRow({ user, onAction }: { user: UserItem; onAction: () => void }) {
 
       {/* Joined */}
       <td className={`${TD_CLS} text-text-muted whitespace-nowrap`}>
-        <span title={fmt(user.first_seen)}>{relativeTime(user.first_seen)}</span>
+        <span title={fmt(user.first_seen)}>{fmtRelative(user.first_seen)}</span>
       </td>
 
       {/* Status */}
@@ -280,37 +285,40 @@ function UserRow({ user, onAction }: { user: UserItem; onAction: () => void }) {
 
       {/* Actions */}
       <td className={`${TD_CLS} whitespace-nowrap`}>
-        {kickConfirm ? (
-          <div className="flex items-center gap-[0.35rem] flex-wrap">
-            <span className="text-[0.75rem] text-danger">Kick + delete all claims?</span>
-            <Button variant="danger" size="sm" onClick={() => doAccess('kick')} disabled={busy}>
-              {busy ? '…' : 'Confirm'}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setKickConfirm(false)}>Cancel</Button>
-          </div>
-        ) : (
-          <div className="flex gap-[0.35rem] flex-wrap">
-            {user.access_status !== 'approved' && (
-              <Button variant="primary" size="sm" onClick={() => doAccess('approve')} disabled={busy}>
-                Approve
+        <div className="flex flex-col gap-1">
+          {kickConfirm ? (
+            <div className="flex items-center gap-[0.35rem] flex-wrap">
+              <span className="text-[0.75rem] text-danger">Kick + delete all claims?</span>
+              <Button variant="danger" size="sm" onClick={() => doAccess('kick')} disabled={busy}>
+                {busy ? '…' : 'Confirm'}
               </Button>
-            )}
-            {user.access_status !== 'denied' && (
-              <Button variant="danger" size="sm" onClick={() => doAccess('deny')} disabled={busy}>
-                Deny
+              <Button variant="ghost" size="sm" onClick={() => setKickConfirm(false)}>Cancel</Button>
+            </div>
+          ) : (
+            <div className="flex gap-[0.35rem] flex-wrap">
+              {user.access_status !== 'approved' && (
+                <Button variant="primary" size="sm" onClick={() => doAccess('approve')} disabled={busy}>
+                  Approve
+                </Button>
+              )}
+              {user.access_status !== 'denied' && (
+                <Button variant="danger" size="sm" onClick={() => doAccess('deny')} disabled={busy}>
+                  Deny
+                </Button>
+              )}
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setKickConfirm(true)}
+                disabled={busy}
+                title="Revoke access and delete all claims"
+              >
+                Kick
               </Button>
-            )}
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => setKickConfirm(true)}
-              disabled={busy}
-              title="Revoke access and delete all claims"
-            >
-              Kick
-            </Button>
-          </div>
-        )}
+            </div>
+          )}
+          {error && <div className="text-danger text-[0.78rem] mt-1">{error}</div>}
+        </div>
       </td>
     </tr>
   )
@@ -376,16 +384,23 @@ function ClaimRow({ claim, onDelete }: { claim: ClaimDetail; onDelete: () => voi
   const [rejectOpen, setRejectOpen] = useState(false)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function doAction(url: string, body?: object | null, method = 'POST') {
     setBusy(true)
+    setError(null)
     try {
-      await fetch(url, {
+      const res = await fetch(url, {
         method,
         credentials: 'include',
         headers: body ? { 'Content-Type': 'application/json' } : undefined,
         body: body ? JSON.stringify(body) : undefined,
       })
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        setError(errBody.detail ?? `HTTP ${res.status}`)
+        return
+      }
       onDelete()
     } finally {
       setBusy(false)
@@ -423,13 +438,13 @@ function ClaimRow({ claim, onDelete }: { claim: ClaimDetail; onDelete: () => voi
 
       {/* Submitted */}
       <td className={`${TD_CLS} text-text-muted whitespace-nowrap`}>
-        <span title={fmt(claim.requested_at)}>{relativeTime(claim.requested_at)}</span>
+        <span title={fmt(claim.requested_at)}>{fmtRelative(claim.requested_at)}</span>
       </td>
 
       {/* Reviewed */}
       <td className={`${TD_CLS} text-text-muted whitespace-nowrap`}>
         {claim.reviewed_at ? (
-          <span title={fmt(claim.reviewed_at)}>{relativeTime(claim.reviewed_at)}</span>
+          <span title={fmt(claim.reviewed_at)}>{fmtRelative(claim.reviewed_at)}</span>
         ) : (
           <span className="opacity-40">—</span>
         )}
@@ -445,6 +460,7 @@ function ClaimRow({ claim, onDelete }: { claim: ClaimDetail; onDelete: () => voi
 
       {/* Actions */}
       <td className={`${TD_CLS} whitespace-nowrap`}>
+        <div className="flex flex-col gap-1">
         {claim.status === 'pending' ? (
           rejectOpen ? (
             <div className="flex flex-col gap-[0.3rem] min-w-[200px]">
@@ -506,6 +522,8 @@ function ClaimRow({ claim, onDelete }: { claim: ClaimDetail; onDelete: () => voi
             🗑
           </Button>
         )}
+        {error && <div className="text-danger text-[0.78rem] mt-1">{error}</div>}
+        </div>
       </td>
     </tr>
   )
@@ -570,16 +588,23 @@ function RoleRequestRow({ request, onAction }: { request: RoleRequest; onAction:
   const [busy, setBusy] = useState(false)
   const [noteOpen, setNoteOpen] = useState<'approve' | 'reject' | null>(null)
   const [adminNote, setAdminNote] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   async function decide(action: 'approve' | 'reject') {
     setBusy(true)
+    setError(null)
     try {
-      await fetch(`/api/admin/role-requests/${request.id}/${action}`, {
+      const res = await fetch(`/api/admin/role-requests/${request.id}/${action}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ note: adminNote.trim() || null }),
       })
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        setError(errBody.detail ?? `HTTP ${res.status}`)
+        return
+      }
       onAction()
     } finally {
       setBusy(false)
@@ -610,43 +635,46 @@ function RoleRequestRow({ request, onAction }: { request: RoleRequest; onAction:
       </td>
       <td className={`${TD_CLS} capitalize`}>{request.role}</td>
       <td className={`${TD_CLS} text-text-muted whitespace-nowrap`}>
-        <span title={fmt(request.requested_at)}>{relativeTime(request.requested_at)}</span>
+        <span title={fmt(request.requested_at)}>{fmtRelative(request.requested_at)}</span>
       </td>
       <td className={`${TD_CLS} text-text-muted text-[0.82rem] max-w-[28rem]`}>
         {request.user_note ? <em>"{request.user_note}"</em> : '—'}
       </td>
       <td className={`${TD_CLS} whitespace-nowrap`}>
-        {noteOpen ? (
-          <div className="flex flex-col gap-1 w-full min-w-[12rem]">
-            <textarea
-              value={adminNote}
-              onChange={e => setAdminNote(e.target.value)}
-              rows={2}
-              placeholder={noteOpen === 'approve' ? 'Optional note (e.g. welcome message)' : 'Optional reason (visible to the requester)'}
-              className="w-full bg-bg/60 border border-border rounded-md p-2 text-[0.82rem] text-text outline-none focus:border-gold/60 resize-y"
-            />
-            <div className="flex items-center gap-[0.35rem] justify-end">
-              <Button variant="ghost" size="sm" onClick={() => { setNoteOpen(null); setAdminNote('') }} disabled={busy}>Cancel</Button>
-              <Button
-                variant={noteOpen === 'approve' ? 'primary' : 'danger'}
-                size="sm"
-                onClick={() => decide(noteOpen)}
-                disabled={busy}
-              >
-                {busy ? '…' : noteOpen === 'approve' ? 'Confirm approve' : 'Confirm reject'}
+        <div className="flex flex-col gap-1">
+          {noteOpen ? (
+            <div className="flex flex-col gap-1 w-full min-w-[12rem]">
+              <textarea
+                value={adminNote}
+                onChange={e => setAdminNote(e.target.value)}
+                rows={2}
+                placeholder={noteOpen === 'approve' ? 'Optional note (e.g. welcome message)' : 'Optional reason (visible to the requester)'}
+                className="w-full bg-bg/60 border border-border rounded-md p-2 text-[0.82rem] text-text outline-none focus:border-gold/60 resize-y"
+              />
+              <div className="flex items-center gap-[0.35rem] justify-end">
+                <Button variant="ghost" size="sm" onClick={() => { setNoteOpen(null); setAdminNote('') }} disabled={busy}>Cancel</Button>
+                <Button
+                  variant={noteOpen === 'approve' ? 'primary' : 'danger'}
+                  size="sm"
+                  onClick={() => decide(noteOpen)}
+                  disabled={busy}
+                >
+                  {busy ? '…' : noteOpen === 'approve' ? 'Confirm approve' : 'Confirm reject'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-[0.35rem] flex-wrap">
+              <Button variant="primary" size="sm" disabled={busy} onClick={() => setNoteOpen('approve')}>
+                Approve
+              </Button>
+              <Button variant="danger" size="sm" disabled={busy} onClick={() => setNoteOpen('reject')}>
+                Reject
               </Button>
             </div>
-          </div>
-        ) : (
-          <div className="flex gap-[0.35rem] flex-wrap">
-            <Button variant="primary" size="sm" disabled={busy} onClick={() => setNoteOpen('approve')}>
-              Approve
-            </Button>
-            <Button variant="danger" size="sm" disabled={busy} onClick={() => setNoteOpen('reject')}>
-              Reject
-            </Button>
-          </div>
-        )}
+          )}
+          {error && <div className="text-danger text-[0.78rem] mt-1">{error}</div>}
+        </div>
       </td>
     </tr>
   )

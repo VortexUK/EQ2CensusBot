@@ -134,8 +134,7 @@ export default function NotificationBell() {
       >
         <BellIcon />
         <span
-          className="text-[0.65rem] font-bold leading-none py-[0.12rem] px-[0.32rem] rounded-[10px] min-w-[16px] text-center"
-          style={{ background: '#ef4444', color: '#fff' }}
+          className="text-[0.65rem] font-bold leading-none py-[0.12rem] px-[0.32rem] rounded-[10px] min-w-[16px] text-center bg-danger text-white"
         >
           {total}
         </span>

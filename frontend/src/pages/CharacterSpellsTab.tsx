@@ -54,7 +54,7 @@ function SpellRaidReady({ expertOrBetter, totalSpells }: { expertOrBetter: numbe
   if (totalSpells === 0) return null
   const pct       = Math.min(100, Math.round(expertOrBetter / totalSpells * 100))
   const raidReady = pct >= 90
-  const color     = raidReady ? 'var(--success)' : pct >= 70 ? '#fbbf24' : 'var(--danger)'
+  const color     = raidReady ? 'var(--success)' : pct >= 70 ? 'var(--warning)' : 'var(--danger)'
 
   return (
     <div className="mb-3">
@@ -257,7 +257,7 @@ function MaterialsSection({ charName }: { charName: string }) {
   if (error || !data) return null
   if (data.spells_needing_upgrade === 0) return (
     <StatGroup title="Upgrade Materials">
-      <p className="text-[0.78rem] my-1" style={{ color: '#22c55e' }}>
+      <p className="text-[0.78rem] my-1" style={{ color: 'var(--success)' }}>
         All spells at Expert or better ✓
       </p>
     </StatGroup>
@@ -468,7 +468,7 @@ export function SpellsTab({ charName }: { charName: string }) {
             value={masterOrBetter}
             total={totalSpells}
             pct={masteredPct}
-            color="#22c55e"
+            color="var(--success)"
           />
         </StatGroup>
 

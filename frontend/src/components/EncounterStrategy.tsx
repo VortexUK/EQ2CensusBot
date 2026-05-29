@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useFetch } from '../hooks/useFetch'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -131,13 +132,28 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
     auth.status === 'authenticated' &&
     (auth.user.is_admin || auth.user.static_roles.includes('contributor'))
 
-  const [data, setData] = useState<StrategyResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const strategyUrl = `/api/zones/${encodeURIComponent(zoneName)}/encounters/${position}/strategy`
+  const {
+    data: fetchedData,
+    loading,
+    error: fetchError,
+    statusCode,
+  } = useFetch<StrategyResponse>(strategyUrl)
+
+  // 404 = "no strategy written yet" — the editor uses null data as the empty state.
+  // Suppress the error so non-editors see nothing and editors see the placeholder.
+  const data = statusCode === 404 ? null : fetchedData
+  const error = statusCode === 404 ? null : fetchError
+
+  // Local override after a successful save so the UI updates instantly.
+  const [savedData, setSavedData] = useState<StrategyResponse | null | undefined>(undefined)
+  const effectiveData = savedData !== undefined ? savedData : data
+
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [preview, setPreview] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // History disclosure state. Lazy-loaded — we don't fetch revisions until the
   // user actually opens the disclosure, since most viewers never will.
@@ -146,34 +162,15 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
 
-  // Fetch when (zone, position) changes. 404 is the expected "no strategy yet"
-  // state and resets data to null — the empty-state UI renders from that.
-  // Also resets the history disclosure so a stale list doesn't leak across
-  // encounter switches.
+  // Reset editing state when the encounter changes (url change → new fetch).
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    setData(null)
     setEditing(false)
     setDraft('')
+    setSavedData(undefined)
     setRevisions(null)
     setHistoryOpen(false)
     setHistoryError(null)
-
-    fetch(`/api/zones/${encodeURIComponent(zoneName)}/encounters/${position}/strategy`, {
-      credentials: 'include',
-    })
-      .then(async r => {
-        if (r.status === 404) return null
-        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
-        return r.json() as Promise<StrategyResponse>
-      })
-      .then(j => { if (!cancelled) setData(j) })
-      .catch(err => { if (!cancelled) setError(String(err.message ?? err)) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-
-    return () => { cancelled = true }
+    setSaveError(null)
   }, [zoneName, position])
 
   async function toggleHistory() {
@@ -204,25 +201,25 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
   }
 
   function startEdit() {
-    setDraft(data?.markdown ?? '')
+    setDraft(effectiveData?.markdown ?? '')
     setPreview(false)
     setEditing(true)
-    setError(null)
+    setSaveError(null)
   }
 
   function cancelEdit() {
     setEditing(false)
     setDraft('')
-    setError(null)
+    setSaveError(null)
   }
 
   async function save() {
     if (!draft.trim()) {
-      setError('Strategy body is empty.')
+      setSaveError('Strategy body is empty.')
       return
     }
     setSaving(true)
-    setError(null)
+    setSaveError(null)
     try {
       const r = await fetch(
         `/api/zones/${encodeURIComponent(zoneName)}/encounters/${position}/strategy`,
@@ -235,14 +232,14 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
       )
       if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
       const fresh = (await r.json()) as StrategyResponse
-      setData(fresh)
+      setSavedData(fresh)
       setEditing(false)
       setDraft('')
       // The save just appended a new revision row server-side; drop the cache
       // so the next history-open fetches fresh.
       setRevisions(null)
     } catch (err) {
-      setError(String((err as Error).message ?? err))
+      setSaveError(String((err as Error).message ?? err))
     } finally {
       setSaving(false)
     }
@@ -254,28 +251,28 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
         <SectionLabel>Strategy</SectionLabel>
         {isAdmin && !editing && (
           <Button size="sm" variant="secondary" onClick={startEdit}>
-            {data ? 'Edit' : 'Write strategy'}
+            {effectiveData ? 'Edit' : 'Write strategy'}
           </Button>
         )}
       </header>
 
       {loading && <p className="text-text-muted text-sm">Loading…</p>}
 
-      {!loading && !editing && data && (
+      {!loading && !editing && effectiveData && (
         <>
           <div className="text-text text-[0.95rem]">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-              {data.markdown}
+              {effectiveData.markdown}
             </ReactMarkdown>
           </div>
           <div className="flex items-baseline justify-between flex-wrap gap-2 mt-2 text-[0.72rem]">
-            {data.last_edited_at ? (
+            {effectiveData.last_edited_at ? (
               <p className="text-text-muted">
-                Edited {fmtRelative(data.last_edited_at)}
-                {data.last_edited_by ? (
+                Edited {fmtRelative(effectiveData.last_edited_at)}
+                {effectiveData.last_edited_by ? (
                   <>
                     {' · '}
-                    <EditorName name={data.last_edited_by_name} raw={data.last_edited_by} />
+                    <EditorName name={effectiveData.last_edited_by_name} raw={effectiveData.last_edited_by} />
                   </>
                 ) : ''}
               </p>
@@ -299,7 +296,7 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
         </>
       )}
 
-      {!loading && !editing && !data && (
+      {!loading && !editing && !effectiveData && (
         <p className="text-text-muted text-sm leading-relaxed">
           No strategy written yet for this encounter.{' '}
           {isAdmin ? (
@@ -330,7 +327,7 @@ export function EncounterStrategy({ zoneName, position, wikiUrl }: Props) {
           preview={preview}
           onPreview={setPreview}
           saving={saving}
-          error={error}
+          error={saveError}
           onSave={save}
           onCancel={cancelEdit}
         />

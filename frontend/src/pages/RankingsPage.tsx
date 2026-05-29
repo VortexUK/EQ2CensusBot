@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useFetch } from '../hooks/useFetch'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Card } from '../components/ui'
@@ -38,8 +39,6 @@ export default function RankingsPage() {
   const [filters, setFilters] = useState<FiltersResponse>({ scopes: [] })
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
-  const [board, setBoard] = useState<RankingsResponse | null>(null)
-  const [loading, setLoading] = useState(false)
 
   const size = params.get('size') || ''
   const zone = params.get('zone') || ''
@@ -100,21 +99,18 @@ export default function RankingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size, zone, zoneObj, boss])
 
-  useEffect(() => {
-    if (!size || !zone || !boss) { setBoard(null); return }
+  const boardUrl = useMemo(() => {
+    if (!size || !zone || !boss) return null
     const u = new URL('/api/rankings', window.location.origin)
-    u.searchParams.set('size', size); u.searchParams.set('zone', zone)
-    u.searchParams.set('boss', boss); u.searchParams.set('metric', metric)
+    u.searchParams.set('size', size)
+    u.searchParams.set('zone', zone)
+    u.searchParams.set('boss', boss)
+    u.searchParams.set('metric', metric)
     if (cls && metric !== 'speed') u.searchParams.set('class', cls)
-    let cancelled = false
-    setLoading(true)
-    fetch(u.toString(), { credentials: 'include' })
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((j: RankingsResponse) => { if (!cancelled) setBoard(j) })
-      .catch(() => { if (!cancelled) setBoard(null) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    return u.toString()
   }, [size, zone, boss, metric, cls])
+
+  const { data: board, loading } = useFetch<RankingsResponse>(boardUrl)
 
   const isSpeed = metric === 'speed'
 

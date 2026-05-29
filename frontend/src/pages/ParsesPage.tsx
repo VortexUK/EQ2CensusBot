@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useFetch } from '../hooks/useFetch'
 import { useSearchParams, Link } from 'react-router-dom'
 
 import Caret from '../components/Caret'
@@ -181,9 +182,24 @@ export default function ParsesPage() {
   const [bossesOnly, setBossesOnly] = useState<boolean>(
     searchParams.get('bosses') === '1',
   )
-  const [data, setData] = useState<ParsesListResponse | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+  const parsesUrl = useMemo(() => {
+    const url = new URL('/api/parses', window.location.origin)
+    if (size) url.searchParams.set('size', size)
+    url.searchParams.set('limit', '500')
+    return url.toString()
+  }, [size])
+
+  const { data: fetchedData, loading, error } = useFetch<ParsesListResponse>(parsesUrl)
+
+  // Local copy for optimistic deletions — seeded from fetchedData on each
+  // successful fetch, then mutated locally so deletes don't trigger a full
+  // reload (which would unmount GuildSection / ZoneSection, losing open state).
+  const [localData, setLocalData] = useState<ParsesListResponse | null>(null)
+  useEffect(() => {
+    if (fetchedData !== null) setLocalData(fetchedData)
+  }, [fetchedData])
+  const data = localData ?? fetchedData
 
   // URL sync
   useEffect(() => {
@@ -193,38 +209,11 @@ export default function ParsesPage() {
     setSearchParams(p, { replace: true })
   }, [size, bossesOnly, setSearchParams])
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-
-    const url = new URL('/api/parses', window.location.origin)
-    if (size) url.searchParams.set('size', size)
-    url.searchParams.set('limit', '500')
-
-    fetch(url.toString(), { credentials: 'include' })
-      .then(r => {
-        if (!r.ok) throw new Error(`Server error ${r.status}`)
-        return r.json()
-      })
-      .then((json: ParsesListResponse) => {
-        if (!cancelled) setData(json)
-      })
-      .catch(err => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Unknown error')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => { cancelled = true }
-  }, [size])
-
   // Optimistic local removal after a successful delete — avoids a full
   // refetch (which would briefly toggle `loading` and unmount every
   // GuildSection / ZoneSection, losing their open/closed state).
   const removeEncounters = useCallback((pred: (e: ParseEncounterSummary) => boolean) => {
-    setData(prev => {
+    setLocalData(prev => {
       if (!prev) return prev
       const kept = prev.results.filter(e => !pred(e))
       const removed = prev.results.length - kept.length
