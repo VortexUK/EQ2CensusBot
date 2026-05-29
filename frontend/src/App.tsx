@@ -60,12 +60,12 @@ function LoginGate() {
  * For most routes this is just the pathname — every URL change replays the
  * fade-up entrance and resets in-page state.
  *
- * For `/raids/<zone>/<position>` the `:position` segment drives the sidebar
+ * For `/raids/<zone>/<bossName>` the `:bossName` segment drives the sidebar
  * boss selection. Including it in the key would remount RaidZonePage on
  * every sidebar click (scroll reset, fetch re-runs, animation replay). The
- * regex below collapses the position out so the same key is returned for
- * every boss within a zone — React Router still updates `useParams` so the
- * selected encounter changes, but the surrounding chrome stays mounted.
+ * regex below collapses the boss-name segment out so the same key is returned
+ * for every boss within a zone — React Router still updates `useParams` so
+ * the selected encounter changes, but the surrounding chrome stays mounted.
  */
 function stablePathKey(pathname: string): string {
   const m = pathname.match(/^(\/raids\/[^/]+)/)
@@ -331,7 +331,7 @@ function App() {
         <Route path="/recipes" element={<RecipesPage />} />
         <Route path="/raids"                    element={<RaidZonesPage />} />
         <Route path="/raids/:name"              element={<RaidZonePage />} />
-        <Route path="/raids/:name/:position"    element={<RaidZonePage />} />
+        <Route path="/raids/:name/:bossName"    element={<RaidZonePage />} />
         <Route path="/parses"      element={<ParsesPage />} />
         <Route path="/rankings"    element={<RankingsPage />} />
         <Route path="/parse/:id"   element={<ParsePage />} />

@@ -28,6 +28,15 @@ interface RankingRow {
 }
 interface RankingsResponse { rows: RankingRow[]; classes: string[]; total: number }
 
+// Normalise apostrophe variants to a plain straight apostrophe (U+0027) for
+// boss-name comparison. ACT/game data uses curly right-single-quote (U+2019);
+// URLSearchParams encodes %27 and decodes back to U+0027 — so the two strings
+// fail Array#includes without this step. All EQ2 boss names use only these
+// forms; the regex covers the full set of visually similar codepoints.
+function normaliseBossName(s: string): string {
+  return s.replace(/[''ʼ`´]/g, "'").trim()
+}
+
 // Metric options grouped Character vs Guild (à la Warcraft Logs).
 const METRICS: DropdownOption[] = [
   { value: 'dps', label: 'Damage (DPS)', group: 'Character' },
@@ -93,8 +102,17 @@ export default function RankingsPage() {
 
   // Default to the first boss when a zone is set without a valid boss (e.g. URL load).
   useEffect(() => {
-    if (size && zone && zoneObj && zoneObj.bosses.length && (!boss || !zoneObj.bosses.includes(boss))) {
-      update({ boss: zoneObj.bosses[0] })
+    if (!size || !zone || !zoneObj || !zoneObj.bosses.length) return
+    const normBoss = normaliseBossName(boss)
+    const inList = zoneObj.bosses.some(b => normaliseBossName(b) === normBoss)
+    if (!boss || !inList) {
+      // Use setParams directly (not update) so we can pass replace:true and
+      // avoid polluting browser history with the auto-selection.
+      setParams(prev => {
+        const next = new URLSearchParams(prev)
+        next.set('boss', zoneObj.bosses[0])
+        return next
+      }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size, zone, zoneObj, boss])

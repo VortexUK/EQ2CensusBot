@@ -39,8 +39,13 @@ interface Zone {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 //
-// URL: /raids/:name           — defaults to the first encounter
-//      /raids/:name/:position — opens the encounter with that curator position
+// URL: /raids/:name                — defaults to the first encounter
+//      /raids/:name/:bossName      — opens the encounter with that encounter_name
+//
+// The :bossName segment is the URL-encoded encounter_name (e.g. "D'Lizta%20Cheroon").
+// Client-side resolution: look up zone.bosses by encounter_name === decodeURIComponent(bossName).
+// The API is still keyed by position (GET /api/zones/{zone}/encounters/{position}/strategy);
+// we carry `selected.position` for API calls while the URL carries the human-readable name.
 //
 // Layout: sidebar (encounter list, grouped by stage) + main pane (selected
 // encounter detail). Clicking a sidebar item updates the URL via navigate(),
@@ -48,7 +53,7 @@ interface Zone {
 // reload / data refetch.
 
 export default function RaidZonePage() {
-  const { name = '', position } = useParams<{ name: string; position?: string }>()
+  const { name = '', bossName } = useParams<{ name: string; bossName?: string }>()
   const navigate = useNavigate()
   const auth = useAuth()
 
@@ -61,21 +66,24 @@ export default function RaidZonePage() {
   const progress = useRaidProgress()
 
   // Group encounters by stage in curator order. Memoise both for cheap
-  // re-renders when only the selected position changes.
+  // re-renders when only the selected bossName changes.
   const stages = useMemo(() => groupByStage(zone?.bosses ?? []), [zone])
 
-  // Resolve the selected encounter from the URL. Falls back to the first
-  // encounter when no position or an unknown position is given so a bare
-  // /raids/:name URL still shows something useful.
+  // Resolve the selected encounter from the URL :bossName segment.
+  // Falls back to the first encounter when bossName is absent or unknown so a
+  // bare /raids/:name URL still shows something useful.
+  // Edge case: if two encounters share the same encounter_name, the first
+  // position-ascending match wins (curator ordering is deterministic).
   const selected: Encounter | null = useMemo(() => {
     if (!zone || zone.bosses.length === 0) return null
-    if (position) {
-      const want = Number.parseInt(position, 10)
-      const hit = zone.bosses.find(b => b.position === want)
+    if (bossName) {
+      const decoded = decodeURIComponent(bossName)
+      const hit = zone.bosses.find(b => b.encounter_name === decoded)
       if (hit) return hit
+      // Unknown bossName — canonicalise the URL to the first encounter.
     }
     return zone.bosses[0]
-  }, [zone, position])
+  }, [zone, bossName])
 
   // Map encounter_name → KilledEncounter so the sidebar + main pane can pull
   // ‹last_kill_id, last_kill_at, kill_count› without scanning the list each render.
@@ -92,7 +100,10 @@ export default function RaidZonePage() {
   function selectEncounter(enc: Encounter) {
     // replace:true keeps the back button useful — bouncing between encounters
     // shouldn't bloat history with one entry per click.
-    navigate(`/raids/${encodeURIComponent(name)}/${enc.position}`, { replace: true })
+    navigate(
+      `/raids/${encodeURIComponent(name)}/${encodeURIComponent(enc.encounter_name)}`,
+      { replace: true },
+    )
   }
 
   return (
