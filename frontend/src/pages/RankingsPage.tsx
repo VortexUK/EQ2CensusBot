@@ -140,35 +140,28 @@ export default function RankingsPage() {
       return
     }
 
+    // TEMP prod diagnostic — capture every effect fire so we can see whether
+    // the loop-breaker is actually limiting calls. Revert once V'Tekla K'Zalk
+    // codepoint is identified + added to normaliseBossName regex.
+    const cps = (s: string) =>
+      [...s].map(c => `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`).join(' ')
+    console.warn(
+      `[RankingsPage v2026-05-29-prod-diag-v2] effect-fire #${resetCountRef.current + 1} ` +
+      `(zone="${zone}", boss="${boss}", inList=${inList})`,
+      `\n  URL boss codepoints: ${cps(boss)}`,
+      `\n  Normalised URL boss: "${normBoss}"`,
+      `\n  resetCountRef.current = ${resetCountRef.current}`,
+      `\n  lastZoneRef.current = "${lastZoneRef.current}"`,
+      `\n  Zone bosses (count=${zoneObj.bosses.length}):`,
+      ...zoneObj.bosses.map(b => `\n    "${b}" → "${normaliseBossName(b)}" [${cps(b)}]`),
+    )
+
     if (resetCountRef.current >= 2) {
-      // We've already tried to auto-reset twice for this zone. If we're here
-      // a third time, the URL round-trip is mutating our reset value and
-      // further setParams calls will just feed the loop. Bail out — the user
-      // sees whatever the URL currently holds; the board may render empty
-      // until they pick a different boss. Better than browser-throttle
-      // SecurityError storms.
-      // TEMP: not DEV-gated so we can capture the codepoints from prod once.
-      // Revert once the V'Tekla K'Zalk codepoint is identified.
       console.warn(
-        `[RankingsPage v2026-05-29-loopbreaker-prod-diag] suppressed auto-reset loop ` +
-        `(zone="${zone}", boss="${boss}"). URL round-trip is mutating codepoints — ` +
-        `see prior diagnostic for codepoints.`,
+        `[RankingsPage v2026-05-29-prod-diag-v2] BAIL — already reset twice for zone="${zone}". ` +
+        `URL round-trip is mutating codepoints. NOT calling setParams.`,
       )
       return
-    }
-
-    if (boss) {
-      // TEMP: not DEV-gated so we can capture which exotic codepoint slipped
-      // through normaliseBossName on prod (V'Tekla K'Zalk reported flicker).
-      // Revert once the codepoint is added to the normaliser regex.
-      const cps = (s: string) => [...s].map(c => `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`).join(' ')
-      console.warn(
-        `[RankingsPage v2026-05-29-loopbreaker-prod-diag] boss "${boss}" not in zone "${zone}" boss list — resetting.`,
-        `\n  URL boss codepoints: ${cps(boss)}`,
-        `\n  Normalised URL boss: "${normBoss}"`,
-        `\n  Zone bosses (count=${zoneObj.bosses.length}):`,
-        ...zoneObj.bosses.map(b => `\n    "${b}" → "${normaliseBossName(b)}" [${cps(b)}]`),
-      )
     }
 
     resetCountRef.current += 1
