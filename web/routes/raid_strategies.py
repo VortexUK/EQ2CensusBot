@@ -4,21 +4,21 @@ PUT  /api/zones/{zone}/encounters/{position}/strategy             (editor-gated)
 GET  /api/zones/{zone}/encounters/{position}/strategy/revisions   (history)
 GET  /api/zones/{zone}/overview                                   (zone-level)
 PUT  /api/zones/{zone}/overview                                   (editor-gated)
+GET  /api/zones/{zone}/overview/revisions                         (history)
 
 Read-write surface for raid strategy markdown — per-encounter strategies and
 zone-level overview. Bodies live in ``census/raids_db.py`` (separate SQLite
 file from the zones DB). Write gate is ``require_editor`` from
-``web/auth_deps.py`` (admin / contributor / officer — see that module's
+``web/auth_deps.py`` (admin / contributor — see that module's
 docstring for the role model).
 
 For encounters, the revision history is recorded automatically by
 ``upsert_raid_encounter`` so this route doesn't have to think about it on the
 write path — only surface it on the read path via the ``/revisions`` endpoint.
 
-Zone overviews share the editor gate but don't (yet) carry a per-field
-revision history — only ``last_edited_at`` + ``last_edited_by`` are stamped on
-the zone row. A future raid_zone_revisions table can layer in without changing
-this route shape.
+Zone overviews share the editor gate and carry a per-field revision history
+in ``raid_zone_revisions`` — every PUT to the overview writes a revision row
+in the same transaction before returning the updated row.
 
 Key translation: the URL identifies a curator encounter by ``(zone_name,
 position)`` (matches the sidebar URLs in the React app). We resolve those via
@@ -137,6 +137,12 @@ class ZoneOverviewResponse(BaseModel):
 
 class ZoneOverviewUpdateRequest(BaseModel):
     markdown: str = Field(..., description="Full overview markdown body (replaces the current value).")
+    edit_note: str | None = Field(None, description="Optional commit-style note attached to the revision.")
+
+
+class ZoneRevisionListResponse(BaseModel):
+    zone_name: str
+    revisions: list[RevisionEntry]
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +218,7 @@ def _write_overview_sync(
     markdown: str,
     editor_discord_id: str,
     expansion_short: str,
+    edit_note: str | None = None,
 ) -> dict:
     """Targeted update of just ``overview_md`` on the raid_zones row.
 
@@ -220,13 +227,18 @@ def _write_overview_sync(
     column-scoped UPDATE so access_md / background_md aren't clobbered — the
     full-row upsert helper would null them out.
 
+    Writes a ``raid_zone_revisions`` row in the same transaction whenever the
+    markdown actually changes (or on the very first write, with before_md=NULL).
+    No revision row is written if the markdown is identical to the current value.
+
     Returns the fresh row dict matching ``_read_overview_sync``."""
     conn = raids_db.init_db()
     try:
         existing = conn.execute(
-            "SELECT id FROM raid_zones WHERE zone_name_lower = ?",
+            "SELECT id, overview_md FROM raid_zones WHERE zone_name_lower = ?",
             (zone_name.lower(),),
         ).fetchone()
+        now = int(time.time())
         if existing is None:
             # Lazy-create — same as the encounter PUT path.
             raids_db.upsert_raid_zone(
@@ -238,13 +250,23 @@ def _write_overview_sync(
             )
             # upsert_raid_zone doesn't set last_edited_at — do it here so the
             # initial write also stamps the audit fields.
-            now = int(time.time())
             conn.execute(
                 "UPDATE raid_zones SET last_edited_at = ?, last_edited_by = ? WHERE zone_name_lower = ?",
                 (now, editor_discord_id, zone_name.lower()),
             )
+            # Record first-ever revision with before_md=NULL.
+            zone_id_row = conn.execute(
+                "SELECT id FROM raid_zones WHERE zone_name_lower = ?",
+                (zone_name.lower(),),
+            ).fetchone()
+            conn.execute(
+                "INSERT INTO raid_zone_revisions "
+                "(raid_zone_id, edited_at, edited_by, before_md, after_md, edit_note) "
+                "VALUES (?, ?, ?, NULL, ?, ?)",
+                (zone_id_row[0], now, editor_discord_id, markdown, edit_note),
+            )
         else:
-            now = int(time.time())
+            zone_id, prev_md = int(existing[0]), existing[1]
             conn.execute(
                 "UPDATE raid_zones SET "
                 "  overview_md = ?, "
@@ -252,8 +274,16 @@ def _write_overview_sync(
                 "  last_edited_at = ?, "
                 "  last_edited_by = ? "
                 "WHERE id = ?",
-                (markdown, raids_db.SOURCE_MANUAL, now, editor_discord_id, existing[0]),
+                (markdown, raids_db.SOURCE_MANUAL, now, editor_discord_id, zone_id),
             )
+            # Only write a revision row when the markdown actually changes.
+            if markdown != prev_md:
+                conn.execute(
+                    "INSERT INTO raid_zone_revisions "
+                    "(raid_zone_id, edited_at, edited_by, before_md, after_md, edit_note) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (zone_id, now, editor_discord_id, prev_md, markdown, edit_note),
+                )
         conn.commit()
         conn.row_factory = sqlite3.Row
         row = conn.execute(
@@ -408,9 +438,8 @@ async def put_strategy(
 ) -> StrategyResponse:
     """Replace the encounter's strategy. Records a revision automatically.
 
-    Gated by ``require_editor`` — admin, contributor, or officer. A future
-    per-zone authz rule can swap in here without touching the rest of the
-    route.
+    Gated by ``require_editor`` — admin or contributor. A future per-zone
+    authz rule can swap in here without touching the rest of the route.
     """
     if not body.markdown.strip():
         raise HTTPException(status_code=400, detail="markdown body is empty")
@@ -499,6 +528,23 @@ async def get_strategy_revisions(zone_name: str, position: int) -> RevisionListR
 # ---------------------------------------------------------------------------
 
 
+def _read_zone_revisions_sync(zone_name: str) -> list[dict]:
+    """All revision rows for a zone's overview, newest first.
+
+    Returns [] if the zone has no raid_zones row OR no revisions yet."""
+    if not raids_db.DB_PATH.exists():
+        return []
+    with sqlite3.connect(raids_db.DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        zrow = conn.execute(
+            "SELECT id FROM raid_zones WHERE zone_name_lower = ?",
+            (zone_name.lower(),),
+        ).fetchone()
+        if zrow is None:
+            return []
+    return raids_db.list_zone_revisions(zrow["id"])
+
+
 async def _resolve_canonical_zone_name(zone_name: str) -> str | None:
     """Resolve an URL zone name (possibly an alias) to its canonical form via
     zones.db. Returns None when the zone is unknown — caller 404s."""
@@ -556,6 +602,7 @@ async def put_zone_overview(
             markdown=body.markdown,
             editor_discord_id=user["id"],
             expansion_short=expansion_short,
+            edit_note=body.edit_note,
         ),
     )
 
@@ -568,4 +615,42 @@ async def put_zone_overview(
         last_edited_by=last_edited_by,
         last_edited_by_name=editor_name,
         source=row.get("source") or raids_db.SOURCE_MANUAL,
+    )
+
+
+@router.get(
+    "/zones/{zone_name}/overview/revisions",
+    response_model=ZoneRevisionListResponse,
+)
+async def get_zone_overview_revisions(zone_name: str) -> ZoneRevisionListResponse:
+    """Return the full revision history for a zone's overview, newest first.
+    Public read (same auth as the overview GET).
+
+    Empty list when no overview has ever been written — the frontend
+    disclosure shows "no history yet" rather than 404-ing."""
+    canonical = await _resolve_canonical_zone_name(zone_name)
+    if canonical is None:
+        raise HTTPException(status_code=404, detail=f"Unknown zone: {zone_name!r}")
+
+    loop = asyncio.get_event_loop()
+    rows = await loop.run_in_executor(None, _read_zone_revisions_sync, canonical)
+
+    # Batch-resolve display names for all unique editor ids in one DB call.
+    editor_ids = list({r["edited_by"] for r in rows if r.get("edited_by")})
+    names = await users_db.get_display_names_for_discord_ids(editor_ids)
+
+    return ZoneRevisionListResponse(
+        zone_name=canonical,
+        revisions=[
+            RevisionEntry(
+                id=r["id"],
+                edited_at=r["edited_at"],
+                edited_by=r["edited_by"],
+                edited_by_name=names.get(r["edited_by"]),
+                before_md=r["before_md"],
+                after_md=r["after_md"],
+                edit_note=r["edit_note"],
+            )
+            for r in rows
+        ],
     )

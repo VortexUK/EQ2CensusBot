@@ -269,11 +269,17 @@ def init_db(path: Path = DB_PATH) -> None:
         # leaves any admin-edited rows alone if/when a future UI exposes the
         # table for live edits. Listed here (not in _SCHEMA) so the seed
         # statements live with their semantic intent.
+
+        # Drop the officer→edit_content permission that was seeded in earlier
+        # versions. Officer access to raid editing is being removed per the
+        # 2026-05-29 decision; only admins + contributors edit content now.
+        # Idempotent: no-op once the row is gone.
+        conn.execute("DELETE FROM role_permissions WHERE role = 'officer' AND capability = 'edit_content'")
+
         conn.executemany(
             "INSERT OR IGNORE INTO role_permissions (role, capability) VALUES (?, ?)",
             [
                 ("contributor", "edit_content"),
-                ("officer", "edit_content"),
             ],
         )
 

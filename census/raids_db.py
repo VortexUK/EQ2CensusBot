@@ -147,6 +147,19 @@ CREATE TABLE IF NOT EXISTS raid_encounter_revisions (
 );
 """
 
+_CREATE_RAID_ZONE_REVISIONS = """
+CREATE TABLE IF NOT EXISTS raid_zone_revisions (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    raid_zone_id  INTEGER NOT NULL,
+    edited_at     INTEGER NOT NULL,
+    edited_by     TEXT    NOT NULL,              -- discord_id or scrape token
+    before_md     TEXT,                          -- NULL on the very first row (seed)
+    after_md      TEXT    NOT NULL,
+    edit_note     TEXT,                          -- optional commit-style note
+    FOREIGN KEY (raid_zone_id) REFERENCES raid_zones (id) ON DELETE CASCADE
+);
+"""
+
 # ACT Triggers — regex-driven matchers a player imports into Advanced Combat
 # Tracker to react to in-game log lines (boss callouts, debuffs, mechanic
 # triggers). One row maps 1:1 to a <Trigger> element in ACT's
@@ -231,6 +244,7 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_raid_enc_zone          ON raid_encounters (raid_zone_id, position);",
     "CREATE INDEX IF NOT EXISTS idx_raid_enc_mob_lower     ON raid_encounters (mob_name_lower);",
     "CREATE INDEX IF NOT EXISTS idx_raid_rev_encounter     ON raid_encounter_revisions (encounter_id, edited_at);",
+    "CREATE INDEX IF NOT EXISTS idx_raid_zone_rev_zone     ON raid_zone_revisions (raid_zone_id, edited_at);",
     "CREATE INDEX IF NOT EXISTS idx_act_triggers_enc       ON act_triggers (raid_encounter_id, position);",
     "CREATE INDEX IF NOT EXISTS idx_act_triggers_timer     ON act_triggers (raid_encounter_id, timer_name);",
     "CREATE INDEX IF NOT EXISTS idx_act_spell_timers_enc   ON act_spell_timers (raid_encounter_id);",
@@ -253,6 +267,7 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute(_CREATE_META)
     conn.execute(_CREATE_RAID_ZONES)
+    conn.execute(_CREATE_RAID_ZONE_REVISIONS)
     conn.execute(_CREATE_RAID_ENCOUNTERS)
     conn.execute(_CREATE_REVISIONS)
     conn.execute(_CREATE_ACT_TRIGGERS)
@@ -674,6 +689,22 @@ def encounter_revisions(encounter_id: int, path: Path = DB_PATH) -> list[dict]:
             "FROM raid_encounter_revisions "
             "WHERE encounter_id = ? ORDER BY edited_at DESC, id DESC",
             (encounter_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_zone_revisions(zone_id: int, path: Path = DB_PATH) -> list[dict]:
+    """All revision rows for a zone's overview, newest first.
+    Each row: {id, edited_at, edited_by, before_md, after_md, edit_note}."""
+    if not path.exists():
+        return []
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, edited_at, edited_by, before_md, after_md, edit_note "
+            "FROM raid_zone_revisions WHERE raid_zone_id = ? "
+            "ORDER BY edited_at DESC, id DESC",
+            (zone_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 

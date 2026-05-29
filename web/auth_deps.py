@@ -26,6 +26,10 @@ inside `require_editor`:
                       primary character's guild rank against
                       ``_OFFICER_RANKS`` (see ``web/routes/guild.py``).
                       Never persisted — Census is the source of truth.
+                      Officers used to hold edit_content; that grant was
+                      removed on 2026-05-29 so editing is admin/contributor
+                      only. The officer code path stays for future
+                      officer-only capabilities (e.g. claim approvals).
 
 `KNOWN_ROLES` is the route-layer allowlist for grant/revoke endpoints; new
 roles get added there before they're meaningful anywhere else.
