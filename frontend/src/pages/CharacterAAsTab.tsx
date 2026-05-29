@@ -253,10 +253,10 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
     : null
 
   return (
-    <div className="mt-4 flex gap-6 items-start">
+    <div className="mt-4 flex flex-col md:flex-row gap-6 items-start">
 
       {/* ── Left sidebar ── */}
-      <div className="w-[240px] shrink-0">
+      <div className="w-full md:w-[240px] md:shrink-0">
 
         {/* Raid Ready */}
         <AARaidReady spent={spentInView} cap={config.aa_cap} />
@@ -376,15 +376,19 @@ export function AAsTab({ charName, aaCount }: { charName: string; aaCount: numbe
                   {_TREE_TYPE_LABEL[activeCt.tree_type] ?? activeCt.tree_type}
                 </div>
 
-                {/* Tree at 60% of the right column */}
-                <div className="w-[60%]">
-                  {activeTd ? (
-                    <AATree tree={activeTd} spent={activeCt.spent} />
-                  ) : (
-                    <Card className="rounded-sm p-4 text-text-muted text-[0.82rem]">
-                      Tree data unavailable (tree #{activeCt.tree_id})
-                    </Card>
-                  )}
+                {/* Tree at 60% of the right column on desktop; full-width with
+                    horizontal scroll on narrow viewports so the game-client-
+                    replica layout stays pixel-faithful instead of squashing. */}
+                <div className="overflow-x-auto md:overflow-visible">
+                  <div className="min-w-[420px] md:min-w-0 md:w-[60%]">
+                    {activeTd ? (
+                      <AATree tree={activeTd} spent={activeCt.spent} />
+                    ) : (
+                      <Card className="rounded-sm p-4 text-text-muted text-[0.82rem]">
+                        Tree data unavailable (tree #{activeCt.tree_id})
+                      </Card>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

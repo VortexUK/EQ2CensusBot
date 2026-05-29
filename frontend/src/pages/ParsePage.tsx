@@ -330,27 +330,29 @@ function CombatantSection({
           · {combatants.length}
         </span>
       </h2>
-      <Card
-        className="grid items-center text-[0.82rem] rounded-[6px] px-[0.6rem] py-[0.4rem] gap-x-2 gap-y-0"
-        style={{
-          gridTemplateColumns:
-            'minmax(160px,1.6fr) 90px 80px 50px 90px 70px 90px 60px 40px',
-        }}
-      >
-        <div className={HDR_CELL_CLS}>Name</div>
-        <div className={`${HDR_CELL_CLS} text-right`}>DMG</div>
-        <div className={`${HDR_CELL_CLS} text-right`}>encDPS</div>
-        <div className={`${HDR_CELL_CLS} text-right`}>%</div>
-        <div className={`${HDR_CELL_CLS} text-right`}>Healed</div>
-        <div className={`${HDR_CELL_CLS} text-right`}>HPS</div>
-        <div className={`${HDR_CELL_CLS} text-right`}>Taken</div>
-        <div className={`${HDR_CELL_CLS} text-right`}>Crit%</div>
-        <div className={`${HDR_CELL_CLS} text-right`}>D</div>
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <Card
+          className="grid items-center text-[0.82rem] rounded-[6px] px-[0.6rem] py-[0.4rem] gap-x-2 gap-y-0 min-w-[640px]"
+          style={{
+            gridTemplateColumns:
+              'minmax(160px,1.6fr) 90px 80px 50px 90px 70px 90px 60px 40px',
+          }}
+        >
+          <div className={HDR_CELL_CLS}>Name</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>DMG</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>encDPS</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>%</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>Healed</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>HPS</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>Taken</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>Crit%</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>D</div>
 
-        {combatants.map(c => (
-          <CombatantRow key={c.id} combatant={c} lookupEntry={lookup[c.name]} />
-        ))}
-      </Card>
+          {combatants.map(c => (
+            <CombatantRow key={c.id} combatant={c} lookupEntry={lookup[c.name]} />
+          ))}
+        </Card>
+      </div>
     </section>
   )
 }

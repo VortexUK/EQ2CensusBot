@@ -384,12 +384,12 @@ export default function RecipesPage() {
         </h1>
       </div>
 
-      <div className="grid gap-5" style={{ gridTemplateColumns: '1fr 340px' }}>
+      <div className="grid gap-5 grid-cols-1 md:[grid-template-columns:1fr_340px]">
 
         {/* ── Left column: filters + results ─────────────────────────────────── */}
         <div>
           {/* Filter row */}
-          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-[0.6rem] items-end mb-4">
+          <div className="flex flex-wrap gap-[0.6rem] items-end mb-4 [&>div]:flex-1 [&>div]:min-w-[140px]">
             {/* Name */}
             <div>
               <label className="text-xs text-text-muted block mb-[3px]">

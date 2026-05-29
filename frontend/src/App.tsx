@@ -26,6 +26,7 @@ import { Link } from 'react-router-dom'
 import logo from './assets/EQ2L.png'
 import ServerLaunchTimer from './components/ServerLaunchTimer'
 import CensusStatus from './components/CensusStatus'
+import { MobileNav } from './components/MobileNav'
 
 function LoginGate() {
   return (
@@ -258,19 +259,27 @@ function Layout() {
           </Link>
           <ServerBadge />
         </div>
-        <NavLinks />
+        {/* Inline nav: lg+ only. Below lg, MobileNav renders the hamburger. */}
+        <div className="hidden lg:block">
+          <NavLinks />
+        </div>
         <div className="flex items-center gap-[0.6rem]">
+          {/* ACT download icon: lg+ only (it's also in the MobileNav drawer). */}
           <a
             href="https://github.com/VortexUK/EQ2LexiconACTPlugin/releases/latest"
             target="_blank"
             rel="noopener noreferrer"
             title="Download the EQ2 Lexicon ACT plugin"
-            className="block shrink-0 transition-[transform,filter] duration-150 hover:brightness-110 hover:scale-[1.03]"
+            className="hidden lg:block shrink-0 transition-[transform,filter] duration-150 hover:brightness-110 hover:scale-[1.03]"
           >
             <img src="/download_plugin.png" alt="Download ACT Plugin" className="h-10 w-auto" />
           </a>
           <NotificationBell />
           <UserWidget />
+          {/* Hamburger: below lg only. */}
+          <div className="lg:hidden">
+            <MobileNav />
+          </div>
         </div>
       </div>
       {/* pt-14 pushes content below the fixed header; min-h-screen makes the

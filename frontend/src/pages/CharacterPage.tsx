@@ -646,9 +646,9 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
 
       {/* Equipment & Stats tab */}
       {activeTab === 'equipment' && (
-        <div className="flex gap-6 items-start mt-4">
+        <div className="flex flex-col md:flex-row gap-6 items-start mt-4">
           {/* Left: gear rating + detailed stats */}
-          <div className="w-[260px] shrink-0">
+          <div className="w-full md:w-[260px] md:shrink-0">
             <GearRating equipment={char.equipment} ready={itemsReady} maxLevel={maxLevel} ratingConfig={ratingConfig} ilvl={char.ilvl} />
             <StatsPanel char={char}
               onStatHover={setHoveredStat}
@@ -658,7 +658,7 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
           {/* Right: paperdoll */}
           <div className="flex-1 min-w-0">
             <h2 className={sectionHeadingClass}>Equipment</h2>
-            <div className="grid grid-cols-2 gap-y-[4px] gap-x-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-[4px] gap-x-3">
               <div className="flex flex-col gap-1">
                 {LEFT_SLOTS.map(([label, key]) => {
                   const item = bySlot.get(key) ?? null
@@ -674,7 +674,7 @@ function CharacterView({ char, maxLevel, ratingConfig }: { char: Character; maxL
             </div>
 
             <h2 className={`${sectionHeadingClass} mt-4`}>Consumables</h2>
-            <div className="grid grid-cols-2 gap-y-[4px] gap-x-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-[4px] gap-x-3">
               {CONSUMABLE_SLOTS.map(([label, key]) => {
                 const item = bySlot.get(key) ?? null
                 return <SlotRow key={key} label={label} item={item} iconSide="left" onShow={showTip} onHide={hideTip} highlight={getHighlight(item)} />

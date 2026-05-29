@@ -419,10 +419,10 @@ export function SpellsTab({ charName }: { charName: string }) {
   }
 
   return (
-    <div className="mt-4 flex gap-6 items-start">
+    <div className="mt-4 flex flex-col md:flex-row gap-6 items-start">
 
       {/* ── Left sidebar ── */}
-      <div className="w-[240px] shrink-0">
+      <div className="w-full md:w-[240px] md:shrink-0">
         <SpellRaidReady expertOrBetter={expertOrBetter} totalSpells={totalSpells} />
 
         <StatGroup title="By Tier">
@@ -569,7 +569,7 @@ export function SpellsTab({ charName }: { charName: string }) {
           )
 
           return (
-            <div className="flex gap-3 items-start">
+            <div className="flex flex-col md:flex-row gap-3">
               {cols.map((col, ci) => <React.Fragment key={ci}>{renderTable(col)}</React.Fragment>)}
             </div>
           )
