@@ -130,6 +130,16 @@ async def _build_claims_response(discord_id: str, world: str) -> tuple[ClaimsRes
     return result, not any_failed
 
 
+def _safe_for_log(value: object) -> str:
+    """Strip CR/LF before interpolating into a log line — defence-in-depth
+    against log-spoofing should a future caller ever pass user-controlled
+    data here. Discord IDs (numeric snowflakes) and world names (from the
+    fixed registry) are already safe today; this just satisfies CodeQL's
+    py/log-injection rule and keeps the pattern correct as the code
+    evolves."""
+    return str(value).replace("\n", " ").replace("\r", " ")
+
+
 async def _refresh_claim_cache(discord_id: str, world: str) -> None:
     """Background task: silently rebuild the per-(user, world) claim cache."""
     try:
@@ -139,11 +149,16 @@ async def _refresh_claim_cache(discord_id: str, world: str) -> None:
         else:
             _log.warning(
                 "[Cache] Background claim refresh for %s on %s: some fetches failed, skipping cache update",
-                discord_id,
-                world,
+                _safe_for_log(discord_id),
+                _safe_for_log(world),
             )
     except Exception as exc:
-        _log.error("[Cache] Background claim refresh failed for %s on %s: %s", discord_id, world, exc)
+        _log.error(
+            "[Cache] Background claim refresh failed for %s on %s: %s",
+            _safe_for_log(discord_id),
+            _safe_for_log(world),
+            _safe_for_log(exc),
+        )
 
 
 def invalidate_user_claim_cache_all_worlds(discord_id: str) -> None:
