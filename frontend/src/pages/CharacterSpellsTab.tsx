@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StatGroup } from './CharacterPage'
 import { Button, Card, SectionLabel } from '../components/ui'
@@ -132,11 +132,38 @@ const CAT_COLOUR: Record<string, string> = {
   fuel:      '#64748b',   // muted — bulk fuel
 }
 
+// Tooltip width is fixed at 220px; we flip to the left side of the row when
+// the right side would clip the viewport. Margin is 8px (ml-2 / mr-2).
+const _INGREDIENT_TOOLTIP_W = 220
+const _INGREDIENT_TOOLTIP_MARGIN = 8
+const _INGREDIENT_TOOLTIP_VIEWPORT_PAD = 8
+
 function IngredientTooltip({ ing }: { ing: Ingredient }) {
   const tierColour = itemRarityColor(ing.tier, 'var(--text)')
+  // DOM-anchored position: default `left-full top-0 ml-2` puts the 220px box
+  // to the right of the row. On narrow viewports (mobile) that clips the
+  // right edge, so measure-and-flip to `right-full top-0 mr-2` (left side).
+  // useLayoutEffect runs synchronously after mount so the flip happens before
+  // paint — no visible jump on the first render.
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [flipLeft, setFlipLeft] = useState(false)
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    const viewportRight = window.innerWidth - _INGREDIENT_TOOLTIP_VIEWPORT_PAD
+    // Would the right edge clip? If yes, flip — but only if there's enough room
+    // on the left side to fit the tooltip there (otherwise stay where we are).
+    const wouldClipRight = rect.right > viewportRight
+    const leftRoomAvailable =
+      rect.left - _INGREDIENT_TOOLTIP_W - _INGREDIENT_TOOLTIP_MARGIN >= _INGREDIENT_TOOLTIP_VIEWPORT_PAD
+    if (wouldClipRight && leftRoomAvailable) setFlipLeft(true)
+  }, [])
   return (
     <div
-      className="absolute z-[9999] left-full top-0 ml-2 w-[220px] bg-surface border border-border rounded-md py-2.5 px-3 pointer-events-none"
+      ref={ref}
+      className={`absolute z-[9999] top-0 w-[220px] bg-surface border border-border rounded-md py-2.5 px-3 pointer-events-none ${
+        flipLeft ? 'right-full mr-2' : 'left-full ml-2'
+      }`}
       style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
     >
       {/* Header: icon + name */}
