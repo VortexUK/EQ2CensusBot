@@ -460,6 +460,7 @@ async def list_parses(
             success_level=f.get("success_level", 0) or 0,
             combatant_count=f.get("combatant_count", 0),
             player_count=f.get("player_count", 0),
+            category=_classify_zone(f.get("zone")),
             uploaded_by=f.get("uploaded_by") or "local",
             uploader_discord_id=did,
             uploader_display_name=uploader_names.get(did) if did else None,

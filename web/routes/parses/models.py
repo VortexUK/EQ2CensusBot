@@ -7,6 +7,8 @@ circular-import pain.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -70,6 +72,11 @@ class ParseEncounterSummary(BaseModel):
     success_level: int  # ACT enum: 0=unknown, 1=win, 2=loss, 3=mixed
     combatant_count: int
     player_count: int  # ally combatants with single-word names, excluding 'Unknown'
+    # Backed by web/routes/parses/list.py:_classify_zone — Raid / Dungeon /
+    # Other bucketing for the ParsesPage hierarchy. Computed at query time
+    # from the zone field against zones.db; not persisted on the encounters
+    # table.
+    category: Literal["raid", "dungeon", "other"]
     uploaded_by: str  # who ingested the canonical upload; 'local' for local-only era
     # Discord identity of the canonical upload's submitter — same shape as
     # ParseUploadSummary's fields. Surfaced here too so the list view can
