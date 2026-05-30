@@ -75,3 +75,13 @@ export interface GuildBucket {
   fightsByCategory: Record<Category, ZoneDayBucket[]>  // each category's zone-day buckets, newest bucket first
   totalFights: number
 }
+
+/**
+ * "No guild" sentinel. Used as a guild-name placeholder in GuildBucket
+ * for fights whose uploader had no Census-resolved guild (e.g. the
+ * uploader's character isn't currently in a guild, or the guild lookup
+ * failed at ingest). Centralised here so the two consumers
+ * (ParsesPage.tsx for the groupEncounters sort, GuildSection.tsx for
+ * the trash-button filter predicate) read from one source of truth.
+ */
+export const NO_GUILD = 'No Guild'

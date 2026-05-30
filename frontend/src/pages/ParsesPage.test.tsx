@@ -133,6 +133,11 @@ describe('ParsesPage grouping', () => {
       fight({ id: 1, title: 'RaidFight', category: 'raid', guild_name: 'Guild', started_at: 100, zone: 'Z', player_count: 12 }),
     ])
     renderPage()
+    // Wait for the fetch to resolve and the page to render the one fight
+    // before checking that the empty categories are absent. Without this,
+    // the queryAllByRole calls fire before useFetch's state update settles,
+    // and react-testing-library logs "not wrapped in act()" warnings.
+    await screen.findByText('RaidFight')
     // Dungeon + Other should not render at all because the guild has no
     // fights in those buckets. Only the Raid section header is present.
     const dungeonHeaders = screen.queryAllByRole('button', { name: /^Dungeon ·/ })

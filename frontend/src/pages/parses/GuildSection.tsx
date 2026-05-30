@@ -12,13 +12,10 @@ import Caret from '../../components/Caret'
 
 import { CategorySection } from './CategorySection'
 import { deleteByFilter } from './api'
+import { NO_GUILD } from './types'
 import type { GuildBucket, ParseEncounterSummary } from './types'
 
 const headerBtnCls = 'flex items-center gap-2 w-full bg-transparent border-none text-inherit cursor-pointer py-2 px-3 text-left font-inherit'
-
-// Sentinel value for encounters without a guild — kept here so GuildSection
-// can reference it without importing from ParsesPage (avoids a circular dep).
-const NO_GUILD = 'No Guild'
 
 export interface GuildSectionProps {
   bucket: GuildBucket

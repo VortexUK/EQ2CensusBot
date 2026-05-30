@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { discordAvatarUrl } from '../../hooks/useAuth'
-import { Button } from '../../components/ui'
-import { Badge } from '../../components/ui/Badge'
+import { Badge, Button } from '../../components/ui'
 import { FilterPill } from '../../components/FilterPill'
 import { fmtRelative } from '../../formatters'
 import {

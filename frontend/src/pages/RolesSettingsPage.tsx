@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import Breadcrumb from '../components/Breadcrumb'
-import { Button, Card, SectionLabel } from '../components/ui'
-import { Badge } from '../components/ui/Badge'
+import { Badge, Button, Card, SectionLabel } from '../components/ui'
 import { Textarea } from '../components/ui/Textarea'
 import { fmtLocalDateTime, fmtRelative } from '../formatters'
 import { useAuth } from '../hooks/useAuth'

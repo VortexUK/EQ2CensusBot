@@ -6,6 +6,7 @@ import { FilterPill } from '../components/FilterPill'
 import { fmtLocalDate } from '../formatters'
 
 import { GuildSection } from './parses/GuildSection'
+import { NO_GUILD } from './parses/types'
 import type { ParseEncounterSummary, ParsesListResponse } from './parses/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -22,7 +23,6 @@ const SIZE_OPTIONS: { value: SizeFilter; label: string; range: string }[] = [
   { value: 'individual', label: 'Individual', range: '1'     },
 ]
 
-const NO_GUILD = 'No Guild'
 const PARSES_FETCH_LIMIT = 500
 
 // Visible joiner (used in display) + internal joiner (used in Map keys).

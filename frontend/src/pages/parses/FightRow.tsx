@@ -9,7 +9,7 @@ import type { CSSProperties } from 'react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Badge } from '../../components/ui/Badge'
+import { Badge } from '../../components/ui'
 import { UploaderTag } from '../../components/UploaderTag'
 import Caret from '../../components/Caret'
 import { fmtDuration, fmtLocalTime, fmtNum } from '../../formatters'
