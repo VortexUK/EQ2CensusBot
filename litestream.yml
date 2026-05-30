@@ -30,7 +30,13 @@
 # `litestream replicate` keeps all four DBs in sync (RPO ~10 s).
 
 dbs:
-  - path: ${DB_PARSES_PATH:-/app/data/parses/parses.db}
+  # NOTE on env-var syntax: litestream uses Go's os.ExpandEnv, which only
+  # supports `${VAR}` — NOT `${VAR:-default}`. Bash-style defaults parse as
+  # a single (nonexistent) env-var name and substitute to empty string,
+  # which leaves the path empty and litestream then tries to open `/app`
+  # (the cwd) as a database. So: no defaults here. The env vars MUST be
+  # set on the Railway service (see CLAUDE.md → Environment variables).
+  - path: ${DB_PARSES_PATH}
     replicas:
       - type: s3
         endpoint: ${R2_ENDPOINT}
@@ -44,7 +50,7 @@ dbs:
         retention-check-interval: 24h
         snapshot-interval: 24h
 
-  - path: ${DB_USERS_PATH:-/app/data/users.db}
+  - path: ${DB_USERS_PATH}
     replicas:
       - type: s3
         endpoint: ${R2_ENDPOINT}
@@ -57,7 +63,7 @@ dbs:
         retention-check-interval: 24h
         snapshot-interval: 24h
 
-  - path: ${DB_ZONES_PATH:-/app/data/zones/zones.db}
+  - path: ${DB_ZONES_PATH}
     replicas:
       - type: s3
         endpoint: ${R2_ENDPOINT}
@@ -70,7 +76,7 @@ dbs:
         retention-check-interval: 24h
         snapshot-interval: 24h
 
-  - path: ${DB_RAIDS_PATH:-/app/data/raids/raids.db}
+  - path: ${DB_RAIDS_PATH}
     replicas:
       - type: s3
         endpoint: ${R2_ENDPOINT}
