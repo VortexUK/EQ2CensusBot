@@ -257,3 +257,62 @@ async def test_delete_mob_no_invalidation_on_404(app, editor_override) -> None:
     assert r.status_code == 404
     # Cache must NOT have been cleared — the mob didn't exist
     assert _cached_zones_data.cache_info().currsize == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — invalidate_zones_cache also nukes combatant is_player
+# ---------------------------------------------------------------------------
+
+import sqlite3
+from pathlib import Path
+
+from parses import db as parses_db
+
+
+@pytest.fixture
+def parses_db_in_memory(monkeypatch):
+    """Shared in-memory parses DB for the duration of the test.
+
+    Patches invalidate_is_player_cache so it operates on the in-memory
+    connection rather than opening a new connection to DB_PATH."""
+    conn = parses_db.init_db(Path(":memory:"))
+    monkeypatch.setattr(parses_db, "DB_PATH", Path(":memory:"))
+    monkeypatch.setattr(parses_db, "init_db", lambda *a, **k: conn)
+    monkeypatch.setattr(
+        parses_db,
+        "invalidate_is_player_cache",
+        lambda *a, **k: parses_db.invalidate_is_player_cache_with_conn(conn),
+    )
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def test_invalidate_zones_cache_nukes_combatant_is_player(parses_db_in_memory):
+    from web.routes.rankings import invalidate_zones_cache
+
+    cur = parses_db_in_memory.execute(
+        """
+        INSERT INTO encounters (
+            act_encid, title, zone, started_at, ended_at, duration_s,
+            total_damage, encdps, kills, deaths, source_dsn, ingested_at, world
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        ("invZ", "Test", "Z", 1, 2, 1, 100, 100.0, 0, 0, "test", 1, "Varsoon"),
+    )
+    enc_id = int(cur.lastrowid or 0)
+    parses_db_in_memory.execute(
+        "INSERT INTO combatants (encounter_id, name, ally, is_player) VALUES (?, ?, ?, ?)",
+        (enc_id, "Alpha", 1, 1),
+    )
+    parses_db_in_memory.execute(
+        "INSERT INTO combatants (encounter_id, name, ally, is_player) VALUES (?, ?, ?, ?)",
+        (enc_id, "Bravo", 1, 0),
+    )
+    parses_db_in_memory.commit()
+
+    invalidate_zones_cache()
+
+    rows = parses_db_in_memory.execute("SELECT is_player FROM combatants").fetchall()
+    assert all(r[0] is None for r in rows), "every is_player must be NULL after invalidate_zones_cache"

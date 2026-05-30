@@ -194,22 +194,27 @@ def _build_speed_board(kills: list[dict], *, size: str, zone: str, boss: str) ->
 
 def invalidate_zones_cache() -> None:
     """Clear the _cached_zones_data lru_cache AND the parses
-    classifier's leaderboard map.
+    classifier's leaderboard map AND mark every combatant for
+    re-classification.
 
     Call this after any mutation to zones / zone_encounters /
-    zone_encounter_mobs so the next /api/rankings/filters request rebuilds
-    the dropdown tree from disk, and the next /api/parses request rebuilds
-    the classifier map (which is derived from the same trees). Without
-    this the rankings dropdown shows a stale view of the roster, and the
-    parses page misclassifies new/updated zones, until the process
-    restarts.
+    zone_encounter_mobs so:
+      * the next /api/rankings/filters rebuilds the dropdown tree
+      * the next /api/parses request rebuilds the classifier map
+      * existing parses re-classify against the updated zone trees
+        on first read (the brute-force is_player NULL reset is fine
+        at current data size — flagged as a scalability concern in
+        the pet-detection-pipeline spec)
     """
     _cached_zones_data.cache_clear()
-    # Local import to avoid a circular dependency at module load time —
-    # parses.list already imports _cached_zones_data from this module.
+    # Local imports: parses.list already imports _cached_zones_data
+    # from this module, and parses.db is a deeper dependency. Local
+    # imports keep the module-load DAG cycle-free.
+    from parses import db as parses_db
     from web.routes.parses.list import _classifier_cache_clear
 
     _classifier_cache_clear()
+    parses_db.invalidate_is_player_cache()
 
 
 @lru_cache(maxsize=1)
