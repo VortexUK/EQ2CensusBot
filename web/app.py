@@ -346,7 +346,15 @@ def create_app(session_secret: str | None = None) -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
     # Surface X-Request-ID in 4xx/5xx JSON so users can quote it back to support.
+    # Register for BOTH FastAPI's HTTPException and Starlette's parent
+    # HTTPException. Unmatched-route 404s raise the Starlette parent directly;
+    # only registering for the FastAPI subclass fails to catch them. (Passes
+    # locally on Windows but failed in CI on Linux — Starlette/FastAPI version
+    # interaction.)
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
     app.add_exception_handler(HTTPException, _http_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(StarletteHTTPException, _http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, _validation_exception_handler)  # type: ignore[arg-type]
 
     # Outermost: security headers on every response
