@@ -20,13 +20,8 @@ import pytest
 
 from parses import db as parses_db
 
-
-@pytest.fixture
-def parses_db_conn():
-    conn = parses_db.init_db(":memory:")  # type: ignore[arg-type]
-    yield conn
-    conn.close()
-
+# parses_db_conn is now provided globally via tests/conftest.py
+# (hoisted from here per TEST-011 / Phase 2a.2).
 
 # ---------------------------------------------------------------------------
 # Fake ACT export DB — mirrors what the SQLite ODBC driver writes.
