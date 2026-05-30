@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import io
 from collections import Counter
+from typing import TYPE_CHECKING
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from census.client import CensusClient
-from census.config import SERVICE_ID, WORLD
+from census.config import WORLD
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
+
+if TYPE_CHECKING:
+    from bot.bot import EQ2Bot
 from census.models import CharacterSpells, SpellEntry
 from census.spells_db import (
     load_blocklist as _load_spell_blocklist,
@@ -87,14 +92,9 @@ def _build_table(data: CharacterSpells) -> str:
 
 
 class SpellcheckCog(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: EQ2Bot) -> None:
         self.bot = bot
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        self.census = CensusClient(service_id=SERVICE_ID)
         self.world = WORLD
-
-    async def cog_unload(self) -> None:
-        await self.census.close()
 
     @app_commands.command(name="spellcheck", description="Summarise a character's spell tiers")
     @app_commands.describe(
@@ -109,7 +109,7 @@ class SpellcheckCog(commands.Cog):
     ) -> None:
         await interaction.response.defer(thinking=True)
 
-        data = await self.census.get_character_spells(name, self.world)
+        data = await self.bot.census.get_character_spells(name, self.world)
         if data is None:
             await interaction.followup.send(
                 f"No character found for **{name}** on **{self.world}**.",

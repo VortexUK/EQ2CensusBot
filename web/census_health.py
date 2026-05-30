@@ -73,7 +73,8 @@ async def _probe_census() -> bool:
                 _log.warning("[census-health] non-JSON 200 response: %r", text[:200])
                 return False
             return _body_looks_healthy(body)
-    except Exception:
+    except Exception as exc:
+        _log.debug("[census-health] Probe failed: %s", exc)
         return False
 
 

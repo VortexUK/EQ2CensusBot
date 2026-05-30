@@ -11,7 +11,6 @@ from collections import Counter
 from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
-from census.client import CensusClient
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.spells_db import DB_PATH as _SPELLS_DB
 from census.spells_db import find_by_ids as _spell_find_by_ids
@@ -19,7 +18,8 @@ from census.spells_db import load_blocklist as _load_spell_blocklist
 from census.spells_db import strip_roman as _strip_roman
 from census.spells_db import unique_highest_entries as _unique_highest_rows
 from web.cache import character_cache
-from web.config import SERVICE_ID as _SERVICE_ID
+from web.lib.cache_keys import char_cache_key
+from web.lib.census_lifecycle import shared_census_client
 from web.limiter import limiter
 from web.routes.character import router
 from web.routes.character.views import _build_char_response
@@ -57,19 +57,15 @@ async def get_character_spells(request: Request, name: str) -> CharacterSpellsRe
 
     # Use the cached character record (populated on first character page load).
     # Fall back to fetching if somehow the cache was cold.
-    cache_key = f"{name.lower()}:{current_world().lower()}"
+    cache_key = char_cache_key(name, current_world())
     cached, _ = character_cache.get_stale(cache_key)
 
     if cached is not None:
         char_name = cached.name
         spell_ids = cached.spell_ids
     else:
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        client = CensusClient(service_id=_SERVICE_ID)
-        try:
+        async with shared_census_client() as client:
             char = await client.get_character(name, current_world())
-        finally:
-            await client.close()
         if char is None:
             raise HTTPException(status_code=404, detail=f"Character '{name}' not found on {current_world()}")
         result = _build_char_response(char)

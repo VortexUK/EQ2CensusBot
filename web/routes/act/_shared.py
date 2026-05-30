@@ -4,13 +4,13 @@ endpoint modules (each imports from here, not from each other)."""
 
 from __future__ import annotations
 
-import asyncio
 import sqlite3
 
 from fastapi import HTTPException
 from pydantic import BaseModel
 
 from census import raids_db, zones_db
+from web.lib.executor import run_sync
 
 # ---------------------------------------------------------------------------
 # Models (Pydantic responses)
@@ -74,6 +74,21 @@ class SpellTimerEntry(BaseModel):
 # Sync helpers — encounter resolution + DB shapes
 # ---------------------------------------------------------------------------
 
+_RAIDS_DB_INIT_DONE = False
+
+
+def _ensure_raids_db_inited() -> None:
+    """Call raids_db.init_db() at most once per process.
+
+    raids_db.init_db() is idempotent (CREATE TABLE IF NOT EXISTS), but
+    calling it on every trigger read is wasteful. The module-level flag
+    short-circuits after the first invocation.
+    """
+    global _RAIDS_DB_INIT_DONE
+    if not _RAIDS_DB_INIT_DONE:
+        raids_db.init_db().close()
+        _RAIDS_DB_INIT_DONE = True
+
 
 def _resolve_encounter_sync(zone_name: str, position: int) -> tuple[str, str, int] | None:
     """Map ``(zone_name, position)`` -> ``(canonical_zone, mob_name, encounter_id)``.
@@ -100,13 +115,13 @@ def _resolve_encounter_sync(zone_name: str, position: int) -> tuple[str, str, in
 
     # Find or lazy-create the raids_db rows.
     #
-    # ALWAYS call init_db() (not just on the file-missing branch) — it's
-    # idempotent (CREATE TABLE IF NOT EXISTS) and is the only thing that
-    # ensures the act_triggers / act_spell_timers tables exist on an older
-    # raids.db that was seeded before they were added to the schema. Without
-    # this, a viewer hitting the GET endpoint against a stale DB sees
-    # "no such table: act_triggers" → 500.
-    raids_db.init_db().close()
+    # _ensure_raids_db_inited() is idempotent (CREATE TABLE IF NOT EXISTS)
+    # and is the only thing that ensures the act_triggers / act_spell_timers
+    # tables exist on an older raids.db that was seeded before they were
+    # added to the schema. Without this, a viewer hitting the GET endpoint
+    # against a stale DB sees "no such table: act_triggers" → 500.
+    # After the first call per process it is a no-op (module-level flag).
+    _ensure_raids_db_inited()
 
     with sqlite3.connect(raids_db.DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -151,7 +166,7 @@ def _resolve_encounter_sync(zone_name: str, position: int) -> tuple[str, str, in
 
 async def _resolve_encounter(zone_name: str, position: int) -> tuple[str, str, int]:
     """Async wrapper that 404s on miss. Used by every endpoint here."""
-    resolved = await asyncio.get_event_loop().run_in_executor(None, _resolve_encounter_sync, zone_name, position)
+    resolved = await run_sync(_resolve_encounter_sync, zone_name, position)
     if resolved is None:
         raise HTTPException(status_code=404, detail="Encounter not found")
     return resolved

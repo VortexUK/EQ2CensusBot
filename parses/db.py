@@ -778,6 +778,16 @@ def unhide_encounter(conn: sqlite3.Connection, encounter_id: int) -> bool:
     return cur.rowcount > 0
 
 
+def set_encounter_guild_name(conn: sqlite3.Connection, encounter_id: int, guild_name: str | None) -> bool:
+    """Set (or clear) the guild_name on an encounter row. Returns True if the row was updated."""
+    with conn:
+        cur = conn.execute(
+            "UPDATE encounters SET guild_name = ? WHERE id = ?",
+            (guild_name, encounter_id),
+        )
+    return cur.rowcount > 0
+
+
 def delete_encounters_by_filter(
     conn: sqlite3.Connection,
     *,

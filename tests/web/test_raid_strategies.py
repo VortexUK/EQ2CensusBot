@@ -135,7 +135,8 @@ async def test_put_strategy_session_but_no_role_is_403(app):
         patch("web.auth_deps.users_db.user_has_capability_via_db", new_callable=AsyncMock, return_value=False),
         patch("web.auth_deps.users_db.role_has_capability", new_callable=AsyncMock, return_value=True),
         patch(
-            "web.routes.raid_strategies.get_active_claims",
+            "web.lib.primary_guild.get_active_claims",
+            new_callable=AsyncMock,
             return_value={"approved": [], "pending": None},
         ),
     ):
@@ -206,13 +207,14 @@ async def test_put_strategy_officer_path_allows_write(app):
         patch("web.auth_deps.users_db.user_has_capability_via_db", new_callable=AsyncMock, return_value=False),
         patch("web.auth_deps.users_db.role_has_capability", new_callable=AsyncMock, return_value=True),
         patch(
-            "web.routes.raid_strategies.get_active_claims",
+            "web.lib.primary_guild.get_active_claims",
+            new_callable=AsyncMock,
             return_value={
                 "approved": [{"character_name": "Sigarth", "is_primary": 1}],
                 "pending": None,
             },
         ),
-        patch("web.routes.raid_strategies.character_cache.get_stale", return_value=(_Cached(), True)),
+        patch("web.lib.primary_guild.character_cache.get_stale", return_value=(_Cached(), True)),
         patch("web.routes.guild._officer_chars", return_value={"sigarth"}),
         patch("web.routes.raid_strategies.zones_db.find_by_name", return_value=_fake_zone()),
         patch("web.routes.raid_strategies._write_strategy_sync", return_value=fresh_row) as m_write,
@@ -240,13 +242,14 @@ async def test_put_strategy_officer_path_403_on_cold_cache(app):
         patch("web.auth_deps.users_db.user_has_capability_via_db", new_callable=AsyncMock, return_value=False),
         patch("web.auth_deps.users_db.role_has_capability", new_callable=AsyncMock, return_value=True),
         patch(
-            "web.routes.raid_strategies.get_active_claims",
+            "web.lib.primary_guild.get_active_claims",
+            new_callable=AsyncMock,
             return_value={
                 "approved": [{"character_name": "Sigarth", "is_primary": 1}],
                 "pending": None,
             },
         ),
-        patch("web.routes.raid_strategies.character_cache.get_stale", return_value=(None, False)),
+        patch("web.lib.primary_guild.character_cache.get_stale", return_value=(None, False)),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.put(

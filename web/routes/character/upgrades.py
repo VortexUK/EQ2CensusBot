@@ -12,7 +12,6 @@ from collections import defaultdict
 from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
-from census.client import CensusClient
 from census.db import DB_PATH as _ITEMS_DB
 from census.recipes_db import DB_PATH as _RECIPES_DB
 from census.recipes_db import find_spells_by_tier as _find_spell_recipes
@@ -22,7 +21,8 @@ from census.spells_db import load_blocklist as _load_spell_blocklist
 from census.spells_db import strip_roman as _strip_roman
 from census.spells_db import unique_highest_entries as _unique_highest_rows
 from web.cache import character_cache
-from web.config import SERVICE_ID as _SERVICE_ID
+from web.lib.cache_keys import char_cache_key
+from web.lib.census_lifecycle import shared_census_client
 from web.limiter import limiter
 from web.routes.character import router
 from web.routes.character.views import _build_char_response
@@ -146,17 +146,13 @@ async def get_upgrade_materials(request: Request, name: str) -> UpgradeMaterials
         raise HTTPException(status_code=503, detail="Recipes database not available")
 
     # Reuse cached character record
-    cache_key = f"{name.lower()}:{current_world().lower()}"
+    cache_key = char_cache_key(name, current_world())
     cached, _ = character_cache.get_stale(cache_key)
     if cached is not None:
         spell_ids = cached.spell_ids
     else:
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        client = CensusClient(service_id=_SERVICE_ID)
-        try:
+        async with shared_census_client() as client:
             char = await client.get_character(name, current_world())
-        finally:
-            await client.close()
         if char is None:
             raise HTTPException(status_code=404, detail=f"Character '{name}' not found on {current_world()}")
         result = _build_char_response(char)
@@ -258,17 +254,13 @@ async def get_upgrade_recipes(request: Request, name: str) -> UpgradeRecipesResp
         raise HTTPException(status_code=503, detail="Recipes database not available")
 
     # Reuse cached character record (same pattern as get_upgrade_materials)
-    cache_key = f"{name.lower()}:{current_world().lower()}"
+    cache_key = char_cache_key(name, current_world())
     cached, _ = character_cache.get_stale(cache_key)
     if cached is not None:
         spell_ids = cached.spell_ids
     else:
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        client = CensusClient(service_id=_SERVICE_ID)
-        try:
+        async with shared_census_client() as client:
             char = await client.get_character(name, current_world())
-        finally:
-            await client.close()
         if char is None:
             raise HTTPException(status_code=404, detail=f"Character '{name}' not found on {current_world()}")
         result = _build_char_response(char)

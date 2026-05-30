@@ -11,12 +11,10 @@ import asyncio
 import hashlib
 import hmac
 import logging
-import re
 import time
 
 from fastapi import BackgroundTasks, HTTPException, Request
 
-from census.client import CensusClient
 from parses import db as parses_db
 from parses.models import (
     AttackType,
@@ -34,8 +32,11 @@ from parses.models import (
 from web.auth_deps import require_user_session_or_token
 from web.cache import character_cache
 from web.config import ALLOWED_SERVERS as _ALLOWED_SERVERS
-from web.config import SERVICE_ID as _SERVICE_ID
 from web.config import WORLD as _WORLD
+from web.lib.census_lifecycle import shared_census_client
+from web.lib.executor import run_sync
+from web.lib.validation import sanitize_world as _sanitize_world
+from web.lib.validation import validate_character_name as _validate_character_name
 from web.limiter import limiter
 from web.routes.parses import router
 from web.routes.parses.models import (
@@ -52,40 +53,27 @@ _log = logging.getLogger(__name__)
 # casing for display in /auth/whoami responses.
 _ALLOWED_SERVERS_LOWER: frozenset[str] = frozenset(s.lower() for s in _ALLOWED_SERVERS)
 
-# EQ2 server names are a small known set with a predictable shape —
-# letters, digits, spaces, apostrophes, hyphens. Match conservatively
-# and fall back to EQ2_WORLD when the plugin sends garbage. Caps at
-# 30 chars to match the Pydantic max_length on logger_server.
-_VALID_WORLD_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 '_-]{0,30}$")
-
-# EQ2 character names are letters only, max 15 characters per
-# Daybreak's naming rules. Validate on ingest as defence-in-depth
-# on top of the Pydantic max_length=64 cap — a hostile logger_name
-# containing ':' would otherwise collide character_cache entries
-# (the keys are shaped `name.lower():world.lower()` throughout the
-# app). Constraining to the real EQ2 shape also keeps weird
-# payloads out of Census API URLs and the parses DB.
-_VALID_CHARACTER_NAME_RE = re.compile(r"^[A-Za-z]{1,15}$")
+# _sanitize_world and _validate_character_name are imported from web.lib.validation.
 
 
-def _sanitize_world(world: str | None) -> str | None:
-    """Return the world name if it matches the conservative shape we
-    expect for an EQ2 server, else None so the caller falls back to
-    the EQ2_WORLD env-var default. Defence-in-depth on top of the
-    Pydantic max_length=64 cap — keeps obvious injection shapes
-    (paths, query strings, control chars) out of Census API calls."""
-    if not world:
-        return None
-    candidate = world.strip()
-    if not candidate:
-        return None
-    return candidate if _VALID_WORLD_RE.match(candidate) else None
+class _CensusUnavailable:
+    """Sentinel — distinct from None.
+
+    Signals "Census API/network error — try again later" as opposed to
+    "character is genuinely unguilded" (None). Callers can schedule a
+    background retry instead of permanently writing NULL as the guild.
+    """
+
+    __slots__ = ()
+
+
+CENSUS_UNAVAILABLE = _CensusUnavailable()
 
 
 async def _resolve_uploader_guild_async(
     uploader: str,
     world: str | None = None,
-) -> str | None:
+) -> str | None | _CensusUnavailable:
     """Cache-aware guild lookup for the upload path. Order of attempts:
 
       1. character_cache hit on the uploader's character → return its
@@ -105,9 +93,10 @@ async def _resolve_uploader_guild_async(
     expected shape also falls back rather than feeding garbage into
     a Census API URL.
 
-    Returns None for: uploader='local', Census error, character not found,
-    or character is unguilded — callers store guild_name as NULL in all
-    those cases.
+    Returns:
+      - ``str``                — guild name (character is in this guild)
+      - ``None``               — character is genuinely unguilded (or 'local' uploader)
+      - ``CENSUS_UNAVAILABLE`` — Census API/network error; caller should retry later
     """
     if not uploader or uploader == "local":
         return None
@@ -124,15 +113,12 @@ async def _resolve_uploader_guild_async(
     if cached is not None:
         return getattr(cached, "guild_name", None) or None
 
-    # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-    client = CensusClient(service_id=_SERVICE_ID)
     try:
-        guild_name = await client.get_character_guild_name(uploader, effective_world)
+        async with shared_census_client() as client:
+            guild_name = await client.get_character_guild_name(uploader, effective_world)
     except Exception as exc:
         _log.warning("Census guild lookup failed for %r: %s", uploader, exc)
-        return None
-    finally:
-        await client.close()
+        return CENSUS_UNAVAILABLE
 
     if not guild_name:
         return None
@@ -184,15 +170,11 @@ async def _resolve_combatant_snapshots(
     effective_world = _sanitize_world(world) or _WORLD
     world_lower = effective_world.lower()
     out: dict[str, CombatantSnapshot] = {}
-    client: CensusClient | None = None
-    try:
+    async with shared_census_client() as client:
         for name in names:
             cache_key = f"{name.lower()}:{world_lower}"
             cached, _ = character_cache.get_stale(cache_key)
             if cached is None:
-                if client is None:
-                    # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-                    client = CensusClient(service_id=_SERVICE_ID)
                 try:
                     guild_name = await client.get_character_guild_name(name, effective_world)
                 except Exception as exc:
@@ -211,9 +193,6 @@ async def _resolve_combatant_snapshots(
             # so they aren't missing it on the leaderboard. Bounded: only fires
             # for resolved players still lacking an ilvl.
             if cached is not None and getattr(cached, "cls", None) and getattr(cached, "ilvl", None) is None:
-                if client is None:
-                    # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-                    client = CensusClient(service_id=_SERVICE_ID)
                 try:
                     char = await client.get_character(name, effective_world)
                 except Exception as exc:
@@ -228,16 +207,18 @@ async def _resolve_combatant_snapshots(
                     character_cache.set(cache_key, resp)
                     cached = resp
             if cached is not None:
-                out[name] = CombatantSnapshot(
-                    level=getattr(cached, "level", None),
-                    guild_name=getattr(cached, "guild_name", None),
-                    cls=getattr(cached, "cls", None),
-                    ilvl=getattr(cached, "ilvl", None),
-                )
-    finally:
-        if client is not None:
-            await client.close()
+                out[name] = _snapshot_from_cache(cached)
     return out
+
+
+def _snapshot_from_cache(cached: object) -> CombatantSnapshot:
+    """Build a CombatantSnapshot from a cached CharacterResponse-shaped object."""
+    return CombatantSnapshot(
+        level=getattr(cached, "level", None),
+        guild_name=getattr(cached, "guild_name", None),
+        cls=getattr(cached, "cls", None),
+        ilvl=getattr(cached, "ilvl", None),
+    )
 
 
 def _cached_snapshots(names: list[str], world: str | None = None) -> dict[str, CombatantSnapshot]:
@@ -251,12 +232,7 @@ def _cached_snapshots(names: list[str], world: str | None = None) -> dict[str, C
     for name in names:
         cached, _ = character_cache.get_stale(f"{name.lower()}:{world_lower}")
         if cached is not None:
-            out[name] = CombatantSnapshot(
-                level=getattr(cached, "level", None),
-                guild_name=getattr(cached, "guild_name", None),
-                cls=getattr(cached, "cls", None),
-                ilvl=getattr(cached, "ilvl", None),
-            )
+            out[name] = _snapshot_from_cache(cached)
     return out
 
 
@@ -268,6 +244,34 @@ def _update_snapshots_sync(encounter_id: int, snapshots: dict[str, CombatantSnap
         conn.close()
 
 
+async def _backfill_encounter_guild(encounter_id: int, uploader: str, world: str | None) -> None:
+    """Background: retry a Census guild lookup that failed at ingest time.
+
+    Called when _resolve_uploader_guild_async returns CENSUS_UNAVAILABLE —
+    Census was transiently down and we committed the encounter with
+    guild_name=NULL. A single retry after the response is sent is usually
+    enough to resolve the guild once Census recovers.
+
+    Never raises — guild attribution failure must not surface errors to
+    the user after the parse was already accepted.
+    """
+    try:
+        result = await _resolve_uploader_guild_async(uploader, world)
+        if isinstance(result, _CensusUnavailable) or result is None:
+            _log.debug(
+                "Background guild backfill for encounter %s: Census still unavailable or unguilded", encounter_id
+            )
+            return
+        conn = parses_db.init_db(parses_db.DB_PATH)
+        try:
+            parses_db.set_encounter_guild_name(conn, encounter_id, result)
+            _log.info("Background guild backfill set encounter %s guild_name=%r", encounter_id, result)
+        finally:
+            conn.close()
+    except Exception as exc:
+        _log.warning("Background guild backfill failed for encounter %s: %s", encounter_id, exc)
+
+
 async def _resolve_and_update_snapshots(encounter_id: int, player_names: list[str], world: str | None) -> None:
     """Background: do the full (Census-backed) snapshot resolution OFF the
     response path, then write the results onto the combatant rows. Never
@@ -276,8 +280,7 @@ async def _resolve_and_update_snapshots(encounter_id: int, player_names: list[st
         snapshots = await _resolve_combatant_snapshots(player_names, world)
         if not snapshots:
             return
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, _update_snapshots_sync, encounter_id, snapshots)
+        await run_sync(_update_snapshots_sync, encounter_id, snapshots)
     except Exception as exc:
         _log.warning("Background snapshot resolution failed for encounter %s: %s", encounter_id, exc)
 
@@ -611,7 +614,7 @@ async def ingest_parse(
     # anything else — keeps malformed payloads out of Census API
     # URLs, parses-DB rows, and prevents the ":"-injection cache-
     # collision path called out in the v0.1.13 audit (M4).
-    if not _VALID_CHARACTER_NAME_RE.match(uploader):
+    if _validate_character_name(uploader) is None:
         raise HTTPException(
             status_code=400,
             detail="logger_name must be 1-15 letters (the EQ2 character-name shape).",
@@ -672,7 +675,12 @@ async def ingest_parse(
     # guaranteed valid; _resolve_uploader_guild_async re-sanitises it
     # defensively and that fallback is now only reachable from the
     # local-ingest pipeline.
-    guild_name = await _resolve_uploader_guild_async(uploader, body.logger_server)
+    guild_result = await _resolve_uploader_guild_async(uploader, body.logger_server)
+    # Distinguish "Census down" (CENSUS_UNAVAILABLE) from "genuinely unguilded" (None).
+    # We commit the parse with guild_name=NULL in both cases and schedule a
+    # background retry only for the transient error case.
+    census_error_on_guild = isinstance(guild_result, _CensusUnavailable)
+    guild_name: str | None = None if census_error_on_guild else guild_result  # type: ignore[assignment]
 
     # Freeze each player ally's level/guild/class at ingest. Restricted to
     # player-like names (single-word ally, not the 'Unknown' rollup) so we
@@ -692,10 +700,7 @@ async def ingest_parse(
     # response has already gone out.
     snapshots = _cached_snapshots(player_names, body.logger_server)
 
-    loop = asyncio.get_event_loop()
-
-    status, encounter_id, n_c, n_dt, n_at = await loop.run_in_executor(
-        None,
+    status, encounter_id, n_c, n_dt, n_at = await run_sync(
         _ingest_payload_sync,
         body,
         uploader,
@@ -711,6 +716,11 @@ async def ingest_parse(
     # already have their snapshots, and an empty name list has nothing to do.
     if status in ("inserted", "revived") and encounter_id is not None and player_names:
         background.add_task(_resolve_and_update_snapshots, encounter_id, player_names, body.logger_server)
+
+    # If Census was transiently down during guild resolution, schedule a
+    # background retry so the guild_name is back-filled once Census recovers.
+    if census_error_on_guild and status in ("inserted", "revived") and encounter_id is not None:
+        background.add_task(_backfill_encounter_guild, encounter_id, uploader, body.logger_server)
 
     return IngestResponse(
         status=status,

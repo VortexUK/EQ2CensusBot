@@ -21,7 +21,8 @@ from web.auth_deps import (
 from web.auth_deps import (
     require_user_session as _require_user,
 )
-from web.constants import PARSE_MIRROR_WINDOW_S
+from web.constants import PARSE_INNER_CAP_FLOOR, PARSE_INNER_CAP_MULTIPLIER, PARSE_LIST_MAX_LIMIT, PARSE_MIRROR_WINDOW_S
+from web.lib.executor import run_sync
 from web.limiter import limiter
 from web.routes.parses import router  # the package-level router
 from web.routes.parses.models import (
@@ -262,7 +263,7 @@ async def list_parses(
     # `limit` is now a FIGHT cap, not an upload cap. Clamp to 500 — the
     # whole page is rendered client-side; bigger pages stall the browser
     # before they stall the server.
-    limit = max(1, min(limit, 500))
+    limit = max(1, min(limit, PARSE_LIST_MAX_LIMIT))
 
     # Unknown `size` value is silently dropped (no filter applied) — same
     # forgiving behaviour as the recipes route's bench filter.
@@ -273,10 +274,9 @@ async def list_parses(
     # would yield well over `limit` fights after grouping. 30x is the magic
     # number — for limit=500, inner=15000 uploads covers 625 fights at the
     # 24-mirror worst case, or 15000 unique fights at one-upload-per-fight.
-    inner_cap = max(limit * 30, 2000)
+    inner_cap = max(limit * PARSE_INNER_CAP_MULTIPLIER, PARSE_INNER_CAP_FLOOR)
 
-    loop = asyncio.get_event_loop()
-    encounters = await loop.run_in_executor(None, _list_encounters_sync, inner_cap, zone, size, current_world())
+    encounters = await run_sync(_list_encounters_sync, inner_cap, zone, size, current_world())
 
     # Group uploads into fights, then apply the user-facing limit to the
     # FIGHT list. `total` reports total fights (pre-limit) so the UI can
@@ -359,8 +359,7 @@ async def get_parse(
 
     top_attacks = max(1, min(top_attacks, 50))
 
-    loop = asyncio.get_event_loop()
-    enc = await loop.run_in_executor(None, _encounter_detail_sync, encounter_id, top_attacks, current_world())
+    enc = await run_sync(_encounter_detail_sync, encounter_id, top_attacks, current_world())
     if enc is None:
         raise HTTPException(status_code=404, detail="Parse not found")
 
@@ -372,7 +371,7 @@ async def get_parse(
     # Pass the encounter's own world so benchmarks use the same server's
     # leaderboard data, regardless of the active request context.
     enc_world = enc.get("world") or current_world()
-    bench = await loop.run_in_executor(None, benchmarks_for_boss, enc["title"], enc_world)
+    bench = await run_sync(benchmarks_for_boss, enc["title"], enc_world)
 
     def _pct(c: dict, metric: str, value_key: str) -> int | None:
         cls = c.get("cls")

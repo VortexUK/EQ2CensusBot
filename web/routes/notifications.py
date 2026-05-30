@@ -13,6 +13,8 @@ hit on every poll.
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette.requests import Request
@@ -20,6 +22,7 @@ from starlette.requests import Request
 from web.auth_deps import ADMIN_IDS as _ADMIN_IDS  # canonical source
 from web.cache import character_cache
 from web.db import get_active_claims, list_claims, list_pending_users
+from web.lib.cache_keys import char_cache_key
 from web.routes.guild import _OFFICER_RANKS, _roster_rank_map
 from web.server_context import current_world
 
@@ -66,7 +69,7 @@ async def get_notifications(request: Request) -> NotificationsResponse:
         guilds_seen: set[str] = set()
         approved_lower = {c.lower() for c in approved_chars}
         for char_name in approved_chars:
-            cache_key = f"{char_name.lower()}:{current_world().lower()}"
+            cache_key = char_cache_key(char_name, current_world())
             cached, _ = character_cache.get_stale(cache_key)
             if cached is not None and getattr(cached, "guild_name", None):
                 guilds_seen.add(cached.guild_name)
@@ -75,11 +78,12 @@ async def get_notifications(request: Request) -> NotificationsResponse:
             all_pending = await list_claims(status="pending", world=current_world())
             counted_ids: set[int] = set()
 
-            for guild_name in guilds_seen:
-                # One _roster_rank_map call per guild — cached after first fetch,
-                # shared across concurrent polls via in-flight deduplication.
-                rank_map = await _roster_rank_map(guild_name)
-
+            # Gather roster rank maps concurrently — each is cached after first
+            # fetch, so subsequent polls are cheap, and the gather only matters
+            # when a user belongs to multiple guilds.
+            guilds_list = list(guilds_seen)
+            rank_maps = await asyncio.gather(*[_roster_rank_map(g) for g in guilds_list])
+            for guild_name, rank_map in zip(guilds_list, rank_maps, strict=True):
                 # Check officer status inline (avoids a redundant second call)
                 if not any(rank_map.get(n) in _OFFICER_RANKS for n in approved_lower):
                     continue

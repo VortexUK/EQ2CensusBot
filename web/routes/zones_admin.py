@@ -5,13 +5,12 @@ this sibling file keeps the read/write split clean."""
 
 from __future__ import annotations
 
-import asyncio
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from census import zones_db
 from web.auth_deps import require_editor
+from web.lib.executor import run_sync
 from web.routes.rankings import invalidate_zones_cache
 
 router = APIRouter(tags=["zones-admin"])
@@ -23,8 +22,7 @@ def _resolve_zone_id_sync(zone_name: str) -> int | None:
 
 
 async def _resolve_zone_id(zone_name: str) -> int:
-    loop = asyncio.get_event_loop()
-    zid = await loop.run_in_executor(None, _resolve_zone_id_sync, zone_name)
+    zid = await run_sync(_resolve_zone_id_sync, zone_name)
     if zid is None:
         raise HTTPException(status_code=404, detail=f"Zone {zone_name!r} not found")
     return zid
@@ -68,9 +66,7 @@ class MobUpdateBody(BaseModel):
 )
 async def create_encounter(zone_name: str, body: EncounterCreateBody) -> dict:
     zone_id = await _resolve_zone_id(zone_name)
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(
-        None,
+    result = await run_sync(
         lambda: zones_db.add_encounter(
             zone_id=zone_id,
             primary_mob=body.primary_mob,
@@ -89,10 +85,8 @@ async def create_encounter(zone_name: str, body: EncounterCreateBody) -> dict:
 )
 async def reorder_zone_encounters(zone_name: str, body: ReorderBody) -> dict:
     zone_id = await _resolve_zone_id(zone_name)
-    loop = asyncio.get_event_loop()
     try:
-        await loop.run_in_executor(
-            None,
+        await run_sync(
             zones_db.reorder_encounters,
             zone_id,
             body.ordered_encounter_ids,
@@ -100,7 +94,7 @@ async def reorder_zone_encounters(zone_name: str, body: ReorderBody) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     invalidate_zones_cache()
-    z = await loop.run_in_executor(None, zones_db.find_by_name, zone_name)
+    z = await run_sync(zones_db.find_by_name, zone_name)
     return z or {}
 
 
@@ -120,10 +114,8 @@ async def edit_encounter(zone_name: str, encounter_id: int, body: EncounterUpdat
     kw_wu: dict[str, str | None] = {"wiki_url": body.wiki_url} if "wiki_url" in sent else {}
     # Merge the typed dicts before the executor call to keep the lambda simple.
     merged: dict[str, str | None] = {**kw_pm, **kw_st, **kw_wu}
-    loop = asyncio.get_event_loop()
     try:
-        result = await loop.run_in_executor(
-            None,
+        result = await run_sync(
             lambda: zones_db.update_encounter(encounter_id, **merged),  # type: ignore[arg-type]
         )
     except LookupError as exc:
@@ -139,8 +131,7 @@ async def edit_encounter(zone_name: str, encounter_id: int, body: EncounterUpdat
 )
 async def remove_encounter(zone_name: str, encounter_id: int) -> None:
     await _resolve_zone_id(zone_name)
-    loop = asyncio.get_event_loop()
-    ok = await loop.run_in_executor(None, zones_db.delete_encounter, encounter_id)
+    ok = await run_sync(zones_db.delete_encounter, encounter_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Encounter not found")
     invalidate_zones_cache()
@@ -152,9 +143,7 @@ async def remove_encounter(zone_name: str, encounter_id: int) -> None:
 )
 async def create_mob(zone_name: str, encounter_id: int, body: MobCreateBody) -> dict:
     await _resolve_zone_id(zone_name)
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(
-        None,
+    result = await run_sync(
         lambda: zones_db.add_mob(
             encounter_id,
             mob_name=body.mob_name,
@@ -171,9 +160,8 @@ async def create_mob(zone_name: str, encounter_id: int, body: MobCreateBody) -> 
 )
 async def edit_mob(zone_name: str, encounter_id: int, mob_id: int, body: MobUpdateBody) -> dict:
     await _resolve_zone_id(zone_name)
-    loop = asyncio.get_event_loop()
     try:
-        result = await loop.run_in_executor(None, lambda: zones_db.update_mob(mob_id, mob_name=body.mob_name))
+        result = await run_sync(lambda: zones_db.update_mob(mob_id, mob_name=body.mob_name))
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     invalidate_zones_cache()
@@ -186,9 +174,8 @@ async def edit_mob(zone_name: str, encounter_id: int, mob_id: int, body: MobUpda
 )
 async def promote_mob_route(zone_name: str, encounter_id: int, mob_id: int) -> dict:
     await _resolve_zone_id(zone_name)
-    loop = asyncio.get_event_loop()
     try:
-        result = await loop.run_in_executor(None, zones_db.promote_mob, mob_id)
+        result = await run_sync(zones_db.promote_mob, mob_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     invalidate_zones_cache()
@@ -202,9 +189,8 @@ async def promote_mob_route(zone_name: str, encounter_id: int, mob_id: int) -> d
 )
 async def remove_mob(zone_name: str, encounter_id: int, mob_id: int) -> None:
     await _resolve_zone_id(zone_name)
-    loop = asyncio.get_event_loop()
     try:
-        ok = await loop.run_in_executor(None, zones_db.delete_mob, mob_id)
+        ok = await run_sync(zones_db.delete_mob, mob_id)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not ok:

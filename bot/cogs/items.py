@@ -1,33 +1,32 @@
+from __future__ import annotations
+
 import io
 import logging
+from typing import TYPE_CHECKING
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from census.client import CensusClient
-from census.config import SERVICE_ID
 from image.tooltip import render_tooltip
+
+if TYPE_CHECKING:
+    from bot.bot import EQ2Bot
 
 _log = logging.getLogger(__name__)
 
 
 class ItemsCog(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: EQ2Bot) -> None:
         self.bot = bot
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        self.census = CensusClient(service_id=SERVICE_ID)
-
-    async def cog_unload(self) -> None:
-        await self.census.close()
 
     @app_commands.command(name="item", description="Look up an EverQuest 2 item by name")
     @app_commands.describe(name="Exact item display name (e.g. Faded Black Hood)")
     async def item(self, interaction: discord.Interaction, name: str) -> None:
         await interaction.response.defer(thinking=True)
 
-        _log.debug("item query=%r params=%s", name, self.census._build_params(name))
-        item_data = await self.census.get_item(name)
+        _log.debug("item query=%r params=%s", name, self.bot.census._build_params(name))
+        item_data = await self.bot.census.get_item(name)
         _log.debug("item result=%s", "found: " + item_data.name if item_data else "not found")
         if item_data is None:
             await interaction.followup.send(

@@ -6,7 +6,7 @@ without a built ``data/zones/zones.db``.
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -178,7 +178,11 @@ async def test_get_progress_requires_session(app):
 async def test_get_progress_returns_empty_when_no_guild(app):
     """No primary character + no recent parses → guild_name None, empty progress."""
     with (
-        patch("web.routes.zones.get_active_claims", return_value={"approved": [], "pending": None}),
+        patch(
+            "web.lib.primary_guild.get_active_claims",
+            new_callable=AsyncMock,
+            return_value={"approved": [], "pending": None},
+        ),
         patch("web.routes.zones._most_recent_parsed_guild_sync", return_value=None),
     ):
         async with _signed_in_client(app) as client:
@@ -205,14 +209,15 @@ async def test_get_progress_aggregates_kills(app):
     }
     with (
         patch(
-            "web.routes.zones.get_active_claims",
+            "web.lib.primary_guild.get_active_claims",
+            new_callable=AsyncMock,
             return_value={
                 "approved": [{"character_name": "Sihtric", "is_primary": 1}],
                 "pending": None,
             },
         ),
         # Cache miss forces the most-recent-parses fallback path.
-        patch("web.routes.zones.character_cache.get_stale", return_value=(None, False)),
+        patch("web.lib.primary_guild.character_cache.get_stale", return_value=(None, False)),
         patch("web.routes.zones._most_recent_parsed_guild_sync", return_value="Exordium"),
         patch("web.routes.zones._compute_progress_sync", return_value=fake_progress),
     ):
@@ -242,13 +247,14 @@ async def test_get_progress_cached_guild_short_circuits_parses_fallback(app):
 
     with (
         patch(
-            "web.routes.zones.get_active_claims",
+            "web.lib.primary_guild.get_active_claims",
+            new_callable=AsyncMock,
             return_value={
                 "approved": [{"character_name": "Sihtric", "is_primary": 1}],
                 "pending": None,
             },
         ),
-        patch("web.routes.zones.character_cache.get_stale", return_value=(_Cached(), True)),
+        patch("web.lib.primary_guild.character_cache.get_stale", return_value=(_Cached(), True)),
         patch("web.routes.zones._most_recent_parsed_guild_sync") as m_fallback,
         patch("web.routes.zones._compute_progress_sync", return_value={}),
     ):

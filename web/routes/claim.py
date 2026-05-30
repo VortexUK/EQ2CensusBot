@@ -6,11 +6,11 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from census.client import CensusClient
 from web.auth_deps import require_user_session as _require_user
 from web.cache import character_cache, claim_cache
-from web.config import SERVICE_ID as _SERVICE_ID
 from web.db import get_active_claims, set_primary, submit_claim, upsert_user, withdraw_claim
+from web.lib.census_lifecycle import shared_census_client
+from web.lib.log_safety import scrub as _safe_for_log
 from web.limiter import limiter
 from web.server_context import current_world
 
@@ -97,17 +97,13 @@ async def _build_claims_response(discord_id: str, world: str) -> tuple[ClaimsRes
     any_failed = False
     census_guild: dict[str, str | None | BaseException] = {}
     if need_census:
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        client = CensusClient(service_id=_SERVICE_ID)
-        try:
+        async with shared_census_client() as client:
             # return_exceptions=True so a Census timeout/error comes back as an
             # Exception instance rather than propagating and losing all results
             results = await asyncio.gather(
                 *[client.get_character_guild_name(n, world) for n in need_census],
                 return_exceptions=True,
             )
-        finally:
-            await client.close()
         census_guild = dict(zip(need_census, results))
         failed_names = [n for n, gn in census_guild.items() if isinstance(gn, BaseException)]
         if failed_names:
@@ -129,16 +125,6 @@ async def _build_claims_response(discord_id: str, world: str) -> tuple[ClaimsRes
         pending=ClaimResponse(**data["pending"]) if data["pending"] else None,
     )
     return result, not any_failed
-
-
-def _safe_for_log(value: object) -> str:
-    """Strip CR/LF before interpolating into a log line — defence-in-depth
-    against log-spoofing should a future caller ever pass user-controlled
-    data here. Discord IDs (numeric snowflakes) and world names (from the
-    fixed registry) are already safe today; this just satisfies CodeQL's
-    py/log-injection rule and keeps the pattern correct as the code
-    evolves."""
-    return str(value).replace("\n", " ").replace("\r", " ")
 
 
 async def _refresh_claim_cache(discord_id: str, world: str) -> None:
@@ -233,12 +219,21 @@ async def create_claim(request: Request, body: SubmitClaimRequest) -> ClaimRespo
         avatar=user.get("avatar"),
     )
 
-    # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-    client = CensusClient(service_id=_SERVICE_ID)
+    from web import census_health
+
+    if census_health.is_down():
+        raise HTTPException(
+            status_code=503,
+            detail="Census is unavailable. Cannot verify character existence — try again shortly.",
+        )
     try:
-        char = await client.get_character(name, current_world())
-    finally:
-        await client.close()
+        async with shared_census_client() as client:
+            char = await client.get_character(name, current_world())
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Census is unavailable. Cannot verify character existence — try again shortly.",
+        )
 
     if char is None:
         raise HTTPException(

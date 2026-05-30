@@ -105,6 +105,7 @@ from web.db.users import (  # noqa: E402,F401
     list_role_assignments,
     list_role_requests,
     list_roles_for_user,
+    review_and_grant_role,
     review_role_request,
     revoke_role,
     role_has_capability,

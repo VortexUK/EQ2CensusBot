@@ -89,12 +89,12 @@ async def test_spells_character_not_found(app):
 
     mock_census = AsyncMock()
     mock_census.get_character = AsyncMock(return_value=None)
-    mock_census.close = AsyncMock()
 
     with (
         patch("web.routes.character.spells._SPELLS_DB", mock_db),
         patch("web.routes.character.spells.character_cache") as mock_cache,
-        patch("web.routes.character.spells.CensusClient", return_value=mock_census),
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient", return_value=mock_census),
     ):
         # Cache miss
         mock_cache.get_stale.return_value = (None, False)
@@ -316,12 +316,12 @@ async def test_spells_fetches_from_census_on_cache_miss(app):
 
     mock_census = AsyncMock()
     mock_census.get_character = AsyncMock(return_value=mock_char_overview)
-    mock_census.close = AsyncMock()
 
     with (
         patch("web.routes.character.spells._SPELLS_DB", mock_db),
         patch("web.routes.character.spells.character_cache") as mock_cache,
-        patch("web.routes.character.spells.CensusClient", return_value=mock_census),
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient", return_value=mock_census),
     ):
         # Cache miss
         mock_cache.get_stale.return_value = (None, False)

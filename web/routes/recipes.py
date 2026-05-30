@@ -17,8 +17,8 @@ page        1-based page index (default 1)
 
 from __future__ import annotations
 
-import asyncio
 import json
+import logging
 import sqlite3
 
 import aiosqlite
@@ -27,6 +27,9 @@ from pydantic import BaseModel
 
 from census.db import DB_PATH as ITEMS_DB_PATH
 from census.recipes_db import DB_PATH as RECIPES_DB_PATH
+from web.lib.executor import run_sync
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["recipes"])
 
@@ -179,7 +182,8 @@ def _row_to_result(
 ) -> RecipeResult:
     try:
         sec = json.loads(row["secondary_comps"] or "[]")
-    except Exception:
+    except Exception as exc:
+        _log.warning("[recipes] Failed to parse secondary_comps for recipe id=%s: %s", row["id"], exc)
         sec = []
 
     # Prefer explicitly passed class_label; fall back to a column if present
@@ -301,8 +305,7 @@ async def search_recipes(
     # hitting the items DB concurrently under uvicorn.
     class_item_ids: list[int] | None = None
     if class_name and items_db_available:
-        loop = asyncio.get_event_loop()
-        class_item_ids, _ = await loop.run_in_executor(None, _query_items_db, class_name, None)
+        class_item_ids, _ = await run_sync(_query_items_db, class_name, None)
         if not class_item_ids:
             return RecipeSearchResponse(results=[], total=0, page=1, per_page=per_page)
 
@@ -389,8 +392,7 @@ async def search_recipes(
     elaborate_ids = [r["out_elaborate_id"] for r in rows if r["out_elaborate_id"]]
     label_map: dict[int, str] = {}
     if elaborate_ids and items_db_available:
-        loop = asyncio.get_event_loop()
-        _, label_map = await loop.run_in_executor(None, _query_items_db, None, elaborate_ids)
+        _, label_map = await run_sync(_query_items_db, None, elaborate_ids)
 
     results = [
         _row_to_result(

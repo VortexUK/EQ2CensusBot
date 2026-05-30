@@ -291,6 +291,9 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     # as the PRIMARY mob's name (kept in sync with the mob at
     # position 0). Rewrite any comma-containing row to its position-0
     # mob name; rows without any mobs are left untouched.
+    # NOTE: Not version-gated — this UPDATE is cheap (only touches rows
+    # with commas in the name) and must remain idempotent across multiple
+    # init_db calls (see test_init_db_normalizes_comma_joined_encounter_name).
     conn.execute(
         """
         UPDATE zone_encounters

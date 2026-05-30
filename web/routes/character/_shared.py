@@ -23,9 +23,8 @@ import logging
 
 from fastapi import HTTPException
 
-from census.client import CensusClient
 from web.cache import character_cache
-from web.config import SERVICE_ID as _SERVICE_ID
+from web.lib.census_lifecycle import shared_census_client
 from web.server_context import current_world
 
 _log = logging.getLogger(__name__)
@@ -47,15 +46,12 @@ async def _get_or_fetch_character(name: str):
     if cached is not None:
         return cached
 
-    # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-    client = CensusClient(service_id=_SERVICE_ID)
     try:
-        char = await client.get_character(name, current_world())
+        async with shared_census_client() as client:
+            char = await client.get_character(name, current_world())
     except Exception as exc:
         _log.warning("Census fetch failed for %r: %s", name, exc)
         raise HTTPException(status_code=503, detail="Census is unavailable; please retry shortly.") from exc
-    finally:
-        await client.close()
 
     if char is None:
         raise HTTPException(status_code=404, detail=f"Character '{name}' not found on {current_world()}")

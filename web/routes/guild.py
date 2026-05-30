@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import time
 
 import aiosqlite
@@ -10,9 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from census import census_store
-from census.client import CensusClient
 from web.cache import guild_cache
-from web.config import SERVICE_ID as _SERVICE_ID
 from web.db import DB_PATH as _USERS_DB_PATH
 from web.db import get_active_claims
 from web.guild_cache import (
@@ -20,6 +17,10 @@ from web.guild_cache import (
     _fetch_and_cache_guild,
     _persist_and_publish_guild,
 )
+from web.lib.cache_keys import guild_adorns_key, guild_info_key, guild_roster_key, guild_spells_key
+from web.lib.census_lifecycle import shared_census_client
+from web.lib.log_safety import scrub as _scrub
+from web.lib.validation import validate_guild_name as _validate_guild_name_lib
 from web.limiter import limiter
 from web.server_context import current_world
 
@@ -32,25 +33,18 @@ from web.guild_cache import _overview_to_char_response  # noqa: E402,F401
 router = APIRouter(tags=["guild"])
 
 
-def _scrub(value: object) -> str:
-    """Strip CR/LF before logging a user-supplied value, so a crafted name
-    can't forge log lines (CWE-117 log injection)."""
-    return str(value).replace("\r", " ").replace("\n", " ")
-
-
 _OFFICER_RANKS = frozenset({0, 1})  # rank_ids that count as "officer"
-
-# Guild name validation: EQ2 guild names are letters, digits, spaces, hyphens,
-# apostrophes — max 64 characters.  Reject anything else early.
-_GUILD_NAME_MAX = 64
 
 
 def _validate_guild_name(guild_name: str) -> None:
-    """Raise 400 if guild_name looks malformed or dangerously long."""
-    if not guild_name or len(guild_name) > _GUILD_NAME_MAX:
-        raise HTTPException(status_code=400, detail="Invalid guild name length (max 64 characters).")
-    if not re.fullmatch(r"[A-Za-z0-9 '\-]+", guild_name):
-        raise HTTPException(status_code=400, detail="Guild name contains invalid characters.")
+    """Raise 400 if guild_name looks malformed or dangerously long.
+
+    Wraps web.lib.validation.validate_guild_name so call sites are unchanged."""
+    if _validate_guild_name_lib(guild_name) is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Guild name is invalid (letters, digits, spaces, hyphens, apostrophes; max 64 chars).",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +160,7 @@ async def _roster_rank_map(guild_name: str) -> dict[str, int | None]:
     guild fetch via _fetch_and_cache_guild (which also pre-warms every other
     cache key so the roster endpoint and character pages are all warm too).
     """
-    roster, _ = guild_cache.get_stale(f"roster:{guild_name.lower()}:{current_world().lower()}")
+    roster, _ = guild_cache.get_stale(guild_roster_key(guild_name, current_world()))
     if roster is not None:
         return {m.name.lower(): m.rank_id for m in roster.members}
     full = await _fetch_and_cache_guild(guild_name)
@@ -210,7 +204,7 @@ async def get_guild_info(request: Request, guild_name: str) -> GuildInfoResponse
     from web.census_refresh import request_guild_refresh
 
     _validate_guild_name(guild_name)
-    info_key = f"info:{guild_name.lower()}:{current_world().lower()}"
+    info_key = guild_info_key(guild_name, current_world())
     cached, is_stale = guild_cache.get_stale(info_key)
     if cached is not None and not is_stale:
         return cached
@@ -274,7 +268,7 @@ async def get_guild(request: Request, guild_name: str) -> GuildResponse:
     from web.census_refresh import request_guild_refresh
 
     _validate_guild_name(guild_name)
-    cache_key = f"roster:{guild_name.lower()}:{current_world().lower()}"
+    cache_key = guild_roster_key(guild_name, current_world())
     cached, is_stale = guild_cache.get_stale(cache_key)
     if cached is not None and not is_stale:
         return cached
@@ -323,7 +317,7 @@ async def guild_spell_check(request: Request, guild_name: str) -> GuildSpellChec
     Spell IDs are resolved locally — no per-character Census calls needed.
     """
     _validate_guild_name(guild_name)
-    cache_key = f"spells:{guild_name.lower()}:{current_world().lower()}"
+    cache_key = guild_spells_key(guild_name, current_world())
     cached, is_stale = guild_cache.get_stale(cache_key)
     if cached is not None:
         if is_stale:
@@ -353,7 +347,7 @@ async def guild_adorn_check(request: Request, guild_name: str) -> GuildAdornChec
     (one Census call) that also warms roster/chars/spells.
     """
     _validate_guild_name(guild_name)
-    cache_key = f"adorns:{guild_name.lower()}:{current_world().lower()}"
+    cache_key = guild_adorns_key(guild_name, current_world())
     cached, is_stale = guild_cache.get_stale(cache_key)
     if cached is not None:
         if is_stale:
@@ -399,14 +393,12 @@ async def search_guilds(name: str = "") -> GuildSearchResponse:
     if len(q) > 64:
         return GuildSearchResponse(results=[], total=0)
 
-    # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-    client = CensusClient(service_id=_SERVICE_ID)
     try:
-        raw = await client.search_guilds_by_name(q, current_world())
-    except Exception:
+        async with shared_census_client() as client:
+            raw = await client.search_guilds_by_name(q, current_world())
+    except Exception as exc:
+        _log.warning("[guild] Census guild search failed for %r: %s", q, exc)
         raw = []
-    finally:
-        await client.close()
 
     if raw:
         results = [GuildNameResult(name=r["name"]) for r in raw]

@@ -25,7 +25,6 @@ import time
 from collections import Counter
 
 from census import census_store
-from census.client import CensusClient
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.models import CharacterOverview, GuildData, SpellEntry
 from census.spells_db import (
@@ -44,7 +43,8 @@ from census.spells_db import (
     unique_highest_entries as _unique_highest,
 )
 from web.cache import character_cache, guild_cache
-from web.config import SERVICE_ID as _SERVICE_ID
+from web.lib.cache_keys import census_refresh_guild_key, guild_info_key, guild_roster_key
+from web.lib.census_lifecycle import shared_census_client
 from web.server_context import current_world
 
 _log = logging.getLogger(__name__)
@@ -275,19 +275,15 @@ async def _fetch_and_cache_guild(
     """
     from web.routes.guild import GuildInfoResponse, GuildMemberResponse, GuildResponse  # noqa: PLC0415
 
-    task_key = f"{guild_name.lower()}:{current_world().lower()}"
+    task_key = guild_roster_key(guild_name, current_world())
     existing = _guild_fetch_tasks.get(task_key)
     if existing is not None and not existing.done():
         return await existing
 
     async def _do_fetch():
         world = current_world()
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        client = CensusClient(service_id=_SERVICE_ID)
-        try:
+        async with shared_census_client() as client:
             full = await client.get_guild_full(guild_name, world)
-        finally:
-            await client.close()
         if not full or not full[0].members:
             return None
 
@@ -314,8 +310,8 @@ async def _fetch_and_cache_guild(
                     f"{ov.name.lower()}:{world_lower}",
                     _overview_to_char_response(ov),
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.warning("[guild_cache] Pre-warm failed for %s: %s", ov.name, exc)
 
         # Adorn + spell derived caches
         _prewarm_adorn_cache(
@@ -410,12 +406,11 @@ async def _persist_and_publish_guild(guild_name: str, world: str | None = None) 
     world = world or current_world()
     await _fetch_and_cache_guild(guild_name)  # existing: warms roster/info/spells/adorns + char cache
     now = int(time.time())
-    glower, wlower = guild_name.lower(), world.lower()
-    roster, _ = guild_cache.get_stale(f"roster:{glower}:{wlower}")
+    roster, _ = guild_cache.get_stale(guild_roster_key(guild_name, world))
     if roster is None:
         return
-    info, _ = guild_cache.get_stale(f"info:{glower}:{wlower}")
-    roster_stubs, _ = guild_cache.get_stale(f"roster_stubs:{glower}:{wlower}")
+    info, _ = guild_cache.get_stale(guild_info_key(guild_name, world))
+    roster_stubs, _ = guild_cache.get_stale(f"roster_stubs:{guild_name.lower()}:{world.lower()}")
     if roster_stubs is None:
         roster_stubs = []
 
@@ -458,7 +453,9 @@ async def _persist_and_publish_guild(guild_name: str, world: str | None = None) 
     finally:
         conn.close()
     # SSE event carries the MERGED roster
-    census_events.publish({"type": "guild", "key": f"guild:{glower}:{wlower}", "data": merged_data, "fetched_at": now})
+    census_events.publish(
+        {"type": "guild", "key": census_refresh_guild_key(guild_name, world), "data": merged_data, "fetched_at": now}
+    )
 
 
 def _overview_to_char_response(ov: CharacterOverview):  # → CharacterResponse

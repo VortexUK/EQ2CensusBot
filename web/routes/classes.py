@@ -8,13 +8,12 @@ it works before the DB is built/copied to a fresh environment. Cached in-memory
 
 from __future__ import annotations
 
-import asyncio
-
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from census import classes_db
 from census.classes_db import CLASS_SEED
+from web.lib.executor import run_sync
 
 router = APIRouter(tags=["classes"])
 
@@ -55,7 +54,7 @@ def _rows() -> list[dict]:
 async def list_classes() -> list[ClassResponse]:
     global _cache
     if _cache is None:
-        rows = await asyncio.get_event_loop().run_in_executor(None, _rows)
+        rows = await run_sync(_rows)
         _cache = [
             ClassResponse(
                 name=r["name"],

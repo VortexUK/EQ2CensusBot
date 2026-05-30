@@ -9,10 +9,13 @@ Mirrors parses/db.py: DB_CENSUS_PATH env override, WAL, idempotent _MIGRATIONS.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 import time
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 
 def _db_path() -> Path:
@@ -50,6 +53,16 @@ CREATE TABLE IF NOT EXISTS guilds (
 );
 """
 
+_CREATE_CHARACTER_AAS = """
+CREATE TABLE IF NOT EXISTS character_aas (
+    name_lower         TEXT    NOT NULL,
+    world              TEXT    NOT NULL,
+    data_json          TEXT    NOT NULL,
+    last_resolved_at   INTEGER NOT NULL,
+    PRIMARY KEY (name_lower, world)
+);
+"""
+
 _MIGRATIONS: list[str] = []  # future schema bumps appended here
 
 
@@ -62,11 +75,12 @@ def init_db(path: Path = DB_PATH) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute(_CREATE_CHARACTERS)
     conn.execute(_CREATE_GUILDS)
+    conn.execute(_CREATE_CHARACTER_AAS)
     for stmt in _MIGRATIONS:
         try:
             conn.execute(stmt)
-        except sqlite3.OperationalError:
-            pass
+        except sqlite3.OperationalError as exc:
+            _log.debug("[census_store] migration swallowed: %s (%s)", stmt[:60], exc)
     conn.commit()
     return conn
 
@@ -137,3 +151,40 @@ def get_guild(conn: sqlite3.Connection, name: str, world: str) -> dict | None:
     if row is None:
         return None
     return {"data": json.loads(row[0]), "last_resolved_at": row[1]}
+
+
+def get_character_aas(conn: sqlite3.Connection, name: str, world: str) -> dict | None:
+    """Return the persisted CharAAsResponse dict (or None) for (name, world).
+
+    The record carries the model_dump() of the response plus a
+    last_resolved_at unix timestamp."""
+    row = conn.execute(
+        "SELECT data_json, last_resolved_at FROM character_aas WHERE name_lower = ? AND world = ?",
+        (name.lower(), world),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        "data": json.loads(row[0]),
+        "last_resolved_at": row[1],
+    }
+
+
+def upsert_character_aas(
+    conn: sqlite3.Connection,
+    name: str,
+    world: str,
+    data: dict,
+    *,
+    now: int | None = None,
+) -> None:
+    """Insert or update the (name, world) AA record. Always overwrites — AAs
+    have no 'best-known merge' equivalent because the Census response is
+    authoritative."""
+    if now is None:
+        now = int(time.time())
+    conn.execute(
+        "INSERT OR REPLACE INTO character_aas (name_lower, world, data_json, last_resolved_at) VALUES (?, ?, ?, ?)",
+        (name.lower(), world, json.dumps(data), now),
+    )
+    conn.commit()

@@ -241,15 +241,18 @@ async def test_approve_request_409_when_already_resolved(app):
 
 @pytest.mark.asyncio
 async def test_approve_request_grants_role_after_marking_approved(app):
-    """Happy path: review_role_request flips the row, grant_role inserts into
-    user_roles. Both helpers called with the admin's id stamped through."""
+    """Happy path: review_and_grant_role atomically flips the row and grants
+    the role in a single transaction. The admin id is stamped through."""
     pending = _fake_request_row(status="pending")
     reviewed = _fake_request_row(status="approved", reviewed_by="admin-1", admin_note="welcome!")
     with (
         patch("web.routes.admin._require_admin", _fake_admin),
         patch("web.routes.admin.get_role_request", return_value=pending),
-        patch("web.routes.admin.review_role_request", return_value=reviewed) as m_review,
-        patch("web.routes.admin.grant_role", return_value=True) as m_grant,
+        patch(
+            "web.routes.admin.review_and_grant_role",
+            new_callable=AsyncMock,
+            return_value=reviewed,
+        ) as m_review_and_grant,
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post(
@@ -259,26 +262,27 @@ async def test_approve_request_grants_role_after_marking_approved(app):
 
     assert r.status_code == 200
     assert r.json()["status"] == "approved"
-    m_review.assert_awaited_once_with(1, "approved", "admin-1", "welcome!")
-    m_grant.assert_awaited_once_with("user-42", "contributor", "admin-1")
+    m_review_and_grant.assert_awaited_once_with(1, "approved", "admin-1", "welcome!")
 
 
 @pytest.mark.asyncio
 async def test_approve_request_409_on_lost_race(app):
-    """review_role_request returns None when another admin already moved the
-    row out of pending between get + update — surface as 409 (don't grant)."""
+    """review_and_grant_role returns None when another admin already moved the
+    row out of pending between get + update — surface as 409."""
     pending = _fake_request_row(status="pending")
     with (
         patch("web.routes.admin._require_admin", _fake_admin),
         patch("web.routes.admin.get_role_request", return_value=pending),
-        patch("web.routes.admin.review_role_request", return_value=None),
-        patch("web.routes.admin.grant_role") as m_grant,
+        patch(
+            "web.routes.admin.review_and_grant_role",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             r = await client.post("/api/admin/role-requests/1/approve", json={})
 
     assert r.status_code == 409
-    m_grant.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

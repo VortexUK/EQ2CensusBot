@@ -17,11 +17,17 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import logging
 import os
 import re
 import sqlite3
 from functools import lru_cache
 from pathlib import Path
+
+from census._coerce import coerce_float as _float
+from census._coerce import coerce_int as _int
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -166,24 +172,6 @@ def _str(v) -> str | None:
     return s or None
 
 
-def _int(v) -> int | None:
-    if v is None:
-        return None
-    try:
-        return int(v)
-    except (TypeError, ValueError):
-        return None
-
-
-def _float(v) -> float | None:
-    if v is None:
-        return None
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
-
-
 def _passes_spellcheck(row: dict) -> int:
     """Return 1 if this spell row would survive the spellcheck filter, else 0."""
     level = row.get("level") or 0
@@ -206,7 +194,14 @@ def _parse_effects(spell: dict) -> str:
       - '[]'             → processed, genuinely no effects in Census
     """
     raw = spell.get("effect_list")
+    if raw is None:
+        return "[]"
     if not isinstance(raw, list):
+        _log.warning(
+            "[spells_db] effect_list for spell %s has unexpected shape %s — returning empty",
+            spell.get("id"),
+            type(raw).__name__,
+        )
         return "[]"
     effects = []
     for e in raw:
@@ -489,7 +484,8 @@ def load_blocklist(path: Path = _BLOCKLIST_PATH) -> Blocklist:
                 exact.append(strip_roman(lowered))
 
         return Blocklist(frozenset(exact), patterns)
-    except Exception:
+    except Exception as exc:
+        _log.warning("[spells_db] Failed to load blocklist: %s", exc)
         return Blocklist(frozenset(), [])
 
 

@@ -16,7 +16,6 @@ pattern as ``recipes.py`` and ``classes.py``.
 
 from __future__ import annotations
 
-import asyncio
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,8 +24,9 @@ from pydantic import BaseModel
 from census import zones_db
 from parses.db import DB_PATH as PARSES_DB_PATH
 from web.auth_deps import require_user_session
-from web.cache import character_cache
-from web.db import get_active_claims
+from web.constants import SQLITE_VAR_CHUNK_SAFE
+from web.lib.executor import run_sync
+from web.lib.primary_guild import cached_primary_guild
 from web.server_context import current_world as _current_world
 
 router = APIRouter(tags=["zones"])
@@ -153,11 +153,10 @@ async def list_zones(
     """
     # Empty string from the client means "no filter" — None to the DB helper.
     type_arg = type or None
-    loop = asyncio.get_event_loop()
     if expansion:
-        rows = await loop.run_in_executor(None, zones_db.list_by_expansion, expansion, type_arg)
+        rows = await run_sync(zones_db.list_by_expansion, expansion, type_arg)
     elif type_arg:
-        rows = await loop.run_in_executor(None, zones_db.list_by_type, type_arg)
+        rows = await run_sync(zones_db.list_by_type, type_arg)
     else:
         # No filter at all is rarely what a UI wants — bail early to keep the
         # accidental "/api/zones" payload small. The frontend should always
@@ -197,8 +196,7 @@ async def get_progress(user: dict = Depends(require_user_session)) -> RaidProgre
             killed_encounters={},
         )
 
-    loop = asyncio.get_event_loop()
-    killed = await loop.run_in_executor(None, _compute_progress_sync, guild_name)
+    killed = await run_sync(_compute_progress_sync, guild_name)
     return RaidProgressResponse(
         guild_name=guild_name,
         character_name=character_name,
@@ -209,8 +207,7 @@ async def get_progress(user: dict = Depends(require_user_session)) -> RaidProgre
 @router.get("/zones/{name}", response_model=ZoneResponse)
 async def get_zone(name: str) -> ZoneResponse:
     """Fetch a single zone by canonical name or alias. 404 on miss."""
-    loop = asyncio.get_event_loop()
-    z = await loop.run_in_executor(None, zones_db.find_by_name, name)
+    z = await run_sync(zones_db.find_by_name, name)
     if z is None:
         raise HTTPException(status_code=404, detail=f"Zone not found: {name}")
     return _to_response(z)
@@ -228,26 +225,14 @@ async def _resolve_primary_guild(discord_id: str) -> tuple[str | None, str | Non
     or no recent parses all return ``(name_or_None, None)`` and the caller
     renders the "no progress data" state.
     """
-    world = _current_world()
-    data = await get_active_claims(discord_id, world=world)
-    primary = next((c for c in data["approved"] if c.get("is_primary")), None)
-    character_name = primary["character_name"] if primary else None
-
-    # Cheap path: character_cache holds the resolved guild already if any page
-    # has loaded the character recently (incl. the guild roster prewarm).
-    if character_name:
-        cached, _ = character_cache.get_stale(f"{character_name.lower()}:{world.lower()}")
-        if cached is not None:
-            guild = getattr(cached, "guild_name", None) or (
-                cached.get("guild_name") if isinstance(cached, dict) else None
-            )
-            if guild:
-                return character_name, guild
+    char_name, guild_name = await cached_primary_guild(discord_id, _current_world())
+    if guild_name:
+        return char_name, guild_name
 
     # Fallback: the parses pipeline already resolved + froze the guild on every
     # encounter the user has uploaded. Most-recent wins (handles guild changes).
-    guild = await asyncio.get_event_loop().run_in_executor(None, _most_recent_parsed_guild_sync, discord_id)
-    return character_name, guild
+    guild = await run_sync(_most_recent_parsed_guild_sync, discord_id)
+    return char_name, guild
 
 
 def _most_recent_parsed_guild_sync(discord_id: str) -> str | None:
@@ -311,8 +296,8 @@ def _compute_progress_sync(guild_name: str) -> dict[str, list[KilledEncounter]]:
         zconn.execute("PRAGMA query_only = ON")
         zconn.row_factory = sqlite3.Row
         titles_list = list(title_set)
-        for i in range(0, len(titles_list), 900):
-            chunk = titles_list[i : i + 900]
+        for i in range(0, len(titles_list), SQLITE_VAR_CHUNK_SAFE):
+            chunk = titles_list[i : i + SQLITE_VAR_CHUNK_SAFE]
             placeholders = ",".join("?" * len(chunk))
             rows = zconn.execute(
                 f"""

@@ -5,11 +5,11 @@ import logging
 import re
 import time as _time
 from collections import Counter
-from typing import Any
 
 import aiohttp
 
 from census import db as item_db
+from census._coerce import coerce_int as _int
 from census.item_parser import parse_item as _parse_item_fn
 from census.models import (
     AAProfile,
@@ -44,6 +44,12 @@ def _redact_url(url: str) -> str:
 
 
 BASE_URL = "https://census.daybreakgames.com"
+
+
+class CensusError(Exception):
+    """Raised when a Census API call fails for non-data reasons (network /
+    HTTP error). Distinct from "no results" — callers should turn this into
+    a 503 with a useful message, not an empty result list."""
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +88,7 @@ def _build_trace_config() -> aiohttp.TraceConfig:
                 status="success" if http_ok else "http_error",
             ).inc()
             CENSUS_DURATION.labels(endpoint=endpoint).observe(elapsed)
-        except Exception:
+        except Exception:  # noqa: BLE001 — metrics-only; swallow to keep the request path clean
             pass
 
     async def _on_exception(
@@ -95,7 +101,7 @@ def _build_trace_config() -> aiohttp.TraceConfig:
 
             endpoint = census_endpoint_label(str(params.url))
             CENSUS_REQUESTS.labels(endpoint=endpoint, status="error").inc()
-        except Exception:
+        except Exception:  # noqa: BLE001 — metrics-only; swallow to keep the request path clean
             pass
 
     tc.on_request_start.append(_on_start)  # type: ignore[arg-type]
@@ -119,6 +125,31 @@ class CensusClient:
     async def close(self) -> None:
         if self._session and not self._session.closed:
             await self._session.close()
+
+    async def _census_get(
+        self,
+        path: str,
+        params: dict[str, str],
+        *,
+        timeout_s: int = 30,
+    ) -> dict | None:
+        """One canonical Census HTTP+parse+error-swallow wrapper.
+
+        Returns the parsed JSON dict, or None on any HTTP / network / parse
+        error (already logged at WARNING). Replaces the hand-rolled
+        try/except blocks in the public methods.
+        """
+        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/{path}"
+        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
+        try:
+            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=timeout_s)) as resp:
+                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
+                if resp.status != 200:
+                    return None
+                return await resp.json(content_type=None)
+        except Exception as exc:
+            _log.warning("[Census] API error on %s: %s: %r", path, type(exc).__name__, exc)
+            return None
 
     # ------------------------------------------------------------------
     # Public API
@@ -180,7 +211,6 @@ class CensusClient:
         return await self._fetch(self._build_params(query))
 
     async def get_guild(self, name: str, world: str) -> GuildData | None:
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
         params = {
             "name": name,
             "world": world,
@@ -188,15 +218,8 @@ class CensusClient:
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return None
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
+        data = await self._census_get("guild/", params)
+        if data is None:
             return None
 
         guild_list = data.get("guild_list", [])
@@ -342,22 +365,14 @@ class CensusClient:
         return equipment
 
     async def get_character(self, name: str, world: str) -> CharacterOverview | None:
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
             "name.first": name,
             "locationdata.world": world,
             "c:show": "name,type,stats,equipmentslot_list,spell_list,guild",
             "c:limit": "1",
         }
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return None
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
+        data = await self._census_get("character/", params)
+        if data is None:
             return None
 
         char_list = data.get("character_list", [])
@@ -417,22 +432,14 @@ class CensusClient:
         )
 
     async def get_character_aas(self, name: str, world: str) -> CharacterAAs | None:
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
             "name.first": name,
             "locationdata.world": world,
             "c:show": "name,alternateadvancements,orderedalternateadvancement_list",
             "c:limit": "1",
         }
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return None
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
+        data = await self._census_get("character/", params)
+        if data is None:
             return None
 
         char_list = data.get("character_list", [])
@@ -476,7 +483,6 @@ class CensusClient:
         Returns (rank_id→name map, raw member list).
         Each member dict has 'name', 'guild' (with 'rank'), and 'equipmentslot_list'.
         """
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
         params = {
             "name": guild_name,
             "world": world,
@@ -484,15 +490,8 @@ class CensusClient:
             "c:show": "member_list,name,world,rank_list",
             "c:limit": "1",
         }
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return {}, []
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
+        data = await self._census_get("guild/", params, timeout_s=60)
+        if data is None:
             return {}, []
 
         guild_list = data.get("guild_list", [])
@@ -523,7 +522,6 @@ class CensusClient:
         should resolve them against the local spells DB rather than making
         per-character Census calls.
         """
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
         params = {
             "name": name,
             "world": world,
@@ -533,15 +531,8 @@ class CensusClient:
             "c:show": "member_list,name,world,rank_list,dateformed,description,alignment,type,level,members,accounts,achievement_list",
             "c:limit": "1",
         }
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return None
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
+        data = await self._census_get("guild/", params, timeout_s=60)
+        if data is None:
             return None
 
         guild_list = data.get("guild_list", [])
@@ -704,22 +695,14 @@ class CensusClient:
         Uses the same ``name.first`` exact-match parameter as ``get_character``
         so it works reliably even when prefix-search misses a character.
         """
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
             "name.first": name,
             "locationdata.world": world,
             "c:show": "name,type,guild",
             "c:limit": "1",
         }
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return None
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
+        data = await self._census_get("character/", params, timeout_s=15)
+        if data is None:
             return None
 
         char_list = data.get("character_list", [])
@@ -751,26 +734,16 @@ class CensusClient:
         Returns a list of dicts with keys: name, cls, class_id, level, aa_level,
         race, guild_name.
         """
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
             "name.first_lower": f"^{name.lower()}",
             "locationdata.world": world,
             "c:show": "name,type,guild",
             "c:limit": str(limit),
         }
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return []
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
-            return []
+        data = await self._census_get("character/", params, timeout_s=15)
 
         results: list[dict] = []
-        for char in data.get("character_list") or []:
+        for char in (data or {}).get("character_list") or []:
             t = char.get("type") or {}
             guild = char.get("guild") or {}
             char_name = (char.get("name") or {}).get("first", "")
@@ -800,26 +773,16 @@ class CensusClient:
         Search guilds whose name starts with *name* on the given world.
         Returns a list of dicts with keys: name.
         """
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/guild/"
         params = {
             "name_lower": f"^{name.lower()}",
             "world": world,
             "c:show": "name,world",
             "c:limit": str(limit),
         }
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return []
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
-            return []
+        data = await self._census_get("guild/", params, timeout_s=15)
 
         results: list[dict] = []
-        for guild in data.get("guild_list") or []:
+        for guild in (data or {}).get("guild_list") or []:
             guild_name = guild.get("name")
             if guild_name:
                 results.append({"name": guild_name})
@@ -884,7 +847,6 @@ class CensusClient:
         min_level: int | None,
     ) -> list[dict]:
         """Single Census character search call.  Used by search_characters."""
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params: dict[str, str] = {
             "locationdata.world": world,
             "c:show": "displayname,type,guild",
@@ -897,16 +859,9 @@ class CensusClient:
             # aiohttp percent-encodes ] as %5D which Census accepts fine
             params["type.level"] = f"]{min_level}"
 
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return []
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
-            return []
+        data = await self._census_get("character/", params)
+        if data is None:
+            raise CensusError(f"Census search failed for world={world!r} class_id={class_id!r}")
 
         results: list[dict] = []
         for char in data.get("character_list") or []:
@@ -930,7 +885,6 @@ class CensusClient:
         return results
 
     async def get_character_spells(self, name: str, world: str) -> CharacterSpells | None:
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/character/"
         params = {
             "name.first": name,
             "locationdata.world": world,
@@ -938,15 +892,8 @@ class CensusClient:
             "c:show": "name,spell_list",
             "c:limit": "1",
         }
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return None
-                data = await resp.json(content_type=None)
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
+        data = await self._census_get("character/", params)
+        if data is None:
             return None
 
         char_list = data.get("character_list", [])
@@ -995,37 +942,7 @@ class CensusClient:
         return {"displayname": query, "c:limit": "1"}
 
     async def _fetch(self, params: dict) -> dict | None:
-        url = f"{BASE_URL}/s:{self.service_id}/json/get/eq2/item/"
-        _log.debug("[Census] GET %s params=%s", _redact_url(url), params)
-        try:
-            async with self._session_().get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                _log.debug("[Census] HTTP %s url=%s", resp.status, _redact_url(str(resp.url)))
-                if resp.status != 200:
-                    return None
-                data = await resp.json(content_type=None)
-                _log.info("[Census] returned=%s items", data.get("returned"))
-                return data
-        except Exception as exc:
-            _log.error("[Census] API error: %s: %r", type(exc).__name__, exc)
-            return None
-
-
-# ------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------
-
-
-def _int(value: Any) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def _str(value: Any) -> str:
-    """Return a string from value, treating dicts/None as empty."""
-    if value is None or isinstance(value, dict):
-        return ""
-    return str(value)
+        data = await self._census_get("item/", params, timeout_s=10)
+        if data is not None:
+            _log.info("[Census] returned=%s items", data.get("returned"))
+        return data

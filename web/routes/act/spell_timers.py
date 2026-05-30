@@ -10,7 +10,6 @@ Surface:
 
 from __future__ import annotations
 
-import asyncio
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -18,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from census import raids_db
 from web.auth_deps import require_editor
+from web.lib.executor import run_sync
 from web.routes.act._shared import (
     SpellTimerEntry,
     _resolve_encounter,
@@ -68,9 +68,7 @@ class SpellTimerUpsertRequest(BaseModel):
 async def list_spell_timers(zone_name: str, position: int) -> list[SpellTimerEntry]:
     """All spell timers defined for this encounter."""
     _, _, encounter_id = await _resolve_encounter(zone_name, position)
-    rows = await asyncio.get_event_loop().run_in_executor(
-        None, raids_db.list_act_spell_timers_for_encounter, encounter_id
-    )
+    rows = await run_sync(raids_db.list_act_spell_timers_for_encounter, encounter_id)
     return [_spell_row_to_entry(r) for r in rows]
 
 
@@ -83,8 +81,7 @@ async def export_spell_timer(zone_name: str, position: int, timer_id: int) -> Re
     share one standalone timer without bundling the encounter's full
     trigger pack — the mirror of export_trigger above."""
     canonical_zone, mob_name, encounter_id = await _resolve_encounter(zone_name, position)
-    loop = asyncio.get_event_loop()
-    timer = await loop.run_in_executor(None, raids_db.get_act_spell_timer, timer_id)
+    timer = await run_sync(raids_db.get_act_spell_timer, timer_id)
     if timer is None or timer["raid_encounter_id"] != encounter_id:
         raise HTTPException(status_code=404, detail="Spell timer not found")
 
@@ -141,14 +138,14 @@ async def create_spell_timer(
             conn.close()
 
     try:
-        new_id = await asyncio.get_event_loop().run_in_executor(None, _write)
+        new_id = await run_sync(_write)
     except sqlite3.IntegrityError as exc:
         raise HTTPException(
             status_code=409,
             detail=f"A spell timer named {body.name!r} already exists for this encounter",
         ) from exc
 
-    row = await asyncio.get_event_loop().run_in_executor(None, raids_db.get_act_spell_timer, new_id)
+    row = await run_sync(raids_db.get_act_spell_timer, new_id)
     if row is None:
         raise HTTPException(status_code=500, detail="Failed to load freshly-created spell timer")
     return _spell_row_to_entry(row)
@@ -166,7 +163,7 @@ async def update_spell_timer(
     user: dict = Depends(require_editor),
 ) -> SpellTimerEntry:
     _, mob_name, encounter_id = await _resolve_encounter(zone_name, position)
-    existing = await asyncio.get_event_loop().run_in_executor(None, raids_db.get_act_spell_timer, timer_id)
+    existing = await run_sync(raids_db.get_act_spell_timer, timer_id)
     if existing is None or existing["raid_encounter_id"] != encounter_id:
         raise HTTPException(status_code=404, detail="Spell timer not found")
 
@@ -203,14 +200,14 @@ async def update_spell_timer(
             conn.close()
 
     try:
-        await asyncio.get_event_loop().run_in_executor(None, _write)
+        await run_sync(_write)
     except sqlite3.IntegrityError as exc:
         raise HTTPException(
             status_code=409,
             detail=f"Renaming to {body.name!r} would clash with another timer for this encounter",
         ) from exc
 
-    row = await asyncio.get_event_loop().run_in_executor(None, raids_db.get_act_spell_timer, timer_id)
+    row = await run_sync(raids_db.get_act_spell_timer, timer_id)
     if row is None:
         raise HTTPException(status_code=500, detail="Failed to load updated spell timer")
     return _spell_row_to_entry(row)
@@ -227,7 +224,7 @@ async def delete_spell_timer(
     user: dict = Depends(require_editor),  # noqa: ARG001 — auth check
 ) -> dict:
     _, _, encounter_id = await _resolve_encounter(zone_name, position)
-    existing = await asyncio.get_event_loop().run_in_executor(None, raids_db.get_act_spell_timer, timer_id)
+    existing = await run_sync(raids_db.get_act_spell_timer, timer_id)
     if existing is None or existing["raid_encounter_id"] != encounter_id:
         raise HTTPException(status_code=404, detail="Spell timer not found")
 
@@ -238,7 +235,7 @@ async def delete_spell_timer(
         finally:
             conn.close()
 
-    removed = await asyncio.get_event_loop().run_in_executor(None, _delete)
+    removed = await run_sync(_delete)
     if not removed:
         raise HTTPException(status_code=404, detail="Spell timer not found")
     return {"ok": True}

@@ -11,7 +11,6 @@ docs/superpowers/specs/2026-05-25-eq2logs-rankings-design.md.
 
 from __future__ import annotations
 
-import asyncio
 import sqlite3
 import unicodedata
 from collections import defaultdict
@@ -25,6 +24,7 @@ from parses import db as parses_db
 from parses.boss import is_boss
 from web.auth_deps import require_user_session as _require_user
 from web.cache import TTLCache
+from web.lib.executor import run_sync
 from web.limiter import limiter
 from web.routes.parses.list import _PLAYER_COUNT_SQL, _group_into_fights
 from web.server_context import current_server, current_world
@@ -537,8 +537,7 @@ async def get_ranking_filters(request: Request) -> dict:
     # Resolve world in the async handler (contextvar is set here); do NOT read
     # current_world() inside the executor thread — contextvars don't cross threads.
     world = current_world()
-    loop = asyncio.get_event_loop()
-    kills = await loop.run_in_executor(None, _cached_kills, world)
+    kills = await run_sync(_cached_kills, world)
     return _build_filters(kills)
 
 
@@ -561,8 +560,7 @@ async def get_rankings(
     # Resolve world in the async handler (contextvar is set here); do NOT read
     # current_world() inside the executor thread — contextvars don't cross threads.
     world = current_world()
-    loop = asyncio.get_event_loop()
-    kills = await loop.run_in_executor(None, _cached_kills, world)
+    kills = await run_sync(_cached_kills, world)
 
     if metric == "speed":
         rows = _build_speed_board(kills, size=size, zone=zone, boss=boss)

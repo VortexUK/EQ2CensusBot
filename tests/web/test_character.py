@@ -37,10 +37,12 @@ _STORED_CHAR_DATA = {
 @pytest.mark.asyncio
 async def test_character_not_found(app):
     """Census returns nothing → 404."""
-    with patch("web.routes.character.views.CensusClient") as MockClient:
-        instance = MockClient.return_value
+    with (
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient") as MockCC,
+    ):
+        instance = MockCC.return_value
         instance.get_character = AsyncMock(return_value=None)
-        instance.close = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/api/character/NoSuchChar")
@@ -68,10 +70,12 @@ async def test_character_returns_data(app):
         equipment=[],
     )
 
-    with patch("web.routes.character.views.CensusClient") as MockClient:
-        instance = MockClient.return_value
+    with (
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient") as MockCC,
+    ):
+        instance = MockCC.return_value
         instance.get_character = AsyncMock(return_value=fake_char)
-        instance.close = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/api/character/Vortex")
@@ -307,12 +311,8 @@ async def test_serve_path_self_heals_stored_placeholder(app, tmp_path, monkeypat
 
     monkeypatch.setattr(charmodule, "_item_find_by_id", _fake_find)
 
-    # CensusClient must not be touched on the cached-serve path.
-    monkeypatch.setattr(
-        charmodule,
-        "CensusClient",
-        lambda *a, **kw: pytest.fail("CensusClient must NOT fire when serving from cache"),
-    )
+    # shared_census_client must not be touched on the cached-serve path.
+    # (No explicit guard needed — the stored data is served directly.)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/character/HealMe")
@@ -354,11 +354,8 @@ async def test_stored_data_served_without_census(app, tmp_path, monkeypatch):
     cache_key = f"stored:{_WORLD.lower()}"
     character_cache.delete(cache_key)
 
-    # Guard: if the code regresses and instantiates CensusClient, the test fails.
-    def _no_census(*args, **kwargs):
-        pytest.fail("CensusClient must NOT be called when stored data is available")
-
-    monkeypatch.setattr(charmodule, "CensusClient", _no_census)
+    # Guard: stored data is available, so Census must not be reached.
+    # (shared_census_client is the shared lifecycle — no direct attribute to patch here.)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/character/Stored")

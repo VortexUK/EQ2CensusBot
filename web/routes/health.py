@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from web.config import LAUNCH_DT_ISO, SERVER_MAX_LEVEL, WORLD
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["health"])
 
@@ -38,7 +41,8 @@ def _load_gear_rating() -> dict[str, Any]:
         raw = json.loads(_GEAR_RATING_PATH.read_text(encoding="utf-8"))
         raw.pop("_comment", None)
         return raw
-    except Exception:
+    except Exception as exc:
+        _log.warning("[health] Failed to load gear-rating config, using defaults: %s", exc)
         return _GEAR_RATING_DEFAULTS
 
 

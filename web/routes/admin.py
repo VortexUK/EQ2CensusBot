@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime
 from typing import Annotated, Literal
@@ -12,6 +11,7 @@ from parses import db as parses_db
 from web import server_context
 from web.auth_deps import KNOWN_ROLES
 from web.auth_deps import require_admin as _require_admin
+from web.constants import ADMIN_PARSE_LIST_MAX_LIMIT
 from web.db import (
     delete_claim,
     delete_claims_for_user,
@@ -24,6 +24,7 @@ from web.db import (
     list_role_assignments,
     list_role_requests,
     list_servers_sync,
+    review_and_grant_role,
     review_claim,
     review_role_request,
     revoke_role,
@@ -31,6 +32,7 @@ from web.db import (
     set_user_access,
     upsert_server_settings_sync,
 )
+from web.lib.executor import run_sync
 from web.routes.claim import invalidate_user_claim_cache_all_worlds
 from web.server_context import current_world
 
@@ -287,15 +289,13 @@ async def approve_role_request(
     if existing["status"] != "pending":
         raise HTTPException(status_code=409, detail=f"Request already {existing['status']}")
 
-    # Mark approved first so a grant-side failure doesn't leave the queue with
-    # a phantom-approved row; if grant_role raises, the request stays pending
-    # for retry. (Single SQLite file — atomicity across two helpers is
-    # best-effort, but ordering matters for the failure mode.)
-    reviewed = await review_role_request(request_id, "approved", admin["id"], body.note)
+    # Single atomic transaction: mark approved + insert user_roles row.
+    # A process crash between the two writes can't leave a phantom-approved
+    # row whose grant never landed.
+    reviewed = await review_and_grant_role(request_id, "approved", admin["id"], body.note)
     if reviewed is None:
         # Lost to a concurrent admin (race). Surface as 409 rather than 200.
         raise HTTPException(status_code=409, detail="Request was reviewed by someone else")
-    await grant_role(existing["discord_id"], existing["role"], admin["id"])
     return RoleRequestEntry(**reviewed)
 
 
@@ -329,7 +329,7 @@ async def list_parses_admin(
     Hard-purge uses the existing DELETE /api/parses/{id}?purge=1 and
     /api/parses/batch?ids=...&purge=1."""
     _require_admin(request)
-    limit = max(1, min(limit, 1000))
+    limit = max(1, min(limit, ADMIN_PARSE_LIST_MAX_LIMIT))
     world = current_world()
 
     def _query() -> list[dict]:
@@ -341,7 +341,7 @@ async def list_parses_admin(
         finally:
             conn.close()
 
-    rows = await asyncio.get_event_loop().run_in_executor(None, _query)
+    rows = await run_sync(_query)
     return [
         AdminParseItem(
             id=r["id"],

@@ -4,12 +4,11 @@ import aiosqlite
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from census.client import CensusClient
 from census.constants import CLASS_GROUPS
 from census.db import DB_PATH
 from census.recipes_db import DB_PATH as RECIPES_DB_PATH
 from census.recipes_db import find_by_spell
-from web.config import SERVICE_ID as _SERVICE_ID
+from web.lib.census_lifecycle import shared_census_client
 from web.server_context import current_server
 
 router = APIRouter(tags=["item"])
@@ -559,12 +558,8 @@ async def get_item(item_id: str) -> ItemResponse:
     except ValueError:
         raise HTTPException(status_code=400, detail="Item ID must be numeric")
 
-    # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-    client = CensusClient(service_id=_SERVICE_ID)
-    try:
+    async with shared_census_client() as client:
         item = await client.get_item(item_id)
-    finally:
-        await client.close()
 
     if item is None:
         raise HTTPException(status_code=404, detail=f"Item {item_id} not found")

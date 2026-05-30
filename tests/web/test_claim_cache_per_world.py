@@ -98,7 +98,8 @@ async def test_varsoon_subdomain_returns_only_varsoon_claims(app, monkeypatch):
     await review_claim(w["id"], "approved", "admin", path=db.DB_PATH)
 
     monkeypatch.setattr(claim_mod, "_require_user", _fake_user_for(uid))
-    monkeypatch.setattr(claim_mod, "CensusClient", _NullCensusClient)
+    monkeypatch.setattr("web.lib.census_lifecycle._clients", {})
+    monkeypatch.setattr("web.lib.census_lifecycle.CensusClient", _NullCensusClient)
     # TTLCache has no public clear() — reach into _store directly for
     # the per-test fresh start. Acceptable in tests.
     claim_cache._store.clear()
@@ -130,7 +131,8 @@ async def test_wuoshi_subdomain_after_varsoon_hit_serves_own_data(app, monkeypat
     await review_claim(w["id"], "approved", "admin", path=db.DB_PATH)
 
     monkeypatch.setattr(claim_mod, "_require_user", _fake_user_for(uid))
-    monkeypatch.setattr(claim_mod, "CensusClient", _NullCensusClient)
+    monkeypatch.setattr("web.lib.census_lifecycle._clients", {})
+    monkeypatch.setattr("web.lib.census_lifecycle.CensusClient", _NullCensusClient)
     # TTLCache has no public clear() — reach into _store directly for
     # the per-test fresh start. Acceptable in tests.
     claim_cache._store.clear()

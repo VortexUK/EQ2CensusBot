@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from census.client import CensusClient
-from census.config import SERVICE_ID, WORLD
+from census.config import WORLD
 from image.aa_tree import detect_tree_type, render_tree
+
+if TYPE_CHECKING:
+    from bot.bot import EQ2Bot
+
+_log = logging.getLogger(__name__)
 
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "AAs"
 _TREES_DIR = _DATA_DIR / "trees"
@@ -29,8 +35,8 @@ def _load_tree_index() -> None:
                 tid = int(path.stem)
                 _TREE_NAMES[tid] = aa_list[0].get("name", path.stem)
                 _TREE_TYPES[tid] = detect_tree_type(data)
-        except Exception:
-            pass
+        except Exception as exc:
+            _log.warning("[aacheck] Failed to load tree index %s: %s", path.name, exc)
 
 
 _load_tree_index()
@@ -54,14 +60,9 @@ _TREE_CHOICES = [
 
 
 class AaCheckCog(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: EQ2Bot) -> None:
         self.bot = bot
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        self.census = CensusClient(service_id=SERVICE_ID)
         self.world = WORLD
-
-    async def cog_unload(self) -> None:
-        await self.census.close()
 
     @app_commands.command(name="aacheck", description="Show a character's AA allocations for a tree")
     @app_commands.describe(
@@ -77,7 +78,7 @@ class AaCheckCog(commands.Cog):
     ) -> None:
         await interaction.response.defer(thinking=True)
 
-        char_aas = await self.census.get_character_aas(character, self.world)
+        char_aas = await self.bot.census.get_character_aas(character, self.world)
         if char_aas is None:
             await interaction.followup.send(
                 f"No character found for **{character}** on **{self.world}**.",

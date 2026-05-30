@@ -242,7 +242,8 @@ async def test_fetch_and_cache_guild_populates_roster_and_info(app):
     with (
         patch("web.guild_cache.guild_cache") as mock_cache,
         patch("web.guild_cache.character_cache"),
-        patch("web.guild_cache.CensusClient", return_value=mock_client),
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient", return_value=mock_client),
         patch("web.guild_cache.census_store") as mock_cs,
         patch("web.census_health.is_down", return_value=False),
     ):
@@ -443,7 +444,10 @@ async def test_persist_merges_offline_member_from_store(app, tmp_path, monkeypat
     for prefix in ("roster", "info", "roster_stubs", "adorns", "spells"):
         guild_cache.delete(f"{prefix}:{glower}:{wlower}")
 
-    with patch("web.guild_cache.CensusClient", return_value=mock_client):
+    with (
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient", return_value=mock_client),
+    ):
         await _persist_and_publish_guild("TestGuild")
 
     conn = census_store.init_db(db_path)

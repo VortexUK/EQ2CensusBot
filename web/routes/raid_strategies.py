@@ -32,7 +32,6 @@ Lazy zone creation: a PUT for a zone not yet known to raids_db creates the
 
 from __future__ import annotations
 
-import asyncio
 import sqlite3
 import time
 
@@ -42,8 +41,8 @@ from pydantic import BaseModel, Field
 from census import raids_db, zones_db
 from web import db as users_db
 from web.auth_deps import require_editor
-from web.cache import character_cache
-from web.db import get_active_claims
+from web.lib.executor import run_sync
+from web.lib.primary_guild import cached_primary_guild
 from web.server_context import current_world as _current_world
 
 router = APIRouter(tags=["raid_strategies"])
@@ -64,16 +63,8 @@ async def _resolve_primary_guild_cached(discord_id: str) -> str | None:
     Lives here rather than in web/auth_deps.py because raids_db isn't an auth
     concept — auth_deps imports this lazily inside ``require_editor`` to skirt
     the routes→auth circular dependency."""
-    world = _current_world()
-    claims = await get_active_claims(discord_id, world=world)
-    primary = next((c for c in claims["approved"] if c.get("is_primary")), None)
-    if not primary:
-        return None
-    char_name = primary["character_name"]
-    cached, _ = character_cache.get_stale(f"{char_name.lower()}:{world.lower()}")
-    if cached is None:
-        return None
-    return getattr(cached, "guild_name", None) or (cached.get("guild_name") if isinstance(cached, dict) else None)
+    _, guild_name = await cached_primary_guild(discord_id, _current_world())
+    return guild_name
 
 
 # ---------------------------------------------------------------------------
@@ -403,13 +394,12 @@ async def get_strategy(zone_name: str, position: int) -> StrategyResponse:
     encounter exists but no strategy has been written yet — same as 404 for
     an unknown encounter (callers don't need to distinguish; either way the
     UI falls back to the placeholder)."""
-    loop = asyncio.get_event_loop()
-    resolved = await loop.run_in_executor(None, _resolve_curator_encounter, zone_name, position)
+    resolved = await run_sync(_resolve_curator_encounter, zone_name, position)
     if resolved is None:
         raise HTTPException(status_code=404, detail="Encounter not found")
     canonical_zone, encounter_name = resolved
 
-    row = await loop.run_in_executor(None, _read_strategy_sync, canonical_zone, encounter_name)
+    row = await run_sync(_read_strategy_sync, canonical_zone, encounter_name)
     if row is None:
         raise HTTPException(status_code=404, detail="No strategy yet")
 
@@ -444,18 +434,16 @@ async def put_strategy(
     if not body.markdown.strip():
         raise HTTPException(status_code=400, detail="markdown body is empty")
 
-    loop = asyncio.get_event_loop()
-    resolved = await loop.run_in_executor(None, _resolve_curator_encounter, zone_name, position)
+    resolved = await run_sync(_resolve_curator_encounter, zone_name, position)
     if resolved is None:
         raise HTTPException(status_code=404, detail="Encounter not found")
     canonical_zone, encounter_name = resolved
 
     # Pull expansion_short from zones.db for the lazy raid_zones row creation.
-    z = await loop.run_in_executor(None, zones_db.find_by_name, canonical_zone)
+    z = await run_sync(zones_db.find_by_name, canonical_zone)
     expansion_short = z["expansion_short"] if z else "Unknown"
 
-    row = await loop.run_in_executor(
-        None,
+    row = await run_sync(
         lambda: _write_strategy_sync(
             zone_name=canonical_zone,
             encounter_name=encounter_name,
@@ -492,13 +480,12 @@ async def get_strategy_revisions(zone_name: str, position: int) -> RevisionListR
     Empty list when no strategy has ever been written for this encounter —
     the frontend disclosure just shows "no history yet" in that case rather
     than 404-ing, which would be confusing on a valid encounter."""
-    loop = asyncio.get_event_loop()
-    resolved = await loop.run_in_executor(None, _resolve_curator_encounter, zone_name, position)
+    resolved = await run_sync(_resolve_curator_encounter, zone_name, position)
     if resolved is None:
         raise HTTPException(status_code=404, detail="Encounter not found")
     canonical_zone, encounter_name = resolved
 
-    rows = await loop.run_in_executor(None, _read_revisions_sync, canonical_zone, encounter_name)
+    rows = await run_sync(_read_revisions_sync, canonical_zone, encounter_name)
 
     # Batch-resolve display names for all unique editor ids in one DB call.
     unique_ids = list({r["edited_by"] for r in rows if r.get("edited_by")})
@@ -548,7 +535,7 @@ def _read_zone_revisions_sync(zone_name: str) -> list[dict]:
 async def _resolve_canonical_zone_name(zone_name: str) -> str | None:
     """Resolve an URL zone name (possibly an alias) to its canonical form via
     zones.db. Returns None when the zone is unknown — caller 404s."""
-    z = await asyncio.get_event_loop().run_in_executor(None, zones_db.find_by_name, zone_name)
+    z = await run_sync(zones_db.find_by_name, zone_name)
     return z["name"] if z else None
 
 
@@ -560,7 +547,7 @@ async def get_zone_overview(zone_name: str) -> ZoneOverviewResponse:
     if canonical is None:
         raise HTTPException(status_code=404, detail="Zone not found")
 
-    row = await asyncio.get_event_loop().run_in_executor(None, _read_overview_sync, canonical)
+    row = await run_sync(_read_overview_sync, canonical)
     if row is None:
         raise HTTPException(status_code=404, detail="No overview yet")
 
@@ -586,17 +573,15 @@ async def put_zone_overview(
     if not body.markdown.strip():
         raise HTTPException(status_code=400, detail="markdown body is empty")
 
-    loop = asyncio.get_event_loop()
     canonical = await _resolve_canonical_zone_name(zone_name)
     if canonical is None:
         raise HTTPException(status_code=404, detail="Zone not found")
 
     # expansion_short needed for the lazy-create branch in the write helper.
-    z = await loop.run_in_executor(None, zones_db.find_by_name, canonical)
+    z = await run_sync(zones_db.find_by_name, canonical)
     expansion_short = z["expansion_short"] if z else "Unknown"
 
-    row = await loop.run_in_executor(
-        None,
+    row = await run_sync(
         lambda: _write_overview_sync(
             zone_name=canonical,
             markdown=body.markdown,
@@ -632,8 +617,7 @@ async def get_zone_overview_revisions(zone_name: str) -> ZoneRevisionListRespons
     if canonical is None:
         raise HTTPException(status_code=404, detail=f"Unknown zone: {zone_name!r}")
 
-    loop = asyncio.get_event_loop()
-    rows = await loop.run_in_executor(None, _read_zone_revisions_sync, canonical)
+    rows = await run_sync(_read_zone_revisions_sync, canonical)
 
     # Batch-resolve display names for all unique editor ids in one DB call.
     editor_ids = list({r["edited_by"] for r in rows if r.get("edited_by")})

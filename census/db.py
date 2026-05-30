@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import sqlite3
 from pathlib import Path
 from typing import Any, NamedTuple
 
+import aiosqlite
+
 from census.item_level import compute_ilvl
+
+_log = logging.getLogger(__name__)
 
 
 def _resolve_db_path() -> Path:
@@ -725,7 +730,10 @@ def _backfill_pvp_flag(conn: sqlite3.Connection) -> None:
 
     Only touches rows where flag_pvp IS NULL or 0 and raw_json contains the
     string, so it runs quickly after the first pass (nearly all rows are 0).
+    Guarded by a version key so the full table scan only happens once.
     """
+    if get_meta(conn, "pvp_backfill_version") == "1":
+        return  # already done
     conn.execute("""
         UPDATE items
         SET flag_pvp = 1
@@ -733,6 +741,7 @@ def _backfill_pvp_flag(conn: sqlite3.Connection) -> None:
           AND raw_json IS NOT NULL
           AND LOWER(raw_json) LIKE '%pvp%'
     """)
+    set_meta(conn, "pvp_backfill_version", "1")
     conn.commit()
 
 
@@ -765,7 +774,8 @@ def _backfill_effect_stats(conn: sqlite3.Connection) -> None:
     for item_id, raw_json_str in rows:
         try:
             raw = json.loads(raw_json_str)
-        except Exception:
+        except Exception as exc:
+            _log.warning("[db] Failed to parse effect_stats JSON for item_id=%s: %s", item_id, exc)
             continue
         for stat_name, value in extract_effect_stats(raw).items():
             stat_rows.append((item_id, stat_name, value))
@@ -862,11 +872,6 @@ def gear_for_ids(ids: list[int], db_path: Path = DB_PATH) -> dict[int, GearRow]:
 
 async def find_by_name(name: str, path: Path = DB_PATH) -> dict | None:
     """Return raw Census JSON dict for the closest name match, or None."""
-    try:
-        import aiosqlite
-    except ImportError:
-        return _find_by_name_sync(name, path)
-
     if not path.exists():
         return None
     async with aiosqlite.connect(path) as db:
@@ -924,11 +929,6 @@ async def find_by_name(name: str, path: Path = DB_PATH) -> dict | None:
 
 async def find_by_id(item_id: int, path: Path = DB_PATH) -> dict | None:
     """Return raw Census JSON dict for the given item ID, or None."""
-    try:
-        import aiosqlite
-    except ImportError:
-        return _find_by_id_sync(item_id, path)
-
     if not path.exists():
         return None
     async with aiosqlite.connect(path) as db:
@@ -936,47 +936,3 @@ async def find_by_id(item_id: int, path: Path = DB_PATH) -> dict | None:
         async with db.execute("SELECT raw_json FROM items WHERE id = ? LIMIT 1", (item_id,)) as cur:
             row = await cur.fetchone()
         return json.loads(row["raw_json"]) if row else None
-
-
-def _find_by_name_sync(name: str, path: Path) -> dict | None:
-    if not path.exists():
-        return None
-
-    def _best(conn: sqlite3.Connection, where_clause: str, params: tuple) -> sqlite3.Row | None:
-        if SERVER_MAX_LEVEL is not None:
-            row = conn.execute(
-                f"SELECT raw_json FROM items WHERE {where_clause}"
-                "  AND (level_to_use IS NULL OR level_to_use <= ?)"
-                "  ORDER BY level_to_use DESC, tierid DESC, last_update DESC LIMIT 1",
-                params + (SERVER_MAX_LEVEL,),
-            ).fetchone()
-            if row:
-                return row
-            return conn.execute(
-                f"SELECT raw_json FROM items WHERE {where_clause}"
-                "  ORDER BY level_to_use DESC, tierid DESC, last_update DESC LIMIT 1",
-                params,
-            ).fetchone()
-        return conn.execute(
-            f"SELECT raw_json FROM items WHERE {where_clause}  ORDER BY tierid DESC, last_update DESC LIMIT 1",
-            params,
-        ).fetchone()
-
-    with sqlite3.connect(path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = _best(conn, "displayname_lower = ?", (name.lower(),))
-        if not row:
-            row = _best(
-                conn,
-                "displayname_lower LIKE ? ESCAPE '\\'",
-                (f"%{_like_escape(name.lower())}%",),
-            )
-        return json.loads(row["raw_json"]) if row else None
-
-
-def _find_by_id_sync(item_id: int, path: Path) -> dict | None:
-    if not path.exists():
-        return None
-    with sqlite3.connect(path) as conn:
-        row = conn.execute("SELECT raw_json FROM items WHERE id = ? LIMIT 1", (item_id,)).fetchone()
-        return json.loads(row[0]) if row else None

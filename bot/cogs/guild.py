@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import io
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from census.client import CensusClient
-from census.config import SERVICE_ID, WORLD
+from census.config import WORLD
 from census.models import GuildData, GuildMember
+
+if TYPE_CHECKING:
+    from bot.bot import EQ2Bot
 
 _COL_SEP = "  "
 
@@ -71,21 +76,16 @@ def _build_table(data: GuildData) -> str:
 
 
 class GuildCog(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: EQ2Bot) -> None:
         self.bot = bot
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        self.census = CensusClient(service_id=SERVICE_ID)
         self.world = WORLD
-
-    async def cog_unload(self) -> None:
-        await self.census.close()
 
     @app_commands.command(name="guild", description="Show a member summary for an EverQuest 2 guild")
     @app_commands.describe(name="Guild name (e.g. Exordium)")
     async def guild(self, interaction: discord.Interaction, name: str) -> None:
         await interaction.response.defer(thinking=True)
 
-        data = await self.census.get_guild(name, self.world)
+        data = await self.bot.census.get_guild(name, self.world)
         if data is None or not data.members:
             await interaction.followup.send(
                 f"No guild found for **{name}** on **{self.world}**.",

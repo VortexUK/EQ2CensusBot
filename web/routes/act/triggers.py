@@ -13,7 +13,6 @@ Surface:
 
 from __future__ import annotations
 
-import asyncio
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -21,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from census import raids_db
 from web.auth_deps import require_editor
+from web.lib.executor import run_sync
 from web.routes.act._shared import (
     SpellTimerEntry,
     TriggerEntry,
@@ -121,7 +121,7 @@ def _spell_timer_id_for_name_sync(encounter_id: int, name: str) -> int | None:
 async def list_triggers(zone_name: str, position: int) -> list[TriggerEntry]:
     """All triggers for an encounter, ordered by curator position then id."""
     _, _, encounter_id = await _resolve_encounter(zone_name, position)
-    rows = await asyncio.get_event_loop().run_in_executor(None, raids_db.list_act_triggers_for_encounter, encounter_id)
+    rows = await run_sync(raids_db.list_act_triggers_for_encounter, encounter_id)
     return [_trigger_row_to_entry(r) for r in rows]
 
 
@@ -135,9 +135,8 @@ async def export_all_triggers(zone_name: str, position: int) -> Response:
     spell timers are included so ACT picks up timers that fire off a
     skill/combat-art via native name-matching."""
     canonical_zone, mob_name, encounter_id = await _resolve_encounter(zone_name, position)
-    loop = asyncio.get_event_loop()
-    triggers = await loop.run_in_executor(None, raids_db.list_act_triggers_for_encounter, encounter_id)
-    spells = await loop.run_in_executor(None, raids_db.list_act_spell_timers_for_encounter, encounter_id)
+    triggers = await run_sync(raids_db.list_act_triggers_for_encounter, encounter_id)
+    spells = await run_sync(raids_db.list_act_spell_timers_for_encounter, encounter_id)
     # Emit EVERY spell timer for this encounter — both the ones a trigger
     # references and standalone ones (which fire off ACT's native skill/CA
     # name-match). The table's UNIQUE(encounter, name_lower) keeps <Spell>
@@ -160,14 +159,13 @@ async def export_trigger(zone_name: str, position: int, trigger_id: int) -> Resp
     references. Useful for sharing just one mechanic without dragging the
     whole boss's trigger pack."""
     canonical_zone, mob_name, encounter_id = await _resolve_encounter(zone_name, position)
-    loop = asyncio.get_event_loop()
-    trigger = await loop.run_in_executor(None, raids_db.get_act_trigger, trigger_id)
+    trigger = await run_sync(raids_db.get_act_trigger, trigger_id)
     if trigger is None or trigger["raid_encounter_id"] != encounter_id:
         raise HTTPException(status_code=404, detail="Trigger not found")
 
     spells: list[dict] = []
     if trigger.get("timer") and trigger.get("timer_name"):
-        all_spells = await loop.run_in_executor(None, raids_db.list_act_spell_timers_for_encounter, encounter_id)
+        all_spells = await run_sync(raids_db.list_act_spell_timers_for_encounter, encounter_id)
         spells = spell_timers_referenced_by([trigger], all_spells)
 
     xml = build_xml([trigger], spells)
@@ -186,7 +184,7 @@ async def export_trigger(zone_name: str, position: int, trigger_id: int) -> Resp
 )
 async def get_trigger(zone_name: str, position: int, trigger_id: int) -> TriggerEntry:
     _, _, encounter_id = await _resolve_encounter(zone_name, position)
-    trigger = await asyncio.get_event_loop().run_in_executor(None, raids_db.get_act_trigger, trigger_id)
+    trigger = await run_sync(raids_db.get_act_trigger, trigger_id)
     if trigger is None or trigger["raid_encounter_id"] != encounter_id:
         raise HTTPException(status_code=404, detail="Trigger not found")
     return _trigger_row_to_entry(trigger)
@@ -232,8 +230,8 @@ async def create_trigger(
         finally:
             conn.close()
 
-    new_id = await asyncio.get_event_loop().run_in_executor(None, _write)
-    row = await asyncio.get_event_loop().run_in_executor(None, raids_db.get_act_trigger, new_id)
+    new_id = await run_sync(_write)
+    row = await run_sync(raids_db.get_act_trigger, new_id)
     if row is None:
         raise HTTPException(status_code=500, detail="Failed to load freshly-created trigger")
     return _trigger_row_to_entry(row)
@@ -254,7 +252,7 @@ async def update_trigger(
 
     # Verify the trigger belongs to the resolved encounter (avoid letting
     # an editor edit a trigger on another boss by guessing IDs).
-    existing = await asyncio.get_event_loop().run_in_executor(None, raids_db.get_act_trigger, trigger_id)
+    existing = await run_sync(raids_db.get_act_trigger, trigger_id)
     if existing is None or existing["raid_encounter_id"] != encounter_id:
         raise HTTPException(status_code=404, detail="Trigger not found")
 
@@ -284,8 +282,8 @@ async def update_trigger(
         finally:
             conn.close()
 
-    await asyncio.get_event_loop().run_in_executor(None, _write)
-    row = await asyncio.get_event_loop().run_in_executor(None, raids_db.get_act_trigger, trigger_id)
+    await run_sync(_write)
+    row = await run_sync(raids_db.get_act_trigger, trigger_id)
     if row is None:
         raise HTTPException(status_code=500, detail="Failed to load updated trigger")
     return _trigger_row_to_entry(row)
@@ -302,7 +300,7 @@ async def delete_trigger(
     user: dict = Depends(require_editor),  # noqa: ARG001 — auth check
 ) -> dict:
     _, _, encounter_id = await _resolve_encounter(zone_name, position)
-    existing = await asyncio.get_event_loop().run_in_executor(None, raids_db.get_act_trigger, trigger_id)
+    existing = await run_sync(raids_db.get_act_trigger, trigger_id)
     if existing is None or existing["raid_encounter_id"] != encounter_id:
         raise HTTPException(status_code=404, detail="Trigger not found")
 
@@ -313,7 +311,7 @@ async def delete_trigger(
         finally:
             conn.close()
 
-    removed = await asyncio.get_event_loop().run_in_executor(None, _delete)
+    removed = await run_sync(_delete)
     if not removed:
         raise HTTPException(status_code=404, detail="Trigger not found")
     return {"ok": True}
@@ -354,7 +352,6 @@ async def import_triggers_xml(
     _, mob_name, encounter_id = await _resolve_encounter(zone_name, position)
 
     triggers, spell_timers = parse_import_xml(body.xml)
-    loop = asyncio.get_event_loop()
 
     triggers_added: list[int] = []
     triggers_skipped = 0
@@ -431,19 +428,19 @@ async def import_triggers_xml(
             conn.close()
         return added
 
-    triggers_added, triggers_skipped = await loop.run_in_executor(None, _write_triggers)
-    spell_timers_added = await loop.run_in_executor(None, _write_spell_timers)
+    triggers_added, triggers_skipped = await run_sync(_write_triggers)
+    spell_timers_added = await run_sync(_write_spell_timers)
 
     # Hydrate the response with the freshly-written rows (in insert order).
     trigger_rows: list[TriggerEntry] = []
     for tid in triggers_added:
-        row = await loop.run_in_executor(None, raids_db.get_act_trigger, tid)
+        row = await run_sync(raids_db.get_act_trigger, tid)
         if row is not None:
             trigger_rows.append(_trigger_row_to_entry(row))
 
     spell_rows: list[SpellTimerEntry] = []
     for sid in spell_timers_added:
-        row = await loop.run_in_executor(None, raids_db.get_act_spell_timer, sid)
+        row = await run_sync(raids_db.get_act_spell_timer, sid)
         if row is not None:
             spell_rows.append(_spell_row_to_entry(row))
 

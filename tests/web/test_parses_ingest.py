@@ -781,17 +781,27 @@ async def test_signature_with_session_auth_is_rejected(app):
 @pytest.mark.asyncio
 async def test_resolve_snapshots_cache_hit_skips_census():
     """A character already in character_cache is snapshotted with zero Census
-    traffic — no CensusClient is even constructed."""
+    API calls — the shared client is obtained but its Census methods are not
+    called when every combatant is already in the cache with a non-None ilvl."""
     from web.routes.parses import ingest as parses_mod
 
-    # A COMPLETE cache hit (ilvl present) skips Census entirely.
+    # A COMPLETE cache hit (ilvl present) skips Census API calls entirely.
     cached = SimpleNamespace(level=90, guild_name="Exordium", cls="Templar", ilvl=372.2)
     fake_cache = MagicMock()
     fake_cache.get_stale.return_value = (cached, 0)
 
+    mock_client = MagicMock()
+    mock_client.get_character_guild_name = AsyncMock(
+        side_effect=AssertionError("get_character_guild_name must not be called on cache hit")
+    )
+    mock_client.get_character = AsyncMock(
+        side_effect=AssertionError("get_character must not be called on cache hit with ilvl")
+    )
+
     with (
         patch.object(parses_mod, "character_cache", fake_cache),
-        patch.object(parses_mod, "CensusClient", side_effect=AssertionError("Census must not be hit on a cache hit")),
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient", return_value=mock_client),
     ):
         out = await parses_mod._resolve_combatant_snapshots(["Menludiir"], "Varsoon")
 
@@ -819,7 +829,8 @@ async def test_resolve_snapshots_backfills_missing_ilvl():
 
     with (
         patch.object(parses_mod, "character_cache", fake_cache),
-        patch.object(parses_mod, "CensusClient", return_value=client),
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient", return_value=client),
         patch("web.routes.character._build_char_response", return_value=filled),
     ):
         out = await parses_mod._resolve_combatant_snapshots(["Wiz"], "Varsoon")
@@ -846,7 +857,8 @@ async def test_resolve_snapshots_miss_warms_roster_then_hits():
 
     with (
         patch.object(parses_mod, "character_cache", fake_cache),
-        patch.object(parses_mod, "CensusClient", return_value=client),
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient", return_value=client),
         patch.object(parses_mod, "_prewarm_guild_silently", new=AsyncMock()) as prewarm,
     ):
         out = await parses_mod._resolve_combatant_snapshots(["Sihtric"], "Varsoon")
@@ -871,7 +883,8 @@ async def test_resolve_snapshots_unguilded_miss_is_absent():
 
     with (
         patch.object(parses_mod, "character_cache", fake_cache),
-        patch.object(parses_mod, "CensusClient", return_value=client),
+        patch("web.lib.census_lifecycle._clients", {}),
+        patch("web.lib.census_lifecycle.CensusClient", return_value=client),
     ):
         out = await parses_mod._resolve_combatant_snapshots(["Randompug"], "Varsoon")
 

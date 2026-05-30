@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from census._coerce import coerce_int as _int
 from census.constants import ITEM_DISPLAY, STAT_MAP, TYPEINFO_DISPLAY
 from census.item_level import compute_ilvl
 from census.models import ItemData, ItemEffect, ItemStat, RecipeBookEntry, SetBonusEntry
@@ -26,15 +27,6 @@ _FLAG_LABELS: dict[str, str] = {
 # ------------------------------------------------------------------
 # Low-level helpers (duplicated from client.py to avoid circular import)
 # ------------------------------------------------------------------
-
-
-def _int(value: Any) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
 
 
 def _str(value: Any) -> str:

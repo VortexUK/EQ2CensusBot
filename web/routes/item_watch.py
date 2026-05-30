@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from census.client import CensusClient
 from web.cache import character_cache, guild_cache
-from web.config import SERVICE_ID as _SERVICE_ID
 from web.db import (
     add_item_watch,
     get_active_claims,
@@ -15,8 +14,13 @@ from web.db import (
     remove_item_watch,
     update_item_watch_check,
 )
+from web.lib.cache_keys import char_cache_key, guild_roster_key
+from web.lib.census_lifecycle import shared_census_client
+from web.lib.primary_guild import get_primary_claim
 from web.routes.guild import _officer_chars, _roster_rank_map, _validate_guild_name
 from web.server_context import current_world
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["guild"])
 
@@ -58,7 +62,7 @@ async def _check_watch(watch: dict) -> None:
     resolves the correct cache key even if called outside a request context.
     """
     row_world = watch.get("world", current_world())
-    name_key = f"{watch['character_name'].lower()}:{row_world.lower()}"
+    name_key = char_cache_key(watch["character_name"], row_world)
     cached, _ = character_cache.get_stale(name_key)
     if cached is None:
         return  # no data available yet — skip, will check later
@@ -73,8 +77,8 @@ async def _check_all_watches(guild_name: str, world: str) -> None:
     for w in watches:
         try:
             await _check_watch(w)
-        except Exception:
-            pass
+        except Exception as exc:
+            _log.warning("[item_watch] Check failed for watch_id=%s: %s", w.get("id"), exc)
 
 
 # ---------------------------------------------------------------------------
@@ -138,15 +142,11 @@ async def add_item_watch_entry(
     item_name = body.item_name.strip()
     raw = await item_db.find_by_name(item_name)
     if raw is None:
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        client = CensusClient(service_id=_SERVICE_ID)
-        try:
+        async with shared_census_client() as client:
             raw = await client.get_raw_item(item_name)
-            if raw:
-                item_list = raw.get("item_list") or []
-                raw = item_list[0] if item_list else None
-        finally:
-            await client.close()
+        if raw:
+            item_list = raw.get("item_list") or []
+            raw = item_list[0] if item_list else None
     if raw is None:
         raise HTTPException(
             status_code=404,
@@ -162,7 +162,7 @@ async def add_item_watch_entry(
         body.character_name.strip(),
     )
     # Try to get properly capitalised name from the cached roster response
-    roster_cache_key = f"roster:{guild_name.lower()}:{current_world().lower()}"
+    roster_cache_key = guild_roster_key(guild_name, current_world())
     roster, _ = guild_cache.get_stale(roster_cache_key)
     if roster:
         match = next((m.name for m in roster.members if m.name.lower() == char_key), None)
@@ -172,7 +172,7 @@ async def add_item_watch_entry(
     # Use the officer's primary in-game character name as the attribution,
     # falling back to their Discord display name if no primary is set.
     officer_claims = await get_active_claims(user["id"], world=current_world())
-    primary_claim = next((c for c in officer_claims["approved"] if c.get("is_primary")), None)
+    primary_claim = get_primary_claim(officer_claims)
     added_by_name = (
         primary_claim["character_name"]
         if primary_claim

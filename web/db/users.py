@@ -306,6 +306,53 @@ async def review_role_request(
     return await get_role_request(request_id, path=path)
 
 
+async def review_and_grant_role(
+    request_id: int,
+    status: str,
+    admin_id: str,
+    note: str | None = None,
+    path: Path = DB_PATH,
+) -> dict | None:
+    """Atomically mark a role request approved + insert the user_roles row.
+
+    Single transaction so a process crash between the two writes can't leave
+    the queue with a phantom-approved row whose grant never landed. Returns
+    the reviewed request dict (or None if not found / already reviewed).
+
+    Idempotency: if the user already holds the role (e.g. admin granted it
+    directly between submit + approve), the INSERT OR IGNORE is a no-op and
+    the request still transitions to approved.
+    """
+    async with aiosqlite.connect(path) as db:
+        cur = await db.execute(
+            """
+            UPDATE role_requests SET
+                status      = ?,
+                reviewed_at = strftime('%s','now'),
+                reviewed_by = ?,
+                admin_note  = ?
+            WHERE id = ? AND status = 'pending'
+            """,
+            (status, admin_id, note, request_id),
+        )
+        if cur.rowcount == 0:
+            return None
+        # Fetch the request row so we can grant the role
+        async with db.execute(
+            "SELECT discord_id, role FROM role_requests WHERE id = ?",
+            (request_id,),
+        ) as sel:
+            row = await sel.fetchone()
+        if row is not None:
+            discord_id, role = row
+            await db.execute(
+                "INSERT OR IGNORE INTO user_roles (discord_id, role, granted_by) VALUES (?, ?, ?)",
+                (discord_id, role, admin_id),
+            )
+        await db.commit()
+    return await get_role_request(request_id, path=path)
+
+
 async def withdraw_role_request(
     request_id: int,
     discord_id: str,

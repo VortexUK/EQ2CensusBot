@@ -7,7 +7,6 @@ or the original uploader can soft-delete their own.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import sqlite3
 import time
@@ -22,6 +21,7 @@ from web.auth_deps import (
 from web.auth_deps import (
     require_user_session as _require_user,
 )
+from web.lib.executor import run_sync
 from web.limiter import limiter
 from web.routes.parses import router
 from web.routes.parses.list import _uploader_discord_id
@@ -114,8 +114,7 @@ async def delete_parses_batch(
     if not id_list:
         raise HTTPException(status_code=400, detail="ids must not be empty")
 
-    loop = asyncio.get_event_loop()
-    rows = await loop.run_in_executor(None, _fetch_encounter_auth_rows, id_list, current_world())
+    rows = await run_sync(_fetch_encounter_auth_rows, id_list, current_world())
     if not rows:
         raise HTTPException(status_code=404, detail="No matching parses")
 
@@ -132,7 +131,7 @@ async def delete_parses_batch(
         finally:
             conn.close()
 
-    n = await loop.run_in_executor(None, _delete_many)
+    n = await run_sync(_delete_many)
     return DeleteParsesResponse(deleted=n)
 
 
@@ -150,8 +149,7 @@ async def delete_parse(
     # Look up the row so we can authorise against its real guild_name and
     # source_dsn — never trust the caller for either.  Also enforces
     # per-server isolation: an id from another world returns no rows → 404.
-    loop = asyncio.get_event_loop()
-    rows = await loop.run_in_executor(None, _fetch_encounter_auth_rows, [encounter_id], current_world())
+    rows = await run_sync(_fetch_encounter_auth_rows, [encounter_id], current_world())
     if not rows:
         raise HTTPException(status_code=404, detail="Parse not found")
 
@@ -168,7 +166,7 @@ async def delete_parse(
         finally:
             conn.close()
 
-    removed = await loop.run_in_executor(None, _delete_sync)
+    removed = await run_sync(_delete_sync)
     return DeleteParsesResponse(deleted=1 if removed else 0)
 
 
@@ -206,8 +204,6 @@ async def delete_parses_bulk(
     if not allowed:
         raise HTTPException(status_code=403, detail="Not authorised to delete parses for this guild")
 
-    loop = asyncio.get_event_loop()
-
     now = int(time.time())
 
     _world = current_world()
@@ -227,5 +223,5 @@ async def delete_parses_bulk(
         finally:
             conn.close()
 
-    n = await loop.run_in_executor(None, _delete_sync)
+    n = await run_sync(_delete_sync)
     return DeleteParsesResponse(deleted=n)

@@ -13,12 +13,14 @@ import time
 from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
-from census.client import CensusClient
 from census.db import GearRow, gear_for_ids
 from census.db import find_by_id as _item_find_by_id
 from census.item_level import adorn_bonus, character_ilvl
 from web.cache import character_cache
-from web.config import SERVICE_ID as _SERVICE_ID
+from web.constants import CHARACTER_STALE_S
+from web.lib.cache_keys import char_cache_key
+from web.lib.census_lifecycle import shared_census_client
+from web.lib.validation import validate_character_name
 from web.limiter import limiter
 from web.routes.character import router  # the package-level router
 from web.server_context import current_world
@@ -382,20 +384,17 @@ async def prewarm_character_cache() -> None:
         sem = asyncio.Semaphore(3)  # max 3 concurrent Census fetches
 
         async def _fetch_one(name: str) -> None:
-            cache_key = f"{name.lower()}:{current_world().lower()}"
+            cache_key = char_cache_key(name, current_world())
             if character_cache.get_stale(cache_key)[0] is not None:
                 return  # already warm
             async with sem:
-                # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-                client = CensusClient(service_id=_SERVICE_ID)
                 try:
-                    char = await client.get_character(name, current_world())
+                    async with shared_census_client() as client:
+                        char = await client.get_character(name, current_world())
                     if char is not None:
                         character_cache.set(cache_key, _build_char_response(char))
                 except Exception as exc:
                     _log.warning("[startup] Pre-warm failed for %s: %s", name, exc)
-                finally:
-                    await client.close()
 
         await asyncio.gather(*[_fetch_one(n) for n in names])
         _log.info("[startup] Character cache pre-warm complete.")
@@ -409,11 +408,13 @@ async def prewarm_character_cache() -> None:
 async def get_character(request: Request, name: str) -> CharacterResponse:
     """Serve last-known data instantly; refresh from Census only in the
     background. Never blocks on / fails because of Census."""
-    if len(name) > 64:
-        raise HTTPException(status_code=400, detail="Character name is too long")
-    cache_key = f"{name.lower()}:{current_world().lower()}"
+    sanitised = validate_character_name(name)
+    if sanitised is None:
+        raise HTTPException(status_code=400, detail="Character name is invalid (must be 1-15 letters).")
+    name = sanitised
+    cache_key = char_cache_key(name, current_world())
     now = int(time.time())
-    STALE_S = 900  # 15 min
+    STALE_S = CHARACTER_STALE_S
 
     # 1) Hot in-memory copy.
     cached, is_stale = character_cache.get_stale(cache_key)
@@ -476,17 +477,14 @@ async def get_character(request: Request, name: str) -> CharacterResponse:
             status_code=503,
             detail=f"'{name}' not cached yet and Census is unavailable. Try again shortly.",
         )
-    # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-    client = CensusClient(service_id=_SERVICE_ID)
     try:
-        char = await client.get_character(name, current_world())
+        async with shared_census_client() as client:
+            char = await client.get_character(name, current_world())
     except Exception:
         raise HTTPException(
             status_code=503,
             detail=f"'{name}' not cached yet and Census is unavailable. Try again shortly.",
         )
-    finally:
-        await client.close()
     if char is None:
         raise HTTPException(status_code=404, detail=f"Character '{name}' not found on {current_world()}")
     resp = _build_char_response(char)

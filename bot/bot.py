@@ -3,12 +3,15 @@ import logging
 import discord
 from discord.ext import commands
 
-from census.config import DISCORD_SYNC_GUILD_IDS
+from census.client import CensusClient
+from census.config import DISCORD_SYNC_GUILD_IDS, SERVICE_ID
 
 _log = logging.getLogger(__name__)
 
 
 class EQ2Bot(commands.Bot):
+    census: CensusClient
+
     def __init__(self) -> None:
         intents = discord.Intents.default()
         super().__init__(command_prefix="!", intents=intents)
@@ -19,6 +22,8 @@ class EQ2Bot(commands.Bot):
         from bot.cogs.guild import GuildCog
         from bot.cogs.items import ItemsCog
         from bot.cogs.spellcheck import SpellcheckCog
+
+        self.census = CensusClient(service_id=SERVICE_ID)
 
         await self.add_cog(ItemsCog(self))
         await self.add_cog(GuildCog(self))
@@ -31,6 +36,12 @@ class EQ2Bot(commands.Bot):
             await self.tree.sync(guild=guild)
         await self.tree.sync()
         _log.info("Slash commands synced.")
+
+    async def close(self) -> None:
+        try:
+            await self.census.close()
+        finally:
+            await super().close()
 
     async def on_ready(self) -> None:
         assert self.user is not None

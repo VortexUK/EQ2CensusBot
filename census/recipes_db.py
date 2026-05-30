@@ -22,10 +22,15 @@ Non-spell recipes leave both columns NULL.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sqlite3
 from pathlib import Path
+
+from census._coerce import coerce_int as _int
+
+_log = logging.getLogger(__name__)
 
 # Ordered from lowest to highest so tier-comparison logic can use the index.
 SPELL_TIERS: tuple[str, ...] = (
@@ -185,15 +190,6 @@ def _like_escape(s: str) -> str:
     """Escape SQLite ``LIKE`` wildcards. Will move to ``web/lib/db_helpers.py``
     in Phase 2a — duplicated per-module for the Phase 1 surgical fix."""
     return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def _int(v) -> int | None:
-    if v is None:
-        return None
-    try:
-        return int(v)
-    except (TypeError, ValueError):
-        return None
 
 
 def _parse_spell_tier(name: str) -> tuple[str | None, str | None]:
@@ -381,7 +377,8 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     # Deserialise secondary_comps back to a list
     try:
         d["secondary_comps"] = json.loads(d.get("secondary_comps") or "[]")
-    except Exception:
+    except Exception as exc:
+        _log.warning("[recipes_db] Failed to parse secondary_comps for recipe id=%s: %s", d.get("id"), exc)
         d["secondary_comps"] = []
     return d
 

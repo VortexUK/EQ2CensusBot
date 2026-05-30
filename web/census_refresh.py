@@ -11,22 +11,17 @@ import logging
 import time
 
 from census import census_store
-from census.client import CensusClient
 from web import census_events, census_health
 from web.cache import character_cache
-from web.config import SERVICE_ID as _SERVICE_ID
+from web.constants import CENSUS_REFRESH_THROTTLE_S
+from web.lib.cache_keys import census_refresh_guild_key, census_refresh_key
+from web.lib.census_lifecycle import shared_census_client
+from web.lib.log_safety import scrub as _scrub
 from web.server_context import current_world
 
 _log = logging.getLogger(__name__)
 
-
-def _scrub(value: object) -> str:
-    """Strip CR/LF before logging a user-supplied value, so a crafted name
-    can't forge log lines (CWE-117 log injection)."""
-    return str(value).replace("\r", " ").replace("\n", " ")
-
-
-_THROTTLE = 900  # 15 minutes between refresh attempts per entity
+_THROTTLE = CENSUS_REFRESH_THROTTLE_S  # 15 minutes between refresh attempts per entity
 _last_attempt: dict[str, float] = {}
 _in_flight: set[str] = set()
 
@@ -52,7 +47,7 @@ def _mark_attempt(key: str) -> None:
 def request_character_refresh(name: str) -> None:
     """Fire-and-forget a throttled background character refresh."""
     world = current_world()
-    key = f"{name.lower()}:{world.lower()}"
+    key = census_refresh_key(name, world)
     if not _should_refresh(key):
         return
     _mark_attempt(key)
@@ -64,12 +59,8 @@ async def _run_character_refresh(name: str, key: str, world: str) -> None:
     from web.routes.character import _build_char_response  # local: avoid import cycle
 
     try:
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        client = CensusClient(service_id=_SERVICE_ID)
-        try:
+        async with shared_census_client() as client:
             char = await client.get_character(name, world)
-        finally:
-            await client.close()
         if char is None:
             return  # not found / not resolved → keep best-known
         resp = _build_char_response(char)  # CharacterResponse (pydantic)
@@ -107,7 +98,7 @@ def _merge_roster(roster: list[dict], fresh: dict[str, dict], stored: dict[str, 
 
 def request_guild_refresh(name: str) -> None:
     world = current_world()
-    key = f"guild:{name.lower()}:{world.lower()}"
+    key = census_refresh_guild_key(name, world)
     if not _should_refresh(key):
         return
     _mark_attempt(key)

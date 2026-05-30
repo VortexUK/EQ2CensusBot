@@ -3,16 +3,20 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from census.client import CensusClient
+from census import census_store
 from census.spells_db import find_by_crc
 from image.aa_tree import detect_tree_type
 from web.cache import aa_cache
-from web.config import SERVICE_ID as _SERVICE_ID
+from web.constants import CHARACTER_STALE_S
+from web.lib.cache_keys import aa_cache_key
+from web.lib.census_lifecycle import shared_census_client
+from web.lib.executor import run_sync
 from web.server_context import current_server, current_world
 
 _log = logging.getLogger(__name__)
@@ -52,8 +56,8 @@ def _load_tree_index() -> None:
                 "name": aa.get("name", path.stem),
                 "type": detect_tree_type(data),
             }
-        except Exception:
-            pass
+        except Exception as exc:
+            _log.warning("[aa] Failed to load tree index %s: %s", path.name, exc)
 
 
 _load_tree_index()
@@ -194,60 +198,107 @@ def _build_trees(aa_list) -> list[CharAATree]:
     return result
 
 
+def _aas_response_from_census(char_aas) -> CharAAsResponse:
+    """Build a CharAAsResponse from a Census CharacterAAs model object."""
+    return CharAAsResponse(
+        character_name=char_aas.character_name,
+        total_spent=sum(aa.tier for aa in char_aas.aa_list),
+        trees=_build_trees(char_aas.aa_list),
+        profiles=[CharAAProfile(name=p.name, trees=_build_trees(p.aa_list)) for p in char_aas.profiles],
+    )
+
+
 async def _bg_refresh_aas(name: str, cache_key: str) -> None:
-    """Background task: silently re-fetch a character's AAs and update the cache."""
+    """Background task: silently re-fetch a character's AAs, persist to
+    census_store, and update the in-memory cache."""
     try:
-        # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-        client = CensusClient(service_id=_SERVICE_ID)
-        try:
-            char_aas = await client.get_character_aas(name, current_world())
-        finally:
-            await client.close()
+        world = current_world()
+        async with shared_census_client() as client:
+            char_aas = await client.get_character_aas(name, world)
         if char_aas is not None:
-            aa_cache.set(
-                cache_key,
-                CharAAsResponse(
-                    character_name=char_aas.character_name,
-                    total_spent=sum(aa.tier for aa in char_aas.aa_list),
-                    trees=_build_trees(char_aas.aa_list),
-                    profiles=[CharAAProfile(name=p.name, trees=_build_trees(p.aa_list)) for p in char_aas.profiles],
-                ),
-            )
+            result = _aas_response_from_census(char_aas)
+            now = int(time.time())
+
+            def _write() -> None:
+                conn = census_store.init_db(census_store.DB_PATH)
+                try:
+                    census_store.upsert_character_aas(conn, name, world, result.model_dump(), now=now)
+                finally:
+                    conn.close()
+
+            await run_sync(_write)
+            aa_cache.set(cache_key, result)
     except Exception as exc:
         _log.error("[Cache] Background AA refresh failed for %s: %s", name, exc)
 
 
 @router.get("/character/{name}/aas", response_model=CharAAsResponse)
 async def get_character_aas(name: str) -> CharAAsResponse:
+    """Serve last-known AA data instantly from census_store; refresh from
+    Census only in the background. Mirrors the character read path so AA
+    data survives container restarts the same way.
+
+    Spawned within the request context: asyncio.create_task copies the
+    contextvar, so current_world() inside the task resolves to THIS
+    request's server even after the middleware resets it post-response.
     """
-    Return a character's spent AAs grouped by tree, sorted by tree type.
-    Responds instantly from cache; fires a background refresh when stale.
-    """
-    cache_key = f"aas:{name.lower()}:{current_world().lower()}"
+    world = current_world()
+    cache_key = aa_cache_key(name, world)
+    now = int(time.time())
+
+    # 1) Hot in-memory copy.
     cached, is_stale = aa_cache.get_stale(cache_key)
     if cached is not None:
         if is_stale:
-            # Spawned within the request context: asyncio.create_task copies the
-            # contextvar, so current_world() inside the task resolves to THIS
-            # request's server even after the middleware resets it post-response.
             asyncio.create_task(_bg_refresh_aas(name, cache_key))
         return cached
 
-    # CENSUS-CLIENT-LIFECYCLE: migrate to web.lib.census_lifecycle.shared_census_client (Phase 2c.2)
-    client = CensusClient(service_id=_SERVICE_ID)
+    # 2) Durable store — serve known-good data without a Census round-trip.
+    def _read() -> dict | None:
+        conn = census_store.init_db(census_store.DB_PATH)
+        try:
+            return census_store.get_character_aas(conn, name, world)
+        finally:
+            conn.close()
+
+    rec = await run_sync(_read)
+    if rec is not None:
+        stale = (now - rec["last_resolved_at"]) > CHARACTER_STALE_S
+        if stale:
+            asyncio.create_task(_bg_refresh_aas(name, cache_key))
+        resp = CharAAsResponse(**rec["data"])
+        aa_cache.set(cache_key, resp)
+        return resp
+
+    # 3) Never seen — try one live fetch.
+    from web import census_health
+
+    if census_health.is_down():
+        raise HTTPException(
+            status_code=503,
+            detail=f"'{name}' AA data not cached yet and Census is unavailable. Try again shortly.",
+        )
     try:
-        char_aas = await client.get_character_aas(name, current_world())
-    finally:
-        await client.close()
+        async with shared_census_client() as client:
+            char_aas = await client.get_character_aas(name, world)
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=f"'{name}' AA data not cached yet and Census is unavailable. Try again shortly.",
+        )
     if char_aas is None:
         raise HTTPException(status_code=404, detail=f"Character '{name}' not found")
 
-    result = CharAAsResponse(
-        character_name=char_aas.character_name,
-        total_spent=sum(aa.tier for aa in char_aas.aa_list),
-        trees=_build_trees(char_aas.aa_list),
-        profiles=[CharAAProfile(name=prof.name, trees=_build_trees(prof.aa_list)) for prof in char_aas.profiles],
-    )
+    result = _aas_response_from_census(char_aas)
+
+    def _write() -> None:
+        conn = census_store.init_db(census_store.DB_PATH)
+        try:
+            census_store.upsert_character_aas(conn, name, world, result.model_dump(), now=now)
+        finally:
+            conn.close()
+
+    await run_sync(_write)
     aa_cache.set(cache_key, result)
     return result
 
@@ -280,7 +331,8 @@ async def get_spell_effects(spellcrc: int, tier: int = 0) -> SpellEffectsRespons
         if row.get("effects"):
             try:
                 effects = json.loads(row["effects"])
-            except Exception:
+            except Exception as exc:
+                _log.warning("[aa] Failed to parse effects JSON for crc=%s: %s", spellcrc, exc)
                 effects = []
 
     return SpellEffectsResponse(
