@@ -16,8 +16,6 @@ at parses.py:1324-1326 needs revisiting.
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -26,6 +24,12 @@ from fastapi import Request
 from httpx import ASGITransport, AsyncClient
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from tests.web._parses_ingest_fixtures import (
+    _fake_require_user,
+    _minimal_payload,
+    _sign,
+)
+
 
 class _NoOpBodyReadingMiddleware(BaseHTTPMiddleware):
     """Reads body, then forwards unchanged — proves the cache survives."""
@@ -33,71 +37,6 @@ class _NoOpBodyReadingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         _ = await request.body()  # The exact pattern a debugging middleware would use.
         return await call_next(request)
-
-
-def _minimal_payload() -> dict:
-    return {
-        "logger_name": "Menludiir",
-        "logger_server": "Varsoon",
-        "encounter": {
-            "encid": "HMAC1234",
-            "title": "a krait patriarch",
-            "zone": "Great Divide",
-            "starttime": "2026-05-24 13:51:56",
-            "endtime": "2026-05-24 13:52:42",
-            "duration": 46,
-            "damage": 502718,
-            "encdps": 10928.65,
-            "kills": 4,
-            "deaths": 0,
-        },
-        "combatants": [
-            {
-                "name": "Menludiir",
-                "ally": "T",
-                "starttime": "2026-05-24 13:51:56",
-                "endtime": "2026-05-24 13:52:43",
-                "duration": 47,
-                "damage": 502718,
-                "damageperc": "100%",
-                "kills": 4,
-                "healed": 11637,
-                "healedperc": "100%",
-                "critheals": 1,
-                "heals": 40,
-                "curedispels": 0,
-                "powerdrain": 0,
-                "powerreplenish": 0,
-                "dps": 10696.13,
-                "encdps": 10928.65,
-                "enchps": 252.98,
-                "hits": 132,
-                "crithits": 123,
-                "blocked": 0,
-                "misses": 0,
-                "swings": 132,
-                "healstaken": 11637,
-                "damagetaken": 27557,
-                "deaths": 0,
-                "tohit": 100.0,
-                "critdamperc": "93%",
-                "crithealperc": "3%",
-                "crittypes": "0.8%L - 0.0%F - 0.0%M",
-                "threatstr": "+(0)20000/-(0)0",
-                "threatdelta": 20000,
-            },
-        ],
-        "damage_types": [],
-        "attack_types": [],
-    }
-
-
-def _sign(body_bytes: bytes, token: str) -> str:
-    return hmac.new(token.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
-
-
-async def _fake_require_user(request):
-    return {"id": "discord-123", "username": "alice", "auth_source": "token"}
 
 
 @pytest.mark.asyncio
