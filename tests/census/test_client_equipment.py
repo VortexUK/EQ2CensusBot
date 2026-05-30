@@ -9,6 +9,7 @@ indefinitely). The fallback prevents new cache rows from ever being born stale.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -16,8 +17,25 @@ import pytest
 from census.client import CensusClient
 
 
+@pytest.fixture
+async def client() -> AsyncGenerator[CensusClient]:
+    """Yield a CensusClient and close it on test exit.
+
+    Without this, the underlying aiohttp ClientSession leaks to GC, which
+    fires aiohttp's 'Unclosed client session' destructor warning at process
+    exit. On CI (Linux) that warning's logger.error call raises
+    ValueError: I/O operation on closed file because pytest has closed
+    stdout — the unraisable exception fails the test session with exit 1.
+    """
+    c = CensusClient(service_id="test")
+    try:
+        yield c
+    finally:
+        await c.close()
+
+
 @pytest.mark.asyncio
-async def test_resolve_item_meta_returns_items_db_row_on_hit(monkeypatch):
+async def test_resolve_item_meta_returns_items_db_row_on_hit(client, monkeypatch):
     """Hot items.db → return the row directly, no Census fetch, no cache write."""
     from census import db as item_db_module
 
@@ -29,7 +47,6 @@ async def test_resolve_item_meta_returns_items_db_row_on_hit(monkeypatch):
 
     monkeypatch.setattr(item_db_module, "find_by_id", _fake_find)
 
-    client = CensusClient(service_id="test")
     client._fetch = AsyncMock(side_effect=AssertionError("_fetch must NOT fire on items.db hit"))
     client._cache_item = MagicMock(side_effect=AssertionError("_cache_item must NOT fire on items.db hit"))
 
@@ -38,7 +55,7 @@ async def test_resolve_item_meta_returns_items_db_row_on_hit(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_resolve_item_meta_falls_back_to_census_and_caches(monkeypatch):
+async def test_resolve_item_meta_falls_back_to_census_and_caches(client, monkeypatch):
     """items.db miss → single Census fetch → result persisted to items.db via
     _cache_item → returned to the caller. This is the path that prevents the
     'Item #<id>' placeholder from getting baked into the persistent cache."""
@@ -56,7 +73,6 @@ async def test_resolve_item_meta_falls_back_to_census_and_caches(monkeypatch):
         "iconid": 7777,
     }
 
-    client = CensusClient(service_id="test")
     client._build_params = MagicMock(return_value={"name": "99999"})
     client._fetch = AsyncMock(return_value={"item_list": [census_raw]})
     client._cache_item = MagicMock()
@@ -68,7 +84,7 @@ async def test_resolve_item_meta_falls_back_to_census_and_caches(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_resolve_item_meta_returns_none_when_census_also_misses(monkeypatch):
+async def test_resolve_item_meta_returns_none_when_census_also_misses(client, monkeypatch):
     """items.db miss + Census miss → return None so the caller can render
     the 'Item #<id>' placeholder rather than crash. No cache write — we
     don't want to memoise 'unknown' against the ID."""
@@ -79,7 +95,6 @@ async def test_resolve_item_meta_returns_none_when_census_also_misses(monkeypatc
 
     monkeypatch.setattr(item_db_module, "find_by_id", _fake_find)
 
-    client = CensusClient(service_id="test")
     client._build_params = MagicMock(return_value={"name": "111"})
     client._fetch = AsyncMock(return_value={"item_list": []})
     client._cache_item = MagicMock(side_effect=AssertionError("must not cache an empty result"))
@@ -90,7 +105,7 @@ async def test_resolve_item_meta_returns_none_when_census_also_misses(monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_resolve_item_meta_handles_census_unreachable(monkeypatch):
+async def test_resolve_item_meta_handles_census_unreachable(client, monkeypatch):
     """Census API call returns None (network error already swallowed inside
     _fetch) → _resolve_item_meta returns None, no cache write, no crash."""
     from census import db as item_db_module
@@ -100,7 +115,6 @@ async def test_resolve_item_meta_handles_census_unreachable(monkeypatch):
 
     monkeypatch.setattr(item_db_module, "find_by_id", _fake_find)
 
-    client = CensusClient(service_id="test")
     client._build_params = MagicMock(return_value={"name": "222"})
     client._fetch = AsyncMock(return_value=None)
     client._cache_item = MagicMock(side_effect=AssertionError("must not cache on Census failure"))

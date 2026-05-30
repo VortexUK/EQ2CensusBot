@@ -79,6 +79,38 @@ from unittest.mock import AsyncMock, MagicMock  # noqa: E402
 _TEST_SECRET = "test-secret-for-pytest"
 
 
+def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
+    """Close any leaked aiohttp ClientSession instances before pytest exits.
+
+    Why this matters: httpx.ASGITransport does NOT fire FastAPI's lifespan
+    startup/shutdown — so census_lifecycle.aclose_all() (registered in the
+    app's lifespan) never runs in tests. Any route test that triggers a
+    Census call creates a singleton CensusClient bound to the test loop;
+    that ClientSession then leaks to GC at process exit.
+
+    On Linux/CI the destructor's logger.error('Unclosed client session')
+    fires AFTER pytest has closed stdout, raising ValueError: I/O operation
+    on closed file. The unraisable-exception plugin promotes that to an
+    exit-1 failure even though every test passed.
+
+    Running aclose_all() here closes the underlying sessions cleanly so
+    no destructor warning fires at GC.
+    """
+    import asyncio
+
+    from web.lib import census_lifecycle
+
+    if not census_lifecycle._clients:
+        return
+    try:
+        asyncio.run(census_lifecycle.aclose_all())
+    except RuntimeError:
+        # If there's no event loop AND we somehow can't make one (rare),
+        # silently drop. The destructor warning is the worse alternative
+        # but it's not a correctness bug.
+        pass
+
+
 @pytest.fixture
 def app():
     """FastAPI application instance with a fixed session secret."""
