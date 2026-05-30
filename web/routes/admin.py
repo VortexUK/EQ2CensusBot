@@ -34,6 +34,7 @@ from web.db import (
 )
 from web.lib.executor import run_sync
 from web.routes.claim import invalidate_user_claim_cache_all_worlds
+from web.routes.role_requests import RoleRequestEntry
 from web.server_context import current_world
 
 _log = logging.getLogger(__name__)
@@ -246,9 +247,6 @@ async def revoke_user_role(discord_id: str, role: str, request: Request) -> dict
 # Imported here so admin.py owns the entire admin REST surface; the user-side
 # RoleRequestEntry shape happens to be identical so we reuse it rather than
 # duplicate.
-
-
-from web.routes.role_requests import RoleRequestEntry  # noqa: E402
 
 
 class ReviewRoleRequest(BaseModel):

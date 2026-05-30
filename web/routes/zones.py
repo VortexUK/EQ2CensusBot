@@ -27,6 +27,7 @@ from web.auth_deps import require_user_session
 from web.constants import SQLITE_VAR_CHUNK_SAFE
 from web.lib.executor import run_sync
 from web.lib.primary_guild import cached_primary_guild
+from web.lib.session_user import SessionUser
 from web.server_context import current_world as _current_world
 
 router = APIRouter(tags=["zones"])
@@ -171,7 +172,7 @@ async def list_zones(
 
 
 @router.get("/zones/progress", response_model=RaidProgressResponse)
-async def get_progress(user: dict = Depends(require_user_session)) -> RaidProgressResponse:
+async def get_progress(user: SessionUser = Depends(require_user_session)) -> RaidProgressResponse:
     """Per-zone kill progress for the signed-in user's primary character's guild.
 
     Resolution chain (cheapest first):
@@ -224,6 +225,10 @@ async def _resolve_primary_guild(discord_id: str) -> tuple[str | None, str | Non
     Either value may be None — missing claim, missing primary flag, cold cache,
     or no recent parses all return ``(name_or_None, None)`` and the caller
     renders the "no progress data" state.
+
+    Returns:
+        (character_name | None, guild_name | None) — both may be None when no
+        primary character has yet resolved a guild.
     """
     char_name, guild_name = await cached_primary_guild(discord_id, _current_world())
     if guild_name:

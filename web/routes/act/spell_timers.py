@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from census import raids_db
 from web.auth_deps import require_editor
 from web.lib.executor import run_sync
+from web.lib.session_user import SessionUser
 from web.routes.act._shared import (
     SpellTimerEntry,
     _resolve_encounter,
@@ -103,7 +104,7 @@ async def create_spell_timer(
     zone_name: str,
     position: int,
     body: SpellTimerUpsertRequest,
-    user: dict = Depends(require_editor),
+    user: SessionUser = Depends(require_editor),
 ) -> SpellTimerEntry:
     _, mob_name, encounter_id = await _resolve_encounter(zone_name, position)
     category = body.category or mob_name
@@ -160,7 +161,7 @@ async def update_spell_timer(
     position: int,
     timer_id: int,
     body: SpellTimerUpsertRequest,
-    user: dict = Depends(require_editor),
+    user: SessionUser = Depends(require_editor),
 ) -> SpellTimerEntry:
     _, mob_name, encounter_id = await _resolve_encounter(zone_name, position)
     existing = await run_sync(raids_db.get_act_spell_timer, timer_id)
@@ -221,7 +222,7 @@ async def delete_spell_timer(
     zone_name: str,
     position: int,
     timer_id: int,
-    user: dict = Depends(require_editor),  # noqa: ARG001 — auth check
+    user: SessionUser = Depends(require_editor),  # noqa: ARG001 — auth check
 ) -> dict:
     _, _, encounter_id = await _resolve_encounter(zone_name, position)
     existing = await run_sync(raids_db.get_act_spell_timer, timer_id)

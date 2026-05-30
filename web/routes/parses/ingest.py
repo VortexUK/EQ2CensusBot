@@ -11,6 +11,7 @@ import asyncio
 import hashlib
 import hmac
 import logging
+import sqlite3
 import time
 
 from fastapi import BackgroundTasks, HTTPException, Request
@@ -35,11 +36,15 @@ from web.config import ALLOWED_SERVERS as _ALLOWED_SERVERS
 from web.config import WORLD as _WORLD
 from web.lib.census_lifecycle import shared_census_client
 from web.lib.executor import run_sync
+from web.lib.session_user import TokenUser
 from web.lib.validation import sanitize_world as _sanitize_world
 from web.lib.validation import validate_character_name as _validate_character_name
 from web.limiter import limiter
 from web.routes.parses import router
 from web.routes.parses.models import (
+    IngestAttackType,
+    IngestCombatant,
+    IngestDamageType,
     IngestEncounter,
     IngestRequest,
     IngestResponse,
@@ -310,130 +315,193 @@ def _encounter_from_payload(p: IngestEncounter) -> Encounter | None:
     )
 
 
-def _combatants_from_payload(rows: list[dict], encid: str) -> list[Combatant]:
+def _combatants_from_payload(rows: list[IngestCombatant], encid: str) -> list[Combatant]:
     out: list[Combatant] = []
     for r in rows:
-        name = str(r.get("name") or "").strip()
+        name = str(r.name or "").strip()
         if not name:
             continue
         out.append(
             Combatant(
                 encid=encid,
                 name=name,
-                ally=_to_bool_tf(r.get("ally")),
-                started_at=_to_ts(r.get("starttime")),
-                ended_at=_to_ts(r.get("endtime")),
-                duration_s=_to_int(r.get("duration")),
-                damage=_to_int(r.get("damage")),
-                damage_perc=_to_perc(r.get("damageperc")),
-                kills=_to_int(r.get("kills")),
-                healed=_to_int(r.get("healed")),
-                healed_perc=_to_perc(r.get("healedperc")),
-                crit_heals=_to_int(r.get("critheals")),
-                heals=_to_int(r.get("heals")),
-                cure_dispels=_to_int(r.get("curedispels")),
-                power_drain=_to_int(r.get("powerdrain")),
-                power_replenish=_to_int(r.get("powerreplenish")),
-                dps=_to_float(r.get("dps")),
-                encdps=_to_float(r.get("encdps")),
-                enchps=_to_float(r.get("enchps")),
-                hits=_to_int(r.get("hits")),
-                crit_hits=_to_int(r.get("crithits")),
-                blocked=_to_int(r.get("blocked")),
-                misses=_to_int(r.get("misses")),
-                swings=_to_int(r.get("swings")),
-                heals_taken=_to_int(r.get("healstaken")),
-                damage_taken=_to_int(r.get("damagetaken")),
-                deaths=_to_int(r.get("deaths")),
-                to_hit=_to_float(r.get("tohit")),
-                crit_dam_perc=_to_perc(r.get("critdamperc")),
-                crit_heal_perc=_to_perc(r.get("crithealperc")),
-                crit_types=_to_str_or_none(r.get("crittypes")),
-                threat_str=_to_str_or_none(r.get("threatstr")),
-                threat_delta=_to_int(r.get("threatdelta")),
+                ally=_to_bool_tf(r.ally),
+                started_at=_to_ts(r.starttime),
+                ended_at=_to_ts(r.endtime),
+                duration_s=_to_int(r.duration),
+                damage=_to_int(r.damage),
+                damage_perc=_to_perc(r.damageperc),
+                kills=_to_int(r.kills),
+                healed=_to_int(r.healed),
+                healed_perc=_to_perc(r.healedperc),
+                crit_heals=_to_int(r.critheals),
+                heals=_to_int(r.heals),
+                cure_dispels=_to_int(r.curedispels),
+                power_drain=_to_int(r.powerdrain),
+                power_replenish=_to_int(r.powerreplenish),
+                dps=_to_float(r.dps),
+                encdps=_to_float(r.encdps),
+                enchps=_to_float(r.enchps),
+                hits=_to_int(r.hits),
+                crit_hits=_to_int(r.crithits),
+                blocked=_to_int(r.blocked),
+                misses=_to_int(r.misses),
+                swings=_to_int(r.swings),
+                heals_taken=_to_int(r.healstaken),
+                damage_taken=_to_int(r.damagetaken),
+                deaths=_to_int(r.deaths),
+                to_hit=_to_float(r.tohit),
+                crit_dam_perc=_to_perc(r.critdamperc),
+                crit_heal_perc=_to_perc(r.crithealperc),
+                crit_types=_to_str_or_none(r.crittypes),
+                threat_str=_to_str_or_none(r.threatstr),
+                threat_delta=_to_int(r.threatdelta),
             )
         )
     return out
 
 
-def _damage_types_from_payload(rows: list[dict], encid: str) -> list[DamageType]:
+def _damage_types_from_payload(rows: list[IngestDamageType], encid: str) -> list[DamageType]:
     out: list[DamageType] = []
     for r in rows:
-        combatant = str(r.get("combatant") or "").strip()
-        damage_type = str(r.get("type") or "").strip()
+        combatant = str(r.combatant or "").strip()
+        damage_type = str(r.type or "").strip()
         if not combatant or not damage_type:
             continue
         out.append(
             DamageType(
                 encid=encid,
                 combatant_name=combatant,
-                grouping_label=_to_str_or_none(r.get("grouping")),
+                grouping_label=_to_str_or_none(r.grouping),
                 damage_type=damage_type,
-                started_at=_to_ts(r.get("starttime")),
-                ended_at=_to_ts(r.get("endtime")),
-                duration_s=_to_int(r.get("duration")),
-                damage=_to_int(r.get("damage")),
-                encdps=_to_float(r.get("encdps")),
-                char_dps=_to_float(r.get("chardps")),
-                dps=_to_float(r.get("dps")),
-                average=_to_float(r.get("average")),
-                median=_to_int(r.get("median")),
-                min_hit=_to_int(r.get("minhit")),
-                max_hit=_to_int(r.get("maxhit")),
-                hits=_to_int(r.get("hits")),
-                crit_hits=_to_int(r.get("crithits")),
-                blocked=_to_int(r.get("blocked")),
-                misses=_to_int(r.get("misses")),
-                swings=_to_int(r.get("swings")),
-                to_hit=_to_float(r.get("tohit")),
-                average_delay=_to_float(r.get("averagedelay")),
-                crit_perc=_to_perc(r.get("critperc")),
-                crit_types=_to_str_or_none(r.get("crittypes")),
+                started_at=_to_ts(r.starttime),
+                ended_at=_to_ts(r.endtime),
+                duration_s=_to_int(r.duration),
+                damage=_to_int(r.damage),
+                encdps=_to_float(r.encdps),
+                char_dps=_to_float(r.chardps),
+                dps=_to_float(r.dps),
+                average=_to_float(r.average),
+                median=_to_int(r.median),
+                min_hit=_to_int(r.minhit),
+                max_hit=_to_int(r.maxhit),
+                hits=_to_int(r.hits),
+                crit_hits=_to_int(r.crithits),
+                blocked=_to_int(r.blocked),
+                misses=_to_int(r.misses),
+                swings=_to_int(r.swings),
+                to_hit=_to_float(r.tohit),
+                average_delay=_to_float(r.averagedelay),
+                crit_perc=_to_perc(r.critperc),
+                crit_types=_to_str_or_none(r.crittypes),
             )
         )
     return out
 
 
-def _attack_types_from_payload(rows: list[dict], encid: str) -> list[AttackType]:
+def _attack_types_from_payload(rows: list[IngestAttackType], encid: str) -> list[AttackType]:
     """ACT writes per-combatant rollups as type='All' across various
     swingtypes — strip those (same rule as the file-based reader)."""
     out: list[AttackType] = []
     for r in rows:
-        attacker = str(r.get("attacker") or "").strip()
-        attack_name = str(r.get("type") or "").strip()
+        attacker = str(r.attacker or "").strip()
+        attack_name = str(r.type or "").strip()
         if not attacker or not attack_name or attack_name == "All":
             continue
         out.append(
             AttackType(
                 encid=encid,
                 combatant_name=attacker,
-                victim=_to_str_or_none(r.get("victim")),
-                swing_type=_to_int(r.get("swingtype")),
+                victim=_to_str_or_none(r.victim),
+                swing_type=_to_int(r.swingtype),
                 attack_name=attack_name,
-                started_at=_to_ts(r.get("starttime")),
-                ended_at=_to_ts(r.get("endtime")),
-                duration_s=_to_int(r.get("duration")),
-                damage=_to_int(r.get("damage")),
-                encdps=_to_float(r.get("encdps")),
-                char_dps=_to_float(r.get("chardps")),
-                dps=_to_float(r.get("dps")),
-                average=_to_float(r.get("average")),
-                median=_to_int(r.get("median")),
-                min_hit=_to_int(r.get("minhit")),
-                max_hit=_to_int(r.get("maxhit")),
-                resist=_to_str_or_none(r.get("resist")),
-                hits=_to_int(r.get("hits")),
-                crit_hits=_to_int(r.get("crithits")),
-                blocked=_to_int(r.get("blocked")),
-                misses=_to_int(r.get("misses")),
-                swings=_to_int(r.get("swings")),
-                to_hit=_to_float(r.get("tohit")),
-                average_delay=_to_float(r.get("averagedelay")),
-                crit_perc=_to_perc(r.get("critperc")),
-                crit_types=_to_str_or_none(r.get("crittypes")),
+                started_at=_to_ts(r.starttime),
+                ended_at=_to_ts(r.endtime),
+                duration_s=_to_int(r.duration),
+                damage=_to_int(r.damage),
+                encdps=_to_float(r.encdps),
+                char_dps=_to_float(r.chardps),
+                dps=_to_float(r.dps),
+                average=_to_float(r.average),
+                median=_to_int(r.median),
+                min_hit=_to_int(r.minhit),
+                max_hit=_to_int(r.maxhit),
+                resist=_to_str_or_none(r.resist),
+                hits=_to_int(r.hits),
+                crit_hits=_to_int(r.crithits),
+                blocked=_to_int(r.blocked),
+                misses=_to_int(r.misses),
+                swings=_to_int(r.swings),
+                to_hit=_to_float(r.tohit),
+                average_delay=_to_float(r.averagedelay),
+                crit_perc=_to_perc(r.critperc),
+                crit_types=_to_str_or_none(r.crittypes),
             )
         )
     return out
+
+
+def _check_idempotency_sync(
+    conn: sqlite3.Connection,
+    encid: str,
+    world: str,
+) -> tuple[str, int | None, int, int, int] | None:
+    """Return a terminal result tuple if this encid has already been ingested,
+    or None if we should proceed with a fresh insert.
+
+    'revived' — was ingested then soft-deleted; un-hides and returns.
+    'skipped' — already ingested and still visible; no-op return.
+    None      — never ingested; caller should insert.
+    """
+    if not parses_db.is_ingested(conn, encid, world):
+        return None
+    existing = parses_db.find_encounter_by_act_encid(conn, encid, world)
+    # A re-upload of a soft-deleted (hidden) parse should bring it back,
+    # not silently skip — un-hide it so it returns to the list.
+    if existing and existing.get("hidden_at") is not None:
+        parses_db.unhide_encounter(conn, existing["id"])
+        return ("revived", existing["id"], 0, 0, 0)
+    return ("skipped", existing["id"] if existing else None, 0, 0, 0)
+
+
+def _insert_encounter_rows_sync(
+    conn: sqlite3.Connection,
+    enc: Encounter,
+    *,
+    combatants: list,
+    damage_types: list,
+    attack_types: list,
+    snapshots: dict[str, CombatantSnapshot] | None,
+    uploaded_by: str,
+    guild_name: str | None,
+    source_dsn: str,
+    world: str,
+) -> tuple[int, int, int]:
+    """Insert encounter + all sub-rows in a single transaction.
+    Returns (encounter_id, n_damage_types, n_attack_types)."""
+    ingested_at = int(time.time())
+    with conn:
+        encounter_id = parses_db.insert_encounter(
+            conn,
+            enc,
+            source_dsn=source_dsn,
+            ingested_at=ingested_at,
+            uploaded_by=uploaded_by,
+            guild_name=guild_name,
+            world=world,
+        )
+        name_to_id = parses_db.insert_combatants_bulk(conn, encounter_id, combatants, snapshots)
+        n_dt = parses_db.insert_damage_types_bulk(conn, name_to_id, damage_types)
+        n_at = parses_db.insert_attack_types_bulk(conn, name_to_id, attack_types)
+        parses_db.mark_ingested(
+            conn,
+            enc.encid,
+            encounter_id,
+            source_dsn=source_dsn,
+            ingested_at=ingested_at,
+            world=world,
+        )
+    return encounter_id, n_dt, n_at
 
 
 def _ingest_payload_sync(
@@ -455,7 +523,9 @@ def _ingest_payload_sync(
     ``world`` is the authoritative server name (on the HTTP path this is the
     allowlist-gated ``sanitized_server`` derived from logger_server) and is
     stored on the encounter row and in ingest_log so the same act_encid from
-    two different servers are distinct."""
+    two different servers are distinct.
+
+    Dispatches to ``_check_idempotency_sync`` then ``_insert_encounter_rows_sync``."""
     enc = _encounter_from_payload(payload.encounter)
     if enc is None:
         raise HTTPException(status_code=400, detail="Encounter starttime/endtime unparseable")
@@ -467,38 +537,21 @@ def _ingest_payload_sync(
 
     conn = parses_db.init_db(parses_db.DB_PATH)
     try:
-        # Idempotency: skip if this world+encid pair was already ingested.
-        if parses_db.is_ingested(conn, enc.encid, world):
-            existing = parses_db.find_encounter_by_act_encid(conn, enc.encid, world)
-            # A re-upload of a soft-deleted (hidden) parse should bring it back,
-            # not silently skip — un-hide it so it returns to the list.
-            if existing and existing.get("hidden_at") is not None:
-                parses_db.unhide_encounter(conn, existing["id"])
-                return ("revived", existing["id"], 0, 0, 0)
-            return ("skipped", existing["id"] if existing else None, 0, 0, 0)
-
-        ingested_at = int(time.time())
-        with conn:
-            encounter_id = parses_db.insert_encounter(
-                conn,
-                enc,
-                source_dsn=source_dsn,
-                ingested_at=ingested_at,
-                uploaded_by=uploaded_by,
-                guild_name=guild_name,
-                world=world,
-            )
-            name_to_id = parses_db.insert_combatants_bulk(conn, encounter_id, combatants, snapshots)
-            n_dt = parses_db.insert_damage_types_bulk(conn, name_to_id, damage_types)
-            n_at = parses_db.insert_attack_types_bulk(conn, name_to_id, attack_types)
-            parses_db.mark_ingested(
-                conn,
-                enc.encid,
-                encounter_id,
-                source_dsn=source_dsn,
-                ingested_at=ingested_at,
-                world=world,
-            )
+        terminal = _check_idempotency_sync(conn, enc.encid, world)
+        if terminal is not None:
+            return terminal
+        encounter_id, n_dt, n_at = _insert_encounter_rows_sync(
+            conn,
+            enc,
+            combatants=combatants,
+            damage_types=damage_types,
+            attack_types=attack_types,
+            snapshots=snapshots,
+            uploaded_by=uploaded_by,
+            guild_name=guild_name,
+            source_dsn=source_dsn,
+            world=world,
+        )
         return ("inserted", encounter_id, len(combatants), n_dt, n_at)
     finally:
         conn.close()
@@ -512,7 +565,7 @@ PLUGIN_SIGNATURE_HEADER = "X-Lexicon-Signature"
 
 async def _validate_payload_signature(
     request: Request,
-    user: dict,
+    user: TokenUser,
 ) -> None:
     """HMAC-SHA256 validation of the upload body, keyed by the bearer
     token. Plugin v0.1.8+ ships this header on every upload.
@@ -648,6 +701,10 @@ async def ingest_parse(
             status_code=400,
             detail=f"logger_server '{raw_server}' is malformed.",
         )
+    # Case-insensitive membership check: compare lowercased server against a
+    # pre-lowered frozenset so 'Wuoshi' and 'wuoshi' both pass.
+    # sanitized_server retains its original casing for DB storage (tests
+    # and Census lookups rely on "Wuoshi" not "wuoshi").
     if sanitized_server.lower() not in _ALLOWED_SERVERS_LOWER:
         # Sort the allowed list so the error message renders
         # deterministically — same display order as /auth/whoami.
@@ -660,7 +717,7 @@ async def ingest_parse(
         )
 
     # After the strict gate, sanitized_server is a guaranteed-valid,
-    # allowlisted server name (Varsoon/Wuoshi) — and those ARE registry
+    # allowlisted server name (original casing preserved) — and those ARE registry
     # worlds — so it is the authoritative `world` we persist this parse
     # under. The gate has already established a concrete world, so there is
     # no current_world() fallback to fall through to on this HTTP path.
@@ -688,10 +745,7 @@ async def ingest_parse(
     player_names = [
         name
         for r in body.combatants
-        if _to_bool_tf(r.get("ally"))
-        and (name := str(r.get("name") or "").strip())
-        and " " not in name
-        and name != "Unknown"
+        if _to_bool_tf(r.ally) and (name := str(r.name or "").strip()) and " " not in name and name != "Unknown"
     ]
     # Cache-only on the response path — NEVER hit Census here, or a cold-cache
     # raid upload (up to N serial 30 s Census calls) would time the plugin out.

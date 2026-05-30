@@ -22,6 +22,7 @@ from web.auth_deps import (
     require_user_session as _require_user,
 )
 from web.lib.executor import run_sync
+from web.lib.session_user import SessionUser
 from web.limiter import limiter
 from web.routes.parses import router
 from web.routes.parses.list import _uploader_discord_id
@@ -31,7 +32,7 @@ from web.server_context import current_world
 _log = logging.getLogger(__name__)
 
 
-async def _can_delete_encounter(user: dict, enc: dict) -> bool:
+async def _can_delete_encounter(user: SessionUser, enc: dict) -> bool:
     """Authorise deletion of one encounter row (must carry `guild_name` and
     `source_dsn`). Any of: admin, the original uploader, or an officer of the
     encounter's guild. Never trusts the caller for guild/uploader — both come

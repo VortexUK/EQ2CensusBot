@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import io
-import json
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
@@ -11,35 +9,12 @@ from discord import app_commands
 from discord.ext import commands
 
 from census.config import WORLD
-from image.aa_tree import detect_tree_type, render_tree
+from image.aa_tree import load_tree_index, render_tree
 
 if TYPE_CHECKING:
     from bot.bot import EQ2Bot
 
 _log = logging.getLogger(__name__)
-
-_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "AAs"
-_TREES_DIR = _DATA_DIR / "trees"
-
-# Loaded once at import: tree_id → (name, detected_type)
-_TREE_NAMES: dict[int, str] = {}
-_TREE_TYPES: dict[int, str] = {}
-
-
-def _load_tree_index() -> None:
-    for path in _TREES_DIR.glob("*.json"):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            aa_list = data.get("alternateadvancement_list") or []
-            if aa_list:
-                tid = int(path.stem)
-                _TREE_NAMES[tid] = aa_list[0].get("name", path.stem)
-                _TREE_TYPES[tid] = detect_tree_type(data)
-        except Exception as exc:
-            _log.warning("[aacheck] Failed to load tree index %s: %s", path.name, exc)
-
-
-_load_tree_index()
 
 # Static choice value → detect_tree_type key(s) that satisfy it
 _CHOICE_TO_TYPES: dict[str, set[str]] = {
@@ -87,9 +62,10 @@ class AaCheckCog(commands.Cog):
             return
 
         # Find the tree ID matching the chosen type
+        tree_index = load_tree_index()
         wanted_types = _CHOICE_TO_TYPES.get(tree.value, {tree.value})
         tree_id = next(
-            (tid for tid in char_aas.tree_ids if _TREE_TYPES.get(tid) in wanted_types),
+            (tid for tid in char_aas.tree_ids if tree_index.get(tid, {}).get("type") in wanted_types),
             None,
         )
         if tree_id is None:
@@ -107,7 +83,7 @@ class AaCheckCog(commands.Cog):
             await interaction.followup.send(f"Failed to render tree: {exc}", ephemeral=True)
             raise
 
-        tree_name = _TREE_NAMES.get(tree_id, str(tree_id))
+        tree_name = tree_index.get(tree_id, {}).get("name", str(tree_id))
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         buf.seek(0)

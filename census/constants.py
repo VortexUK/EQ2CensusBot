@@ -87,6 +87,18 @@ ARTISANS = frozenset(
     ["Sage", "Armorer", "Weaponsmith", "Woodworker", "Jeweler", "Carpenter", "Tailor", "Alchemist", "Provisioner"]
 )
 
+# Canonical archetype colours — used by image/tooltip.py, census/classes_db.py, and any
+# future renderer that needs to tint class icons.  Both the PIL tooltip renderer and
+# classes_db mirror these values; classes_db cannot import them directly (circular: this
+# module already imports CLASS_SEED from classes_db) so the values are intentionally kept
+# in sync via this comment.  #f87171 Fighter · #4ade80 Priest · #fbbf24 Scout · #93b4ff Mage
+CLASS_ARCHETYPE_COLOURS: dict[str, str] = {
+    "Fighter": "#f87171",
+    "Priest": "#4ade80",
+    "Scout": "#fbbf24",
+    "Mage": "#93b4ff",
+}
+
 # Ordered list used for archetype decomposition (most specific → least specific)
 ARCHETYPES: list[tuple[frozenset, str]] = [
     (FIGHTERS, "All Fighters"),

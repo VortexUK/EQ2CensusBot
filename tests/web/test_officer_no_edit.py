@@ -31,7 +31,7 @@ async def test_officer_cannot_put_encounter_strategy(app):
         patch("web.auth_deps.users_db.user_has_capability_via_db", new_callable=AsyncMock, return_value=False),
         # The key condition: officer row is gone from role_permissions.
         patch("web.auth_deps.users_db.role_has_capability", new_callable=AsyncMock, return_value=False),
-        patch("web.routes.raid_strategies._resolve_primary_guild_cached") as mock_g,
+        patch("web.routes.raid_strategies._primary_guild_from_cache") as mock_g,
         patch("web.routes.guild._officer_chars") as mock_o,
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -56,7 +56,7 @@ async def test_officer_cannot_put_zone_overview(app):
         patch("web.auth_deps.users_db.user_has_capability_via_db", new_callable=AsyncMock, return_value=False),
         # The key condition: officer row is gone from role_permissions.
         patch("web.auth_deps.users_db.role_has_capability", new_callable=AsyncMock, return_value=False),
-        patch("web.routes.raid_strategies._resolve_primary_guild_cached") as mock_g,
+        patch("web.routes.raid_strategies._primary_guild_from_cache") as mock_g,
         patch("web.routes.raid_strategies.zones_db.find_by_name", return_value=_fake_zone()),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

@@ -355,15 +355,8 @@ def _build_char_response(char) -> CharacterResponse:
     )
 
 
-async def prewarm_character_cache() -> None:
-    """
-    Fetch all approved claimed characters into cache at startup.
-    Runs as a background task so it never blocks the server coming up.
-    Uses a semaphore to avoid hammering Census with too many parallel requests.
-    """
-    # NOTE: pre-warm runs at startup OUTSIDE any request, so current_world() here
-    # resolves to the default server only. Non-default servers warm on first
-    # request rather than at boot. (Per-server pre-warm would iterate the registry.)
+async def _prewarm_for_world(world: str, sem: asyncio.Semaphore) -> None:
+    """Pre-warm the character cache for all approved claims in one world."""
     import aiosqlite
 
     from web.db import DB_PATH
@@ -372,35 +365,57 @@ async def prewarm_character_cache() -> None:
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
-                "SELECT DISTINCT character_name FROM character_claims WHERE status = 'approved'"
+                "SELECT DISTINCT character_name FROM character_claims WHERE status = 'approved' AND world = ?",
+                (world,),
             ) as cur:
                 names = [row["character_name"] for row in await cur.fetchall()]
 
         if not names:
             return
 
-        _log.info("[startup] Pre-warming character cache for %d character(s)...", len(names))
-
-        sem = asyncio.Semaphore(3)  # max 3 concurrent Census fetches
+        _log.info("[startup] Pre-warming character cache for %d character(s) on %s...", len(names), world)
 
         async def _fetch_one(name: str) -> None:
-            cache_key = char_cache_key(name, current_world())
+            cache_key = char_cache_key(name, world)
             if character_cache.get_stale(cache_key)[0] is not None:
                 return  # already warm
             async with sem:
                 try:
                     async with shared_census_client() as client:
-                        char = await client.get_character(name, current_world())
+                        char = await client.get_character(name, world)
                     if char is not None:
                         character_cache.set(cache_key, _build_char_response(char))
                 except Exception as exc:
-                    _log.warning("[startup] Pre-warm failed for %s: %s", name, exc)
+                    _log.warning("[startup] Pre-warm failed for %s (%s): %s", name, world, exc)
 
         await asyncio.gather(*[_fetch_one(n) for n in names])
-        _log.info("[startup] Character cache pre-warm complete.")
 
     except Exception as exc:
-        _log.error("[startup] Character cache pre-warm error: %s", exc)
+        _log.error("[startup] Character cache pre-warm error for %s: %s", world, exc)
+
+
+async def prewarm_character_cache() -> None:
+    """
+    Fetch all approved claimed characters into cache at startup, for every
+    registered server. Runs as a background task so it never blocks the server
+    coming up. Uses a shared semaphore to avoid hammering Census with too many
+    parallel requests across all servers combined.
+
+    BE-116: iterates the server registry so Wuoshi (and any future server)
+    pre-warms at boot, not just the default server.
+    """
+    from web.db.servers import list_servers_sync
+    from web.lib.executor import run_sync
+
+    try:
+        servers = await run_sync(list_servers_sync)
+    except Exception as exc:
+        _log.error("[startup] Could not load server registry for pre-warm: %s", exc)
+        return
+
+    sem = asyncio.Semaphore(3)  # max 3 concurrent Census fetches across ALL servers
+    await asyncio.gather(*[_prewarm_for_world(srv["world"], sem) for srv in servers])
+    _log.info("[startup] Character cache pre-warm complete (%d server(s)).", len(servers))
 
 
 @router.get("/character/{name}", response_model=CharacterResponse)

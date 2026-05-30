@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from census import raids_db
 from web.auth_deps import require_editor
 from web.lib.executor import run_sync
+from web.lib.session_user import SessionUser
 from web.routes.act._shared import (
     SpellTimerEntry,
     TriggerEntry,
@@ -199,7 +200,7 @@ async def create_trigger(
     zone_name: str,
     position: int,
     body: TriggerUpsertRequest,
-    user: dict = Depends(require_editor),
+    user: SessionUser = Depends(require_editor),
 ) -> TriggerEntry:
     """Append a new trigger. ``category`` defaults to the encounter's mob
     name on save — when ACT imports the file it groups triggers under that
@@ -246,7 +247,7 @@ async def update_trigger(
     position: int,
     trigger_id: int,
     body: TriggerUpsertRequest,
-    user: dict = Depends(require_editor),
+    user: SessionUser = Depends(require_editor),
 ) -> TriggerEntry:
     _, mob_name, encounter_id = await _resolve_encounter(zone_name, position)
 
@@ -297,7 +298,7 @@ async def delete_trigger(
     zone_name: str,
     position: int,
     trigger_id: int,
-    user: dict = Depends(require_editor),  # noqa: ARG001 — auth check
+    user: SessionUser = Depends(require_editor),  # noqa: ARG001 — auth check
 ) -> dict:
     _, _, encounter_id = await _resolve_encounter(zone_name, position)
     existing = await run_sync(raids_db.get_act_trigger, trigger_id)
@@ -331,7 +332,7 @@ async def import_triggers_xml(
     zone_name: str,
     position: int,
     body: ImportXmlRequest,
-    user: dict = Depends(require_editor),
+    user: SessionUser = Depends(require_editor),
 ) -> ImportXmlResponse:
     """Paste-import path: parse one or more ``<Trigger>`` / ``<Spell>``
     elements (ACT's verbose XML or its "shareable" short-attribute form)

@@ -31,6 +31,9 @@ from census.spells_db import (
     DB_PATH as _SPELLS_DB,
 )
 from census.spells_db import (
+    SpellRow as _SpellRow,
+)
+from census.spells_db import (
     find_by_ids as _spell_find_by_ids,
 )
 from census.spells_db import (
@@ -169,7 +172,7 @@ def _build_spell_check_from_overviews(
     if not all_ids:
         return None
 
-    spell_db: dict[int, dict] = _spell_find_by_ids(list(set(all_ids)))
+    spell_db: dict[int, _SpellRow] = _spell_find_by_ids(list(set(all_ids)))
     blocklist = _load_spell_blocklist()
 
     out_members: list[MemberSpellTiers] = []
@@ -191,10 +194,10 @@ def _build_spell_check_from_overviews(
                 continue
             entries.append(
                 SpellEntry(
-                    name=row["name"],
-                    tier=row["tier_name"] or "Unknown",
-                    spell_type=row["type"] or "",
-                    level=row["level"] or 0,
+                    name=row.get("name", ""),
+                    tier=row.get("tier_name") or "Unknown",
+                    spell_type=row.get("type") or "",
+                    level=row.get("level") or 0,
                 )
             )
 

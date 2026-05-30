@@ -14,6 +14,20 @@ import os
 import sqlite3
 import time
 from pathlib import Path
+from typing import Any, TypedDict
+
+
+class StoreRecord(TypedDict):
+    """Envelope returned by ``get_character`` / ``get_guild`` / ``get_character_aas``.
+
+    ``data`` is the original model_dump() dict stored as JSON; the caller
+    deserialises field-by-field as needed. ``last_resolved_at`` is a Unix
+    timestamp of when Census last responded successfully for this entity.
+    """
+
+    data: dict[str, Any]
+    last_resolved_at: int
+
 
 _log = logging.getLogger(__name__)
 
@@ -115,7 +129,7 @@ def upsert_character(
     conn.commit()
 
 
-def get_character(conn: sqlite3.Connection, name: str, world: str) -> dict | None:
+def get_character(conn: sqlite3.Connection, name: str, world: str) -> StoreRecord | None:
     """Return {data, last_resolved_at} or None."""
     row = conn.execute(
         "SELECT data_json, last_resolved_at FROM characters WHERE name_lower=? AND world=?",
@@ -143,7 +157,7 @@ def upsert_guild(conn: sqlite3.Connection, name: str, world: str, data: dict, *,
     conn.commit()
 
 
-def get_guild(conn: sqlite3.Connection, name: str, world: str) -> dict | None:
+def get_guild(conn: sqlite3.Connection, name: str, world: str) -> StoreRecord | None:
     row = conn.execute(
         "SELECT data_json, last_resolved_at FROM guilds WHERE name_lower=? AND world=?",
         (name.lower(), world),
@@ -153,7 +167,7 @@ def get_guild(conn: sqlite3.Connection, name: str, world: str) -> dict | None:
     return {"data": json.loads(row[0]), "last_resolved_at": row[1]}
 
 
-def get_character_aas(conn: sqlite3.Connection, name: str, world: str) -> dict | None:
+def get_character_aas(conn: sqlite3.Connection, name: str, world: str) -> StoreRecord | None:
     """Return the persisted CharAAsResponse dict (or None) for (name, world).
 
     The record carries the model_dump() of the response plus a

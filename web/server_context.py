@@ -8,9 +8,12 @@ the code reads current_world()/current_server() instead of a fixed env world.
 
 from __future__ import annotations
 
+import contextlib
 import os
+from collections.abc import Iterator
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
+from urllib.parse import parse_qs
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -109,6 +112,16 @@ def reset_active_server(token: Token[Server | None]) -> None:
     _active_server.reset(token)
 
 
+@contextlib.contextmanager
+def active_server(record: Server) -> Iterator[None]:
+    """Push ``record`` onto the per-request server contextvar; pop on exit."""
+    token = _active_server.set(record)
+    try:
+        yield
+    finally:
+        _active_server.reset(token)
+
+
 def get_server() -> Server:
     """FastAPI dependency: the active server for the request."""
     return current_server()
@@ -134,12 +147,6 @@ class ServerContextMiddleware:
         override = headers.get("x-server")
         if override is None:
             qs = scope.get("query_string", b"").decode()
-            for part in qs.split("&"):
-                if part.startswith("server="):
-                    override = part[len("server=") :]
-                    break
-        token = set_active_server(resolve_host(host, override))
-        try:
+            override = parse_qs(qs).get("server", [None])[0]
+        with active_server(resolve_host(host, override)):
             await self.app(scope, receive, send)
-        finally:
-            reset_active_server(token)

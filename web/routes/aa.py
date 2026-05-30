@@ -4,14 +4,16 @@ import asyncio
 import json
 import logging
 import time
+from functools import lru_cache
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from census import census_store
+from census.census_store import StoreRecord
 from census.spells_db import find_by_crc
-from image.aa_tree import detect_tree_type
+from image.aa_tree import detect_tree_type, load_tree_index
 from web.cache import aa_cache
 from web.constants import CHARACTER_STALE_S
 from web.lib.cache_keys import aa_cache_key
@@ -38,30 +40,6 @@ _TYPE_ORDER = {
     "prestige": 7,
     "dragon": 8,
 }
-
-# ---------------------------------------------------------------------------
-# Tree index (loaded once at startup)
-# ---------------------------------------------------------------------------
-
-_tree_index: dict[int, dict] = {}  # tree_id → {"name": str, "type": str}
-
-
-def _load_tree_index() -> None:
-    for path in _TREES_DIR.glob("*.json"):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            aa = (data.get("alternateadvancement_list") or [{}])[0]
-            tid = int(path.stem)
-            _tree_index[tid] = {
-                "name": aa.get("name", path.stem),
-                "type": detect_tree_type(data),
-            }
-        except Exception as exc:
-            _log.warning("[aa] Failed to load tree index %s: %s", path.name, exc)
-
-
-_load_tree_index()
-
 
 # ---------------------------------------------------------------------------
 # Response models
@@ -137,16 +115,25 @@ async def get_aa_config() -> AAConfigResponse:
     )
 
 
-@router.get("/aa/tree/{tree_id}", response_model=AATreeResponse)
-async def get_aa_tree(tree_id: int) -> AATreeResponse:
-    """Return the full node data for an AA tree."""
+@lru_cache(maxsize=128)
+def _load_tree_for_response(tree_id: int) -> AATreeResponse | None:
+    """Parse + build the AATreeResponse for a single tree id.
+
+    Returns None when the file is missing or has no AA data.
+
+    Invalidation: tree JSON is static reference data on disk; rebuild via a
+    process restart. If the data/AAs/trees/ files ever become hot-editable,
+    add a sibling _load_tree_for_response.cache_clear() on the mutation
+    path — see the canonical pattern at web/routes/rankings.py:195-203
+    (invalidate_zones_cache).
+    """
     path = _TREES_DIR / f"{tree_id}.json"
     if not path.exists():
-        raise HTTPException(status_code=404, detail=f"AA tree {tree_id} not found")
+        return None
     data = json.loads(path.read_text(encoding="utf-8"))
     aa_list = data.get("alternateadvancement_list") or []
     if not aa_list:
-        raise HTTPException(status_code=404, detail=f"AA tree {tree_id} has no data")
+        return None
     tree = aa_list[0]
     tree_type = detect_tree_type(data)
     nodes: list[AANodeResponse] = []
@@ -177,14 +164,24 @@ async def get_aa_tree(tree_id: int) -> AATreeResponse:
     )
 
 
+@router.get("/aa/tree/{tree_id}", response_model=AATreeResponse)
+async def get_aa_tree(tree_id: int) -> AATreeResponse:
+    """Return the full node data for an AA tree."""
+    result = _load_tree_for_response(tree_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"AA tree {tree_id} not found")
+    return result
+
+
 def _build_trees(aa_list) -> list[CharAATree]:
     """Convert a list of NodeAA objects into CharAATree list, sorted by tree type."""
     by_tree: dict[int, dict[int, int]] = {}
     for aa in aa_list:
         by_tree.setdefault(aa.tree_id, {})[aa.node_id] = aa.tier
+    tree_index = load_tree_index()
     result = []
     for tid, spent in by_tree.items():
-        info = _tree_index.get(tid, {})
+        info = tree_index.get(tid, {})
         result.append(
             CharAATree(
                 tree_id=tid,
@@ -254,7 +251,7 @@ async def get_character_aas(name: str) -> CharAAsResponse:
         return cached
 
     # 2) Durable store — serve known-good data without a Census round-trip.
-    def _read() -> dict | None:
+    def _read() -> StoreRecord | None:
         conn = census_store.init_db(census_store.DB_PATH)
         try:
             return census_store.get_character_aas(conn, name, world)
@@ -330,7 +327,7 @@ async def get_spell_effects(spellcrc: int, tier: int = 0) -> SpellEffectsRespons
         matched_tier = row.get("tier")
         if row.get("effects"):
             try:
-                effects = json.loads(row["effects"])
+                effects = json.loads(row.get("effects", "[]"))
             except Exception as exc:
                 _log.warning("[aa] Failed to parse effects JSON for crc=%s: %s", spellcrc, exc)
                 effects = []

@@ -97,27 +97,15 @@ async def update_item_watch_check(
     """
     now = "strftime('%s','now')"
     if seen:
-        await _run(
-            path,
-            f"""
+        sql = f"""
             UPDATE item_watch SET
                 last_checked_at = {now},
                 last_seen_at    = {now},
                 first_seen_at   = COALESCE(first_seen_at, {now})
             WHERE id = ?
-            """,
-            (watch_id,),
-        )
+            """
     else:
-        await _run(
-            path,
-            f"UPDATE item_watch SET last_checked_at = {now} WHERE id = ?",
-            (watch_id,),
-        )
-
-
-async def _run(path: Path, sql: str, params: tuple = ()) -> None:
-    """Execute a single write statement."""
+        sql = f"UPDATE item_watch SET last_checked_at = {now} WHERE id = ?"
     async with aiosqlite.connect(path) as db:
-        await db.execute(sql, params)
+        await db.execute(sql, (watch_id,))
         await db.commit()

@@ -11,6 +11,7 @@ import time
 
 import aiohttp
 
+from census.config import CENSUS_BASE_URL as _CENSUS_BASE_URL
 from web.config import SERVICE_ID as _SERVICE_ID
 
 _log = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ _log = logging.getLogger(__name__)
 _POLL_INTERVAL = 300  # 5 minutes
 # Probe a real collection (not the base `/eq2/` index) so the response is a
 # normal Census JSON document we can validate. ``c:limit=1`` keeps it tiny.
-_PROBE_URL = f"https://census.daybreakgames.com/s:{_SERVICE_ID}/json/get/eq2/world?c:limit=1"
+_PROBE_URL = f"{_CENSUS_BASE_URL}/s:{_SERVICE_ID}/json/get/eq2/world?c:limit=1"
 
 _status: str = "unknown"  # "up" | "down" | "unknown"
 _checked_at: int = 0

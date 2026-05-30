@@ -26,7 +26,9 @@ class ClassInfo:
     icon_id: int  # EQ2wire class_medium icon id
 
 
-# Archetype colours (carried from the old frontend classConstants.ts).
+# Archetype colours — canonical source is CLASS_ARCHETYPE_COLOURS in census/constants.py.
+# Mirrored here (not imported) to avoid a circular import: constants.py imports CLASS_SEED
+# from this module, so this module cannot import back from constants.
 _F, _P, _S, _M = "#f87171", "#4ade80", "#fbbf24", "#93b4ff"
 
 # Ordered: archetype [Fighter, Priest, Scout, Mage], icon_id ascending within
@@ -116,6 +118,15 @@ def seed(conn: sqlite3.Connection) -> int:
             rows,
         )
     return len(rows)
+
+
+def iter_adventure_class_names() -> list[str]:
+    """Return all adventure-class names in display_order (sorted alphabetically within CLASS_SEED).
+
+    Sourced directly from CLASS_SEED so this works without an initialised DB.
+    Used by web routes that need the class name list without a DB round-trip.
+    """
+    return [c.name for c in CLASS_SEED]
 
 
 def list_all(path: Path = DB_PATH) -> list[dict]:

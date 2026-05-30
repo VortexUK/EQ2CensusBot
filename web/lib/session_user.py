@@ -19,7 +19,13 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 
-class SessionUser(TypedDict, total=False):
+class _SessionUserRequired(TypedDict):
+    """Required fields that every valid session-user dict must have."""
+
+    id: str
+
+
+class SessionUser(_SessionUserRequired, total=False):
     """Session-derived user shape. ``id`` is the only required field; the
     others are populated from the Discord OAuth profile and may be missing
     on legacy sessions or session-replays from third-party admin tools.
@@ -27,14 +33,17 @@ class SessionUser(TypedDict, total=False):
     All fields strings except where noted. ``id`` is the Discord snowflake.
     """
 
-    id: str
     username: str
     discord_name: str
     discord_username: str | None
     avatar: str | None
 
 
-class TokenUser(SessionUser, total=False):
+class _TokenUserRequired(_SessionUserRequired):
+    """Required fields that every token-auth user dict must have."""
+
+
+class TokenUser(_TokenUserRequired, total=False):
     """Extended shape returned by ``require_user_session_or_token`` when the
     request authenticated via a bearer token rather than a session cookie.
 
@@ -42,6 +51,10 @@ class TokenUser(SessionUser, total=False):
     destructive operations on token auth, or attribute uploads via
     ``token_name``)."""
 
+    username: str
+    discord_name: str
+    discord_username: str | None
+    avatar: str | None
     auth_source: Literal["session", "token"]
     token_id: int
     token_name: str | None

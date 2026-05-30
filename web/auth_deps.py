@@ -57,10 +57,12 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import cast
 
 from fastapi import HTTPException, Request
 
 from web import db as users_db
+from web.lib.session_user import SessionUser, TokenUser
 
 # Admin allow-list. Comma-separated env var of Discord IDs. Frozen at import
 # time — a config change requires a process restart, which is fine for our
@@ -72,7 +74,7 @@ if not ADMIN_IDS:
     )
 
 
-def require_user_session(request: Request) -> dict:
+def require_user_session(request: Request) -> SessionUser:
     """Require a logged-in session. Returns the session user dict.
 
     Shape:  {"id": "<discord_id>", "username": "...", ...}
@@ -80,10 +82,10 @@ def require_user_session(request: Request) -> dict:
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return user
+    return user  # type: ignore[return-value]  # Discord OAuth dict matches SessionUser shape
 
 
-async def require_user_session_or_token(request: Request) -> dict:
+async def require_user_session_or_token(request: Request) -> TokenUser:
     """Accept either a session cookie OR an `Authorization: Bearer <token>`
     header. Returns a normalised dict:
 
@@ -94,7 +96,7 @@ async def require_user_session_or_token(request: Request) -> dict:
     # Prefer session cookie if present — cheaper, no DB hit.
     user = request.session.get("user")
     if user:
-        return {**user, "auth_source": "session"}
+        return cast(TokenUser, {**user, "auth_source": "session"})
 
     auth_header = request.headers.get("authorization") or ""
     if not auth_header.lower().startswith("bearer "):
@@ -112,22 +114,25 @@ async def require_user_session_or_token(request: Request) -> dict:
         # can't be used for writes.
         raise HTTPException(status_code=403, detail="Account not approved")
 
-    return {
-        "id": row["user_id"],
-        "username": row.get("discord_username") or row.get("discord_name") or row["user_id"],
-        "discord_name": row.get("discord_name"),
-        "auth_source": "token",
-        "token_id": row["token_id"],
-        "token_name": row.get("token_name"),
-    }
+    return cast(
+        TokenUser,
+        {
+            "id": row["user_id"],
+            "username": row.get("discord_username") or row.get("discord_name") or row["user_id"],
+            "discord_name": row.get("discord_name"),
+            "auth_source": "token",
+            "token_id": row["token_id"],
+            "token_name": row.get("token_name"),
+        },
+    )
 
 
-def is_admin(user: dict | None) -> bool:
+def is_admin(user: SessionUser | None) -> bool:
     """True iff the session user's Discord ID is in ADMIN_IDS."""
     return bool(user and user.get("id") in ADMIN_IDS)
 
 
-def require_admin(request: Request) -> dict:
+def require_admin(request: Request) -> SessionUser:
     """Require a logged-in admin. 401 if no session, 403 if not in
     ADMIN_DISCORD_IDS. Returns the session user dict."""
     user = require_user_session(request)
@@ -162,7 +167,7 @@ KNOWN_ROLES: frozenset[str] = frozenset({"contributor", "supporter"})
 KNOWN_CAPABILITIES: frozenset[str] = frozenset({"edit_content"})
 
 
-async def is_contributor(user: dict | None) -> bool:
+async def is_contributor(user: SessionUser | None) -> bool:
     """True iff the session user holds the 'contributor' DB role.
 
     Kept for explicit callers / tests; the auth gate uses the
@@ -195,7 +200,7 @@ def require_capability(capability: str):
             f"and seed role_permissions rows in web/db.py:init_db first."
         )
 
-    async def dep(request: Request) -> dict:
+    async def dep(request: Request) -> SessionUser:
         user = require_user_session(request)
         if is_admin(user):
             return user
@@ -210,9 +215,9 @@ def require_capability(capability: str):
         if await users_db.role_has_capability("officer", capability):
             # Lazy import to skirt the routes→auth_deps circular dependency.
             from web.routes.guild import _officer_chars
-            from web.routes.raid_strategies import _resolve_primary_guild_cached
+            from web.routes.raid_strategies import _primary_guild_from_cache
 
-            guild_name = await _resolve_primary_guild_cached(discord_id)
+            guild_name = await _primary_guild_from_cache(discord_id)
             if guild_name:
                 officer_chars = await _officer_chars(discord_id, guild_name)
                 if officer_chars:

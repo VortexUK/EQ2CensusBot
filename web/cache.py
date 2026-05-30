@@ -7,20 +7,22 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import Any, Literal
 
 from web.constants import CACHE_MAX_AGE_S, CACHE_STALE_TTL_S
 from web.lib.silent_swallow import swallow
 
 _log = logging.getLogger(__name__)
 
+CacheName = Literal["character", "guild", "claim", "aa", "rankings"]
+
 
 class TTLCache:
     def __init__(
         self,
-        ttl: int = 300,
-        max_age: int | None = None,
-        name: str = "default",
+        ttl: int = CACHE_STALE_TTL_S,
+        max_age: int | None = CACHE_MAX_AGE_S,
+        name: CacheName = "default",  # type: ignore[assignment]  # "default" is fallback only
         maxsize: int = 1000,
     ):
         """
@@ -160,7 +162,7 @@ class TTLCache:
 #   guild:     ~5 cache keys per guild (roster/info/spells/adorns/chars); 50 covers 10 guilds
 #   claim:     one entry per discord_id; 200 covers a large player base
 #   aa:        one entry per character; 200 covers regular users
-character_cache: TTLCache = TTLCache(ttl=CACHE_STALE_TTL_S, max_age=CACHE_MAX_AGE_S, name="character", maxsize=500)
-guild_cache: TTLCache = TTLCache(ttl=CACHE_STALE_TTL_S, max_age=CACHE_MAX_AGE_S, name="guild", maxsize=50)
-claim_cache: TTLCache = TTLCache(ttl=CACHE_STALE_TTL_S, max_age=CACHE_MAX_AGE_S, name="claim", maxsize=200)
-aa_cache: TTLCache = TTLCache(ttl=CACHE_STALE_TTL_S, max_age=CACHE_MAX_AGE_S, name="aa", maxsize=200)
+character_cache: TTLCache = TTLCache(name="character", maxsize=500)
+guild_cache: TTLCache = TTLCache(name="guild", maxsize=50)
+claim_cache: TTLCache = TTLCache(name="claim", maxsize=200)
+aa_cache: TTLCache = TTLCache(name="aa", maxsize=200)

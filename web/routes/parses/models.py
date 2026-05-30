@@ -7,8 +7,6 @@ circular-import pain.
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -213,6 +211,117 @@ class ParseDetailResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Ingest sub-object models — typed wrappers for combatants/damage/attack rows
+# ---------------------------------------------------------------------------
+
+
+class IngestCombatant(BaseModel):
+    """One ACT combatant row as shipped by the plugin.
+
+    ``model_config = {"extra": "allow"}`` ensures new plugin fields pass
+    through unchanged — forward compatibility with future plugin versions
+    that may add columns.
+    """
+
+    model_config = {"extra": "allow"}
+
+    name: str = ""
+    ally: str | None = None  # "T" / "F" in ACT's export
+    starttime: str | None = None
+    endtime: str | None = None
+    duration: int | None = None
+    damage: int | None = None
+    damageperc: str | None = None
+    kills: int | None = None
+    healed: int | None = None
+    healedperc: str | None = None
+    critheals: int | None = None
+    heals: int | None = None
+    curedispels: int | None = None
+    powerdrain: int | None = None
+    powerreplenish: int | None = None
+    dps: float | None = None
+    encdps: float | None = None
+    enchps: float | None = None
+    hits: int | None = None
+    crithits: int | None = None
+    blocked: int | None = None
+    misses: int | None = None
+    swings: int | None = None
+    healstaken: int | None = None
+    damagetaken: int | None = None
+    deaths: int | None = None
+    tohit: float | None = None
+    critdamperc: str | None = None
+    crithealperc: str | None = None
+    crittypes: str | None = None
+    threatstr: str | None = None
+    threatdelta: int | None = None
+
+
+class IngestDamageType(BaseModel):
+    """One ACT damage-type row as shipped by the plugin."""
+
+    model_config = {"extra": "allow"}
+
+    combatant: str = ""
+    type: str = ""  # damage type label, e.g. "Slashing"
+    grouping: str | None = None
+    starttime: str | None = None
+    endtime: str | None = None
+    duration: int | None = None
+    damage: int | None = None
+    encdps: float | None = None
+    chardps: float | None = None
+    dps: float | None = None
+    average: float | None = None
+    median: int | None = None
+    minhit: int | None = None
+    maxhit: int | None = None
+    hits: int | None = None
+    crithits: int | None = None
+    blocked: int | None = None
+    misses: int | None = None
+    swings: int | None = None
+    tohit: float | None = None
+    averagedelay: float | None = None
+    critperc: str | None = None
+    crittypes: str | None = None
+
+
+class IngestAttackType(BaseModel):
+    """One ACT attack-type row as shipped by the plugin."""
+
+    model_config = {"extra": "allow"}
+
+    attacker: str = ""
+    type: str = ""  # attack name, e.g. "Crushing Blow"
+    victim: str | None = None
+    swingtype: int | None = None
+    starttime: str | None = None
+    endtime: str | None = None
+    duration: int | None = None
+    damage: int | None = None
+    encdps: float | None = None
+    chardps: float | None = None
+    dps: float | None = None
+    average: float | None = None
+    median: int | None = None
+    minhit: int | None = None
+    maxhit: int | None = None
+    resist: str | None = None
+    hits: int | None = None
+    crithits: int | None = None
+    blocked: int | None = None
+    misses: int | None = None
+    swings: int | None = None
+    tohit: float | None = None
+    averagedelay: float | None = None
+    critperc: str | None = None
+    crittypes: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Ingest models — POST /parses/ingest
 # ---------------------------------------------------------------------------
 
@@ -233,10 +342,10 @@ class IngestEncounter(BaseModel):
 
 
 class IngestRequest(BaseModel):
-    """ACT-shaped upload payload. dict[str, Any] used for combatants/damage_
-    types/attack_types so the plugin can pass through raw ACT row dicts
-    without us having to mirror every column in Pydantic — the column names
-    are documented in parses/act_reader.py."""
+    """ACT-shaped upload payload. Sub-lists use typed Pydantic models so the
+    keys are validated. ``model_config = {"extra": "allow"}`` on the sub-models
+    keeps forward-compatibility with newer plugin versions that may add columns.
+    Column names match the ACT export keys documented in parses/act_reader.py."""
 
     logger_name: str = Field(min_length=1, max_length=64)
     # EQ2 server the upload came from (Varsoon, Kaladim, Butcherblock,
@@ -246,9 +355,9 @@ class IngestRequest(BaseModel):
     # Optional so older plugins keep working through the rollout.
     logger_server: str | None = Field(default=None, max_length=64)
     encounter: IngestEncounter
-    combatants: list[dict[str, Any]] = []
-    damage_types: list[dict[str, Any]] = []
-    attack_types: list[dict[str, Any]] = []
+    combatants: list[IngestCombatant] = []
+    damage_types: list[IngestDamageType] = []
+    attack_types: list[IngestAttackType] = []
 
 
 class IngestResponse(BaseModel):

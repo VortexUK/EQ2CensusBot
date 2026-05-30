@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import logging
+from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+_log = logging.getLogger(__name__)
+
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "AAs"
 ICONS_DIR = DATA_DIR / "icons"
+_TREES_DIR = DATA_DIR / "trees"
 BG_PATH = DATA_DIR / "background.jpg"
 BG_CLASS = DATA_DIR / "bg_class.png"
 BG_SUBCLASS = DATA_DIR / "bg_subclass.png"
@@ -153,6 +158,32 @@ def detect_tree_type(tree_data: dict) -> str:
     if xs == {5, 13, 21, 29, 37}:
         return "far_seas"
     return "unknown"
+
+
+@lru_cache(maxsize=1)
+def load_tree_index() -> dict[int, dict[str, str]]:
+    """Return {tree_id: {"name": str, "type": str}} parsed from data/AAs/trees/*.json.
+
+    Single source of truth for both the web AA route and the bot /aacheck cog.
+    Cached at first call — tree JSON is static reference data; restart to refresh.
+
+    BE-204: logs at WARNING on per-file parse failure so a corrupt JSON doesn't
+    silently disappear from the index.
+    """
+    out: dict[int, dict[str, str]] = {}
+    for path in _TREES_DIR.glob("*.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            aa_list = data.get("alternateadvancement_list") or []
+            if aa_list:
+                tid = int(path.stem)
+                out[tid] = {
+                    "name": aa_list[0].get("name", path.stem),
+                    "type": detect_tree_type(data),
+                }
+        except Exception as exc:
+            _log.warning("[aa_tree] Failed to load tree index %s: %s", path.name, exc)
+    return out
 
 
 def render_aa_tree(tree_id: int, aa_data: dict[int, int] | None = None) -> Image.Image:

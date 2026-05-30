@@ -12,6 +12,7 @@ from pathlib import Path
 import aiosqlite
 
 from web.db import DB_PATH
+from web.lib.sql_helpers import build_where
 
 
 async def upsert_user(
@@ -231,7 +232,7 @@ async def list_role_requests(
     if discord_id is not None:
         where.append("rr.discord_id = ?")
         params.append(discord_id)
-    where_sql = "WHERE " + " AND ".join(where) if where else ""
+    where_sql = build_where(where)
     # Pending: oldest first (FIFO queue). Anything resolved: newest first.
     order_sql = (
         "ORDER BY rr.requested_at ASC, rr.id ASC"

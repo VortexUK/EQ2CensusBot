@@ -3,6 +3,11 @@ import logging
 import discord
 from discord.ext import commands
 
+from bot.cogs.aacheck import AaCheckCog
+from bot.cogs.fun import FunCog
+from bot.cogs.guild import GuildCog
+from bot.cogs.items import ItemsCog
+from bot.cogs.spellcheck import SpellcheckCog
 from census.client import CensusClient
 from census.config import DISCORD_SYNC_GUILD_IDS, SERVICE_ID
 
@@ -17,12 +22,6 @@ class EQ2Bot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self) -> None:
-        from bot.cogs.aacheck import AaCheckCog
-        from bot.cogs.fun import FunCog
-        from bot.cogs.guild import GuildCog
-        from bot.cogs.items import ItemsCog
-        from bot.cogs.spellcheck import SpellcheckCog
-
         self.census = CensusClient(service_id=SERVICE_ID)
 
         await self.add_cog(ItemsCog(self))

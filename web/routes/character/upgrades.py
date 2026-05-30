@@ -16,6 +16,7 @@ from census.db import DB_PATH as _ITEMS_DB
 from census.recipes_db import DB_PATH as _RECIPES_DB
 from census.recipes_db import find_spells_by_tier as _find_spell_recipes
 from census.spells_db import DB_PATH as _SPELLS_DB
+from census.spells_db import SpellRow as _SpellRow
 from census.spells_db import find_by_ids as _spell_find_by_ids
 from census.spells_db import load_blocklist as _load_spell_blocklist
 from census.spells_db import strip_roman as _strip_roman
@@ -163,7 +164,7 @@ async def get_upgrade_materials(request: Request, name: str) -> UpgradeMaterials
         return UpgradeMaterialsResponse(spells_needing_upgrade=0, spells_with_recipe=0, ingredients=[])
 
     # Get spell rows, apply same filter as the spells endpoint
-    spell_db: dict[int, dict] = _spell_find_by_ids(spell_ids)
+    spell_db: dict[int, _SpellRow] = _spell_find_by_ids(spell_ids)
     blocklist = _load_spell_blocklist()
     rows = [
         r
@@ -189,19 +190,19 @@ async def get_upgrade_materials(request: Request, name: str) -> UpgradeMaterials
     cats: dict[str, str] = {}
 
     for recipe in recipes.values():
-        if recipe.get("primary_comp"):
-            n = recipe["primary_comp"]
-            totals[n] += recipe.get("primary_qty") or 1
-            cats[n] = "primary"
+        pc = recipe.get("primary_comp")
+        if pc:
+            totals[pc] += recipe.get("primary_qty") or 1
+            cats[pc] = "primary"
         for sc in recipe.get("secondary_comps") or []:
             n = sc.get("description") or ""
             if n:
                 totals[n] += sc.get("quantity") or 1
                 cats[n] = "secondary"
-        if recipe.get("fuel_comp"):
-            n = recipe["fuel_comp"]
-            totals[n] += recipe.get("fuel_qty") or 1
-            cats[n] = "fuel"
+        fc = recipe.get("fuel_comp")
+        if fc:
+            totals[fc] += recipe.get("fuel_qty") or 1
+            cats[fc] = "fuel"
 
     # Bulk item DB lookup for icons + tooltip data
     item_data = _lookup_items_by_name(list(totals.keys()))
@@ -271,7 +272,7 @@ async def get_upgrade_recipes(request: Request, name: str) -> UpgradeRecipesResp
         return UpgradeRecipesResponse(results=[], spells_needing_upgrade=0, spells_with_recipe=0)
 
     # Get spell rows, apply same filter as the spells endpoint
-    spell_db: dict[int, dict] = _spell_find_by_ids(spell_ids)
+    spell_db: dict[int, _SpellRow] = _spell_find_by_ids(spell_ids)
     blocklist = _load_spell_blocklist()
     rows = [
         r

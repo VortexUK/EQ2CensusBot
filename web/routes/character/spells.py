@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from census.constants import SPELL_TIER_ORDER as _TIER_ORDER
 from census.spells_db import DB_PATH as _SPELLS_DB
+from census.spells_db import SpellRow as _SpellRow
 from census.spells_db import find_by_ids as _spell_find_by_ids
 from census.spells_db import load_blocklist as _load_spell_blocklist
 from census.spells_db import strip_roman as _strip_roman
@@ -79,7 +80,7 @@ async def get_character_spells(request: Request, name: str) -> CharacterSpellsRe
         )
 
     # Bulk DB lookup — one query for all IDs
-    spell_db: dict[int, dict] = _spell_find_by_ids(spell_ids)
+    spell_db: dict[int, _SpellRow] = _spell_find_by_ids(spell_ids)
 
     # Only include spells/arts the character explicitly scribed from a scroll.
     # given_by='spellscroll' is the sole upgradable category — it covers both

@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import sqlite3
+from collections.abc import Mapping
+from types import MappingProxyType
 
 from fastapi import HTTPException, Request
 
@@ -54,25 +56,27 @@ def _uploader_discord_id(source_dsn: str | None) -> str | None:
 
 # Encounter "size" buckets — mapped to a (min_players, max_players) range
 # inclusive on both ends. Used to filter the list endpoint via ?size=...
-SIZE_BUCKETS: dict[str, tuple[int, int]] = {
-    "individual": (1, 1),
-    "group": (2, 6),
-    "raid12": (7, 12),
-    "raid24": (13, 24),
-}
+SIZE_BUCKETS: Mapping[str, tuple[int, int]] = MappingProxyType(
+    {
+        "individual": (1, 1),
+        "group": (2, 6),
+        "raid12": (7, 12),
+        "raid24": (13, 24),
+    }
+)
 
 # Player detection: ally combatants whose name is one word and isn't the
 # 'Unknown' fallback row ACT writes for un-attributed damage. Pets nearly
 # always either consolidate into the owner or have multi-word descriptive
 # names, so this catches real player count without false positives.
-_PLAYER_COUNT_SQL = (
-    "SELECT COUNT(*) FROM combatants c "
-    "WHERE c.encounter_id = e.id "
-    "  AND c.ally = 1 "
-    "  AND c.name != '' "
-    "  AND c.name != 'Unknown' "
-    "  AND instr(c.name, ' ') = 0"
-)
+_PLAYER_COUNT_SQL = """\
+    SELECT COUNT(*) FROM combatants c
+    WHERE c.encounter_id = e.id
+      AND c.ally = 1
+      AND c.name != ''
+      AND c.name != 'Unknown'
+      AND instr(c.name, ' ') = 0
+"""
 
 
 def _list_encounters_sync(

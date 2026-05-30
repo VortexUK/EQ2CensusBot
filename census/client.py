@@ -10,6 +10,7 @@ import aiohttp
 
 from census import db as item_db
 from census._coerce import coerce_int as _int
+from census.config import CENSUS_BASE_URL as BASE_URL  # re-exported so callers can import from client
 from census.item_parser import parse_item as _parse_item_fn
 from census.models import (
     AAProfile,
@@ -41,9 +42,6 @@ def _redact_url(url: str) -> str:
     could be exfiltrated and griefed (rate-limited by an attacker).
     """
     return _SERVICE_ID_RE.sub("/s:REDACTED/", url)
-
-
-BASE_URL = "https://census.daybreakgames.com"
 
 
 class CensusError(Exception):

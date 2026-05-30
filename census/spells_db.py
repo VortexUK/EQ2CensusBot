@@ -23,9 +23,46 @@ import re
 import sqlite3
 from functools import lru_cache
 from pathlib import Path
+from typing import TypedDict
 
 from census._coerce import coerce_float as _float
 from census._coerce import coerce_int as _int
+
+
+class SpellRow(TypedDict, total=False):
+    """Row shape returned by ``find_by_id`` / ``find_by_ids`` / ``find_by_crc`` / ``find_by_name``.
+
+    ``total=False`` because a query with a narrower SELECT list (e.g. name-only)
+    still returns a valid but incomplete dict. Callers that need a guaranteed
+    field should use ``dict.get`` with a sensible default.
+    """
+
+    id: int
+    name: str
+    name_lower: str
+    base_name: str
+    base_name_lower: str
+    tier: int
+    tier_name: str
+    type: str
+    typeid: int
+    level: int
+    given_by: str
+    crc: int
+    beneficial: int
+    passes_spellcheck: int
+    cast_secs: float
+    recast_secs: float
+    recovery_secs: float
+    target_type: str
+    aoe_radius: float
+    max_targets: int
+    description: str
+    icon_id: int
+    icon_backdrop: int
+    effects: str  # JSON-encoded
+    last_update: int
+
 
 _log = logging.getLogger(__name__)
 
@@ -301,6 +338,7 @@ def upsert_spells(spells: list[dict], conn: sqlite3.Connection) -> int:
     rows = [spell_to_row(s) for s in spells if s.get("id") is not None]
     conn.executemany(_UPSERT_SQL, rows)
     conn.commit()
+    find_by_crc.cache_clear()  # BE-236: spell data changed; stale CRC lookups would lie
     return len(rows)
 
 
@@ -324,11 +362,11 @@ _SELECT_COLS = (
 )
 
 
-def _row_to_dict(row: sqlite3.Row) -> dict:
-    return dict(row)
+def _row_to_dict(row: sqlite3.Row) -> SpellRow:
+    return dict(row)  # type: ignore[return-value]
 
 
-def find_by_id(spell_id: int, path: Path = DB_PATH) -> dict | None:
+def find_by_id(spell_id: int, path: Path = DB_PATH) -> SpellRow | None:
     """Return a spell row dict for the given ID, or None."""
     if not path.exists():
         return None
@@ -338,7 +376,7 @@ def find_by_id(spell_id: int, path: Path = DB_PATH) -> dict | None:
     return _row_to_dict(row) if row else None
 
 
-def find_by_ids(spell_ids: list[int], path: Path = DB_PATH) -> dict[int, dict]:
+def find_by_ids(spell_ids: list[int], path: Path = DB_PATH) -> dict[int, SpellRow]:
     """Return {spell_id: row_dict} for all matching IDs. Missing IDs are omitted."""
     if not spell_ids or not path.exists():
         return {}
@@ -353,7 +391,7 @@ def find_by_ids(spell_ids: list[int], path: Path = DB_PATH) -> dict[int, dict]:
 
 
 @lru_cache(maxsize=4096)
-def find_by_crc(crc: int, tier: int | None = None, path: Path = DB_PATH) -> dict | None:
+def find_by_crc(crc: int, tier: int | None = None, path: Path = DB_PATH) -> SpellRow | None:
     """Return the spell row for the given CRC and AA rank tier.
 
     AA nodes reference spells by CRC; multiple rows share a CRC — one per
@@ -489,7 +527,7 @@ def load_blocklist(path: Path = _BLOCKLIST_PATH) -> Blocklist:
         return Blocklist(frozenset(), [])
 
 
-def find_by_name(name: str, path: Path = DB_PATH) -> list[dict]:
+def find_by_name(name: str, path: Path = DB_PATH) -> list[SpellRow]:
     """Return all spell rows whose name matches (exact, then LIKE). Ordered by level."""
     if not path.exists():
         return []

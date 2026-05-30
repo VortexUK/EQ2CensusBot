@@ -696,54 +696,6 @@ class TestDeleteHelpers:
             parses_db_conn.execute("SELECT COUNT(*) FROM ingest_log WHERE encounter_id = ?", (eid,)).fetchone()[0] == 0
         )
 
-    def test_delete_by_filter_requires_guild(self, parses_db_conn):
-        with pytest.raises(ValueError):
-            parses_db.delete_encounters_by_filter(parses_db_conn, guild_name="")
-
-    def test_delete_by_filter_guild_only(self, parses_db_conn):
-        self._seed(parses_db_conn, encid="ex1", guild_name="Exordium")
-        self._seed(parses_db_conn, encid="ex2", guild_name="Exordium")
-        self._seed(parses_db_conn, encid="ot1", guild_name="OtherGuild")
-        n = parses_db.delete_encounters_by_filter(parses_db_conn, guild_name="Exordium")
-        assert n == 2
-        remaining = {r[0] for r in parses_db_conn.execute("SELECT act_encid FROM encounters").fetchall()}
-        assert remaining == {"ot1"}
-
-    def test_delete_by_filter_with_zone(self, parses_db_conn):
-        from dataclasses import replace
-
-        # Two encounters: same guild, different zones.
-        e1 = replace(_sample_encounter(), encid="z1", zone="Great Divide")
-        e2 = replace(_sample_encounter(), encid="z2", zone="The Sinking Sands")
-        for e in (e1, e2):
-            parses_db.insert_encounter(
-                parses_db_conn,
-                e,
-                source_dsn="eq2act",
-                ingested_at=1700000000,
-                guild_name="Exordium",
-            )
-        n = parses_db.delete_encounters_by_filter(
-            parses_db_conn,
-            guild_name="Exordium",
-            zone="Great Divide",
-        )
-        assert n == 1
-        remaining = {r[0] for r in parses_db_conn.execute("SELECT act_encid FROM encounters").fetchall()}
-        assert remaining == {"z2"}
-
-    def test_delete_by_filter_with_uploader(self, parses_db_conn):
-        self._seed(parses_db_conn, encid="u1", guild_name="Exordium", uploaded_by="Menludiir")
-        self._seed(parses_db_conn, encid="u2", guild_name="Exordium", uploaded_by="Sihtric")
-        n = parses_db.delete_encounters_by_filter(
-            parses_db_conn,
-            guild_name="Exordium",
-            uploaded_by="Menludiir",
-        )
-        assert n == 1
-        remaining = {r[0] for r in parses_db_conn.execute("SELECT act_encid FROM encounters").fetchall()}
-        assert remaining == {"u2"}
-
 
 class TestFindByFilter:
     def test_find_encounters_by_filter_returns_id_and_title(self, parses_db_conn):

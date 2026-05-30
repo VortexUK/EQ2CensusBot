@@ -141,9 +141,9 @@ class GuildAdornCheckResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _int(v) -> int | None:
+def _int(v: object) -> int | None:
     try:
-        return int(v)
+        return int(v)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
 

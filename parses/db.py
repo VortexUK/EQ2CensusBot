@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import sqlite3
 from datetime import UTC
+from enum import IntEnum
 from pathlib import Path
 
 from parses.models import AttackType, Combatant, CombatantSnapshot, DamageType, Encounter
@@ -788,43 +789,6 @@ def set_encounter_guild_name(conn: sqlite3.Connection, encounter_id: int, guild_
     return cur.rowcount > 0
 
 
-def delete_encounters_by_filter(
-    conn: sqlite3.Connection,
-    *,
-    guild_name: str,
-    zone: str | None = None,
-    date: str | None = None,  # 'YYYY-MM-DD' in the server's local timezone
-    uploaded_by: str | None = None,
-) -> int:
-    """Bulk delete encounters matching the filter. `guild_name` is mandatory
-    so we can never accidentally delete across guilds. Returns the row count
-    removed. Cascades to children.
-
-    NOTE: no longer called by the bulk-delete route (which now uses
-    find_encounters_by_filter + _apply_delete for soft-vs-hard logic);
-    kept for direct/admin hard-delete use and covered by TestDeleteHelpers."""
-    if not guild_name:
-        raise ValueError("guild_name is required")
-    clauses = ["guild_name = ?"]
-    params: list = [guild_name]
-    if zone:
-        clauses.append("zone = ?")
-        params.append(zone)
-    if uploaded_by:
-        clauses.append("uploaded_by = ?")
-        params.append(uploaded_by)
-    if date:
-        # SQLite has no native YYYY-MM-DD-on-unix-seconds helper but `date(?,
-        # 'unixepoch', 'localtime')` does the right thing. Matches what
-        # ParsesPage groups on (fmtLocalDate, server clock).
-        clauses.append("date(started_at, 'unixepoch', 'localtime') = ?")
-        params.append(date)
-    sql = f"DELETE FROM encounters WHERE {' AND '.join(clauses)}"
-    with conn:
-        cur = conn.execute(sql, params)
-    return cur.rowcount
-
-
 def find_encounters_by_filter(
     conn: sqlite3.Connection,
     *,
@@ -881,10 +845,22 @@ def get_combatants_for_encounter(conn: sqlite3.Connection, encounter_id: int) ->
 #                       boosters like 'Undeniable Malice')
 # ACT writes everything as 'AttackType' rows at depth 4 — we split by
 # swing_type at query so each category gets its own UI tab.
-_DAMAGE_SWING_TYPES = (1, 2)
-_HEAL_SWING_TYPES = (3,)
-_CURE_SWING_TYPES = (20,)
-_THREAT_SWING_TYPES = (100,)  # callers should additionally filter type != 'All'
+
+
+class SwingType(IntEnum):
+    """ACT swingtype column values — see parses/act_reader.py for the source."""
+
+    MELEE = 1
+    NONMELEE = 2
+    HEAL = 3
+    CURE = 20
+    PROC = 100
+
+
+_DAMAGE_SWING_TYPES = (SwingType.MELEE, SwingType.NONMELEE)
+_HEAL_SWING_TYPES = (SwingType.HEAL,)
+_CURE_SWING_TYPES = (SwingType.CURE,)
+_THREAT_SWING_TYPES = (SwingType.PROC,)  # callers should additionally filter type != 'All'
 
 
 def get_top_attacks_for_combatant(

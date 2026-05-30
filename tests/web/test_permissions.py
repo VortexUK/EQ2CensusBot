@@ -114,7 +114,7 @@ async def test_officer_check_skipped_when_role_lacks_capability(app):
         patch("web.auth_deps.users_db.user_has_capability_via_db", new_callable=AsyncMock, return_value=False),
         patch("web.auth_deps.users_db.role_has_capability", new_callable=AsyncMock, return_value=False),
         # Officer-resolution helpers shouldn't be touched.
-        patch("web.routes.raid_strategies._resolve_primary_guild_cached") as m_guild,
+        patch("web.routes.raid_strategies._primary_guild_from_cache") as m_guild,
         patch("web.routes.guild._officer_chars") as m_officer,
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

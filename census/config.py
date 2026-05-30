@@ -39,18 +39,14 @@ ALLOWED_SERVERS: frozenset[str] = frozenset(
 
 # ISO-8601 UTC datetime for the server launch countdown.
 # Set LAUNCH_DT env var to override (e.g. "2027-03-15T18:00:00Z").
-# Set to an empty string or a past date to suppress the countdown widget.
-LAUNCH_DT_ISO: str = os.getenv("LAUNCH_DT", "2026-06-09T20:00:00Z")
+# Empty default — the frontend treats empty/past dates as "hide the countdown".
+# A hardcoded past date would silently surface as a stale countdown widget for
+# any contributor running without LAUNCH_DT set.
+LAUNCH_DT_ISO: str = os.getenv("LAUNCH_DT", "")
 
-# Comma-separated list of origins for CORS (web layer only).
-# In production set CORS_ORIGINS to your actual frontend domain.
-CORS_ORIGINS: list[str] = [
-    o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()
-]
-
-# Parent domain for the session cookie so one login spans both subdomains
-# (e.g. ".eq2lexicon.com" in prod). Leave unset in dev (host-only cookie).
-SESSION_COOKIE_DOMAIN: str | None = os.getenv("SESSION_COOKIE_DOMAIN") or None
+# Base URL for the Daybreak Census API. Used by census/client.py; also
+# imported by web/census_health.py for the health-check poll.
+CENSUS_BASE_URL: str = "https://census.daybreakgames.com"
 
 # Comma-separated Discord guild IDs that receive instant slash-command syncs.
 # The bot also does a global sync, but guild syncs propagate immediately.

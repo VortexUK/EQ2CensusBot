@@ -20,8 +20,10 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 
+from web.lib.session_user import SessionUser
 
-async def require_officer_of(user: dict, guild_name: str) -> list[str]:
+
+async def require_officer_of(user: SessionUser, guild_name: str) -> list[str]:
     """Raise 403 if ``user`` is not an officer of ``guild_name``.
 
     Returns the list of officer-rank characters the user holds in that guild

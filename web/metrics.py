@@ -82,7 +82,11 @@ CENSUS_DURATION = Histogram(
 
 # ── Application info ──────────────────────────────────────────────────────────
 
-APP_INFO: Info = Info("eq2_companion", "Static build / configuration info")
+# Old metric kept alive for one release so Grafana dashboards have time to
+# switch their filters from eq2_companion → eq2_lexicon. Drop in the next
+# polish PR after dashboards have moved.
+APP_INFO_LEGACY: Info = Info("eq2_companion", "DEPRECATED — use eq2_lexicon")
+APP_INFO: Info = Info("eq2_lexicon", "Per-deployment app info (world, version).")
 
 # ── App-level error counter ───────────────────────────────────────────────────
 # Bumped by the FastAPI exception handler for unhandled 500s. 4xx user-errors
@@ -107,7 +111,39 @@ class _DBCollector(Collector):
 
     A 30-second scrape interval × ~12 queries × <1 ms each is ~12 ms/scrape
     of total DB work — well under any threshold worth caching for.
+
+    BE-229: connections are kept open between scrapes (ro URI mode) to avoid
+    the open/close overhead every 30 s.  A failed connection is retried on the
+    next scrape (the dict slot is cleared on exception).
     """
+
+    def __init__(self) -> None:
+        self._conns: dict[str, sqlite3.Connection] = {}
+
+    def _get_conn(self, name: str, path: object) -> sqlite3.Connection | None:
+        """Return a cached read-only connection, opening it lazily."""
+        from pathlib import Path as _Path
+
+        if not isinstance(path, _Path) or not path.exists():
+            return None
+        conn = self._conns.get(name)
+        if conn is None:
+            try:
+                conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+                self._conns[name] = conn
+            except Exception as exc:
+                _log.warning("[metrics] failed to open %s: %s", name, exc)
+                return None
+        return conn
+
+    def _close_conn(self, name: str) -> None:
+        """Close and evict a connection (called on error to force re-open next scrape)."""
+        conn = self._conns.pop(name, None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def collect(self):  # type: ignore[override]
         # Lazy imports — keep metrics.py importable from tests without the
@@ -137,52 +173,53 @@ class _DBCollector(Collector):
         )
 
         # users.db ----------------------------------------------------------
-        try:
-            conn = sqlite3.connect(users_db_path, timeout=1.0)
-            for status in ("approved", "pending", "denied"):
-                row = conn.execute(
-                    "SELECT COUNT(*) FROM users WHERE access_status = ?",
-                    (status,),
-                ).fetchone()
-                g_users.add_metric([status], row[0] if row else 0)
+        conn = self._get_conn("users", users_db_path)
+        if conn is not None:
+            try:
+                for status in ("approved", "pending", "denied"):
+                    row = conn.execute(
+                        "SELECT COUNT(*) FROM users WHERE access_status = ?",
+                        (status,),
+                    ).fetchone()
+                    g_users.add_metric([status], row[0] if row else 0)
 
-            for status in ("pending", "approved", "rejected", "withdrawn", "superseded"):
-                row = conn.execute(
-                    "SELECT COUNT(*) FROM character_claims WHERE status = ?",
-                    (status,),
-                ).fetchone()
-                g_claims.add_metric([status], row[0] if row else 0)
-            conn.close()
-        except Exception as exc:
-            _log.error("[metrics] users.db collector error: %s", exc)
+                for status in ("pending", "approved", "rejected", "withdrawn", "superseded"):
+                    row = conn.execute(
+                        "SELECT COUNT(*) FROM character_claims WHERE status = ?",
+                        (status,),
+                    ).fetchone()
+                    g_claims.add_metric([status], row[0] if row else 0)
+            except Exception as exc:
+                _log.error("[metrics] users.db collector error: %s", exc)
+                self._close_conn("users")
 
         # parses.db — encounters split by hidden_at (visible vs soft-deleted)
         # so dashboards can distinguish "live leaderboard rows" from
         # accumulated history.
-        try:
-            if parses_db.DB_PATH.exists():
-                conn = sqlite3.connect(parses_db.DB_PATH, timeout=1.0)
+        conn = self._get_conn("parses", parses_db.DB_PATH)
+        if conn is not None:
+            try:
                 row = conn.execute("SELECT COUNT(*) FROM encounters WHERE hidden_at IS NULL").fetchone()
                 g_parses.add_metric(["visible"], row[0] if row else 0)
                 row = conn.execute("SELECT COUNT(*) FROM encounters WHERE hidden_at IS NOT NULL").fetchone()
                 g_parses.add_metric(["hidden"], row[0] if row else 0)
-                conn.close()
-        except Exception as exc:
-            _log.error("[metrics] parses.db collector error: %s", exc)
+            except Exception as exc:
+                _log.error("[metrics] parses.db collector error: %s", exc)
+                self._close_conn("parses")
 
         # raids.db — strategies + the ACT trigger pack.
-        try:
-            if raids_db.DB_PATH.exists():
-                conn = sqlite3.connect(raids_db.DB_PATH, timeout=1.0)
+        conn = self._get_conn("raids", raids_db.DB_PATH)
+        if conn is not None:
+            try:
                 row = conn.execute("SELECT COUNT(*) FROM raid_encounters").fetchone()
                 g_raids.add_metric([], row[0] if row else 0)
                 row = conn.execute("SELECT COUNT(*) FROM act_triggers").fetchone()
                 g_triggers.add_metric([], row[0] if row else 0)
                 row = conn.execute("SELECT COUNT(*) FROM act_spell_timers").fetchone()
                 g_spell_timers.add_metric([], row[0] if row else 0)
-                conn.close()
-        except Exception as exc:
-            _log.error("[metrics] raids.db collector error: %s", exc)
+            except Exception as exc:
+                _log.error("[metrics] raids.db collector error: %s", exc)
+                self._close_conn("raids")
 
         yield g_users
         yield g_claims

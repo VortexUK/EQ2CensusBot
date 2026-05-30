@@ -35,6 +35,7 @@ from web.limiter import limiter
 from web.metrics import (
     APP_ERRORS,
     APP_INFO,
+    APP_INFO_LEGACY,
     HTTP_REQUEST_DURATION,
     HTTP_REQUESTS,
     USER_PAGE_VIEWS,
@@ -262,6 +263,7 @@ def create_app(session_secret: str | None = None) -> FastAPI:
         # Register the DB gauge collector and set static app info.
         _register_db_collector()
         APP_INFO.info({"world": _WORLD, "version": "0.1.0"})
+        APP_INFO_LEGACY.info({"world": _WORLD, "version": "0.1.0"})  # legacy; drop next release
 
         # ---- async background tasks (tracked so shutdown can cancel) ----
         from web import census_health
@@ -338,32 +340,36 @@ def create_app(session_secret: str | None = None) -> FastAPI:
 
     app.add_middleware(ServerContextMiddleware)
 
-    # API routers
-    app.include_router(health_router, prefix="/api")
-    app.include_router(auth_router, prefix="/api")
-    app.include_router(auth_tokens_router, prefix="/api")
-    app.include_router(character_router, prefix="/api")
-    app.include_router(item_router, prefix="/api")
-    app.include_router(claim_router, prefix="/api")
-    app.include_router(admin_router, prefix="/api")
-    app.include_router(guild_router, prefix="/api")
-    app.include_router(guild_officer_router, prefix="/api")
-    app.include_router(item_watch_router, prefix="/api")
-    app.include_router(characters_router, prefix="/api")
-    app.include_router(aa_router, prefix="/api")
-    app.include_router(notifications_router, prefix="/api")
-    app.include_router(recipes_router, prefix="/api")
-    app.include_router(parses_router, prefix="/api")
-    app.include_router(rankings_router, prefix="/api")
-    app.include_router(classes_router, prefix="/api")
-    app.include_router(zones_router, prefix="/api")
-    app.include_router(zones_admin_router, prefix="/api")
-    app.include_router(raid_strategies_router, prefix="/api")
-    app.include_router(act_triggers_router, prefix="/api")
-    app.include_router(role_requests_router, prefix="/api")
-    app.include_router(census_router, prefix="/api")
-    app.include_router(server_router, prefix="/api")
-    app.include_router(supporters_router, prefix="/api")
+    # API routers — one entry per router, registered at /api prefix
+    _ROUTERS = [
+        health_router,
+        auth_router,
+        auth_tokens_router,
+        character_router,
+        item_router,
+        claim_router,
+        admin_router,
+        guild_router,
+        guild_officer_router,
+        item_watch_router,
+        characters_router,
+        aa_router,
+        notifications_router,
+        recipes_router,
+        parses_router,
+        rankings_router,
+        classes_router,
+        zones_router,
+        zones_admin_router,
+        raid_strategies_router,
+        act_triggers_router,
+        role_requests_router,
+        census_router,
+        server_router,
+        supporters_router,
+    ]
+    for _r in _ROUTERS:
+        app.include_router(_r, prefix="/api")
 
     # ── /metrics — Prometheus text format ───────────────────────────────────
     # Runs synchronously (FastAPI auto-offloads sync def to a thread pool)
@@ -384,21 +390,16 @@ def create_app(session_secret: str | None = None) -> FastAPI:
             )
         return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-    # Item icons — served from local data directory
-    if _ICONS_DIR.exists():
-        app.mount("/icons", StaticFiles(directory=_ICONS_DIR), name="icons")
-
-    # AA assets (backgrounds, node icons)
-    if _AA_ASSETS_DIR.exists():
-        app.mount("/aa-assets", StaticFiles(directory=_AA_ASSETS_DIR), name="aa-assets")
-
-    # Spell icons
-    if _SPELL_ICONS_DIR.exists():
-        app.mount("/spell-icons", StaticFiles(directory=_SPELL_ICONS_DIR), name="spell-icons")
-
-    # Class icons
-    if _CLASS_ICONS_DIR.exists():
-        app.mount("/class-icons", StaticFiles(directory=_CLASS_ICONS_DIR), name="class-icons")
+    # Static data directories (icons, assets) — data-driven mount table
+    _STATIC_MOUNTS: list[tuple[str, Path]] = [
+        ("/icons", _ICONS_DIR),
+        ("/aa-assets", _AA_ASSETS_DIR),
+        ("/spell-icons", _SPELL_ICONS_DIR),
+        ("/class-icons", _CLASS_ICONS_DIR),
+    ]
+    for _mount_path, _dir_path in _STATIC_MOUNTS:
+        if _dir_path.exists():
+            app.mount(_mount_path, StaticFiles(directory=_dir_path), name=_mount_path.lstrip("/"))
 
     # Serve the React build in production
     if _FRONTEND_DIST.exists():

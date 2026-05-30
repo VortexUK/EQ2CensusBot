@@ -27,12 +27,55 @@ import os
 import re
 import sqlite3
 from pathlib import Path
+from typing import TypedDict, cast
 
 from census._coerce import coerce_int as _int
+
+
+class _RecipeRowRequired(TypedDict):
+    """Required fields present in every full RecipeRow."""
+
+    id: int
+    name: str
+
+
+class RecipeRow(_RecipeRowRequired, total=False):
+    """Row shape returned by ``find_by_id`` / ``find_by_name`` / ``find_by_output_id``.
+
+    ``total=False`` (for optional fields) because partial queries produce
+    valid but incomplete dicts. ``secondary_comps`` is deserialised from JSON
+    into a list by ``_row_to_dict``.
+    """
+
+    crc: int
+    name_lower: str
+    bench: str
+    version: int
+    primary_comp: str | None  # ingredient display name (TEXT column)
+    primary_qty: int
+    secondary_comps: list  # deserialised from JSON
+    fuel_comp: str | None  # ingredient display name (TEXT column)
+    fuel_qty: int
+    out_unfinished_id: int | None
+    out_unfinished_count: int | None
+    out_simple_id: int | None
+    out_simple_count: int | None
+    out_worked_id: int | None
+    out_worked_count: int | None
+    out_elaborate_id: int | None
+    out_elaborate_count: int | None
+    out_formed_id: int | None
+    out_formed_count: int | None
+    base_name_lower: str | None
+    crafted_tier: str | None
+    last_update: int
+
 
 _log = logging.getLogger(__name__)
 
 # Ordered from lowest to highest so tier-comparison logic can use the index.
+# BE-225: candidate for StrEnum conversion (ordering would be self-documenting),
+# but consumers rely on iterating bare strings for canonicalisation — keep as tuple.
 SPELL_TIERS: tuple[str, ...] = (
     "Apprentice",
     "Journeyman",
@@ -372,7 +415,7 @@ _SELECT_COLS = (
 )
 
 
-def _row_to_dict(row: sqlite3.Row) -> dict:
+def _row_to_dict(row: sqlite3.Row) -> RecipeRow:
     d = dict(row)
     # Deserialise secondary_comps back to a list
     try:
@@ -380,10 +423,10 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     except Exception as exc:
         _log.warning("[recipes_db] Failed to parse secondary_comps for recipe id=%s: %s", d.get("id"), exc)
         d["secondary_comps"] = []
-    return d
+    return cast(RecipeRow, d)
 
 
-def find_by_id(recipe_id: int, path: Path = DB_PATH) -> dict | None:
+def find_by_id(recipe_id: int, path: Path = DB_PATH) -> RecipeRow | None:
     """Return a recipe row dict for the given ID, or None."""
     if not path.exists():
         return None
@@ -393,7 +436,7 @@ def find_by_id(recipe_id: int, path: Path = DB_PATH) -> dict | None:
     return _row_to_dict(row) if row else None
 
 
-def find_by_name(name: str, path: Path = DB_PATH) -> list[dict]:
+def find_by_name(name: str, path: Path = DB_PATH) -> list[RecipeRow]:
     """Return recipes whose name matches (exact then LIKE), ordered by name."""
     if not path.exists():
         return []
@@ -416,7 +459,7 @@ def find_by_spell(
     spell_name: str,
     tier: str,
     path: Path = DB_PATH,
-) -> list[dict]:
+) -> list[RecipeRow]:
     """Return recipes that craft a spell scroll for the given base name and tier.
 
     Args:
@@ -444,7 +487,7 @@ def find_spells_by_tier(
     spell_names: list[str],
     tier: str,
     path: Path = DB_PATH,
-) -> dict[str, dict]:
+) -> dict[str, RecipeRow]:
     """Bulk lookup: given a list of spell base names, return a mapping of
     lowercased spell name → recipe row for the requested tier.
 
@@ -469,7 +512,7 @@ def find_spells_by_tier(
     return {r["base_name_lower"]: _row_to_dict(r) for r in rows}
 
 
-def find_by_output_id(item_id: int, path: Path = DB_PATH) -> list[dict]:
+def find_by_output_id(item_id: int, path: Path = DB_PATH) -> list[RecipeRow]:
     """Return all recipes that produce the given item ID at any quality tier."""
     if not path.exists():
         return []

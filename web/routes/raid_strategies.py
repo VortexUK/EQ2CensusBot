@@ -43,6 +43,7 @@ from web import db as users_db
 from web.auth_deps import require_editor
 from web.lib.executor import run_sync
 from web.lib.primary_guild import cached_primary_guild
+from web.lib.session_user import SessionUser
 from web.server_context import current_world as _current_world
 
 router = APIRouter(tags=["raid_strategies"])
@@ -53,7 +54,7 @@ router = APIRouter(tags=["raid_strategies"])
 # ---------------------------------------------------------------------------
 
 
-async def _resolve_primary_guild_cached(discord_id: str) -> str | None:
+async def _primary_guild_from_cache(discord_id: str) -> str | None:
     """Return the cached guild for this user's primary character, or None.
 
     Cache-only (no Census fallback) — kept hot so the auth check stays cheap.
@@ -153,6 +154,8 @@ def _resolve_curator_encounter(zone_name: str, position: int) -> tuple[str, str]
     if z is None:
         return None
     canonical_zone = z["name"]
+    # BE-210: bosses is a list[dict]; a {position: encounter_name} dict would be
+    # faster but this path is not hot (curator writes only), so defer the rebuild.
     for boss in z.get("bosses", []):
         if int(boss.get("position", -1)) == position:
             return canonical_zone, boss["encounter_name"]
@@ -203,6 +206,73 @@ def _read_overview_sync(zone_name: str) -> dict | None:
     return dict(row)
 
 
+def _create_overview_sync(
+    conn: sqlite3.Connection,
+    *,
+    zone_name: str,
+    markdown: str,
+    editor_discord_id: str,
+    expansion_short: str,
+    edit_note: str | None,
+    now: int,
+) -> None:
+    """Insert a brand-new raid_zone overview row with revision history."""
+    raids_db.upsert_raid_zone(
+        conn,
+        zone_name=zone_name,
+        expansion_short=expansion_short,
+        overview_md=markdown,
+        source=raids_db.SOURCE_MANUAL,
+    )
+    # upsert_raid_zone doesn't set last_edited_at — stamp the audit fields here.
+    conn.execute(
+        "UPDATE raid_zones SET last_edited_at = ?, last_edited_by = ? WHERE zone_name_lower = ?",
+        (now, editor_discord_id, zone_name.lower()),
+    )
+    # Record first-ever revision with before_md=NULL.
+    zone_id_row = conn.execute(
+        "SELECT id FROM raid_zones WHERE zone_name_lower = ?",
+        (zone_name.lower(),),
+    ).fetchone()
+    conn.execute(
+        "INSERT INTO raid_zone_revisions "
+        "(raid_zone_id, edited_at, edited_by, before_md, after_md, edit_note) "
+        "VALUES (?, ?, ?, NULL, ?, ?)",
+        (zone_id_row[0], now, editor_discord_id, markdown, edit_note),
+    )
+
+
+def _update_overview_sync(
+    conn: sqlite3.Connection,
+    *,
+    zone_id: int,
+    zone_name: str,
+    prev_md: str | None,
+    markdown: str,
+    editor_discord_id: str,
+    edit_note: str | None,
+    now: int,
+) -> None:
+    """Update an existing raid_zone overview row and conditionally write a revision entry."""
+    conn.execute(
+        "UPDATE raid_zones SET "
+        "  overview_md = ?, "
+        "  source = ?, "
+        "  last_edited_at = ?, "
+        "  last_edited_by = ? "
+        "WHERE id = ?",
+        (markdown, raids_db.SOURCE_MANUAL, now, editor_discord_id, zone_id),
+    )
+    # Only write a revision row when the markdown actually changes.
+    if markdown != prev_md:
+        conn.execute(
+            "INSERT INTO raid_zone_revisions "
+            "(raid_zone_id, edited_at, edited_by, before_md, after_md, edit_note) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (zone_id, now, editor_discord_id, prev_md, markdown, edit_note),
+        )
+
+
 def _write_overview_sync(
     *,
     zone_name: str,
@@ -222,6 +292,7 @@ def _write_overview_sync(
     markdown actually changes (or on the very first write, with before_md=NULL).
     No revision row is written if the markdown is identical to the current value.
 
+    Dispatches to ``_create_overview_sync`` or ``_update_overview_sync``.
     Returns the fresh row dict matching ``_read_overview_sync``."""
     conn = raids_db.init_db()
     try:
@@ -231,50 +302,26 @@ def _write_overview_sync(
         ).fetchone()
         now = int(time.time())
         if existing is None:
-            # Lazy-create — same as the encounter PUT path.
-            raids_db.upsert_raid_zone(
+            _create_overview_sync(
                 conn,
                 zone_name=zone_name,
+                markdown=markdown,
+                editor_discord_id=editor_discord_id,
                 expansion_short=expansion_short,
-                overview_md=markdown,
-                source=raids_db.SOURCE_MANUAL,
-            )
-            # upsert_raid_zone doesn't set last_edited_at — do it here so the
-            # initial write also stamps the audit fields.
-            conn.execute(
-                "UPDATE raid_zones SET last_edited_at = ?, last_edited_by = ? WHERE zone_name_lower = ?",
-                (now, editor_discord_id, zone_name.lower()),
-            )
-            # Record first-ever revision with before_md=NULL.
-            zone_id_row = conn.execute(
-                "SELECT id FROM raid_zones WHERE zone_name_lower = ?",
-                (zone_name.lower(),),
-            ).fetchone()
-            conn.execute(
-                "INSERT INTO raid_zone_revisions "
-                "(raid_zone_id, edited_at, edited_by, before_md, after_md, edit_note) "
-                "VALUES (?, ?, ?, NULL, ?, ?)",
-                (zone_id_row[0], now, editor_discord_id, markdown, edit_note),
+                edit_note=edit_note,
+                now=now,
             )
         else:
-            zone_id, prev_md = int(existing[0]), existing[1]
-            conn.execute(
-                "UPDATE raid_zones SET "
-                "  overview_md = ?, "
-                "  source = ?, "
-                "  last_edited_at = ?, "
-                "  last_edited_by = ? "
-                "WHERE id = ?",
-                (markdown, raids_db.SOURCE_MANUAL, now, editor_discord_id, zone_id),
+            _update_overview_sync(
+                conn,
+                zone_id=int(existing[0]),
+                zone_name=zone_name,
+                prev_md=existing[1],
+                markdown=markdown,
+                editor_discord_id=editor_discord_id,
+                edit_note=edit_note,
+                now=now,
             )
-            # Only write a revision row when the markdown actually changes.
-            if markdown != prev_md:
-                conn.execute(
-                    "INSERT INTO raid_zone_revisions "
-                    "(raid_zone_id, edited_at, edited_by, before_md, after_md, edit_note) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (zone_id, now, editor_discord_id, prev_md, markdown, edit_note),
-                )
         conn.commit()
         conn.row_factory = sqlite3.Row
         row = conn.execute(
@@ -424,7 +471,7 @@ async def put_strategy(
     zone_name: str,
     position: int,
     body: StrategyUpdateRequest,
-    user: dict = Depends(require_editor),
+    user: SessionUser = Depends(require_editor),
 ) -> StrategyResponse:
     """Replace the encounter's strategy. Records a revision automatically.
 
@@ -566,7 +613,7 @@ async def get_zone_overview(zone_name: str) -> ZoneOverviewResponse:
 async def put_zone_overview(
     zone_name: str,
     body: ZoneOverviewUpdateRequest,
-    user: dict = Depends(require_editor),
+    user: SessionUser = Depends(require_editor),
 ) -> ZoneOverviewResponse:
     """Replace the zone's overview markdown. Same editor gate as the
     encounter strategy editor. Does NOT touch access_md or background_md."""

@@ -25,6 +25,7 @@ import aiosqlite
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from census.classes_db import iter_adventure_class_names
 from census.db import DB_PATH as ITEMS_DB_PATH
 from census.recipes_db import DB_PATH as RECIPES_DB_PATH
 from web.lib.executor import run_sync
@@ -79,34 +80,9 @@ _LABEL_TO_BENCH: dict[str, str] = {v.lower(): k for k, v in BENCH_DISPLAY.items(
 # Adventure classes
 # ---------------------------------------------------------------------------
 
-_ADVENTURE_CLASSES = [
-    "Assassin",
-    "Beastlord",
-    "Berserker",
-    "Brigand",
-    "Bruiser",
-    "Channeler",
-    "Coercer",
-    "Conjuror",
-    "Defiler",
-    "Dirge",
-    "Fury",
-    "Guardian",
-    "Illusionist",
-    "Inquisitor",
-    "Monk",
-    "Mystic",
-    "Necromancer",
-    "Paladin",
-    "Ranger",
-    "Shadowknight",
-    "Swashbuckler",
-    "Templar",
-    "Troubador",
-    "Warden",
-    "Warlock",
-    "Wizard",
-]
+# Sourced from census.classes_db.CLASS_SEED — single source of truth.
+# BE-230: prevents the list drifting out of sync with the canonical class data.
+_ADVENTURE_CLASSES = iter_adventure_class_names()
 
 # ---------------------------------------------------------------------------
 # Response models
