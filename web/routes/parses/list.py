@@ -17,6 +17,7 @@ from fastapi import HTTPException, Request
 
 from census import zones_db
 from parses import db as parses_db
+from parses.pet_detection import classify_combatants
 from web import db as users_db
 from web.auth_deps import (
     is_admin as _is_admin,
@@ -64,37 +65,57 @@ SIZE_BUCKETS: Mapping[str, tuple[int, int]] = MappingProxyType(
     }
 )
 
-# Player detection: ally combatants whose name is one word and isn't the
-# 'Unknown' fallback row ACT writes for un-attributed damage. Pets nearly
-# always either consolidate into the owner or have multi-word descriptive
-# names, so this catches real player count without false positives.
+# Player count: ally combatants flagged is_player=1 by the pet-detection
+# pipeline (see parses/pet_detection.py). Pre-Phase-4 historic rows
+# have is_player=NULL until _ensure_classified backfills them on first
+# read — until then they count as 0, which is fine because the lazy-
+# backfill runs BEFORE the SQL filter in every read path.
 _PLAYER_COUNT_SQL = """\
     SELECT COUNT(*) FROM combatants c
-    WHERE c.encounter_id = e.id
-      AND c.ally = 1
-      AND c.name != ''
-      AND c.name != 'Unknown'
-      AND instr(c.name, ' ') = 0
+    WHERE c.encounter_id = e.id AND c.is_player = 1
 """
 
-# Top-N ally helpers — the building blocks for the merger's top-N
-# mutual-containment gate (see Phase 4 of the 2026-05-30 parse-grouping-redo
-# plan). The filter mirrors _PLAYER_COUNT_SQL exactly so "top players" and
-# "is a player" agree about who counts: ally=1, single-word, not the
-# 'Unknown' rollup, not the empty-name row.
 _TOP_N_ALLY_SQL = """\
     SELECT name FROM combatants
-    WHERE encounter_id = ? AND ally = 1
-      AND name != '' AND name != 'Unknown' AND instr(name, ' ') = 0
+    WHERE encounter_id = ? AND is_player = 1
     ORDER BY encdps DESC, name ASC
     LIMIT ?
 """
 
 _ALL_ALLY_SQL = """\
     SELECT name FROM combatants
-    WHERE encounter_id = ? AND ally = 1
-      AND name != '' AND name != 'Unknown' AND instr(name, ' ') = 0
+    WHERE encounter_id = ? AND is_player = 1
 """
+
+
+def _ensure_classified(conn: sqlite3.Connection, encounter_id: int, zone: str | None) -> bool:
+    """Lazy backfill for pre-Phase-4 combatant rows.
+
+    If any combatant for this encounter has ``is_player IS NULL`` (i.e.
+    was inserted before the pet-detection pipeline shipped), run the
+    classifier now and persist. No-op when every row is already
+    classified (a single indexed lookup — steady-state cost is
+    negligible).
+
+    Called by every read path (parses list, parse detail, rankings load)
+    before any ``WHERE is_player = 1`` query that depends on the value
+    being populated. Without this, historic encounters would silently
+    report player_count=0 forever.
+
+    Returns True iff backfill actually ran (so callers can decide
+    whether to re-query player_count for the same response)."""
+    needs = conn.execute(
+        "SELECT 1 FROM combatants WHERE encounter_id = ? AND is_player IS NULL LIMIT 1",
+        (encounter_id,),
+    ).fetchone()
+    if not needs:
+        return False
+    rows = parses_db.get_combatants_for_encounter(conn, encounter_id)
+    zone_category = _classify_zone(zone)
+    classification = classify_combatants(rows, zone_category)
+    parses_db.update_combatant_is_player(conn, classification)
+    conn.commit()
+    return True
 
 
 def _top_n_ally_names(conn: sqlite3.Connection, encounter_id: int, n: int) -> set[str]:
@@ -365,6 +386,10 @@ def _encounter_detail_sync(encounter_id: int, top_attacks_per_combatant: int, wo
         if enc_row is None:
             return None
         enc = dict(enc_row)
+        # Phase 4 lazy backfill: classify combatants if pre-migration.
+        # is_player drives the frontend Allies/Pets split (Phase 6) and
+        # any other consumer that hits the detail endpoint.
+        _ensure_classified(conn, enc["id"], enc.get("zone"))
 
         combatants = parses_db.get_combatants_for_encounter(conn, enc["id"])
         for c in combatants:
@@ -456,12 +481,33 @@ async def list_parses(
         Future micro-optimisation: thread a single conn through both
         steps. Not done here — the connection cost in WAL mode is
         sub-millisecond per open, and the API split keeps the test
-        seams clean."""
+        seams clean.
+
+        Phase 4 lazy backfill: any encounter inserted before the pet-
+        detection pipeline shipped has is_player=NULL on its
+        combatants. Classify before the merger runs so its top-N gate
+        sees the correct flag. Also re-query player_count for each
+        backfilled encounter so the response carries the correct
+        number on the same request (no stale-on-first-load glitch)."""
         rows = _list_encounters_sync(inner_cap, zone, size, current_world())
         if not rows:
             return rows, [], 0
         conn = parses_db.init_db(parses_db.DB_PATH)
         try:
+            # Phase 4 lazy backfill: any encounter inserted before the
+            # pet-detection pipeline shipped has is_player=NULL on its
+            # combatants. Classify before the merger runs so its top-N
+            # gate sees the correct flag. Also re-query player_count for
+            # each backfilled encounter so the response carries the
+            # correct number on the same request (no stale-on-first-load
+            # glitch).
+            for r in rows:
+                if _ensure_classified(conn, r["id"], r.get("zone")):
+                    refreshed = conn.execute(
+                        "SELECT COUNT(*) FROM combatants WHERE encounter_id = ? AND is_player = 1",
+                        (r["id"],),
+                    ).fetchone()
+                    r["player_count"] = int(refreshed[0])
             fights = _group_into_fights(rows, conn)
         finally:
             conn.close()

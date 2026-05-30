@@ -22,6 +22,13 @@ def conn() -> sqlite3.Connection:
     Schema is deliberately minimal — we don't want the helpers' behaviour
     to depend on any column we don't actually query, and the parses DB
     schema itself is tested elsewhere.
+
+    Phase 4 (2026-05-30) switched the top-N helpers from the legacy
+    multi-word/Unknown predicate to ``is_player = 1``. The test
+    insertion helper now computes is_player using the same predicate
+    the legacy filter did — single-word, non-empty, not 'Unknown' —
+    so the test semantics ("regex/multi-word names don't count") are
+    preserved without changing every test body.
     """
     c = sqlite3.connect(":memory:")
     c.execute(
@@ -31,7 +38,8 @@ def conn() -> sqlite3.Connection:
             encounter_id INTEGER NOT NULL,
             name         TEXT NOT NULL,
             ally         INTEGER NOT NULL,
-            encdps       REAL NOT NULL DEFAULT 0
+            encdps       REAL NOT NULL DEFAULT 0,
+            is_player    INTEGER
         )
         """
     )
@@ -39,9 +47,15 @@ def conn() -> sqlite3.Connection:
 
 
 def _insert(conn: sqlite3.Connection, **kwargs) -> None:
+    # Derive is_player from the legacy predicate so existing test
+    # bodies that exercised the multi-word/Unknown filter still pass
+    # under the new is_player-based SQL helpers.
+    name = kwargs["name"]
+    ally = kwargs["ally"]
+    is_player = 1 if (ally == 1 and name and name != "Unknown" and " " not in name) else 0
     conn.execute(
-        "INSERT INTO combatants (encounter_id, name, ally, encdps) VALUES (?, ?, ?, ?)",
-        (kwargs["encounter_id"], kwargs["name"], kwargs["ally"], kwargs["encdps"]),
+        "INSERT INTO combatants (encounter_id, name, ally, encdps, is_player) VALUES (?, ?, ?, ?, ?)",
+        (kwargs["encounter_id"], name, ally, kwargs["encdps"], is_player),
     )
 
 

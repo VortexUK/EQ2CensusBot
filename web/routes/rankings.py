@@ -433,6 +433,21 @@ def _load_primary_boss_kills(world: str = "Varsoon") -> list[dict]:
             """,
             (world,),
         ).fetchall()
+        # Phase 4 lazy backfill: classify combatants for any encounter
+        # whose is_player flag is still NULL (pre-migration historic
+        # data). The player_count in the SELECT above uses the same
+        # _PLAYER_COUNT_SQL subquery as parses_list — refresh it here
+        # so the post-classifier value drives _scope_for below.
+        from web.routes.parses.list import _ensure_classified  # noqa: PLC0415 — local: avoid import cycle
+
+        rows = [dict(r) for r in rows]
+        for r in rows:
+            if _ensure_classified(conn, r["id"], r["zone"]):
+                refreshed = conn.execute(
+                    "SELECT COUNT(*) FROM combatants WHERE encounter_id = ? AND is_player = 1",
+                    (r["id"],),
+                ).fetchone()
+                r["player_count"] = int(refreshed[0])
         # Gate + canonicalise per row (scope is known from player_count): raid
         # bosses resolve against zones.db, everything else via the heuristic.
         encs: list[dict] = []

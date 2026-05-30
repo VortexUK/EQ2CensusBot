@@ -438,6 +438,13 @@ def _ins(conn, encid, title, *, success, players, guild, duration):
     ]
     snaps = {f"P{i}": CombatantSnapshot(level=95, guild_name=guild, cls="Wizard") for i in range(players)}
     pdb.insert_combatants_bulk(conn, eid, combs, snaps)
+    # Phase 4 (2026-05-30): the rankings loader's player_count subquery
+    # now filters on is_player=1, and insert_combatants_bulk doesn't
+    # populate that column (the classifier runs in the ingest path, not
+    # the DB layer). Stamp every ally as a player directly so the test
+    # data lands at the pre-classifier intent (all 8 are players, not
+    # 6 after the 'other' zone bucket-fill cap).
+    conn.execute("UPDATE combatants SET is_player = 1 WHERE encounter_id = ? AND ally = 1", (eid,))
     conn.commit()
 
 
@@ -674,6 +681,11 @@ async def test_rankings_leaderboard_is_world_scoped(app, monkeypatch, tmp_path):
         ],
         {f"W{i}": CombatantSnapshot(level=95, guild_name="DragonSlayers", cls="Wizard") for i in range(8)},
     )
+    # Phase 4 (2026-05-30): mark all 8 Wuoshi allies as players so the
+    # rankings loader's is_player=1 player_count subquery yields 8
+    # (raid scope), not 6 after the 'other' zone bucket-fill cap.
+    # Mirrors the same UPDATE in the _ins helper above.
+    conn.execute("UPDATE combatants SET is_player = 1 WHERE encounter_id = ? AND ally = 1", (weid,))
     conn.commit()
     conn.close()
 
