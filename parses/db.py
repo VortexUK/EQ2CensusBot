@@ -209,6 +209,7 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_damage_types_combatant   ON damage_types (combatant_id);",
     "CREATE INDEX IF NOT EXISTS idx_attack_types_combatant   ON attack_types (combatant_id);",
     "CREATE INDEX IF NOT EXISTS idx_attack_types_damage_desc ON attack_types (combatant_id, damage DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_combatants_encounter_is_player ON combatants (encounter_id, is_player);",
 ]
 
 # Append idempotent ALTER TABLE statements here when the schema evolves —
@@ -235,6 +236,11 @@ _MIGRATIONS: list[str] = [
     "ALTER TABLE combatants ADD COLUMN ilvl REAL",
     # Soft-delete marker for parses. Pre-existing rows are visible (NULL).
     "ALTER TABLE encounters ADD COLUMN hidden_at INTEGER",
+    # Phase-1 pet-detection pipeline: is_player flag (per-combatant) is the
+    # authoritative player/pet signal. DEFAULT NULL = the lazy-backfill
+    # sentinel; pre-existing rows get classified on first read of their
+    # parent encounter (see web/routes/parses/list.py:_ensure_classified).
+    "ALTER TABLE combatants ADD COLUMN is_player INTEGER DEFAULT NULL",
 ]
 
 
@@ -534,6 +540,48 @@ def update_combatant_snapshots(
             )
             n += cur.rowcount
     return n
+
+
+def update_combatant_is_player(conn: sqlite3.Connection, classification: dict[int, bool]) -> None:
+    """Bulk UPDATE the per-combatant is_player flag.
+
+    Called from:
+      * the ingest path, after the classifier runs against newly-inserted rows
+      * the async snapshot fill, after cls fills in (which can flip stage 5)
+      * the lazy-backfill helper in web/routes/parses/list.py
+
+    No-op when ``classification`` is empty. Caller owns the connection
+    and transaction scope."""
+    if not classification:
+        return
+    conn.executemany(
+        "UPDATE combatants SET is_player = ? WHERE id = ?",
+        [(1 if v else 0, k) for k, v in classification.items()],
+    )
+
+
+def invalidate_is_player_cache_with_conn(conn: sqlite3.Connection) -> None:
+    """Mark every combatant row for lazy re-classification on next read.
+    Variant that accepts an existing connection (used by tests + by the
+    rankings cache-invalidation hook to share the parses.db connection)."""
+    conn.execute("UPDATE combatants SET is_player = NULL")
+
+
+def invalidate_is_player_cache(path: Path = DB_PATH) -> None:
+    """Mark every combatant row for lazy re-classification on next read.
+    Production caller (opens its own connection).
+
+    Called by web/routes/rankings.py:invalidate_zones_cache so that a
+    curator zone-edit propagates to the existing parses without a
+    separate backfill — the next read of each encounter re-classifies
+    against the updated zone trees.
+
+    Brute-force table-wide invalidation is fine at current data size
+    (test parses only as of 2026-05-30). If the parses corpus grows past
+    ~10k encounters and this becomes painful, swap for a per-zone-targeted
+    invalidation using an is_player_computed_at timestamp."""
+    with sqlite3.connect(path) as conn:
+        invalidate_is_player_cache_with_conn(conn)
 
 
 def insert_damage_types_bulk(
