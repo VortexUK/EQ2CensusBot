@@ -193,14 +193,23 @@ def _build_speed_board(kills: list[dict], *, size: str, zone: str, boss: str) ->
 
 
 def invalidate_zones_cache() -> None:
-    """Clear the _cached_zones_data lru_cache.
+    """Clear the _cached_zones_data lru_cache AND the parses
+    classifier's leaderboard map.
 
     Call this after any mutation to zones / zone_encounters /
     zone_encounter_mobs so the next /api/rankings/filters request rebuilds
-    the dropdown tree from disk. Without this the rankings dropdown shows
-    a stale view of the roster until the process restarts.
+    the dropdown tree from disk, and the next /api/parses request rebuilds
+    the classifier map (which is derived from the same trees). Without
+    this the rankings dropdown shows a stale view of the roster, and the
+    parses page misclassifies new/updated zones, until the process
+    restarts.
     """
     _cached_zones_data.cache_clear()
+    # Local import to avoid a circular dependency at module load time —
+    # parses.list already imports _cached_zones_data from this module.
+    from web.routes.parses.list import _classifier_cache_clear
+
+    _classifier_cache_clear()
 
 
 @lru_cache(maxsize=1)

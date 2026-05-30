@@ -11,9 +11,11 @@ import asyncio
 import sqlite3
 from collections.abc import Mapping
 from types import MappingProxyType
+from typing import Literal
 
 from fastapi import HTTPException, Request
 
+from census import zones_db
 from parses import db as parses_db
 from web import db as users_db
 from web.auth_deps import (
@@ -114,6 +116,87 @@ def _all_ally_names(conn: sqlite3.Connection, encounter_id: int) -> set[str]:
     ``_top_n_ally_names`` to evaluate the merger's mutual-containment rule
     (``top_N(A) ⊆ allies(B)`` and vice versa)."""
     return {row[0] for row in conn.execute(_ALL_ALLY_SQL, (encounter_id,))}
+
+
+# ── Zone classifier ──────────────────────────────────────────────────────
+# Bucket a parse's zone into Raid / Dungeon / Other for the ParsesPage
+# Guild → Category hierarchy. Mirror the rankings page's leaderboard
+# predicate exactly so the dropdown set and the classifier set are
+# guaranteed in lockstep: a zone counts iff (a) it has the right type AND
+# (b) ≥1 row in zone_encounters. _cached_zones_data already embeds (b) in
+# the trees it returns, so we just derive the lookup map from those.
+#
+# _cached_zones_data lives in rankings.py, which already imports from this
+# module (_PLAYER_COUNT_SQL, _group_into_fights). A top-level import here
+# would create a circular dependency at module load time. Instead we expose
+# a thin module-level wrapper that delegates on first call via a local
+# import — this lets tests patch 'web.routes.parses.list._cached_zones_data'
+# while keeping the load-time cycle broken.
+
+
+def _cached_zones_data() -> tuple[dict, list[dict], list[dict]]:
+    """Thin local wrapper around rankings._cached_zones_data.
+
+    Indirects through a local import to avoid the load-time circular
+    dependency (rankings → parses.list → rankings). Tests patch THIS name
+    in this module's namespace to inject fake zone trees."""
+    from web.routes.rankings import _cached_zones_data as _real  # noqa: PLC0415
+
+    return _real()
+
+
+_LEADERBOARD_MAP: dict[str, Literal["raid", "dungeon"]] | None = None
+
+
+def _classifier_cache_clear() -> None:
+    """Reset the lazily-built classifier map. Called from
+    rankings.invalidate_zones_cache so the eight admin curator hooks that
+    already invalidate the rankings cache also invalidate this one — no
+    need to retrofit every call site."""
+    global _LEADERBOARD_MAP
+    _LEADERBOARD_MAP = None
+
+
+def _build_leaderboard_map() -> dict[str, Literal["raid", "dungeon"]]:
+    """Materialise {zone_name_lower: category} from the cached zone trees.
+
+    Dungeons win ties with raids — neither test data nor real EQ2 data
+    should ever assign a single zone BOTH ``raid_x4`` AND ``dungeon``
+    types, but if a curator ever does, the rankings page would surface
+    it under both dropdowns. Picking "dungeon" here is arbitrary; flag
+    this in the audit if it happens in practice."""
+    _, raid_tree, dungeon_tree = _cached_zones_data()
+    out: dict[str, Literal["raid", "dungeon"]] = {entry["zone"].lower(): "raid" for entry in raid_tree}
+    for entry in dungeon_tree:
+        out[entry["zone"].lower()] = "dungeon"
+    return out
+
+
+def _classify_zone(zone: str | None) -> Literal["raid", "dungeon", "other"]:
+    """Bucket the parse's zone for the Guild → (Raid / Dungeon / Other)
+    hierarchy.
+
+    Lookup order:
+      1. Empty / None / '(unknown zone)' → 'other'.
+      2. Lowercase exact match in the cached leaderboard map.
+      3. Alias resolution via ``zones_db.find_by_name`` → retry exact
+         match on the canonical name.
+      4. Fall through → 'other'.
+    """
+    if not zone or zone == "(unknown zone)":
+        return "other"
+    global _LEADERBOARD_MAP
+    if _LEADERBOARD_MAP is None:
+        _LEADERBOARD_MAP = _build_leaderboard_map()
+    hit = _LEADERBOARD_MAP.get(zone.lower())
+    if hit is not None:
+        return hit
+    canonical = zones_db.find_by_name(zone)
+    if canonical:
+        hit = _LEADERBOARD_MAP.get(canonical["name"].lower())
+        if hit is not None:
+            return hit
+    return "other"
 
 
 def _list_encounters_sync(
