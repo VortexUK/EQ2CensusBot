@@ -18,6 +18,11 @@ export interface CombatantSummary {
   id: number
   name: string
   ally: boolean
+  // Pet-detection pipeline output (see parses/pet_detection.py on the
+  // backend). Authoritative player/pet signal — drives the Allies/Pets
+  // split below. Bucket-fill-promoted combatants render identically to
+  // Census-resolved players.
+  is_player: boolean
   // Identity frozen at ingest time. null for pets/NPCs, unresolved players,
   // and parses ingested before snapshots existed — we fall back to the live
   // /api/characters/lookup for those.
@@ -154,24 +159,14 @@ export default function ParsePage() {
   const { allies, pets, enemies } = useMemo(() => {
     if (!data) return { allies: [], pets: [], enemies: [] }
     const byEncdps = (a: CombatantSummary, b: CombatantSummary) => b.encdps - a.encdps
-    // Pet rule: ally + (multi-word/`Unknown` name OR Census lookup attempted
-    // and not found). Single-word allies start out under Allies and only
-    // migrate to Pets once we hear back from /api/characters/lookup, to
-    // avoid showing real players as pets while the lookup is in-flight.
-    const isPet = (c: CombatantSummary): boolean => {
-      if (!c.ally) return false
-      if (c.cls) return false // resolved a class at ingest → a real player, never a pet
-      if (!isLikelyPlayer(c)) return true
-      const entry = lookup[c.name]
-      return entry !== undefined && entry.found === false
-    }
+    const isPet = (c: CombatantSummary): boolean => c.ally && !c.is_player
     const allyCombatants = data.combatants.filter(c => c.ally)
     return {
       allies:  allyCombatants.filter(c => !isPet(c)).sort(byEncdps),
       pets:    allyCombatants.filter(isPet).sort(byEncdps),
       enemies: data.combatants.filter(c => !c.ally).sort(byEncdps),
     }
-  }, [data, lookup])
+  }, [data])
 
   if (loading) {
     return (

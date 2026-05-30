@@ -153,6 +153,12 @@ class CombatantSummary(BaseModel):
     id: int
     name: str
     ally: bool
+    # Pet-detection pipeline output (see parses/pet_detection.py).
+    # Authoritative player/pet signal — drives the frontend Allies/Pets
+    # split on the parse detail page. Bucket-fill-promoted combatants
+    # are visually identical to Census-resolved players (per the spec's
+    # "keep it clean" UX call).
+    is_player: bool
     # Identity frozen at ingest time (resolved from character_cache). NULL for
     # pets/NPCs, unresolved players, and parses ingested before this existed —
     # the frontend falls back to the live /api/characters/lookup for those.

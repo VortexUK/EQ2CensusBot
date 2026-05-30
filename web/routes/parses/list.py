@@ -399,6 +399,7 @@ def _encounter_detail_sync(encounter_id: int, top_attacks_per_combatant: int, wo
             c["top_threats"] = parses_db.get_top_threats_for_combatant(conn, c["id"], limit=top_attacks_per_combatant)
             c["damage_types"] = parses_db.get_damage_types_for_combatant(conn, c["id"])
             c["ally"] = bool(c["ally"])
+            c["is_player"] = bool(c.get("is_player"))
         enc["combatants"] = combatants
         return enc
     finally:
@@ -623,6 +624,7 @@ async def get_parse(
             id=c["id"],
             name=c["name"],
             ally=c["ally"],
+            is_player=c["is_player"],
             level=c.get("level"),
             guild_name=c.get("guild_name"),
             cls=c.get("cls"),
