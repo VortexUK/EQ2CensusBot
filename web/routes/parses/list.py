@@ -248,14 +248,25 @@ def _list_encounters_sync(
         conn.close()
 
 
-def _group_into_fights(encounters: list[dict]) -> list[dict]:
-    """Greedy mirror-grouping. Two uploads are the same fight when they come
-    from *different* uploaders, their guild + title match, and any pair of
-    start times falls within ``PARSE_MIRROR_WINDOW_S``. Same-uploader uploads are
-    never merged — one raider can't mirror their own fight, so two of their
-    uploads are two real fights. The canonical upload (carried as the top-level
-    fields on the returned dict) is the longest-duration upload in the
-    group — the raider whose ACT captured the most fight time.
+def _group_into_fights(encounters: list[dict], conn: sqlite3.Connection) -> list[dict]:
+    """Greedy mirror-grouping. Two uploads are the same fight when ALL of:
+      - they come from *different* uploaders,
+      - their guild + title match,
+      - any pair of start times falls within ``PARSE_MIRROR_WINDOW_S``, AND
+      - their top-N ally encDPS lists mutually contain each other
+        (each side's top-N appears somewhere in the other side's full
+        ally list). N = 3 if either upload is in the raid bucket
+        (``player_count >= 7``), else 2.
+
+    Same-uploader uploads are never merged — one raider can't mirror their
+    own fight, so two of their uploads are two real fights. The canonical
+    upload (carried as the top-level fields on the returned dict) is the
+    longest-duration upload in the group — the raider whose ACT captured
+    the most fight time.
+
+    The top-N gate (added 2026-05-30) catches the case of two of the same
+    guild's groups simultaneously doing the same boss — the older gates
+    alone would have merged them.
 
     Each returned group dict looks like::
 
@@ -264,8 +275,9 @@ def _group_into_fights(encounters: list[dict]) -> list[dict]:
             "uploads": [<every upload dict, including the canonical>],
         }
 
-    Stable behaviour: the previous client-side ``detectMirrors`` in
-    ParsesPage used the same rule; this is a faithful Python port."""
+    The ``conn`` argument lets the top-N gate query ``combatants`` rows
+    without re-opening the parses DB per pair. Caller is responsible for
+    the connection lifetime."""
     if not encounters:
         return []
     # Sort by started_at ASC so we attach in chronological order — late
@@ -290,6 +302,35 @@ def _group_into_fights(encounters: list[dict]) -> list[dict]:
             # Compare against every member so a late straggler still attaches
             # even if the first uploader's start time drifted out of window.
             if not any(abs(u["started_at"] - e["started_at"]) <= PARSE_MIRROR_WINDOW_S for u in g["uploads"]):
+                continue
+            # Top-N mutual containment: each upload's top-N ally encDPS
+            # combatants must appear *somewhere* in the other upload's
+            # ally list. Prevents two different groups doing the same
+            # boss within 60s of each other from merging into one fight
+            # when they share guild + title but have entirely different
+            # rosters.
+            #
+            # Compare new upload against the CANONICAL upload in the
+            # group. Group membership is overlap-transitive only THROUGH
+            # the canonical — every prior member overlapped with the
+            # then-canonical at the time of joining, not member-to-
+            # member. The canonical can also swap mid-group when a
+            # longer-duration upload joins, so the join criterion has a
+            # moving target. Both are acceptable for v1 — the
+            # pathological case (a new join overlaps the current
+            # canonical but would have failed against an earlier
+            # member's roster) is rare in practice.
+            # Missing-data default of 0 → N=2 (the weaker / more permissive
+            # gate). Never fires in practice — _list_encounters_sync's outer
+            # SELECT always projects player_count via _PLAYER_COUNT_SQL — but
+            # if it ever does, two empty top-N sets trivially merge by the
+            # set-containment rule below.
+            n = 3 if max(g.get("player_count", 0), e.get("player_count", 0)) >= 7 else 2
+            top_e = _top_n_ally_names(conn, e["id"], n)
+            all_e = _all_ally_names(conn, e["id"])
+            top_g = _top_n_ally_names(conn, g["id"], n)
+            all_g = _all_ally_names(conn, g["id"])
+            if not (top_e.issubset(all_g) and top_g.issubset(all_e)):
                 continue
             g["uploads"].append(e)
             # Promote to canonical if this upload captured a longer fight.
@@ -400,13 +441,33 @@ async def list_parses(
     # 24-mirror worst case, or 15000 unique fights at one-upload-per-fight.
     inner_cap = max(limit * PARSE_INNER_CAP_MULTIPLIER, PARSE_INNER_CAP_FLOOR)
 
-    encounters = await run_sync(_list_encounters_sync, inner_cap, zone, size, current_world())
+    def _list_and_group_sync() -> tuple[list[dict], list[dict], int]:
+        """Run the inner-list SQL, then group into fights.
 
-    # Group uploads into fights, then apply the user-facing limit to the
-    # FIGHT list. `total` reports total fights (pre-limit) so the UI can
-    # surface "showing X of Y" if it ever wants to.
-    fights = _group_into_fights(encounters)
-    total_fights = len(fights)
+        ``_list_encounters_sync`` opens its own connection for the row
+        SELECT and closes it. Afterwards this wrapper opens a SECOND
+        connection that the grouper uses for its per-pair top-N lookups
+        — keeping the two scopes independent means a test that mocks
+        only ``_list_encounters_sync`` still produces a fresh grouper
+        connection (and lets unit tests that fake the top-N helpers
+        skip the SQL path entirely). Wrapping both steps in one
+        ``run_sync`` keeps the route handler synchronous-DB-step-free.
+
+        Future micro-optimisation: thread a single conn through both
+        steps. Not done here — the connection cost in WAL mode is
+        sub-millisecond per open, and the API split keeps the test
+        seams clean."""
+        rows = _list_encounters_sync(inner_cap, zone, size, current_world())
+        if not rows:
+            return rows, [], 0
+        conn = parses_db.init_db(parses_db.DB_PATH)
+        try:
+            fights = _group_into_fights(rows, conn)
+        finally:
+            conn.close()
+        return rows, fights, len(fights)
+
+    encounters, fights, total_fights = await run_sync(_list_and_group_sync)
     fights = fights[:limit]
 
     # Permission compute needs the flat upload list (perms are per-upload,

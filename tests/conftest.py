@@ -85,6 +85,22 @@ def pytest_configure(config: pytest.Config) -> None:  # noqa: ARG001
     from parses import db as parses_db
     from web import db as users_db
 
+    # Force module-level DB_PATH constants to pick up the env vars set above.
+    # The constants are evaluated at module import time; if a pytest plugin
+    # imported these modules before pytest_configure ran (we saw it for
+    # parses_db: the merger started executing SQL against the developer's
+    # real data/parses/parses.db with real player names visible in debug
+    # output), the cached constants point at the wrong path. Re-evaluate
+    # via the modules' own _db_path() helpers.
+    #
+    # Same latent pattern exists for census_store / zones_db / spells_db /
+    # recipes_db / raids_db / classes_db / boss_index — extend this rebind
+    # list if a test ever needs them to honour an env-var override. Deferred
+    # from the 2026-05-30 parse-grouping-redo plan because Phase 4's tests
+    # don't exercise those paths.
+    parses_db.DB_PATH = parses_db._db_path()
+    users_db.DB_PATH = users_db._db_path()
+
     # Create both schemas immediately. FastAPI's startup hooks (which would
     # normally call init_db) don't fire under ASGITransport, so without this
     # step API-token / parses tests would hit a missing-table OperationalError

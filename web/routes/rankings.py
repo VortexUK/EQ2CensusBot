@@ -448,7 +448,7 @@ def _load_primary_boss_kills(world: str = "Varsoon") -> list[dict]:
             d["title"] = ctitle
             encs.append(d)
         kills: list[dict] = []
-        for g in _group_into_fights(encs):
+        for g in _group_into_fights(encs, conn):
             scope = _scope_for(g.get("player_count") or 0)
             if scope is None:
                 continue
