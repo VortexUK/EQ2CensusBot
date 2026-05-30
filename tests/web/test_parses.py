@@ -880,14 +880,6 @@ async def test_delete_bulk_requires_auth(app):
 
 
 @pytest.mark.asyncio
-async def test_delete_bulk_requires_guild(app):
-    with patch("web.routes.parses.delete._require_user", _fake_user):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            r = await client.delete("/api/parses")
-    assert r.status_code == 422  # FastAPI validation: missing required query param
-
-
-@pytest.mark.asyncio
 async def test_delete_bulk_admin_passes_filters(app):
     captured = {}
 

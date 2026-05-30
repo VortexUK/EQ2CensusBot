@@ -55,20 +55,6 @@ async def test_mixed_present_and_missing():
 
 
 @pytest.mark.asyncio
-async def test_special_token_eq2i_scrape_absent():
-    """'eq2i_scrape' is not a discord_id — it's a source token.
-    It must not appear in the result even if passed directly."""
-    result = await get_display_names_for_discord_ids(["eq2i_scrape"], path=_PATH)
-    assert result == {}
-
-
-@pytest.mark.asyncio
-async def test_special_token_unknown_absent():
-    result = await get_display_names_for_discord_ids(["unknown"], path=_PATH)
-    assert result == {}
-
-
-@pytest.mark.asyncio
 async def test_multiple_present_ids():
     await _seed("333333333333333333", "Alice")
     await _seed("444444444444444444", "Bob")

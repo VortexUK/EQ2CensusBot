@@ -4,10 +4,6 @@ Sub-modules:
   - views   — GET /character/{name}, _build_char_response, equipment helpers
   - spells  — GET /character/{name}/spells
   - upgrades — GET /character/{name}/upgrade-materials + /upgrade-recipes
-
-Shared:
-  - _shared._get_or_fetch_character — the cache-first + Census-fallback flow
-    that all three handlers share. Extracted to kill the BE-028 duplication.
 """
 
 from __future__ import annotations
