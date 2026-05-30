@@ -1,8 +1,10 @@
-"""Per-server item-watch isolation tests (Task 7).
+"""Per-server item-watch isolation tests — DB-helper layer (COV-005).
 
 Tests call DB helpers directly with explicit ``world`` args so they run
 without a live HTTP layer and stay fast.  The conftest plants a temp DB and
 calls init_db() for us.
+
+HTTP-layer tests live in test_item_watch_routes.py.
 
 Mirrors the convention in test_claim_per_server.py.
 """

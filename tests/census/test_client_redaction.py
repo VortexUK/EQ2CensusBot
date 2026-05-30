@@ -1,7 +1,7 @@
-"""Tests for census.client URL redaction + service-id scrubbing.
+"""Tests for census.client URL redaction + TraceConfig + session lifecycle.
 
-Phase 1 (P0) ships only the security-sensitive _redact_url tests. The
-broader census/client.py HTTP-layer coverage is Phase 3.1.
+Phase 1 shipped only _redact_url. Phase 3.5 extends to _build_trace_config
+(smoke test) and the _session_ lazy-creation + reopen-after-close lifecycle.
 
 Security contract: the SERVICE_ID segment of Census URLs (/s:<id>/) must
 never appear in log output at INFO or above. _redact_url is the single
@@ -11,7 +11,11 @@ reintroduce the leakage.
 
 from __future__ import annotations
 
-from census.client import _redact_url
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from census.client import CensusClient, _build_trace_config, _redact_url
 
 
 class TestRedactUrl:
@@ -55,3 +59,69 @@ class TestRedactUrl:
         url = "https://census.daybreakgames.com/s:key123/json/get/eq2/guild/?name=Exordium&world=Varsoon"
         result = _redact_url(url)
         assert result == "https://census.daybreakgames.com/s:REDACTED/json/get/eq2/guild/?name=Exordium&world=Varsoon"
+
+
+# ---------------------------------------------------------------------------
+# _build_trace_config (smoke test)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildTraceConfig:
+    def test_returns_trace_config_object(self):
+        """_build_trace_config returns an aiohttp.TraceConfig (smoke test)."""
+        import aiohttp
+
+        tc = _build_trace_config()
+        assert isinstance(tc, aiohttp.TraceConfig)
+
+    def test_trace_config_has_hooks_attached(self):
+        """The TraceConfig has at least one hook in the on_request_start/end/exception lists."""
+        tc = _build_trace_config()
+        # aiohttp TraceConfig stores hooks as Signal objects; check they're non-empty
+        assert len(tc.on_request_start) > 0  # type: ignore[arg-type]
+        assert len(tc.on_request_end) > 0  # type: ignore[arg-type]
+        assert len(tc.on_request_exception) > 0  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# CensusClient._session_ lifecycle
+# ---------------------------------------------------------------------------
+
+
+class TestSessionLifecycle:
+    @pytest.mark.asyncio
+    async def test_creates_session_on_first_call(self):
+        client = CensusClient(service_id="test")
+        assert client._session is None
+        session = client._session_()
+        assert session is not None
+        assert client._session is session
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_reuses_open_session(self):
+        client = CensusClient(service_id="test")
+        s1 = client._session_()
+        s2 = client._session_()
+        assert s1 is s2
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_reopens_session_after_close(self):
+        """After close(), _session_ creates a fresh ClientSession."""
+        client = CensusClient(service_id="test")
+        s1 = client._session_()
+        await client.close()
+        assert client._session.closed  # type: ignore[union-attr]
+        s2 = client._session_()
+        assert s2 is not s1
+        assert not s2.closed
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_close_is_idempotent(self):
+        """Calling close() twice should not raise."""
+        client = CensusClient(service_id="test")
+        client._session_()
+        await client.close()
+        await client.close()  # second call — should not raise
