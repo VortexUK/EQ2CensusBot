@@ -30,6 +30,7 @@ from parses.models import (
     _to_str_or_none,
     _to_ts,
 )
+from parses.pet_detection import classify_combatants
 from web.auth_deps import require_user_session_or_token
 from web.cache import character_cache
 from web.config import ALLOWED_SERVERS as _ALLOWED_SERVERS
@@ -41,6 +42,7 @@ from web.lib.validation import sanitize_world as _sanitize_world
 from web.lib.validation import validate_character_name as _validate_character_name
 from web.limiter import limiter
 from web.routes.parses import router
+from web.routes.parses.list import _classify_zone
 from web.routes.parses.models import (
     IngestAttackType,
     IngestCombatant,
@@ -245,6 +247,20 @@ def _update_snapshots_sync(encounter_id: int, snapshots: dict[str, CombatantSnap
     conn = parses_db.init_db(parses_db.DB_PATH)
     try:
         parses_db.update_combatant_snapshots(conn, encounter_id, snapshots)
+        # Phase 3 (pet detection): re-classify because cls just changed. The
+        # classifier is stage-5-driven by cls, so a fresh resolution can flip
+        # an unconfirmed ally to player (or unblock a higher-rank slot in the
+        # bucket-fill pool for a different unconfirmed contributor).
+        rows = parses_db.get_combatants_for_encounter(conn, encounter_id)
+        enc = conn.execute(
+            "SELECT zone FROM encounters WHERE id = ?",
+            (encounter_id,),
+        ).fetchone()
+        zone = enc[0] if enc else None
+        zone_category = _classify_zone(zone)
+        classification = classify_combatants(rows, zone_category)
+        parses_db.update_combatant_is_player(conn, classification)
+        conn.commit()
     finally:
         conn.close()
 
@@ -515,6 +531,15 @@ def _insert_encounter_rows_sync(
             ingested_at=ingested_at,
             world=world,
         )
+        # Phase 3 (pet detection): classify ally combatants now that the
+        # cache-warm snapshot fast-path has populated cls for whatever was
+        # already in character_cache. Any cls that fills in later via the
+        # background snapshot resolution triggers a re-classify in
+        # _update_snapshots_sync.
+        rows = parses_db.get_combatants_for_encounter(conn, encounter_id)
+        zone_category = _classify_zone(enc.zone)
+        classification = classify_combatants(rows, zone_category)
+        parses_db.update_combatant_is_player(conn, classification)
     return encounter_id, n_dt, n_at
 
 
