@@ -370,6 +370,17 @@ def upsert_raid_zone(
         conn.commit()
         return int(existing[0])
 
+    # COALESCE on every nullable column so a caller that passes a column as
+    # None means "don't touch", not "clobber to NULL". The historical default
+    # (excluded.col) clobbered existing data — e.g. _write_strategy_sync calls
+    # upsert_raid_zone(... source=MANUAL) to auto-create the zone parent when
+    # a curator edits a boss strategy, passing overview_md=None (default).
+    # On ON CONFLICT that nulled the curator's existing overview_md. Reported
+    # by user "I am STILL losing raid zone overviews" — every encounter-
+    # strategy edit silently wiped the zone overview.
+    # If a caller genuinely wants to clear a column, they should use a
+    # targeted UPDATE (see _update_overview_sync) — that's the right code
+    # path for destructive writes.
     conn.execute(
         """
         INSERT INTO raid_zones (
@@ -380,17 +391,17 @@ def upsert_raid_zone(
             source, last_synced_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(zone_name) DO UPDATE SET
-            expansion_short = excluded.expansion_short,
-            wiki_url        = excluded.wiki_url,
-            access_md       = excluded.access_md,
-            background_md   = excluded.background_md,
-            overview_md     = excluded.overview_md,
-            level_range     = excluded.level_range,
-            zdiff           = excluded.zdiff,
-            lockout_min     = excluded.lockout_min,
-            lockout_max     = excluded.lockout_max,
+            expansion_short = COALESCE(excluded.expansion_short, raid_zones.expansion_short),
+            wiki_url        = COALESCE(excluded.wiki_url,        raid_zones.wiki_url),
+            access_md       = COALESCE(excluded.access_md,       raid_zones.access_md),
+            background_md   = COALESCE(excluded.background_md,   raid_zones.background_md),
+            overview_md     = COALESCE(excluded.overview_md,     raid_zones.overview_md),
+            level_range     = COALESCE(excluded.level_range,     raid_zones.level_range),
+            zdiff           = COALESCE(excluded.zdiff,           raid_zones.zdiff),
+            lockout_min     = COALESCE(excluded.lockout_min,     raid_zones.lockout_min),
+            lockout_max     = COALESCE(excluded.lockout_max,     raid_zones.lockout_max),
             source          = excluded.source,
-            last_synced_at  = COALESCE(excluded.last_synced_at, raid_zones.last_synced_at)
+            last_synced_at  = COALESCE(excluded.last_synced_at,  raid_zones.last_synced_at)
         """,
         (
             zone_name,
