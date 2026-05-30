@@ -14,28 +14,7 @@ import { useRaidProgress, type KilledEncounter } from '../hooks/useRaidProgress'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface EncounterMob { id: number; mob_name: string; position: number }
-interface Encounter {
-  id: number
-  encounter_name: string
-  position: number
-  stage: string | null
-  wiki_url: string | null
-  mobs: EncounterMob[]
-}
-interface Zone {
-  name: string
-  expansion_short: string
-  expansion_name: string
-  expansion_year: number | null
-  types: string[]
-  aliases: string[]
-  wiki_url: string | null
-  is_contested: boolean
-  is_instance: boolean
-  is_openworld: boolean
-  bosses: Encounter[]
-}
+import type { Encounter, Zone } from './raids/types'
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 //

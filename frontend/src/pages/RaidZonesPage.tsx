@@ -7,38 +7,16 @@ import { fmtRelative } from '../formatters'
 import { useFetch } from '../hooks/useFetch'
 import { useRaidProgress, type KilledEncounter } from '../hooks/useRaidProgress'
 import { useServer } from '../hooks/useServer'
+import type { Zone, ZoneListResponse } from './raids/types'
 
 // Data fetch uses useFetch (hooks/useFetch.ts) — canonical pattern.
 // See P0-13 in docs/superpowers/specs/2026-05-29-frontend-cleanliness-audit.md.
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface EncounterMob { mob_name: string; position: number }
-interface Encounter {
-  encounter_name: string
-  position: number
-  stage: string | null
-  wiki_url: string | null
-  mobs: EncounterMob[]
-}
-interface Zone {
-  name: string
-  expansion_short: string
-  expansion_name: string
-  expansion_year: number | null
-  types: string[]
-  aliases: string[]
-  wiki_url: string | null
-  is_contested: boolean
-  is_instance: boolean
-  is_openworld: boolean
-  bosses: Encounter[]
-}
-interface ZoneListResponse {
-  expansion: string | null
-  type: string | null
-  zones: Zone[]
-}
+// Shared with RaidZonePage. The API returns ``id`` on every encounter / mob
+// row; this index page just doesn't read it (the detail page does, for FK
+// references in the boss-roster editor). Keeping a single source of truth
+// matches what /api/zones actually emits and stops the two pages drifting.
 
 // ── Expansion catalogue ───────────────────────────────────────────────────────
 // Ordered newest-first so the most relevant raid content surfaces at the top of
