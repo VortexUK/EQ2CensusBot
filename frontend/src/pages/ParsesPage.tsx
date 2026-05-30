@@ -4,7 +4,8 @@ import { useFetch } from '../hooks/useFetch'
 import { useSearchParams, Link } from 'react-router-dom'
 
 import Caret from '../components/Caret'
-import { Card } from '../components/ui'
+import { Card, SectionLabel } from '../components/ui'
+import { Badge } from '../components/ui/Badge'
 import { FilterPill } from '../components/FilterPill'
 import { UploaderTag } from '../components/UploaderTag'
 import { fmtDuration, fmtLocalDate, fmtLocalTime, fmtNum } from '../formatters'
@@ -43,6 +44,10 @@ interface ParseEncounterSummary {
   success_level: number      // ACT enum: 0=unknown, 1=win, 2=loss, 3=mixed
   combatant_count: number
   player_count: number
+  // Backend-computed Raid / Dungeon / Other bucket (see
+  // web/routes/parses/list.py:_classify_zone). Drives the Guild → Category
+  // hierarchy on this page.
+  category: 'raid' | 'dungeon' | 'other'
   uploaded_by: string                       // canonical upload's character name
   uploader_discord_id: string | null        // canonical upload's Discord ID
   uploader_display_name: string | null      // canonical upload's Discord display name
@@ -73,14 +78,11 @@ const SIZE_OPTIONS: { value: SizeFilter; label: string; range: string }[] = [
 const NO_GUILD = 'No Guild'
 const PARSES_FETCH_LIMIT = 500
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Visible joiner (used in display) + internal joiner (used in Map keys).
+const KEY_SEP = String.fromCharCode(31)   // ASCII Unit Separator — never appears in zone names / dates
+const DISPLAY_SEP = ' · '                  // " · "
 
-function sizeLabel(playerCount: number): string {
-  if (playerCount >= 13) return 'Raid (24)'
-  if (playerCount >= 7)  return 'Raid (12)'
-  if (playerCount >= 2)  return 'Group'
-  return 'Individual'
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 // EQ2 mob naming convention: trash is "a krait warrior" / "an ancient guard"
 // (article + lowercase noun), bosses have a proper capitalised name
@@ -91,80 +93,94 @@ function isBoss(title: string): boolean {
 }
 
 // ── Grouped structure ─────────────────────────────────────────────────────────
-// Guild → (LocalDate + Zone) → ParseEncounterSummary[]   (each = one fight)
+// Guild → Category (Raid / Dungeon / Other) → ParseEncounterSummary[]
 //
 // Mirror grouping (collapsing multiple raider uploads of the same fight)
-// happens server-side now (B2.15e). Each ParseEncounterSummary IS a fight,
-// with the canonical upload's fields at the top level and every raider's
-// view in `.uploads`. The frontend just buckets fights by guild + zone-day.
+// happens server-side. Each ParseEncounterSummary IS a fight, with the
+// canonical upload's fields at the top level. The frontend buckets fights
+// by guild then by the backend-computed category.
 
-interface ZoneBucket {
-  key: string                          // "2026-05-24 · Great Divide"
-  date: string                         // "2026-05-24"
-  zone: string                         // "Great Divide"
-  fights: ParseEncounterSummary[]
+type Category = 'raid' | 'dungeon' | 'other'
+
+interface ZoneDayBucket {
+  key: string                          // "2026-05-24 · Castle Mistmoore"
+  date: string                         // local YYYY-MM-DD
+  zone: string                         // "Castle Mistmoore" or "(unknown zone)"
+  fights: ParseEncounterSummary[]      // sorted started_at desc within the bucket
 }
 
 interface GuildBucket {
-  guild: string                        // "Exordium" or "No Guild"
-  zoneBuckets: ZoneBucket[]
+  guild: string                                // "Exordium" or NO_GUILD
+  fightsByCategory: Record<Category, ZoneDayBucket[]>  // each category's zone-day buckets, newest bucket first
+  totalFights: number
 }
 
-// Visible joiner (used in display) + internal joiner (used in Map keys).
-const KEY_SEP = String.fromCharCode(31)   // ASCII Unit Separator — never appears in zone names / dates
-const DISPLAY_SEP = ' · '   // " · "
-
 function groupEncounters(fights: ParseEncounterSummary[]): GuildBucket[] {
-  const byGuild = new Map<string, Map<string, ParseEncounterSummary[]>>()
+  // First pass: bucket by guild → category → (date · zone).
+  // byGuild[guild][category] is a Map<zoneKey, fights[]> so we can
+  // accumulate without intermediate object spreads.
+  const byGuild = new Map<
+    string,
+    Record<Category, Map<string, ParseEncounterSummary[]>>
+  >()
 
   for (const e of fights) {
-    // Guild attribution stamped at ingest time from the uploader's Census
-    // guild. NULL means the row pre-dates the column or the uploader's guild
-    // couldn't be resolved.
     const guild = e.guild_name || NO_GUILD
+    let cats = byGuild.get(guild)
+    if (!cats) {
+      cats = { raid: new Map(), dungeon: new Map(), other: new Map() }
+      byGuild.set(guild, cats)
+    }
     const date = fmtLocalDate(e.started_at)
     const zone = e.zone || '(unknown zone)'
     const zoneKey = [date, zone].join(KEY_SEP)
-
-    let guildMap = byGuild.get(guild)
-    if (!guildMap) {
-      guildMap = new Map()
-      byGuild.set(guild, guildMap)
-    }
-    let zoneFights = guildMap.get(zoneKey)
+    let zoneFights = cats[e.category].get(zoneKey)
     if (!zoneFights) {
       zoneFights = []
-      guildMap.set(zoneKey, zoneFights)
+      cats[e.category].set(zoneKey, zoneFights)
     }
     zoneFights.push(e)
   }
 
-  // Build result with zones sorted by their newest fight (desc) within each guild.
+  // Second pass: materialise the ZoneDayBucket arrays, sort within and
+  // between buckets.
   const result: GuildBucket[] = []
-  for (const [guild, zoneMap] of byGuild) {
-    const zoneBuckets: ZoneBucket[] = []
-    for (const [key, fightsInZone] of zoneMap) {
-      const [date, zone] = key.split(KEY_SEP)
-      // Server returns fights newest-first overall; re-sort within the
-      // bucket too so the most recent fight shows on top.
-      fightsInZone.sort((a, b) => b.started_at - a.started_at)
-      zoneBuckets.push({
-        key: `${date}${DISPLAY_SEP}${zone}`,
-        date, zone,
-        fights: fightsInZone,
-      })
+  for (const [guild, cats] of byGuild) {
+    const byCategory: Record<Category, ZoneDayBucket[]> = {
+      raid: [],
+      dungeon: [],
+      other: [],
     }
-    zoneBuckets.sort((a, b) => {
-      const ax = a.fights[0]?.started_at ?? 0
-      const bx = b.fights[0]?.started_at ?? 0
-      return bx - ax
-    })
-    result.push({ guild, zoneBuckets })
+    let total = 0
+    for (const k of ['raid', 'dungeon', 'other'] as const) {
+      const buckets: ZoneDayBucket[] = []
+      for (const [key, fightsInBucket] of cats[k]) {
+        // Server returns fights newest-first overall; re-sort within the
+        // bucket so the most recent fight shows on top.
+        fightsInBucket.sort((a, b) => b.started_at - a.started_at)
+        const [date, zone] = key.split(KEY_SEP)
+        buckets.push({
+          key: `${date}${DISPLAY_SEP}${zone}`,
+          date,
+          zone,
+          fights: fightsInBucket,
+        })
+      }
+      // Buckets sorted by their newest fight (desc) so the most recent
+      // raid night appears first under each category.
+      buckets.sort((a, b) => (b.fights[0]?.started_at ?? 0) - (a.fights[0]?.started_at ?? 0))
+      byCategory[k] = buckets
+      total += buckets.reduce((acc, b) => acc + b.fights.length, 0)
+    }
+    result.push({ guild, fightsByCategory: byCategory, totalFights: total })
   }
-  // Sort guilds: "No Guild" last, others alphabetical.
+
+  // Sort guilds: NO_GUILD always last; everyone else by total fight count
+  // desc (most-active guild first), with name ASC as tiebreaker.
   result.sort((a, b) => {
     if (a.guild === NO_GUILD) return 1
     if (b.guild === NO_GUILD) return -1
+    if (b.totalFights !== a.totalFights) return b.totalFights - a.totalFights
     return a.guild.localeCompare(b.guild)
   })
   return result
@@ -193,7 +209,7 @@ export default function ParsesPage() {
 
   // Local copy for optimistic deletions — seeded from fetchedData on each
   // successful fetch, then mutated locally so deletes don't trigger a full
-  // reload (which would unmount GuildSection / ZoneSection, losing open state).
+  // reload (which would unmount GuildSection / CategorySection, losing open state).
   const [localData, setLocalData] = useState<ParsesListResponse | null>(null)
   useEffect(() => {
     if (fetchedData !== null) setLocalData(fetchedData)
@@ -210,7 +226,7 @@ export default function ParsesPage() {
 
   // Optimistic local removal after a successful delete — avoids a full
   // refetch (which would briefly toggle `loading` and unmount every
-  // GuildSection / ZoneSection, losing their open/closed state).
+  // GuildSection / CategorySection, losing their open/closed state).
   const removeEncounters = useCallback((pred: (e: ParseEncounterSummary) => boolean) => {
     setLocalData(prev => {
       if (!prev) return prev
@@ -310,46 +326,49 @@ async function deleteBatch(ids: number[]): Promise<number> {
 
 async function deleteByFilter(params: {
   guild: string
-  zone?: string
-  date?: string
-  uploader?: string
 }): Promise<number> {
   const url = new URL('/api/parses', window.location.origin)
   url.searchParams.set('guild', params.guild)
-  if (params.zone) url.searchParams.set('zone', params.zone)
-  if (params.date) url.searchParams.set('date', params.date)
-  if (params.uploader) url.searchParams.set('uploader', params.uploader)
   const r = await fetch(url.toString(), { method: 'DELETE', credentials: 'include' })
   if (!r.ok) throw new Error(`Bulk delete failed: ${r.status}`)
   const j = await r.json()
   return j.deleted ?? 0
 }
 
-// ── Guild / Zone / Encounter rendering ────────────────────────────────────────
+// ── Guild / Category / Fight rendering ────────────────────────────────────────
 
-function GuildSection({
-  bucket, defaultExpanded, onDeleted,
-}: {
+interface GuildSectionProps {
   bucket: GuildBucket
   defaultExpanded: boolean
   onDeleted: (pred: (e: ParseEncounterSummary) => boolean) => void
-}) {
+}
+
+// One section per guild. Renders three CategorySection children (Raid /
+// Dungeon / Other), each independently collapsible. Empty categories
+// render nothing.
+function GuildSection({ bucket, defaultExpanded, onDeleted }: GuildSectionProps) {
   const [open, setOpen] = useState(defaultExpanded)
-  const totalEncs = bucket.zoneBuckets.reduce(
-    (s, z) => s + z.fights.reduce((n, f) => n + f.uploads.length, 0),
+  const totalUploads = (['raid', 'dungeon', 'other'] as const).reduce(
+    (s, k) => s + bucket.fightsByCategory[k].reduce(
+      (n, zd) => n + zd.fights.reduce((m, f) => m + f.uploads.length, 0),
+      0,
+    ),
     0,
   )
-  const totalFights = bucket.zoneBuckets.reduce((s, z) => s + z.fights.length, 0)
   // Officers / admins can wipe the whole guild only when they have delete
   // perms on every visible row for it (admins always do; officers only
   // within their own guild).
   const canDeleteGuild =
     bucket.guild !== NO_GUILD
-    && bucket.zoneBuckets.every(z => z.fights.every(f => f.uploads.every(u => u.permissions.can_delete)))
+    && (['raid', 'dungeon', 'other'] as const).every(k =>
+      bucket.fightsByCategory[k].every(zd =>
+        zd.fights.every(f => f.uploads.every(u => u.permissions.can_delete)),
+      ),
+    )
 
   async function handleDeleteGuild(e: React.MouseEvent) {
     e.stopPropagation()
-    if (!confirm(`Delete all ${totalEncs} encounter${totalEncs === 1 ? '' : 's'} for ${bucket.guild}? This cannot be undone.`)) return
+    if (!confirm(`Delete all ${totalUploads} encounter${totalUploads === 1 ? '' : 's'} for ${bucket.guild}? This cannot be undone.`)) return
     try {
       await deleteByFilter({ guild: bucket.guild })
       onDeleted(enc => (enc.guild_name || NO_GUILD) === bucket.guild)
@@ -361,13 +380,18 @@ function GuildSection({
   return (
     <Card className="p-0">
       <div className="flex items-center">
-        <button onClick={() => setOpen(v => !v)} className={headerBtnCls}>
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          aria-expanded={open}
+          className={headerBtnCls}
+        >
           <Caret open={open} />
-          <span className="font-heading text-[0.98rem] text-gold">
+          <h2 className="font-heading text-[0.98rem] text-gold m-0">
             {bucket.guild}
-          </span>
+          </h2>
           <span className="text-text-muted text-[0.78rem] ml-auto">
-            {bucket.zoneBuckets.length} zone-{bucket.zoneBuckets.length === 1 ? 'day' : 'days'} · {totalFights} fight{totalFights !== 1 ? 's' : ''}{totalEncs !== totalFights ? ` (${totalEncs} uploads)` : ''}
+            {bucket.totalFights} fight{bucket.totalFights === 1 ? '' : 's'}{totalUploads !== bucket.totalFights ? ` (${totalUploads} uploads)` : ''}
           </span>
         </button>
         {canDeleteGuild && (
@@ -375,108 +399,144 @@ function GuildSection({
         )}
       </div>
       {open && (
-        <div className="flex flex-col gap-1.5 px-2 pb-2.5">
-          {bucket.zoneBuckets.map(z => (
-            <ZoneSection
-              key={z.key}
-              guild={bucket.guild}
-              bucket={z}
-              defaultExpanded={bucket.zoneBuckets.length === 1}
-              onDeleted={onDeleted}
-            />
-          ))}
+        <div className="flex flex-col gap-2 px-2 pb-2.5">
+          <CategorySection
+            label="Raid"
+            buckets={bucket.fightsByCategory.raid}
+            defaultOpen
+            guild={bucket.guild}
+            onDeleted={onDeleted}
+          />
+          <CategorySection
+            label="Dungeon"
+            buckets={bucket.fightsByCategory.dungeon}
+            defaultOpen
+            guild={bucket.guild}
+            onDeleted={onDeleted}
+          />
+          <CategorySection
+            label="Other"
+            buckets={bucket.fightsByCategory.other}
+            defaultOpen={false}
+            guild={bucket.guild}
+            onDeleted={onDeleted}
+          />
         </div>
       )}
     </Card>
   )
 }
 
-function ZoneSection({
-  guild, bucket, defaultExpanded, onDeleted,
-}: {
+// One subsection per category under a guild. Renders nothing when there are
+// no fights — guild headers stay clean.
+interface CategorySectionProps {
+  label: 'Raid' | 'Dungeon' | 'Other'
+  buckets: ZoneDayBucket[]
+  defaultOpen: boolean
   guild: string
-  bucket: ZoneBucket
-  defaultExpanded: boolean
   onDeleted: (pred: (e: ParseEncounterSummary) => boolean) => void
-}) {
-  const [open, setOpen] = useState(defaultExpanded)
-  const totalUploads = bucket.fights.reduce((n, f) => n + f.uploads.length, 0)
-  const allUploads = bucket.fights.flatMap(f => f.uploads)
-  const canDeleteBucket =
-    guild !== NO_GUILD
-    && allUploads.every(u => u.permissions.can_delete)
+}
 
-  async function handleDeleteBucket(e: React.MouseEvent) {
-    e.stopPropagation()
-    const fightCount = bucket.fights.length
-    if (!confirm(`Delete ${totalUploads} encounter${totalUploads === 1 ? '' : 's'} (${fightCount} fight${fightCount === 1 ? '' : 's'}, across all uploaders) for ${guild} · ${bucket.zone} · ${bucket.date}? This cannot be undone.`)) return
-    try {
-      // No uploader filter now — bucket spans every uploader in this zone-day.
-      await deleteByFilter({ guild, zone: bucket.zone, date: bucket.date })
-      const ids = new Set(allUploads.map(u => u.id))
-      onDeleted(enc => ids.has(enc.id))
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Delete failed')
-    }
-  }
-
+function CategorySection({ label, buckets, defaultOpen, guild, onDeleted }: CategorySectionProps) {
+  const [open, setOpen] = useState(defaultOpen)
+  if (buckets.length === 0) return null
+  const totalFights = buckets.reduce((acc, b) => acc + b.fights.length, 0)
   return (
-    <div className="border border-border rounded-sm2" style={{ background: 'rgba(0,0,0,0.15)' }}>
-      <div className="flex items-center">
-        <button onClick={() => setOpen(v => !v)} className={`${headerBtnCls} py-1.5 px-2.5`}>
-          <Caret open={open} />
-          <span className="text-[0.88rem] text-text">
-            <span className="text-text-muted mr-2">{bucket.date}</span>
-            {bucket.zone}
-          </span>
-          <span className="text-text-muted text-[0.76rem] ml-auto">
-            {bucket.fights.length} fight{bucket.fights.length !== 1 ? 's' : ''}{totalUploads !== bucket.fights.length ? ` (${totalUploads} uploads)` : ''}
-          </span>
-        </button>
-        {canDeleteBucket && (
-          <TrashButton onClick={handleDeleteBucket} title="Delete this zone-day bucket" />
-        )}
-      </div>
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        aria-label={`${label} · ${totalFights} fight${totalFights === 1 ? '' : 's'}`}
+        className="appearance-none border-0 bg-transparent p-0 flex items-baseline gap-2 cursor-pointer text-left"
+      >
+        <Caret open={open} />
+        <SectionLabel variant="gold" className="mb-0">{label}</SectionLabel>
+        <span className="text-text-muted text-[0.72rem] tabular-nums">
+          · {totalFights}
+        </span>
+      </button>
       {open && (
-        <div className="px-1.5 pb-1.5">
-          <EncounterTable fights={bucket.fights} onDeleted={onDeleted} />
+        <div className="flex flex-col gap-1 pl-4">
+          {buckets.map(b => (
+            <ZoneDaySection
+              key={b.key}
+              bucket={b}
+              guild={guild}
+              onDeleted={onDeleted}
+            />
+          ))}
         </div>
       )}
     </div>
   )
 }
 
-function EncounterTable({
-  fights, onDeleted,
-}: {
-  fights: ParseEncounterSummary[]
+interface ZoneDaySectionProps {
+  bucket: ZoneDayBucket
+  guild: string
   onDeleted: (pred: (e: ParseEncounterSummary) => boolean) => void
-}) {
+}
+
+function ZoneDaySection({ bucket, guild, onDeleted }: ZoneDaySectionProps) {
+  // Default-open so a fresh load shows the most recent raid night's
+  // fights without an extra click. Same component-local state pattern
+  // as CategorySection — refreshing the page resets to default.
+  const [open, setOpen] = useState(true)
+  // Reference `guild` so the unused-var lint passes — kept on the props
+  // so a future "delete this zone-day" button has the guild context it
+  // would need without needing to drill through CategorySection again.
+  void guild
   return (
-    <div
-      className="grid items-center gap-x-2 gap-y-0.5 text-[0.82rem]"
-      style={{ gridTemplateColumns: '1fr 70px 70px 110px 90px 90px 28px' }}
-    >
-      <div className={HDR_CELL_CLS}>Encounter</div>
-      <div className={`${HDR_CELL_CLS} text-right`}>Time</div>
-      <div className={`${HDR_CELL_CLS} text-right`}>Dur</div>
-      <div className={`${HDR_CELL_CLS} text-right`}>Damage</div>
-      <div className={`${HDR_CELL_CLS} text-right`}>DPS</div>
-      <div className={`${HDR_CELL_CLS} text-right`}>Players</div>
-      <div className={HDR_CELL_CLS} />
-      {fights.map(f => (
-        <MirrorRowGroup key={f.id} fight={f} onDeleted={onDeleted} />
-      ))}
+    <div className="flex flex-col gap-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        aria-label={`${bucket.key} · ${bucket.fights.length} fight${bucket.fights.length === 1 ? '' : 's'}`}
+        className="appearance-none border-0 bg-transparent p-0 flex items-baseline gap-2 cursor-pointer text-left"
+      >
+        <Caret open={open} />
+        <span className="text-text text-[0.85rem]">{bucket.key}</span>
+        <span className="text-text-muted text-[0.7rem] tabular-nums">
+          · {bucket.fights.length}
+        </span>
+      </button>
+      {open && (
+        <div
+          className="grid items-center gap-x-2 gap-y-0.5 text-[0.82rem] pl-4"
+          style={{ gridTemplateColumns: '1fr 70px 70px 110px 90px 60px 130px 28px' }}
+        >
+          <div className={HDR_CELL_CLS}>Encounter</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>Time</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>Dur</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>Damage</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>DPS</div>
+          <div className={`${HDR_CELL_CLS} text-right`}>Size</div>
+          <div className={HDR_CELL_CLS}>Uploader</div>
+          <div className={HDR_CELL_CLS} />
+          {bucket.fights.map(f => (
+            <FightRow
+              key={f.id}
+              fight={f}
+              onDeleted={onDeleted}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-function MirrorRowGroup({
-  fight, onDeleted,
-}: {
+interface FightRowProps {
   fight: ParseEncounterSummary
   onDeleted: (pred: (e: ParseEncounterSummary) => boolean) => void
-}) {
+}
+
+// One row per fight inside a CategorySection's grid. For multi-uploader
+// fights (uploads.length > 1) the title becomes a toggle that expands a
+// nested per-uploader list; otherwise it's a direct link to the parse view.
+function FightRow({ fight, onDeleted }: FightRowProps) {
   const e = fight  // top-level fields are the canonical upload's
   const isMirror = fight.uploads.length > 1
   const [expanded, setExpanded] = useState(false)
@@ -572,8 +632,20 @@ function MirrorRowGroup({
       <div className="text-right text-text-muted" style={cellBase}>{fmtDuration(e.duration_s)}</div>
       <div className="text-right" style={cellBase}>{fmtNum(e.total_damage)}</div>
       <div className="text-right text-gold" style={cellBase}>{fmtNum(Math.round(e.encdps))}</div>
-      <div className="text-right text-text-muted" style={cellBase}>
-        {e.player_count} <span className="opacity-55 text-[0.7rem]">({sizeLabel(e.player_count)})</span>
+      <div className="text-right" style={cellBase}>
+        <Badge variant="muted">{e.player_count}p</Badge>
+      </div>
+      <div className="text-text-muted truncate" style={cellBase}>
+        <UploaderTag
+          characterName={e.uploaded_by}
+          discordId={e.uploader_discord_id}
+          displayName={e.uploader_display_name}
+        />
+        {isMirror && (
+          <span className="ml-1 text-[0.7rem] text-text-muted">
+            +{fight.uploads.length - 1}
+          </span>
+        )}
       </div>
       <div className="text-center" style={cellBase}>
         {!isMirror && e.permissions.can_delete && (
@@ -668,5 +740,3 @@ function TrashButton({ onClick, title, small = false }: {
 const headerBtnCls = 'flex items-center gap-2 w-full bg-transparent border-none text-inherit cursor-pointer py-2 px-3 text-left font-inherit'
 
 const HDR_CELL_CLS = 'text-text-muted text-[0.7rem] uppercase tracking-[0.06em] py-1 border-b border-border mb-1'
-
-
